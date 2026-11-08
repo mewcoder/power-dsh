@@ -23,13 +23,13 @@ GitHub 仓库为 `mewcoder/power-dsh`，origin 已核对为新地址。首次源
 
 ## 插件卡片的名称与描述
 
-[包清单](../package.json)的 `name` 是技术包名 `power-dsh`，`description` 是通用简介；[中文元数据](../locale/zh.json)与[英文元数据](../locale/en.json)的 `meta.title`、`meta.description` 是本地化名称和简介。插件显示名、Client 设置入口与页面标题中英文均为 **PowerDSH**；设置说明使用对应的双语主简介。改名或改简介时按各自用途一起核对。
+[包清单](../package.json)的 `name` 是技术包名 `power-dsh`，`description` 是通用简介；[中文元数据](../locale/zh.json)与[英文元数据](../locale/en.json)的 `meta.title`、`meta.description` 是本地化名称和简介。插件显示名、Client 设置入口与页面标题中英文均为 **PowerDSH**；设置页说明独立精简为「DSH 增强插件」／`A DSH enhancement plugin`。改名或改简介时按各自用途一起核对。
 
 用户提供的市场「已安装」截图中，本地开发卡片显示技术包名、版本和路径，没有显示简介；因此调整本项目元数据后仍需在目标市场页面实际核对展示。公开市场的发现卡片还会使用目录条目的描述，目录描述可以比设置页简介更具体。
 
 ## GitHub 简介、标签与发现入口
 
-GitHub About、包清单、双语元数据与 Client 说明统一使用已确认的简介：中文「DSH 增强插件。优雅克制，专注实效。让你的 DSH 更顺手、更高效。」；英文「A DeepSeek Harness (DSH) enhancement plugin. Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.」。README 首屏独立使用引用块：中文「优雅克制，专注实效。让你的 DSH 更顺手、更高效。」加粗，英文「Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.」斜体。项目介绍明确 DSH 插件与独立社区维护身份。具体功能和变化随版本写入更新日志与 Release，主简介保持简短。GitHub topics 与包清单 keywords 仍准确反映宿主与现有功能：
+GitHub About、包清单和双语元数据使用已确认的完整简介，设置页只用上文的短说明。完整简介为：中文「DSH 增强插件。优雅克制，专注实效。让你的 DSH 更顺手、更高效。」；英文「A DeepSeek Harness (DSH) enhancement plugin. Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.」。README 首屏独立使用引用块：中文「优雅克制，专注实效。让你的 DSH 更顺手、更高效。」加粗，英文「Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.」斜体。项目介绍明确 DSH 插件与独立社区维护身份。具体功能和变化随版本写入更新日志与 Release，主简介保持简短。GitHub topics 与包清单 keywords 仍准确反映宿主与现有功能：
 
 ```text
 dsh-plugin, deepseek-harness, deepseek, dsh, mcp, notifications, skill-management, customization
@@ -41,7 +41,7 @@ README 面向使用者，标题固定为 `# power-dsh`，首屏使用已确认�
 
 ## 选择分发方式
 
-建议首版使用公开 GitHub 仓库、版本标签和 GitHub Release，附带可安装的 `.tgz`。后续需要原生注册表版本查询时再发布 npm；GitHub Release 和 npm 可以同时维护。
+建议首版使用公开 GitHub 仓库、版本标签和 GitHub Release，附带可安装的 `.tgz`，这是本项目推荐的分发方式，不是 dsh-market 收录的硬性前提。能从 GitHub 源码正常安装时，也可先按源码来源申请收录；只有无法从源码安装时，市场才要求提供可用的预构建 tarball。npm 发布是可选项，不影响是否收录；GitHub Release 和 npm 可以同时维护。
 
 | 方式 | 用户获取版本 | 更新路径 |
 | --- | --- | --- |
@@ -77,9 +77,12 @@ README 面向使用者，标题固定为 `# power-dsh`，首屏使用已确认�
 
 1. 确认品牌、简介、仓库地址与选定许可证，补充真实的 `repository`、`homepage`、`bugs` 和作者信息，保留[第三方声明](third-party-notices.md)。许可证由作者决定。
 2. 完成最低 DSH 版本验证，填写兼容范围，并明确实际验证的平台。
-3. 允许公开分发时移除 `private: true` 或设为 `false`，同步调整检查脚本中的开发阶段 private 断言。该标记阻止 npm 发布，DSH 的参考索引生成器也会忽略 private 包，即使源码公开。
+3. 按分发渠道核对 `private`：npm 发布前须移除 `private: true` 或设为 `false`，并同步调整检查脚本中的开发阶段 private 断言；DSH 官方参考索引生成器也会忽略 private 包。不要将这项规则套作 dsh-market 收录的明确门槛，后者按自己的贡献指南检查。
 4. 如果发布 npm，再次确认包名可用和账号权限；一次注册表查询不是名称预留。包名、patch 引用与 Client 注册 id 必须一致。
 5. 审阅项目和打包清单，确认没有凭据、参考仓库和个人日志；准备实际产物验收结果。
+6. 核对官方 `@deepseek-ai/*` 包的依赖声明。市场指南推荐使用 `peerDependencies`；本包目前仍使用固定版本的 `dependencies`，调整时须同时核对宿主模块身份、更新锁文件并执行检查与安装验证。peer 范围须显式包含所支持的预发布分支，不将宽泛范围误当成包含所有 alpha / rc。此项属于上游推荐，不能不经验证机械移动依赖。
+
+以上许可证、兼容范围与实际产物验收是本项目的发布准备要求；市场自身的收录门槛见下文，不能将两者混为一谈。
 
 ## GitHub Release 操作顺序
 
@@ -129,7 +132,21 @@ https://github.com/mewcoder/power-dsh/releases/latest/download/power-dsh.tgz
 
 ## 收录到 dsh-market
 
-dsh-market 的目录来自 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)，不是向市场应用本身提交插件代码。按[当前贡献指南](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md)，以当前仓库地址投稿时新增一个文件 `data/plugins/mewcoder__power-dsh.yml`：
+dsh-market 的目录来自 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)，不是向市场应用本身提交插件代码。投稿前重新读取[当前贡献指南](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md)，本文按 2026-11-09 核对结果维护；上游变更后同步修订，不从旧样例推断新要求。
+
+### 上游要求与可选项
+
+- 必须有真实可用的代码，公开仓库的 `package.json` 声明可安装的 `dsh.bundle`，并提供对应 patch；只有 `dsh.client` 不够。
+- 仓库创建满一天，添加 `dsh-plugin` topic，保持维护；没有提交数量门槛。
+- 描述准确、只说明功能，不写营销词或未经验证的能力；分类贴合实际用途。本项目采用 `ui`。
+- 条目须有正确的 `url`、`name`、`category` 和以句号结尾的 `description.en`；中文描述可选，本项目保留中英文与中文「等实用功能」。
+- npm、Release、图标和截图都是可选项；不能从源码安装时必须提供可用的 Release tarball。填写 `tarball` 时必须使用 GitHub Release 托管的 HTTPS `.tgz`，不能填写不存在的下载地址。
+
+### 首次投稿
+
+先确认所选公开来源能在目标 DSH 安装、加载和操作。源码来源须验证 GitHub 安装，不能只用本地目录加载结果替代；Release 来源须验证实际下载的 tarball。依照本项目的兼容规范记录证据和限制，不宣称未验证的版本或平台。
+
+Fork 目录仓库，从最新 `main` 建立投稿分支，只新增 `data/plugins/mewcoder__power-dsh.yml`。源码收录使用以下内容：
 
 ```yaml
 url: https://github.com/mewcoder/power-dsh
@@ -138,12 +155,37 @@ category: ui
 description:
   en: 'A DSH enhancement plugin offering Skills/MCP management, global instructions, task notifications, and other practical features, with options to streamline built-in functionality as needed.'
   zh: 'DSH 增强插件，提供技能/MCP 管理、全局指令、任务通知等实用功能，支持按需精简内置功能。'
+```
+
+只有已公开发布并验证可下载的安装包才追加：
+
+```yaml
 tarball: https://github.com/mewcoder/power-dsh/releases/latest/download/power-dsh.tgz
 ```
 
-该样例尚未提交。条目中的 `name` 按上游规则使用已核对的 owner/repo；YAML 文件名、url、name 与 tarball 均已统一到 `mewcoder/power-dsh`。发 PR 前重新核对上游要求：当前要求真实可运行的 `dsh.bundle`、仓库创建满一天、添加 `dsh-plugin` topic 和准确描述；两个 README 由上游生成，只新增自己的 YAML 条目。
+该样例尚未投稿。条目中的 `name` 使用实际 owner/repo；YAML 文件名、url、name 与可选 tarball 必须一致。保存条目后向上游 `main` 提交 PR，只包含自己的 YAML；两个 README 由上游生成，不手动编辑，也不改动其他插件条目。一个 PR 最多新增三个条目，本项目只新增一个。
 
-用户确认并完成首次公开发版后再投稿；合并和目录刷新需要等待。收录后，来源和描述不变的常规发版通常无需每次提收录 PR：发布新 Release、上传同名附件，等待目录或缓存刷新，再实际检查市场显示及更新链路。改变包名、仓库、分发来源或描述时修改自己的目录条目。
+`dsh-plugin` topic 只是收录条件之一，不会自动将仓库加入 dsh-market 目录。通常由作者提 PR，也可能由维护者主动添加；目录条目合并并完成网站重建后才算收录，不把 GitHub topic、源码推送或 Release 发布视为已收录。此规则针对 dsh-market，不与 DSH 官方参考索引的发现方式混用。
+
+实际样例与实现已在 2026-11-09 核对：[新增状态插件 PR #13103](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13103) 和[新增 WebChat 插件 PR #13099](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13099) 都只新增各自的 YAML；[更新路由插件描述 PR #13106](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13106) 只修改原条目的双语描述。同类技能/MCP 管理插件也有[独立目录条目](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/data/plugins/alone-tree__dsh-skill-mcp-manager.yml)，其新增记录来自 [PR #2494](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/2494)。目录的 [readEntries](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/scripts/lib/entries.mjs) 从 `data/plugins/*.yml` 读取条目，市场的 [loadRegistry](https://github.com/dsh-market/dsh-market/blob/main/src/registry.ts) 获取已生成目录；这条链路不靠 topic 自动入库。
+
+用户确认投稿后才创建收录 PR，源码收录不额外要求先发 Release。CI 会检查条目数量、`dsh.bundle`、仓库年龄、格式及站点生成，但 CI 通过不等于收录通过；维护者还会核对代码、描述、功能重复与来源。审核或目录刷新没有固定时限。
+
+CI 失败按具体结果修复同一分支，不重复开 PR。被标为 `held: author` 时，完成修改后在同一 PR 留一条说明，等待人工复审；不靠空提交、反复推送或催促解除标签。
+
+### 收录后的更新
+
+| 变化 | 自己的仓库或分发渠道 | 是否修改市场条目 |
+| --- | --- | --- |
+| Git 源码更新 | 检查、更新版本与说明、提交并推送；实际验证市场对 Git 提交的检测和安装更新 | 来源和描述不变时通常不需要 |
+| Release 更新 | 使用新版本和标签，验证新产物，发布 Release 并上传同名 `power-dsh.tgz`；保留旧版本产物 | 已采用有效 `latest/download` 链接时通常不需要 |
+| npm 更新 | 发布新版本并保证 `repository` 指向本仓库，等待市场自动关联；不要给 YAML 添加 `npm` 字段 | 通常不需要 |
+| 描述、分类、包名、仓库或安装来源变化 | 同步修改相关元数据和文档 | 提 PR 修改自己的原条目，不重复新增 |
+| 截图更新 | 在自己的仓库更新图片与可选截图清单 | 通常不需要，等待市场构建或缓存刷新 |
+
+`latest/download` 只指向最新正式 Release；测试版使用明确标签的地址。更新后检查市场显示的版本、下载来源和用户升级后的偏好保留。市场发现新版本不等于用户自动完成升级。
+
+可选的市场 `icon` 须为 GitHub 托管的 PNG / JPEG / WebP 位图，不接受 SVG；不填时回退为作者头像。本项目的插件 SVG 图标不直接用作市场 `icon`。截图可在自己的包根目录声明 `screenshots.json`，列出 1–8 张仓库内相对路径图片；不声明时市场可从 README 提取。不要修改目录仓库的旧截图汇总来添加新条目。
 
 Git、npm 与 Release 附件的更新检测不同，不能只创建空 Release 就认定所有来源会升级。[市场文档](https://github.com/dsh-market/dsh-market/blob/main/README.md)说明能检查 npm 版本或 Git 提交，更新入口会提供 Release notes / commits；Release 分发仍需实际核对来源识别、最新版本与旧版升级后的偏好保留。本地目录安装不会因为远端发版就自动变成市场安装。
 

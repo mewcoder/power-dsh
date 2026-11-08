@@ -4,7 +4,7 @@
 
 PowerDSH 是独立社区维护的 DSH（DeepSeek Harness）插件，技术包名为 `power-dsh`，设置显示名为 **PowerDSH**。
 
-品牌文案为「优雅克制，专注实效。让你的 DSH 更顺手、更高效。」，英文为「Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.」。README 首屏按用户提供的中英引用块展示。GitHub About、插件元数据与 Client 说明同时保留 DSH 增强插件身份：中文「DSH 增强插件。优雅克制，专注实效。让你的 DSH 更顺手、更高效。」；英文「A DeepSeek Harness (DSH) enhancement plugin. Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.」。市场卡片使用已确认简介：「DSH 增强插件，提供技能/MCP 管理、全局指令、任务通知等实用功能，支持按需精简内置功能。」具体功能作为支撑，精简开关与功能数量不作为核心定位。功能收录以实际需要为准。
+品牌文案为「优雅克制，专注实效。让你的 DSH 更顺手、更高效。」，英文为「Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.」。README 首屏按用户提供的中英引用块展示。设置页说明固定为「DSH 增强插件」，英文为「A DSH enhancement plugin」。GitHub About 与插件元数据使用完整简介：中文「DSH 增强插件。优雅克制，专注实效。让你的 DSH 更顺手、更高效。」；英文「A DeepSeek Harness (DSH) enhancement plugin. Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.」。市场卡片使用已确认简介：「DSH 增强插件，提供技能/MCP 管理、全局指令、任务通知等实用功能，支持按需精简内置功能。」具体功能作为支撑，精简开关与功能数量不作为核心定位。功能收录以实际需要为准。
 
 优雅、克制、实用同时指导产品设计，沿用宿主组件、主题和使用习惯。每项能力应解决明确问题，并控制入口、配置与常驻信息的负担。
 

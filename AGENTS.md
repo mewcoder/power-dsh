@@ -9,6 +9,7 @@
 | Bundle、Host/Client、状态与资源 | [架构规范](docs/architecture.md) |
 | 开发前市场检索、参考源码、接口发现、检查、安装与交付 | [开发指南](docs/development.md) |
 | 宿主版本、接口依赖、兼容矩阵与升级验证 | [版本兼容性](docs/compatibility.md) |
+| 版本发布、市场收录与后续更新 | [发布与升级](docs/releasing.md) |
 | 具体功能边界 | [精简官方登录与模型接入](docs/account-blocking.md)、[精简官方搜索](docs/search-blocking.md)、[外观快捷切换](docs/appearance-shortcut.md)、[刷新界面](docs/refresh-button.md)、[重启应用](docs/restart-button.md)、[任务通知](docs/notifications.md)、[反馈与遥测精简](docs/telemetry-blocking.md)、[精简Todo工具](docs/todo-blocking.md)、[个性化](docs/personalization.md)、[技能管理](docs/skills.md)、[MCP 管理](docs/mcp.md) |
 
 ## 关键约束

@@ -8,7 +8,7 @@
 | [UI 规范](ui.md) | 原生表单、图标、主题、文案与可访问性 |
 | [架构规范](architecture.md) | 文件职责、Host/Client、原生启停与侧栏接入 |
 | [开发指南](development.md) | 环境、接口发现、安装、验证方法与限制 |
-| [发布与升级](releasing.md) | 品牌与包名、兼容范围、GitHub Release、市场收录及更新流程 |
+| [发布与升级](releasing.md) | 品牌、兼容范围、分发方式、市场要求与推荐项、首次收录 PR 及后续更新 |
 | [版本兼容性](compatibility.md) | 各功能宿主接口依赖、兼容矩阵、升级验证与发版条件 |
 | [首版兼容性调查](compatibility-audit.md) | 同类插件声明、官方标签差异、候选 SDK 测试和剩余验收 |
 | [更新日志](../CHANGELOG.md) | 首版草稿、后续用户可感知变更与升级说明 |

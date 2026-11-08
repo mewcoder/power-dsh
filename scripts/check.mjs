@@ -53,8 +53,8 @@ assert.ok(dictionaryLiteral, 'Keep the inline dictionaries JSON-compatible.');
 const dictionaries = JSON.parse(dictionaryLiteral[1]);
 assert.deepEqual(keys(dictionaries), ['en', 'zh']);
 assert.deepEqual(keys(dictionaries.en), keys(dictionaries.zh));
-assert.equal(dictionaries.en.description, english.meta.description, 'English settings and plugin descriptions must match.');
-assert.equal(dictionaries.zh.description, chinese.meta.description, 'Chinese settings and plugin descriptions must match.');
+assert.equal(dictionaries.en.description, 'A DSH enhancement plugin', 'Keep the English settings description concise.');
+assert.equal(dictionaries.zh.description, 'DSH 增强插件', 'Keep the Chinese settings description concise.');
 for (const dictionary of Object.values(dictionaries)) {
   assert.equal(dictionary.title, 'PowerDSH', 'The settings title must be PowerDSH in both languages.');
   assert.ok(Object.values(dictionary).every((value) => typeof value === 'string' && value.trim()));

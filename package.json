@@ -67,6 +67,7 @@
     "AGENTS.md",
     "docs/*.md",
     "docs/images/0.0.1/settings.webp",
+    "screenshots.json",
     "scripts/check.mjs",
     "scripts/check-compatibility.mjs",
     "scripts/account-policy.test.mjs",
