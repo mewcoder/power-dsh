@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.DS_Store
+*.tgz
+*.log
+.env
+.env.*
+!.env.example
+
+# Local upstream and plugin sources for reference only
+/.references/
+/reference/

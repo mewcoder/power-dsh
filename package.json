@@ -1,0 +1,103 @@
+{
+  "name": "power-dsh",
+  "version": "0.0.1",
+  "private": true,
+  "description": "A DeepSeek Harness (DSH) enhancement plugin. Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "deepseek",
+    "dsh",
+    "mcp",
+    "notifications",
+    "skill-management",
+    "customization"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mewcoder/power-dsh.git"
+  },
+  "homepage": "https://github.com/mewcoder/power-dsh#readme",
+  "bugs": {
+    "url": "https://github.com/mewcoder/power-dsh/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "account-policy.js",
+    "plugin-policy.js",
+    "telemetry-policy.js",
+    "todo-policy.js",
+    "search-policy.js",
+    "scripts/search-policy.test.mjs",
+    "notifications.js",
+    "system-sounds.js",
+    "restart.js",
+    "scripts/system-sounds.test.mjs",
+    "scripts/restart.test.mjs",
+    "scripts/notifications.test.mjs",
+    "scripts/todo-policy.test.mjs",
+    "operation-queue.js",
+    "personalization.js",
+    "skill-policy.js",
+    "skill-origin.js",
+    "scripts/skill-origin.test.mjs",
+    "mcp-policy.js",
+    "mcp-providers.js",
+    "scripts/mcp-providers.test.mjs",
+    "scripts/skill-policy.test.mjs",
+    "scripts/host-wiring.test.mjs",
+    "scripts/mcp-policy.test.mjs",
+    "rpc.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "CHANGELOG.md",
+    "AGENTS.md",
+    "docs/*.md",
+    "docs/images/0.0.1/settings.webp",
+    "scripts/check.mjs",
+    "scripts/check-compatibility.mjs",
+    "scripts/account-policy.test.mjs",
+    "scripts/client.test.mjs",
+    "scripts/client-wiring.test.mjs",
+    "scripts/telemetry-plugins.test.mjs",
+    "scripts/operation-queue.test.mjs",
+    "scripts/personalization.test.mjs"
+  ],
+  "scripts": {
+    "check": "node scripts/check.mjs && node --test scripts/*.test.mjs",
+    "check:compat": "node scripts/check-compatibility.mjs"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-tools": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.2-rc.1",
+    "@deepseek-ai/schemastery": "~3.19.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-client-ui-session"
+      ]
+    }
+  }
+}
