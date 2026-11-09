@@ -57,7 +57,7 @@ function fixture(layout = 'pI_x6G', sidebarName = 'hHd-Xa') {
   const layoutStyle = new Element('style', { 'data-plugin-css': '@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css' });
   layoutStyle.textContent = `.${layout}_frame{}.${layout}_sidebarCol{}.${layout}_centerCol{}`;
   const sidebarStyle = new Element('style', { 'data-plugin-css': '@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css' });
-  sidebarStyle.textContent = `.${sidebarName}_root{}`;
+  sidebarStyle.textContent = `.${sidebarName}_root{}.${sidebarName}_scrollFade{}`;
   head.append(layoutStyle, sidebarStyle);
   const observers = new Set();
   const statuses = [];
@@ -104,9 +104,13 @@ test('class mappings follow the actual npm and installed Desktop stylesheet hash
     const dispose = f.watch();
     assert.equal(f.statuses.at(-1), 'attached', layout);
     assert.equal(f.starts[0].target, target);
+    const sheet = target.children.at(-1).children[0];
+    assert.ok(sheet.textContent.includes(`html[data-windows-titlebar] .${layout}_frame:has(> .power-dsh-flowing-background)::before { background: transparent !important; }`));
+    assert.ok(sheet.textContent.includes(`html[data-windows-titlebar] .${layout}_frame:not([data-sidebar-drawer]):has(> .power-dsh-flowing-background) > .${layout}_sidebarCol { border-right: 0.5px solid var(--dsw-alias-border-l3) !important; }`));
     assert.equal(sidebar.style.getPropertyValue('background-color'), 'transparent');
     assert.equal(sidebarRoot.style.getPropertyValue('background-color'), 'transparent');
     dispose();
+    assert.equal(sheet.isConnected, false, 'Closing the background removes its Windows chrome rules.');
   }
 });
 
@@ -176,6 +180,47 @@ test('sidebar drawer mode restores its opaque native surfaces without restarting
   assert.equal(sidebar.style.getPropertyValue('background-color'), 'transparent');
   assert.equal(f.starts.length, 1);
   dispose();
+});
+
+test('native sidebar bottom fade stays hidden while enabled and restores on replacement and disposal', () => {
+  for (const sidebarName of ['hHd-Xa', 'kB3qhq']) {
+    const f = fixture('PIRFFq', sidebarName);
+    const { target, sidebarRoot } = f.makeFrame();
+    const fade = new Element('span', { 'aria-hidden': 'true' }, `${sidebarName}_scrollFade`);
+    fade.style.setProperty('display', 'block', 'important');
+    sidebarRoot.append(fade);
+    const unrelated = new Element('span', { 'aria-hidden': 'true' }, `${sidebarName}_scrollFade`);
+    f.body.append(unrelated);
+    const dispose = f.watch();
+    assert.equal(fade.style.getPropertyValue('display'), 'none');
+    assert.equal(fade.style.getPropertyPriority('display'), 'important');
+    assert.equal(unrelated.style.getPropertyValue('display'), '');
+    target.setAttribute('data-sidebar-drawer', 'true'); f.flush();
+    assert.equal(fade.style.getPropertyValue('display'), 'none');
+    fade.remove();
+    const replacement = new Element('span', { 'aria-hidden': 'true' }, `${sidebarName}_scrollFade`);
+    sidebarRoot.append(replacement); f.flush();
+    assert.equal(fade.style.getPropertyValue('display'), 'block');
+    assert.equal(fade.style.getPropertyPriority('display'), 'important');
+    assert.equal(replacement.style.getPropertyValue('display'), 'none');
+    assert.equal(f.starts.length, 1);
+    dispose();
+    assert.equal(replacement.style.getPropertyValue('display'), '');
+  }
+});
+
+test('sidebar fade cleanup preserves later styles and rolls back failed attachment', () => {
+  for (const fail of [false, true]) {
+    const f = fixture();
+    const { sidebarRoot } = f.makeFrame();
+    const fade = new Element('span', { 'aria-hidden': 'true' }, 'hHd-Xa_scrollFade');
+    sidebarRoot.append(fade);
+    const dispose = fail ? f.watch(() => { throw new Error('initialization failed'); }) : f.watch();
+    if (fail) assert.equal(fade.style.getPropertyValue('display'), '');
+    else fade.style.setProperty('display', 'inline', 'important');
+    dispose();
+    assert.equal(fade.style.getPropertyValue('display'), fail ? '' : 'inline');
+  }
 });
 
 test('closing restores previous values and priorities without overwriting another owner', () => {

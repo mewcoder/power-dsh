@@ -58,6 +58,12 @@
 
 ### 修复
 
+- 开启[官网流动背景](src/features/flowing-background/spec.md)时，为 Windows 非抽屉侧栏补上原生同款 0.5px 主题色右侧分割线，关闭后恢复原样；抽屉模式及其他平台保持原生。尚待 Windows 实屏验收。
+
+- 开启[官网流动背景](src/features/flowing-background/spec.md)时，将 Windows 顶部操作栏的 AppFrame 拖动背景透明化，关闭后恢复；保留原生菜单与拖动交互，右上角 Electron 原生窗口按钮底色暂保留。尚待 Windows 实屏验收。
+
+- 修复开启[官网流动背景](src/features/flowing-background/spec.md)后 Windows 等平台侧栏设置按钮上方残留底色阴影的问题：开启期间隐藏原生底部滚动渐隐层，关闭、卸载或节点替换按所有权恢复；沿用当前官方样式模块的唯一类名映射，不影响列表滚动与设置按钮。实际 Windows 页面尚待验收。
+
 - 修复启用 `dsh-skill-mcp-panel` 后 PowerDSH MCP 设置页报 `MCP-PROVIDERS`、无法加载的问题：第三方网关同样注册 `mcpManager`，但不提供原生管理器的配置与列表接口。现在先确认原生 Loader 归属再读取管理器，保留原生 MCP 条目与工具枚举，不调用第三方网关。
 
 - 修复[官网流动背景](src/features/flowing-background/spec.md)开启后聊天输入区外围残留主题底色的问题：适配原生输入区外层的底色渐变，避免深色黑块、浅色白块；保留输入卡片表面、圆角、阴影和布局，关闭或卸载按所有权恢复。弹出菜单外围色块尚未实屏定位，本次不修改菜单材质或 macOS 模糊垫层。

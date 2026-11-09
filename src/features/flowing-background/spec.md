@@ -12,9 +12,13 @@
 
 当前宿主没有公共背景插槽。`shell.overlay` 仅注册 id 为 `power-dsh-flowing-background`、返回 null 的生命周期控制组件，不在全窗口浮层中绘画，也不订阅 `usePanelInfo`、`useSessions` 或会话消息。
 
-用户本次已直接授权全局预览及必要的原生结构表面适配。适配器只寻找唯一、可见且结构符合已安装宿主的 AppFrame。类名映射只读自当前页面两个确切的官方 `style[data-plugin-css]` 标签：`@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css` 和 `@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css`；前者提取唯一、简单且分别以 `_frame`、`_sidebarCol`、`_centerCol` 结尾的类名，后者提取唯一以 `_root` 结尾的简单类名。每个标签及所需类名都必须唯一，再结合真实框架的语义直接子元素、`position:relative` 和 `display:grid` 核对目标；不采用 npm 固定哈希、模糊类名或猜测性后代选择器。画布直接挂在该 AppFrame 内，使用自有 `position:absolute; inset:0; z-index:-1` 绘图层，框架建立 `isolation:isolate` 并保留原生 `--dsw-alias-bg-base` 底色。全框架使用一张连续 Canvas，跨越侧边栏与主内容区；画布位于结构表面及内容下方，不给文字、按钮或卡片叠加前景颜色。
+用户本次已直接授权全局预览及必要的原生结构表面适配。适配器只寻找唯一、可见且结构符合已安装宿主的 AppFrame。类名映射只读自当前页面两个确切的官方 `style[data-plugin-css]` 标签：`@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css` 和 `@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css`；前者提取唯一、简单且分别以 `_frame`、`_sidebarCol`、`_centerCol` 结尾的类名，后者提取唯一以 `_root`、`_scrollFade` 结尾的简单类名。每个标签及所需类名都必须唯一，再结合真实框架的语义直接子元素、`position:relative` 和 `display:grid` 核对目标；不采用 npm 固定哈希、模糊类名或猜测性后代选择器。画布直接挂在该 AppFrame 内，使用自有 `position:absolute; inset:0; z-index:-1` 绘图层，框架建立 `isolation:isolate` 并保留原生 `--dsw-alias-bg-base` 底色。全框架使用一张连续 Canvas，跨越侧边栏与主内容区；画布位于结构表面及内容下方，不给文字、按钮或卡片叠加前景颜色。
 
-为让底层画布透出，仅允许对已核对的 AppFrame `sidebarCol`、`centerCol`、原生 SidebarRoot、任意 phase 的主 ConversationRoot，以及该主内容内通过 `[data-composer-seat][data-conversation-region="composer"]` 核对的输入区外层，临时设置内联 `background-color:transparent` 和 `background-image:none`。主 ConversationRoot 通过原生 `[data-conversation-content]` 的直接父元素及 `[data-phase]` 关系核对，不限制为 hero。不得扩大到输入卡片、编辑器、文件卡片、菜单、弹窗、任意后代或全局主题 token；不替换宿主根节点、不注入宿主全局 CSS、不改原生布局尺寸。窄窗口下 AppFrame 带有 `data-sidebar-drawer` 时，不透明化 sidebarCol 或 SidebarRoot，保留模态侧栏抽屉的原生底色；离开抽屉模式后重新适配这些明确目标。其他全局面板若拥有独立的不透明内容表面，可继续保留其原生底色，不承诺让所有内容表面透明；操作系统原生标题栏不在本次适配范围。
+为让底层画布透出，仅允许对已核对的 AppFrame `sidebarCol`、`centerCol`、原生 SidebarRoot、任意 phase 的主 ConversationRoot，以及该主内容内通过 `[data-composer-seat][data-conversation-region="composer"]` 核对的输入区外层，临时设置内联 `background-color:transparent` 和 `background-image:none`。主 ConversationRoot 通过原生 `[data-conversation-content]` 的直接父元素及 `[data-phase]` 关系核对，不限制为 hero。不得扩大到输入卡片、编辑器、文件卡片、菜单、弹窗、任意后代或全局主题 token；不替换宿主根节点、不注入宿主全局 CSS、不改原生布局尺寸。窄窗口下 AppFrame 带有 `data-sidebar-drawer` 时，不透明化 sidebarCol 或 SidebarRoot，保留模态侧栏抽屉的原生底色；离开抽屉模式后重新适配这些明确目标。按用户要求，Windows 顶部操作栏尽量透明：只为已核对 AppFrame 且直接拥有自有背景层的元素添加局部 `::before` 背景透明规则，受 `html[data-windows-titlebar]` 限制，规则与自有样式节点一并释放。仅改绘制底色，保留原生高度、拖动区域、菜单、悬浮反馈和按钮交互；不修改全局主题 token。右上角原生窗口按钮由 Electron `titleBarOverlay` 绘制，桌面 preload 从独立主题探针同步颜色；当前插件无公共接口修改该底色，因此不承诺该部分透明，不操作内部 IPC 或探针。其他全局面板若拥有独立的不透明内容表面，可继续保留其原生底色，不承诺让所有内容表面透明；操作系统原生标题栏不在本次适配范围。
+
+开启时同时隐藏原生 SidebarRoot 内、由同一官方样式模块唯一 `_scrollFade` 类名及 `aria-hidden="true"` 核对的底部滚动渐隐层，临时设置内联 `display:none !important`，避免 Windows 等平台在设置按钮上方留下侧栏底色阴影；抽屉模式同样隐藏。仅处理这个明确的装饰层，不修改列表滚动、设置按钮或其他渐变。
+
+按用户要求，Windows 非抽屉侧栏在开启背景期间补回右侧分割线，使用原生同款 `0.5px solid var(--dsw-alias-border-l3)`。规则仅匹配已核对、直接拥有自有背景层的 AppFrame 的直接 sidebarCol，受 `html[data-windows-titlebar]` 与 `:not([data-sidebar-drawer])` 限制，浅深主题跟随原生边框 token；关闭或卸载时随自有样式节点移除，恢复 Windows 原生无分割线样式，抽屉与其他平台保持原生。
 
 对每项临时样式保存原值与优先级，恢复时仅处理仍等于本功能写入值和优先级的属性，保留第三方后写值。原生 SidebarRoot、ConversationRoot 或目标列动态替换时，更新这些明确目标的背景适配，不重启动画或新建第二张画布。AppFrame 替换、关闭开关、卸载或 slot 撤销时，释放旧画布、GPU、动画、观察器和自有节点，并按所有权恢复原有样式。
 
@@ -45,6 +49,9 @@ Client 通过 `preferenceSlot` 将控制组件注册和配置订阅绑定到 slo
 - 同版本不同构建哈希均以当前已加载样式模块为准；正确样式延迟到达可恢复挂载，同一框架的哈希或结构表面替换不重启动画，观察器随关闭和卸载释放。
 - 一张 Canvas 连续覆盖框架、侧边栏和主内容区；背景只从已批准结构表面透出，输入卡片、编辑器、文件卡片、菜单和弹窗保留原生表面与交互。窄窗口 `data-sidebar-drawer` 模式保留侧栏抽屉原生底色，退出该模式后再恢复侧栏透明适配。
 - 已有对话的输入区外层不再用原生 bg-base 渐变覆盖官网流动背景，浅深主题均能透出背景；输入卡片的底色、圆角、阴影、sticky 定位和层级保持原生。输入区外层的原始内联值与优先级随关闭、替换或卸载恢复；菜单本体、阴影与 macOS 模糊垫层保持原生，外围色块仍待实屏确认。
+- 开启时隐藏侧栏设置按钮上方的原生底部滚动渐隐层，包括抽屉模式；关闭、卸载、初始化失败或节点替换后按所有权恢复原始 display 值与优先级。动态替换只更新该装饰层，不重启动画，不影响其他位置的渐隐层。
+- Windows 顶部操作栏的 AppFrame `::before` 底色在开启期间透明，规则绑定当前唯一核对框架及其自有直接子层；关闭或卸载移除规则，拖动和菜单交互保持原生。两套构建哈希均使用动态映射；右上角原生窗口按钮底色保留。
+- Windows 非抽屉侧栏开启背景时显示主题色 0.5px 右侧分割线，关闭或卸载后移除规则；两套构建哈希均动态映射，抽屉模式及其他平台不受该规则影响。
 - 原始内联值与优先级能按所有权恢复；第三方后写值不被覆盖；结构表面替换不重启动画，框架替换后旧资源完整释放。
 - Canvas 与绘图层不接收点击、不进入无障碍树与 Tab 顺序，不作为文字与控件之上的前景层。
 - 减少动态效果时无连续帧；隐藏页面后无待执行帧，显示后最多恢复一条帧链；卸载后无观察器、监听、节点或帧残留。
@@ -54,3 +61,7 @@ Client 通过 `preferenceSlot` 将控制组件注册和配置订阅绑定到 slo
 实现见 [client.ts](client.ts)、[attachment.ts](attachment.ts)、[pattern.ts](pattern.ts)、[animation.ts](animation.ts)与 [styles.ts](styles.ts)；行为覆盖见 [tests/background.test.mjs](tests/background.test.mjs)和 [tests/attachment.test.mjs](tests/attachment.test.mjs)。本次确认 npm 固定类名与实际桌面构建类名不一致会导致全局布局校验失败，已改为读取当前官方样式元数据。修复后通过严格类型、构建新鲜度、306 项全仓测试（本功能 20 项）、实际 tarball、独立生产安装及 diff 空白检查，并重建本地链接使用的三个产物。新增回归覆盖实际桌面与 npm 两套不同哈希、官方样式元数据缺失/错误来源/重复标签/类名歧义以及延迟加载恢复；原有层级、样式恢复和 GPU 生命周期检查仍通过。
 
 用户此前反馈“样式好像对了”，仅表明较早图案视觉得到初步认可；其后全局预览实际报告布局适配错误，不能把旧测试或注册 active 当作画面验收。保留本地链接安装与原开关，不因静态检查推定新 Client 代际和画面已生效。浏览器面板仍未连接，当前样式元数据映射修复后的浅深主题、侧栏连续性、窄窗口、文字可读性、输入与点击、弹窗层级、结构表面恢复及官网实屏对照均待实际页面确认。
+
+本次补充侧栏底部渐隐层适配，依据已核对的原生 SidebarRoot 源码和官方样式模块，沿用动态类名与样式所有权恢复机制。新增回归覆盖两套构建哈希、抽屉模式、节点替换、原值与优先级恢复、第三方后写保留及初始化失败回滚。已重建产物，通过严格类型、构建新鲜度、346 项全仓测试、实际 tarball、独立生产安装及 diff 空白检查；实际 Windows 页面仍待验收。
+
+Windows 顶栏适配依据参考源码 AppFrame 的 `data-windows-titlebar` / `::before` 绘制规则，以及桌面 preload 的菜单透明样式与 `titleBarOverlay` 颜色同步实现；当前浏览器面板未连接，尚未完成 Windows 实屏验收。

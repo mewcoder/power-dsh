@@ -2,7 +2,7 @@ import { startAnimation } from './animation.ts';
 import { styles } from './styles.ts';
 
 export type AttachmentStatus = 'attached' | 'unavailable';
-interface NativeClasses { frame: string; sidebarCol: string; centerCol: string; sidebarRoot: string; }
+interface NativeClasses { frame: string; sidebarCol: string; centerCol: string; sidebarRoot: string; scrollFade: string; }
 
 /** CSS-module hashes differ between npm and Desktop builds of the same version. */
 function nativeClasses(doc: Document): NativeClasses | null {
@@ -18,7 +18,9 @@ function nativeClasses(doc: Document): NativeClasses | null {
   const sidebarCol = read(layout, 'sidebarCol');
   const centerCol = read(layout, 'centerCol');
   const sidebarRoot = read('@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css', 'root');
-  return frame && sidebarCol && centerCol && sidebarRoot ? { frame, sidebarCol, centerCol, sidebarRoot } : null;
+  const scrollFade = read('@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css', 'scrollFade');
+  return frame && sidebarCol && centerCol && sidebarRoot && scrollFade
+    ? { frame, sidebarCol, centerCol, sidebarRoot, scrollFade } : null;
 }
 
 /** Restore a declaration only while it still belongs to this attachment. */
@@ -75,7 +77,22 @@ export function watchBackground(
     if (!target || !classes) { report('unavailable'); return; }
     const restores: Array<() => void> = [];
     const surfaces = new Map<HTMLElement, () => void>();
+    const fades = new Map<HTMLElement, () => void>();
     const refresh = (names: NativeClasses) => {
+      // Scope Windows chrome overrides to the verified frame owning this layer.
+      const css = `${styles}
+html[data-windows-titlebar] .${names.frame}:has(> .power-dsh-flowing-background)::before { background: transparent !important; }
+html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .power-dsh-flowing-background) > .${names.sidebarCol} { border-right: 0.5px solid var(--dsw-alias-border-l3) !important; }`;
+      if (sheet.textContent !== css) sheet.textContent = css;
+      // The native bottom fade uses an opaque sidebar tint on Windows and Web.
+      const nextFades = new Set([...target.querySelectorAll<HTMLElement>(`.${names.sidebarRoot}`)]
+        .flatMap(root => [...root.querySelectorAll<HTMLElement>(`.${names.scrollFade}[aria-hidden="true"]`)]));
+      for (const [element, restore] of fades) {
+        if (!nextFades.has(element)) { restore(); fades.delete(element); }
+      }
+      for (const element of nextFades) {
+        if (!fades.has(element)) fades.set(element, change(element, 'display', 'none'));
+      }
       const drawer = target.hasAttribute('data-sidebar-drawer');
       const selectors = `.${names.sidebarCol}, .${names.centerCol}, .${names.sidebarRoot}`;
       const next = new Set([...target.querySelectorAll<HTMLElement>(selectors)].filter(element =>
@@ -109,6 +126,8 @@ export function watchBackground(
       stop(); layer.remove();
       for (const restore of surfaces.values()) restore();
       surfaces.clear();
+      for (const restore of fades.values()) restore();
+      fades.clear();
       restores.reverse().forEach(restore => restore());
     };
     try {

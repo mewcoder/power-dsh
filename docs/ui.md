@@ -60,6 +60,12 @@ Mod 设置入口与页面标题中英文均为「PowerDSH」，技术包名与�
 
 按用户本次授权，仅临时把已核对的 sidebarCol、centerCol、原生 SidebarRoot、任意 phase 的主 ConversationRoot，以及其主内容内已核对的 composerSeat 外层的内联 background-color 设为 transparent、background-image 设为 none，让底层动画透出。输入卡片、编辑器、文件卡片、菜单和弹窗保留原生表面与交互；不修改全局主题 token 或任意后代。窄窗口中 AppFrame 出现 `data-sidebar-drawer` 时，sidebarCol 和 SidebarRoot 保留原生底色，不把模态侧栏抽屉透明化；退出抽屉模式后恢复目标适配。全局面板若另有独立的不透明内容表面，仍可保留其原生底色，不承诺每个内容区都透出动画；操作系统原生标题栏不作适配。
 
+Windows 非抽屉侧栏开启背景时补上原生同款 0.5px 右侧分割线，颜色跟随浅深主题的 border-l3 token，关闭后恢复原生无分割线样式。
+
+Windows 顶部操作栏在开启背景时去掉已核对 AppFrame 拖动层的底色，尽量透出连续背景，关闭后恢复；保留菜单与拖动交互。右上角 Electron 原生窗口按钮底色暂无法通过现有插件接口透明化。
+
+开启官网流动背景时，同时隐藏原生侧栏设置按钮上方的底部滚动渐隐层，避免 Windows 等平台残留侧栏底色阴影；抽屉模式同样隐藏，关闭后恢复原生效果。目标核对与恢复规则以[功能 Spec](../src/features/flowing-background/spec.md)为准。
+
 保存所有临时样式原值和优先级，清理时只恢复仍属于本功能的写入，保留第三方后写值。原生目标表面或同一框架的类名映射动态替换时只刷新背景适配，不重启动画。官方样式元数据缺失、标签或类名歧义，或 AppFrame 缺失、不支持时不绘画，不回退前景；设置页复用共享错误反馈说明全局布局无法适配，不输出样式正文、DOM、机器路径或原始异常。正确官方样式延迟到达后可恢复挂载并移除过期反馈。
 
 动画按框架尺寸绘制，`ResizeObserver` 仅调整自有 Canvas；`MutationObserver` 在 body 跟踪已批准结构表面，在 head 观察官方样式模块加载、替换及文本变化，类名读取限于主 Spec 列明的两个精确标签。关闭、框架替换或卸载时移除节点、释放观察器、动画和 GPU，并恢复所属样式；`prefers-reduced-motion` 下保持静态，页面隐藏时暂停。WebGL 不可用或上下文丢失时，仅在适配成功的框架底层回退自有 CSS 渐变。用户报告的全局布局错误已定位为 npm 固定哈希与已安装桌面构建不一致；浏览器面板未连接，修复后的实际页面仍待验收，行为和本次检查状态以[官网流动背景 Spec](../src/features/flowing-background/spec.md)为准。

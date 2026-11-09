@@ -4526,11 +4526,13 @@ void main() {
 		const sidebarCol = read(layout, "sidebarCol");
 		const centerCol = read(layout, "centerCol");
 		const sidebarRoot = read("@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css", "root");
-		return frame && sidebarCol && centerCol && sidebarRoot ? {
+		const scrollFade = read("@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css", "scrollFade");
+		return frame && sidebarCol && centerCol && sidebarRoot && scrollFade ? {
 			frame,
 			sidebarCol,
 			centerCol,
-			sidebarRoot
+			sidebarRoot,
+			scrollFade
 		} : null;
 	}
 	/** Restore a declaration only while it still belongs to this attachment. */
@@ -4578,7 +4580,18 @@ void main() {
 			}
 			const restores = [];
 			const surfaces = /* @__PURE__ */ new Map();
+			const fades = /* @__PURE__ */ new Map();
 			const refresh = (names) => {
+				const css = `${styles}
+html[data-windows-titlebar] .${names.frame}:has(> .power-dsh-flowing-background)::before { background: transparent !important; }
+html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .power-dsh-flowing-background) > .${names.sidebarCol} { border-right: 0.5px solid var(--dsw-alias-border-l3) !important; }`;
+				if (sheet.textContent !== css) sheet.textContent = css;
+				const nextFades = new Set([...target.querySelectorAll(`.${names.sidebarRoot}`)].flatMap((root) => [...root.querySelectorAll(`.${names.scrollFade}[aria-hidden="true"]`)]));
+				for (const [element, restore] of fades) if (!nextFades.has(element)) {
+					restore();
+					fades.delete(element);
+				}
+				for (const element of nextFades) if (!fades.has(element)) fades.set(element, change(element, "display", "none"));
 				const drawer = target.hasAttribute("data-sidebar-drawer");
 				const selectors = `.${names.sidebarCol}, .${names.centerCol}, .${names.sidebarRoot}`;
 				const next = new Set([...target.querySelectorAll(selectors)].filter((element) => !drawer || !element.matches(`.${names.sidebarCol}, .${names.sidebarRoot}`)));
@@ -4615,6 +4628,8 @@ void main() {
 				layer.remove();
 				for (const restore of surfaces.values()) restore();
 				surfaces.clear();
+				for (const restore of fades.values()) restore();
+				fades.clear();
 				restores.reverse().forEach((restore) => restore());
 			};
 			try {
