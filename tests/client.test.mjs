@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
-import { MOD_RPC } from '../rpc.js';
+import { MOD_RPC } from '../src/rpc.js';
 
 function skillFixture(overrides = {}) {
   return {
@@ -70,6 +70,7 @@ async function mount({ restartStatus = { supported: true, running: false, error:
   }
   const resizeListeners = new Set();
   const focusListeners = new Set();
+  const doubleClickListeners = new Set();
   const intervals = new Map();
   let intervalId = 0;
   const chromeListeners = new Set();
@@ -91,7 +92,7 @@ async function mount({ restartStatus = { supported: true, running: false, error:
   let observeCount = 0;
   let disconnectCount = 0;
   let edge = 280;
-  let settings = { status: 'ready', writable, value: { notificationsEnabled: false, notificationSoundEnabled: true, notificationSound: 'default', blockTodo: false, showThemeSwitcher: false, personalizationEnabled: false, skillManagerEnabled: false, mcpManagerEnabled: false, globalPrompt: '' } };
+  let settings = { status: 'ready', writable, value: { blockDoubleClickRename: false, notificationsEnabled: false, notificationSoundEnabled: true, notificationSound: 'default', blockTodo: false, showThemeSwitcher: false, personalizationEnabled: false, skillManagerEnabled: false, mcpManagerEnabled: false, globalPrompt: '' } };
   let theme = { preference: 'system' };
   const calls = [];
   const rpcCalls = [];
@@ -200,8 +201,14 @@ async function mount({ restartStatus = { supported: true, running: false, error:
       confirm() { assert.fail('Restart confirmation must use the shared DSH modal.'); },
       setInterval(fn, ms) { const id = ++intervalId; intervals.set(id, { fn, ms }); return id; },
       clearInterval(id) { intervals.delete(id); },
-      addEventListener(name, fn) { (name === 'focus' ? focusListeners : resizeListeners).add(fn); },
-      removeEventListener(name, fn) { (name === 'focus' ? focusListeners : resizeListeners).delete(fn); },
+      addEventListener(name, fn, capture) {
+        if (name === 'dblclick') assert.equal(capture, true, 'Block before the native React title handler.');
+        (name === 'focus' ? focusListeners : name === 'dblclick' ? doubleClickListeners : resizeListeners).add(fn);
+      },
+      removeEventListener(name, fn, capture) {
+        if (name === 'dblclick') assert.equal(capture, true);
+        (name === 'focus' ? focusListeners : name === 'dblclick' ? doubleClickListeners : resizeListeners).delete(fn);
+      },
       __ModuleLoader__: { load(value) { plugin = value.factory(specifier => {
         if (specifier === 'react') return React;
         assert.equal(specifier, '@deepseek-ai/dsh-client-ui-primitives');
@@ -209,7 +216,7 @@ async function mount({ restartStatus = { supported: true, running: false, error:
       }); } },
     },
   });
-  vm.runInContext(await readFile(new URL('../client.js', import.meta.url), 'utf8'), context);
+  vm.runInContext(await readFile(new URL('../src/client.js', import.meta.url), 'utf8'), context);
   const form = {
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     getSnapshot: () => settings,
@@ -389,6 +396,15 @@ async function mount({ restartStatus = { supported: true, running: false, error:
     },
     focus() { focusListeners.forEach(fn => fn()); },
     focusSubscriptions: () => focusListeners.size,
+    doubleClickListeners,
+    doubleClick(path, button = 0) {
+      let stopped = false;
+      const event = { button, composedPath: () => path, stopPropagation() { stopped = true; },
+        preventDefault() { assert.fail('Double-click blocking must preserve browser text selection.'); } };
+      doubleClickListeners.forEach(fn => fn(event));
+      return stopped;
+    },
+    setFormStatus(status) { settings = { ...settings, status }; listeners.forEach(fn => fn()); },
     intervals: () => [...intervals.values()].map(timer => timer.ms),
     tickIntervals: () => Promise.all([...intervals.values()].map(timer => timer.fn())),
     setFile(text) { fileText = text; fileVersion++; },
@@ -466,6 +482,52 @@ async function mount({ restartStatus = { supported: true, running: false, error:
   };
   return app;
 }
+
+test('double-click blocking persists through the switch and only intercepts session row gestures', async () => {
+  const app = await mount();
+  const element = (tagName, attributes = {}, extra = {}) => ({ tagName, getAttribute: name => attributes[name] ?? null, ...extra });
+  const title = element('SPAN');
+  const row = element('DIV', { role: 'treeitem', 'data-row-key': 'session:one' });
+  const control = () => descendants(app.selectSettingsTab('simplify')).find(node => node.props.id === 'settings-test-blockDoubleClickRename');
+  assert.equal(control().props['aria-checked'], false);
+  assert.equal(app.doubleClickListeners.size, 0);
+  assert.equal(app.doubleClick([title, row]), false);
+  await control().props.onClick();
+  assert.equal(control().props['aria-checked'], true);
+  assert.equal(app.doubleClickListeners.size, 1);
+  app.set({ blockDoubleClickRename: true });
+  assert.equal(app.doubleClickListeners.size, 1, 'Repeated config notifications must not duplicate the capture listener.');
+  assert.equal(app.doubleClick([title, row]), true);
+  assert.equal(app.doubleClick([title, row], 1), false);
+  assert.equal(app.doubleClick([title, element('DIV', { role: 'treeitem', 'data-row-key': 'workspace:one' })]), false);
+  assert.equal(app.doubleClick([title, element('DIV', { role: 'treeitem' })]), false);
+  assert.equal(app.doubleClick([title]), false);
+  for (const target of [element('BUTTON'), element('INPUT'), element('TEXTAREA'), element('SELECT'), element('A'),
+    element('SPAN', {}, { isContentEditable: true }), element('SPAN', { role: 'switch' }), element('SPAN', { role: 'menuitem' })]) {
+    assert.equal(app.doubleClick([title, target, row]), false, 'Interactive controls retain their own gestures.');
+  }
+  app.setFormStatus('loading');
+  assert.equal(app.doubleClickListeners.size, 0);
+  app.setFormStatus('ready');
+  assert.equal(app.doubleClickListeners.size, 1);
+  await control().props.onClick();
+  assert.equal(app.doubleClickListeners.size, 0);
+  assert.equal(app.doubleClick([title, row]), false);
+  app.set({ blockDoubleClickRename: true });
+  app.unmount();
+  assert.equal(app.doubleClickListeners.size, 0);
+  assert.equal(app.subscriptions(), 0);
+});
+
+test('failed double-click preference saves leave the gesture enabled', async () => {
+  const app = await mount({ formReply: () => false });
+  const control = () => descendants(app.selectSettingsTab('simplify')).find(node => node.props.id === 'settings-test-blockDoubleClickRename');
+  await control().props.onClick();
+  assert.equal(control().props['aria-checked'], false);
+  assert.equal(app.doubleClickListeners.size, 0);
+  assert.ok(descendants(app.renderSettings()).some(node => node.props.role === 'alert' && node.props.children.includes('saveFailed')));
+  app.unmount();
+});
 
 function notificationSession({ id = 'task', seq = -1, reason = '', running = true, ...rest } = {}) {
   return { id, displayTitle: 'Build the project', running, retainedBy: {},
@@ -1117,13 +1179,13 @@ function descendants(node) {
   return [node, ...(node.props?.children || []).flat().flatMap(descendants)];
 }
 
-test('settings group thirteen switches under three panels and default to General', async () => {
+test('settings group fourteen switches under three panels and default to General', async () => {
   const app = await mount();
   app.set({ notificationsEnabled: true });
   const groups = {
     general: ['showVersion', 'showThemeSwitcher', 'showRefreshButton', 'showRestartButton', 'notificationsEnabled', 'notificationSoundEnabled'],
     enhancements: ['personalizationEnabled', 'skillManagerEnabled', 'mcpManagerEnabled'],
-    simplify: ['blockOfficialAccount', 'blockOfficialSearch', 'blockOfficialTelemetry', 'blockTodo'],
+    simplify: ['blockOfficialAccount', 'blockOfficialSearch', 'blockOfficialTelemetry', 'blockTodo', 'blockDoubleClickRename'],
   };
   const fields = [];
   for (const [id, expected] of Object.entries(groups)) {
@@ -1149,7 +1211,7 @@ test('settings group thirteen switches under three panels and default to General
     fields.push(...actual);
     assert.ok(!view.some(node => node.type === 'textarea'));
   }
-  assert.equal(new Set(fields).size, 13);
+  assert.equal(new Set(fields).size, 14);
   app.unmount();
 });
 
@@ -1216,7 +1278,7 @@ test('blocking settings omit background status and display native action errors'
   app.set({ blockOfficialTelemetry: true });
   let view = descendants(app.renderSettings());
   const controls = view.filter(node => node.props.role === 'switch');
-  assert.equal(controls.length, 4);
+  assert.equal(controls.length, 5);
   assert.ok(!view.some(node => node.props.role === 'status' || node.props.role === 'alert'));
   await controls.find(node => node.props.id === 'settings-test-blockOfficialTelemetry').props.onClick();
   assert.deepEqual(app.rpcCalls, [{ method: 'setTelemetryBlocked', blocked: false }]);

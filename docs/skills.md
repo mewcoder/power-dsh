@@ -14,7 +14,7 @@
 
 卡片底部显示目录简称，例如 `.dsh`、`.agents`、`.codex`；鼠标悬浮时显示 DSH 返回的完整技能路径，缺少文件路径时使用公开的目录资源根。简介最多两行，悬浮显示完整原文。简介和来源标签复用原生 `Tooltip`，无需等待浏览器 `title`；提示以 portal 呈现，避免被卡片裁剪，规则见 [UI 悬浮提示](ui.md#悬浮提示tooltip)。内置技能显示实际 npm 包名，例如 `@deepseek-ai/dsh-skill-office`，悬浮显示完整包名。不重复显示「用户」「内置」，完整路径不常驻卡片内。使用原生插件卡片的灰底、小圆角、等宽字体字段标签；卡片右上角开关为 28×16px 小号尺寸，主题与交互沿用原生。
 
-[来源解析](../skill-origin.js)直接使用 DSH 公共目录中的来源、文件路径及目录资源根。原生来源保留 `.dsh`、`.agents` 语义；其他提供方的文件技能从已有绝对路径中的 `.目录名/skills` 识别简称，不硬编码某个第三方插件的 source、接口或数据结构，不新增目录扫描。DSH 原生默认扫描 `.dsh`、`.agents`；当前 `.codex` 条目由已启用的第三方提供方注册进统一目录，Mod 只展示该目录的结果。内置来源使用已核对的 provider 对应关系，或公开路径中最近 `node_modules` 包的真实 manifest name。Office 的 `dsh-office` 和 Badge 的 `dsh-badge` 已按安装版 0.2.2-rc.1 源码核对；Office 资源根可以独立配置，因此不能假定其路径包含包名。未知来源不按技能名猜包名，不读取技能正文。来源字段 `origin` 是显示元数据，不改变分组、调用策略或读取范围；停用时保存，重载后保留。
+[来源解析](../src/skill-origin.js)直接使用 DSH 公共目录中的来源、文件路径及目录资源根。原生来源保留 `.dsh`、`.agents` 语义；其他提供方的文件技能从已有绝对路径中的 `.目录名/skills` 识别简称，不硬编码某个第三方插件的 source、接口或数据结构，不新增目录扫描。DSH 原生默认扫描 `.dsh`、`.agents`；当前 `.codex` 条目由已启用的第三方提供方注册进统一目录，Mod 只展示该目录的结果。内置来源使用已核对的 provider 对应关系，或公开路径中最近 `node_modules` 包的真实 manifest name。Office 的 `dsh-office` 和 Badge 的 `dsh-badge` 已按安装版 0.2.2-rc.1 源码核对；Office 资源根可以独立配置，因此不能假定其路径包含包名。未知来源不按技能名猜包名，不读取技能正文。来源字段 `origin` 是显示元数据，不改变分组、调用策略或读取范围；停用时保存，重载后保留。
 
 ## 只对 DSH 生效
 
@@ -28,7 +28,7 @@
 
 ## 原生生效机制
 
-[技能策略](../skill-policy.js)通过公开 `skills.registerProvider(create)` 贡献调用策略：停用候选的 invocation 两字段均为 false，加载结果正文为空且两字段仍为 false。DSH 原生模型目录、skill 工具与 `/name` 用户注入分别检查这些字段，由原生消费链拒绝，不是只隐藏 Mod 列表。
+[技能策略](../src/skill-policy.js)通过公开 `skills.registerProvider(create)` 贡献调用策略：停用候选的 invocation 两字段均为 false，加载结果正文为空且两字段仍为 false。DSH 原生模型目录、skill 工具与 `/name` 用户注入分别检查这些字段，由原生消费链拒绝，不是只隐藏 Mod 列表。
 
 同一层按 rank 选胜者，较近作用域优先于祖先。用户限制采用位于项目 100/200 与用户、内置来源之间的优先级，让同层项目副本继续胜出；项目限制只在查询 cwd 属于匹配项目根时提供，使用足以覆盖该项目来源的优先级。无 cwd 的用户查询不加入项目限制。Agent 精确层只放项目限制，避免用户限制抢过祖先层的项目副本。
 
@@ -51,6 +51,6 @@ owner-only RPC 为 `listSkills(cwd, scope)` 和 `setSkillEnabled(cwd, scope, nam
 
 本会话没有可用 Inspect 工具，接口以当前 App 安装包公开代码核实。市场与同类源码参考记录见[设计研究](skill-mcp-design.md#已做研究与边界)，没有复制或改编参考实现。关键依据是 `dsh-skill` 的分层目录与 rank、`dsh-skill-filesystem` 在 cwd 缺省时不添加项目根的行为、`dsh-scope` 的上下文所有权及原生技能三条消费链的调用策略检查。
 
-[Host 接线测试](../scripts/host-wiring.test.mjs)用实际 Cordis injector 加载 Mod；[策略测试](../scripts/skill-policy.test.mjs)覆盖目录范围、同名技能、项目隔离、作者规则、失败与生命周期；Client 测试覆盖两个范围、项目选择、过期响应和写入期间限制。额外用真实 SkillRegistry/Cordis 做纯内存验证，不改变用户真实技能或 profile。
+[Host 接线测试](../tests/host-wiring.test.mjs)用实际 Cordis injector 加载 Mod；[策略测试](../tests/skill-policy.test.mjs)覆盖目录范围、同名技能、项目隔离、作者规则、失败与生命周期；Client 测试覆盖两个范围、项目选择、过期响应和写入期间限制。额外用真实 SkillRegistry/Cordis 做纯内存验证，不改变用户真实技能或 profile。
 
 这些检查不等于实际 GUI、真实模型请求或整机重启验收。交付时分别记录插件加载和未验证的界面行为。

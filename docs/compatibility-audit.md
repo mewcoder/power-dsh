@@ -81,9 +81,9 @@ npm run check:compat -- 0.2.2-alpha.2
 
 ## 本次修复
 
-[MCP 提供方](../mcp-providers.js)在 Fiber 尚未完成首次配置解析时，可从公开 `rawConfig.serverName` 读取字面量身份，避免等待依赖或加载中的服务器消失。优先使用已解析配置，不执行表达式，不读取命令、参数、环境变量、请求头或 URL；原始名称只用于标识声明，不证明连接成功。模式归属读取补充已验证配置的 id 回退。[MCP 规范](mcp.md)记录现行规则。
+[MCP 提供方](../src/mcp-providers.js)在 Fiber 尚未完成首次配置解析时，可从公开 `rawConfig.serverName` 读取字面量身份，避免等待依赖或加载中的服务器消失。优先使用已解析配置，不执行表达式，不读取命令、参数、环境变量、请求头或 URL；原始名称只用于标识声明，不证明连接成功。模式归属读取补充已验证配置的 id 回退。[MCP 规范](mcp.md)记录现行规则。
 
-[通知注册测试](../scripts/notifications.test.mjs)使用两端均提供的 `onChanged` 和 snapshot 结果验证注册、通知内容、卸载和重新加载，不要求新版才有的 summary keys 接口。[Todo 测试](../scripts/todo-policy.test.mjs)在旧版使用其导出的真实 scheduler，新版使用真实 pipeline，保留执行拒绝及无关工具可执行的业务断言，不跳过旧版用例。[MCP 提供方测试](../scripts/mcp-providers.test.mjs)补充旧版 schema 深克隆、父层过滤、同名覆盖、限制及错误传播；新版仍验证不读取 schema 的快路径。
+[通知注册测试](../tests/notifications.test.mjs)使用两端均提供的 `onChanged` 和 snapshot 结果验证注册、通知内容、卸载和重新加载，不要求新版才有的 summary keys 接口。[Todo 测试](../tests/todo-policy.test.mjs)在旧版使用其导出的真实 scheduler，新版使用真实 pipeline，保留执行拒绝及无关工具可执行的业务断言，不跳过旧版用例。[MCP 提供方测试](../tests/mcp-providers.test.mjs)补充旧版 schema 深克隆、父层过滤、同名覆盖、限制及错误传播；新版仍验证不读取 schema 的快路径。
 
 ## 下一步验收
 

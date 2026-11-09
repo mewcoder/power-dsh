@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
 import ToolsService from '@deepseek-ai/dsh-tools';
-import { McpProviders } from '../mcp-providers.js';
-import { OperationQueue } from '../operation-queue.js';
+import { McpProviders } from '../src/mcp-providers.js';
+import { OperationQueue } from '../src/operation-queue.js';
 
 const require = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools'));
 const { Context, Service } = await import(require.resolve('@deepseek-ai/cordis'));

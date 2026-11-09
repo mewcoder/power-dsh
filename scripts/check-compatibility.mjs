@@ -50,10 +50,10 @@ for (const version of versions) {
   console.log(`Testing DSH SDK ${version}; isolated files: ${directory}`);
   try {
     for (const entry of await readdir(root, { withFileTypes: true })) {
-      const includeFile = entry.isFile() && (entry.name.endsWith('.js') || [
-        'package.json', '.gitignore', 'README.md', 'AGENTS.md', 'CHANGELOG.md', 'icon.svg', 'cordis.patch.yml',
-      ].includes(entry.name));
-      const includeDirectory = entry.isDirectory() && ['scripts', 'locale', 'docs'].includes(entry.name);
+      const includeFile = entry.isFile() && [
+        'package.json', 'pnpm-lock.yaml', '.gitignore', 'README.md', 'AGENTS.md', 'CHANGELOG.md', 'cordis.patch.yml', 'screenshots.json',
+      ].includes(entry.name);
+      const includeDirectory = entry.isDirectory() && ['src', 'assets', 'scripts', 'tests', 'docs'].includes(entry.name);
       if (includeFile || includeDirectory) {
         await cp(path.join(root, entry.name), path.join(directory, entry.name), { recursive: true, force: false, errorOnExist: true });
       }
@@ -71,8 +71,8 @@ for (const version of versions) {
     await run(directory, 'check', npmCommand, npmArgs(['run', 'check']));
     // Keep production imports unchanged while resolving the test's Context and
     // real Tools/Projection services from the historical SDK installation.
-    await run(directory, 'production-sdk-host', process.execPath, ['--test', 'scripts/host-wiring.test.mjs'], {
-      POWER_DSH_HOST_TEST_ENTRY: pathToFileURL(path.join(root, 'index.js')).href,
+    await run(directory, 'production-sdk-host', process.execPath, ['--test', 'tests/host-wiring.test.mjs'], {
+      POWER_DSH_HOST_TEST_ENTRY: pathToFileURL(path.join(root, 'src/index.js')).href,
     });
     result.passed = true;
     console.log(`${version}: repository checks and production-SDK Host wiring passed.`);

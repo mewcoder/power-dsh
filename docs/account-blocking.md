@@ -24,4 +24,4 @@ UI 与 `power_dsh_settings` 调用同一个 owner-only Host 操作。开启时�
 
 请通过开关或工具执行操作；直接修改布尔配置或在管理器单独启停目标后，再次执行开关操作可重新核对和应用期望状态。停用或卸载 Mod 不会自动启用目标，撤销精简的方法见[安装与使用](development.md#安装与使用)。
 
-目标定义见 [account-policy.js](../account-policy.js)，共享操作见 [plugin-policy.js](../plugin-policy.js)，Config 与 RPC 绑定见 [index.js](../index.js)。接口发现、测试和实际验证的区分见[开发指南](development.md#验证方法与限制)。
+目标定义见 [account-policy.js](../src/account-policy.js)，共享操作见 [plugin-policy.js](../src/plugin-policy.js)，Config 与 RPC 绑定见 [index.js](../src/index.js)。接口发现、测试和实际验证的区分见[开发指南](development.md#验证方法与限制)。

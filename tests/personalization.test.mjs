@@ -3,9 +3,9 @@ import { test } from 'node:test';
 import { mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Config } from '../index.js';
-import { PersonalizationFile } from '../personalization.js';
-import { OperationQueue } from '../operation-queue.js';
+import { Config } from '../src/index.js';
+import { PersonalizationFile } from '../src/personalization.js';
+import { OperationQueue } from '../src/operation-queue.js';
 
 async function fixture(fn) {
   const home = await mkdtemp(join(tmpdir(), 'power-dsh-instructions-'));

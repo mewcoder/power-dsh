@@ -69,7 +69,7 @@ test('Mod settings survive startup with real Cordis dependency enforcement, inde
           removeEventListener(_name, listener) { listeners.delete(listener); },
           setTimeout, clearTimeout,
         } });
-        vm.runInContext(await readFile(new URL('../client.js', import.meta.url), 'utf8'), sandbox);
+        vm.runInContext(await readFile(new URL('../src/client.js', import.meta.url), 'utf8'), sandbox);
         const fiber = await root.plugin(plugin);
         await new Promise(setImmediate);
         assert.ok(entries.has('settings.section:power-dsh'), 'The settings entry must survive auxiliary connection initialization.');

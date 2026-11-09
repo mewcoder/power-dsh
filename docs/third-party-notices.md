@@ -2,7 +2,7 @@
 
 ## DeepSeek Harness 原生插件目录布局
 
-[技能与 MCP 管理界面](../client.js)的搜索、分组与卡片布局，以及技能页的范围 Tab，适配自 DeepSeek Harness 的原生内置插件页面；技能与 MCP 卡片按需求提供独立启停开关，技能保持静态卡片；MCP 参考原生卡片的头部悬浮、展开高亮、按下与键盘焦点反馈、展开箭头及底部分隔背景，第一行保留名称 Tooltip 与独立启停开关，第二行并排显示运行状态与已确认的本地／HTTP 类型标签，类型使用原生 outline Tag 规格；第三行展开按钮将无括号的工具数量摘要与箭头左右排列，默认收起，展开区逐项展示工具名，整个三行头部支持点击展开或收起，开关与工具按钮过滤冒泡而独立操作，开关不嵌套在展开按钮内；展开后的工具列表仍可选择与复制文本。保留原有主题 token 与尺寸，使用本插件独立 CSS 类及技能、MCP 数据，不运行时导入其页面内部组件，不修改宿主页面。技能页的项目选择与两页的悬浮提示使用宿主 baseline 提供的公共 `Menu`、`Tooltip`，具体约定见 [UI 下拉规范](ui.md#下拉选择)和[悬浮提示](ui.md#悬浮提示tooltip)。与技能管理无关的插件清单、模式选择和配置编辑逻辑不包含在内。
+[技能与 MCP 管理界面](../src/client.js)的搜索、分组与卡片布局，以及技能页的范围 Tab，适配自 DeepSeek Harness 的原生内置插件页面；技能与 MCP 卡片按需求提供独立启停开关，技能保持静态卡片；MCP 参考原生卡片的头部悬浮、展开高亮、按下与键盘焦点反馈、展开箭头及底部分隔背景，第一行保留名称 Tooltip 与独立启停开关，第二行并排显示运行状态与已确认的本地／HTTP 类型标签，类型使用原生 outline Tag 规格；第三行展开按钮将无括号的工具数量摘要与箭头左右排列，默认收起，展开区逐项展示工具名，整个三行头部支持点击展开或收起，开关与工具按钮过滤冒泡而独立操作，开关不嵌套在展开按钮内；展开后的工具列表仍可选择与复制文本。保留原有主题 token 与尺寸，使用本插件独立 CSS 类及技能、MCP 数据，不运行时导入其页面内部组件，不修改宿主页面。技能页的项目选择与两页的悬浮提示使用宿主 baseline 提供的公共 `Menu`、`Tooltip`，具体约定见 [UI 下拉规范](ui.md#下拉选择)和[悬浮提示](ui.md#悬浮提示tooltip)。与技能管理无关的插件清单、模式选择和配置编辑逻辑不包含在内。
 
 - [原生 Tab 样式](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-settings-plugins/src/client/PluginsSettingsSection.module.css)
 - [原生目录页面](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-settings-plugin-inventory/src/client/PluginInventorySettingsTab.tsx)
@@ -54,7 +54,7 @@ Mod 使用已核对的 DSH `0.2.2-rc.1` 原生会话、交互及 subprocess 通�
 
 ## Lucide Puzzle、Sparkles 与 Cable
 
-[Mod 图标](../icon.svg)与 Mod 设置导航使用 Lucide Puzzle；[技能与 MCP 设置导航](../client.js)分别使用 Lucide Sparkles 和 Cable。仅内联所需 SVG，不引入 Lucide 运行时依赖。图形使用约定见 [UI 规范](ui.md#logo-与图标)，独立 SVG 中也保留完整许可。
+[Mod 图标](../assets/icon.svg)与 Mod 设置导航使用 Lucide Puzzle；[技能与 MCP 设置导航](../src/client.js)分别使用 Lucide Sparkles 和 Cable。仅内联所需 SVG，不引入 Lucide 运行时依赖。图形使用约定见 [UI 规范](ui.md#logo-与图标)，独立 SVG 中也保留完整许可。
 
 - [Puzzle 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/puzzle.svg)
 - [Sparkles 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/sparkles.svg)

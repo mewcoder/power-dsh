@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { McpPolicy } from '../mcp-policy.js';
-import { OperationQueue } from '../operation-queue.js';
+import { McpPolicy } from '../src/mcp-policy.js';
+import { OperationQueue } from '../src/operation-queue.js';
 
 const MCP_CLIENT = '@deepseek-ai/dsh-mcp-client';
 const SECRET = 'never-expose-this-credential';

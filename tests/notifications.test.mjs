@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
-import { notificationProjection } from '../notifications.js';
+import { notificationProjection } from '../src/notifications.js';
 
 const require = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools'));
 const { Context } = await import(require.resolve('@deepseek-ai/cordis'));

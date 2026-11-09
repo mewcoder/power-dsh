@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
 import ToolsService from '@deepseek-ai/dsh-tools';
-const { apply, inject } = await import(process.env.POWER_DSH_HOST_TEST_ENTRY ?? new URL('../index.js', import.meta.url));
+const { apply, inject, Config } = await import(process.env.POWER_DSH_HOST_TEST_ENTRY ?? new URL('../src/index.js', import.meta.url));
 
 // The compatibility runner can load production dependencies with an older Host injector.
 const require = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools'));
@@ -59,7 +59,7 @@ async function fixture(t, { hostWorkspace = true, managedId = 'power-dsh' } = {}
   if (hostWorkspace) root.reflect.provide('workspaceRegistry', { list: () => [{ path: '/memory-only/project', title: 'Memory project' }] });
   else root.reflect.provide('workspaces', { list: { getSnapshot: () => ({ items: [] }) } });
   const config = { disabledSkills: { get: () => [] }, ...Object.fromEntries([
-    'blockTodo', 'blockOfficialTelemetry', 'blockOfficialAccount', 'blockOfficialSearch', 'showVersion', 'showThemeSwitcher', 'showRefreshButton', 'showRestartButton',
+    'blockDoubleClickRename', 'blockTodo', 'blockOfficialTelemetry', 'blockOfficialAccount', 'blockOfficialSearch', 'showVersion', 'showThemeSwitcher', 'showRefreshButton', 'showRestartButton',
   ].map(field => [field, { get: () => false }])) };
   function fixtureMod(ctx) {
     ctx.fiber.entry = { options: { id: managedId } };
@@ -80,16 +80,22 @@ test('the renamed settings tool writes to the actual managed entry, including an
     const preferences = await tool.execute({}, { signal: new AbortController().signal });
     assert.equal(preferences.showVersion, false);
     assert.equal(preferences.blockOfficialSearch, false);
+    assert.equal(preferences.blockDoubleClickRename, false);
+    assert.equal(Config.dict.blockDoubleClickRename.meta.default, false);
+    assert.equal(tool.parameters.properties.blockDoubleClickRename.type, 'boolean');
     assert.equal(tool.parameters.properties.blockOfficialSearch.type, 'boolean');
     assert.deepEqual(writes, [], 'Reading preferences must not migrate or save an existing managed entry.');
-    await tool.execute({ showVersion: true }, { signal: new AbortController().signal });
-    assert.deepEqual(writes, [{ namespace: managedId, ops: [{ op: 'set', path: ['showVersion'], value: true }] }]);
+    await tool.execute({ showVersion: true, blockDoubleClickRename: true }, { signal: new AbortController().signal });
+    assert.deepEqual(writes, [
+      { namespace: managedId, ops: [{ op: 'set', path: ['showVersion'], value: true }] },
+      { namespace: managedId, ops: [{ op: 'set', path: ['blockDoubleClickRename'], value: true }] },
+    ]);
     await fiber.dispose();
     assert.equal(root.get('tools').get('power_dsh_settings'), undefined);
     assert.equal(Object.hasOwn(root.get('sessionProjections').snapshot(session).values, 'powerDshNotifications'), false);
     assert.equal(providers.size, 0);
     await assert.rejects(service.setAccountBlocked(true), /unloaded/);
-    assert.equal(writes.length, 1, 'Unloading must not migrate or save preferences.');
+    assert.equal(writes.length, 2, 'Unloading must not migrate or save preferences.');
   }
 });
 

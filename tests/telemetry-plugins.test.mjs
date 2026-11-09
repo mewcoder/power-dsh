@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { TelemetryPolicy } from '../telemetry-policy.js';
+import { TelemetryPolicy } from '../src/telemetry-policy.js';
 
 function setup({ preDisabled = [] } = {}) {
   const definitions = [

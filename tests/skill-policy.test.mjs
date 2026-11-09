@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { SkillPolicy } from '../skill-policy.js';
-import { OperationQueue } from '../operation-queue.js';
+import { SkillPolicy } from '../src/skill-policy.js';
+import { OperationQueue } from '../src/operation-queue.js';
 
 function fixture({ initial = [], incomplete = false } = {}) {
   let raw = { showVersion: true, personalizationEnabled: true, skillManagerEnabled: true, disabledSkills: initial };

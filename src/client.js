@@ -130,6 +130,8 @@ window.__ModuleLoader__.load({
         "cancel": "Cancel",
         "saving": "Saving…",
         "description": "A DSH enhancement plugin",
+        "blockDoubleClickRename": "Block double-click renaming",
+        "blockDoubleClickRenameDescription": "Disable double-click renaming of session titles in the sidebar",
         "blockTodo": "Simplify Todo tool",
         "blockTodoDescription": "Stop generating to-do lists during harness execution",
         "blockOfficialTelemetry": "Simplify official feedback and telemetry",
@@ -295,6 +297,8 @@ window.__ModuleLoader__.load({
         "cancel": "取消",
         "saving": "正在保存…",
         "description": "DSH 增强插件",
+        "blockDoubleClickRename": "屏蔽双击重命名",
+        "blockDoubleClickRenameDescription": "屏蔽侧栏会话标题的双击重命名操作",
         "blockTodo": "精简Todo工具",
         "blockTodoDescription": "harness执行过程中不再生成待办列表",
         "blockOfficialTelemetry": "精简官方反馈与遥测",
@@ -872,6 +876,41 @@ window.__ModuleLoader__.load({
       return () => { active = false; offList(); offStatus(); offForm(); offConnection(); closeAll(); records.clear(); };
     }
 
+    // Explicitly approved DOM exception: read only the current gesture's path.
+    // The session row marker was checked against DSH 0.2.2-rc.1.
+    function bindDoubleClickRenameBlocker(form) {
+      let listening = false;
+      const enabled = () => {
+        const snapshot = form.getSnapshot();
+        return snapshot.status === 'ready' && snapshot.value?.blockDoubleClickRename === true;
+      };
+      const onDoubleClick = event => {
+        if (!enabled() || event.button !== 0) return;
+        for (const node of event.composedPath()) {
+          if (typeof node?.getAttribute !== 'function') continue;
+          const role = node.getAttribute('role');
+          if (['BUTTON', 'INPUT', 'TEXTAREA', 'SELECT', 'A'].includes(node.tagName)
+            || node.isContentEditable || ['button', 'link', 'textbox', 'combobox', 'switch', 'menuitem'].includes(role)) return;
+          if (role !== 'treeitem') continue;
+          if (node.getAttribute('data-row-key')?.startsWith('session:')) event.stopPropagation();
+          return;
+        }
+      };
+      const sync = () => {
+        const next = enabled();
+        if (next === listening) return;
+        listening = next;
+        if (next) window.addEventListener('dblclick', onDoubleClick, true);
+        else window.removeEventListener('dblclick', onDoubleClick, true);
+      };
+      const unsubscribe = form.subscribe(sync);
+      sync();
+      return () => {
+        unsubscribe();
+        if (listening) window.removeEventListener('dblclick', onDoubleClick, true);
+      };
+    }
+
     function SettingsPage({ t, source, form, version, setAccountBlocked, setTelemetryBlocked, setTodoBlocked, setSearchBlocked, savePreference, notificationsSource, setNotificationsEnabled, soundsSource, loadSystemSounds, playSystemSound }) {
       const sounds = useSnapshot(soundsSource);
       const [soundMenuOpen, setSoundMenuOpen] = React.useState(false);
@@ -886,7 +925,7 @@ window.__ModuleLoader__.load({
       const tabs = [
         { id: 'general', fields: [['showVersion', 'versionDescription'], ['showThemeSwitcher', 'themeSwitcherDescription'], ['showRefreshButton', 'refreshDescription'], ['showRestartButton', 'restartDescription'], ['notificationsEnabled', 'notificationsDescription'], ['notificationSoundEnabled']] },
         { id: 'enhancements', fields: [['personalizationEnabled', 'personalizationDescription'], ['skillManagerEnabled', 'skillManagerDescription'], ['mcpManagerEnabled', 'mcpManagerDescription']] },
-        { id: 'simplify', fields: [['blockOfficialAccount', 'blockAccountDescription'], ['blockOfficialSearch', 'blockSearchDescription'], ['blockOfficialTelemetry', 'blockTelemetryDescription'], ['blockTodo', 'blockTodoDescription']] },
+        { id: 'simplify', fields: [['blockOfficialAccount', 'blockAccountDescription'], ['blockOfficialSearch', 'blockSearchDescription'], ['blockOfficialTelemetry', 'blockTelemetryDescription'], ['blockTodo', 'blockTodoDescription'], ['blockDoubleClickRename', 'blockDoubleClickRenameDescription']] },
       ];
       const [saving, setSaving] = React.useState(null);
       const [error, setError] = React.useState(null);
@@ -915,7 +954,7 @@ window.__ModuleLoader__.load({
             if (source.getSnapshot().value?.notificationSound !== next) await savePreference(field, next);
             if (mounted.current) await playSystemSound(next, true);
           }
-          else if (field === 'personalizationEnabled' || field === 'skillManagerEnabled' || field === 'mcpManagerEnabled' || field === 'notificationSoundEnabled') await savePreference(field, next);
+          else if (field === 'personalizationEnabled' || field === 'skillManagerEnabled' || field === 'mcpManagerEnabled' || field === 'notificationSoundEnabled' || field === 'blockDoubleClickRename') await savePreference(field, next);
           else if (!await form.set(field, next)) throw new Error(t('saveFailed'));
         } catch (failure) {
           if (mounted.current && field !== 'personalizationEnabled') setError({ field, message: failure?.message || t('saveFailed') });
@@ -1832,6 +1871,7 @@ window.__ModuleLoader__.load({
               return () => unsubscribe.forEach(off => off());
             },
           };
+          ctx.effect(() => bindDoubleClickRenameBlocker(form));
           const source = {
             subscribe: (listener) => form.subscribe(listener),
             getSnapshot: () => form.getSnapshot(),

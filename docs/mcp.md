@@ -10,9 +10,9 @@
 
 ## 原生目录与启停
 
-[MCP 策略](../mcp-policy.js)使用 `pluginManager.listPlugins()`、`listBundles()` 和 `agentPresets.compositionInventory()` 取得原生配置清单。只有状态明确、有唯一 patchId 且没有 readOnlyReason 的 profile 条目可调用 `setPluginEnabled(entryId, enabled)`。模式组合中的相对 ID 和页面生成的 ID 都不能作为 profile 写入目标。
+[MCP 策略](../src/mcp-policy.js)使用 `pluginManager.listPlugins()`、`listBundles()` 和 `agentPresets.compositionInventory()` 取得原生配置清单。只有状态明确、有唯一 patchId 且没有 readOnlyReason 的 profile 条目可调用 `setPluginEnabled(entryId, enabled)`。模式组合中的相对 ID 和页面生成的 ID 都不能作为 profile 写入目标。
 
-[提供方目录](../mcp-providers.js)从宿主 Loader 导入同一份 MCP 与 scope 模块，以 `registry.get(nativeMcp).fibers` 的真实回调身份取得已加载的全局实例。只读取必要的名称、生命周期标识、传输类型标量和作用域元数据，不按插件名包含关系或 `mcp__` 工具名称合成服务器，不枚举工作区或 Agent 以判断项目归属，不重新挂载或释放提供方实例。
+[提供方目录](../src/mcp-providers.js)从宿主 Loader 导入同一份 MCP 与 scope 模块，以 `registry.get(nativeMcp).fibers` 的真实回调身份取得已加载的全局实例。只读取必要的名称、生命周期标识、传输类型标量和作用域元数据，不按插件名包含关系或 `mcp__` 工具名称合成服务器，不枚举工作区或 Agent 以判断项目归属，不重新挂载或释放提供方实例。
 
 静态配置与运行实例按 Loader 条目的实际 Fiber uid 对应，同一实例仅显示一次；不能依赖 Fiber 继承的 `entry` 或对象引用来去重，否则 Include 节点会造成重复条目。显示名称优先使用已解析配置中的 `serverName`；首次解析尚未完成时，只从公开 `rawConfig.serverName` 取字面量身份，不执行表达式，也不据此判断连接成功。模式归属 id 可从已验证配置回退读取。旧 Cordis 在等待依赖时没有公开的未解析配置入口：profile 声明仍可显示名称和 pending 状态，缺少公开身份的纯动态实例等到配置解析后再列出，不读取内部 `_config`。持久化操作仍使用原生 entryId。来源只显示可确认的 Bundle、提供插件或模式身份，排除 `cordis:include` 等结构节点，不编造配置路径或服务器简介。
 
@@ -36,4 +36,4 @@ owner-only RPC 为 `listMcpServers()` 与 `setMcpServerEnabled(id, enabled)`，�
 
 以已有 DSH 源码和本机已安装包核对 MCP 客户端、Scope、Cordis Registry／Fiber、Loader、Plugin Manager、Settings 及模式清单；上游源码的 `mcpManager` 与本机是否实际提供该服务分别判断，不把新版字段或导出套到旧发行包。当前没有可用 Inspect 工具。市场参考与许可见[设计研究](skill-mcp-design.md#已做研究与边界)和[第三方声明](third-party-notices.md)，未复制第三方目录扫描器、独立连接器或 profile 接管逻辑。
 
-[策略测试](../scripts/mcp-policy.test.mjs)、[提供方测试](../scripts/mcp-providers.test.mjs)和 [Host 装配测试](../scripts/host-wiring.test.mjs)覆盖真实 Cordis 作用域、模块身份、静态／动态去重、原生 Settings 更新、失败读回、白名单和卸载边界；原生 MCP 传输在测试中替换为不连接的插件。Client 测试覆盖仅全局的分组与搜索、卡片独立展开与折叠、工具完整展示和双语空态、开关与展开相互独立、运行状态标签及其与启用意图的区分、可见时空闲轮询与卸载清理、慢请求、过期响应、只读和错误恢复。仓库检查不代表实际远端连接或 GUI 已验收，不为测试而擅自启停用户真实 MCP。
+[策略测试](../tests/mcp-policy.test.mjs)、[提供方测试](../tests/mcp-providers.test.mjs)和 [Host 装配测试](../tests/host-wiring.test.mjs)覆盖真实 Cordis 作用域、模块身份、静态／动态去重、原生 Settings 更新、失败读回、白名单和卸载边界；原生 MCP 传输在测试中替换为不连接的插件。Client 测试覆盖仅全局的分组与搜索、卡片独立展开与折叠、工具完整展示和双语空态、开关与展开相互独立、运行状态标签及其与启用意图的区分、可见时空闲轮询与卸载清理、慢请求、过期响应、只读和错误恢复。仓库检查不代表实际远端连接或 GUI 已验收，不为测试而擅自启停用户真实 MCP。

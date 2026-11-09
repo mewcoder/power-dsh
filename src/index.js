@@ -28,6 +28,7 @@ export const Config = z.object({
   blockOfficialSearch: z.boolean().default(false).volatile(),
   blockOfficialTelemetry: z.boolean().default(false).volatile(),
   blockTodo: z.boolean().default(false).volatile(),
+  blockDoubleClickRename: z.boolean().default(false).volatile(),
   personalizationEnabled: z.boolean().default(false).volatile(),
   skillManagerEnabled: z.boolean().default(false).volatile(),
   mcpManagerEnabled: z.boolean().default(false).volatile(),
@@ -191,6 +192,10 @@ export function apply(ctx, config) {
         type: 'boolean',
         description: 'Show the desktop application restart button when supported. This preference does not restart the application. Omit to keep it unchanged.',
       },
+      blockDoubleClickRename: {
+        type: 'boolean',
+        description: 'Block double-click renaming in the sidebar session list when true. Menu and keyboard renaming remain available. Omit to keep it unchanged.',
+      },
       blockTodo: {
         type: 'boolean',
         description: 'Disable the Todo tool plugin globally and in modes when true; false enables matching plugins. Existing sessions may need reopening to use a re-enabled mode revision. Session history and the conversation UI are preserved. Omit to keep it unchanged.',
@@ -219,6 +224,7 @@ export function apply(ctx, config) {
           showRestartButton: { type: 'boolean', required: true },
           blockOfficialAccount: { type: 'boolean', required: true },
           blockOfficialSearch: { type: 'boolean', required: true },
+          blockDoubleClickRename: { type: 'boolean', required: true },
           blockOfficialTelemetry: { type: 'boolean', required: true },
           showRestartButton: {
         type: 'boolean',
@@ -248,7 +254,7 @@ export function apply(ctx, config) {
     },
     async execute(args, exec) {
       exec.signal.throwIfAborted();
-      for (const field of ['showVersion', 'showThemeSwitcher', 'showRefreshButton', 'showRestartButton']) {
+      for (const field of ['showVersion', 'showThemeSwitcher', 'showRefreshButton', 'showRestartButton', 'blockDoubleClickRename']) {
         if (args[field] !== undefined) {
           await ctx.settings.mutate(namespace, [{ op: 'set', path: [field], value: args[field] }]);
         }
@@ -273,6 +279,7 @@ export function apply(ctx, config) {
         showThemeSwitcher: config.showThemeSwitcher.get(),
         showRefreshButton: config.showRefreshButton.get(),
         showRestartButton: config.showRestartButton.get(),
+        blockDoubleClickRename: config.blockDoubleClickRename.get(),
         blockOfficialAccount: config.blockOfficialAccount.get(),
         blockOfficialSearch: config.blockOfficialSearch.get(),
         version: ctx.clientModules.graph().release?.version ?? null,

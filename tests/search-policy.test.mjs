@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
 import ToolsService, * as toolsSdk from '@deepseek-ai/dsh-tools';
-import { SearchPolicy } from '../search-policy.js';
-import { OperationQueue } from '../operation-queue.js';
-import { SEARCH_RPC } from '../rpc.js';
+import { SearchPolicy } from '../src/search-policy.js';
+import { OperationQueue } from '../src/operation-queue.js';
+import { SEARCH_RPC } from '../src/rpc.js';
 
 const require = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools'));
 const { Context } = await import(require.resolve('@deepseek-ai/cordis'));

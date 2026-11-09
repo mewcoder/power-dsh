@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { OperationQueue } from '../operation-queue.js';
+import { OperationQueue } from '../src/operation-queue.js';
 
 test('operations serialize and an error does not poison following work', async () => {
   const queue = new OperationQueue();

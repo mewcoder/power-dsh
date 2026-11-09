@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { EventEmitter } from 'node:events';
-import { DesktopRestart } from '../restart.js';
+import { DesktopRestart } from '../src/restart.js';
 
 function fixture(overrides = {}) {
   const effects = [];

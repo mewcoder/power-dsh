@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
 import ToolsService, * as toolsSdk from '@deepseek-ai/dsh-tools';
-import { TodoPolicy } from '../todo-policy.js';
-import { OperationQueue } from '../operation-queue.js';
+import { TodoPolicy } from '../src/todo-policy.js';
+import { OperationQueue } from '../src/operation-queue.js';
 
 // Resolve peer dependencies from the SDK so scopes use the registry's own symbols.
 const require = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools'));

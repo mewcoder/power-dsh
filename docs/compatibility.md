@@ -38,21 +38,25 @@
 
 独立 `blockOfficialSearch` 的接口依据为本机 `0.2.2-rc.1` 安装包及固定 SDK：`tool-web` 的 `search` / `fetch` 配置、ConfigEditor 的活动条目编辑与读回、模式组合诊断，以及既有 Tools `guard` / `restrict` 和 Agent 生命周期。未提供 Inspect 工具，实际安装、页面及旧版矩阵尚未验证；本功能不继承上表旧版测试数字，完整范围见[精简官方搜索](search-blocking.md)。
 
+## 屏蔽双击重命名的新增范围与证据
+
+本机 `0.2.2-rc.1` 安装包已核对内部标题双击处理及会话行 `role="treeitem"`、`data-row-key="session:…"` 标记；没有可单独关闭双击的公开配置或局部包装 slot。经用户明确许可，Client 仅识别当前事件路径并阻止会话行双击传播。标记变化时屏蔽可能失效，旧版矩阵及实际页面尚未验证，不能继承上表历史测试结果。详见[屏蔽双击重命名](double-click-rename.md)。
+
 ## 接口核对清单
 
 下表来自本项目实际调用点。接口最早出现在哪个版本仍需对照确切发行版确认；当前版本有同名方法不能证明旧版具有相同参数、返回字段、事件和清理行为。
 
 | 范围 | 关键依赖 | 核对重点 |
 | --- | --- | --- |
-| 整包 Host 加载 | [Host 入口](../index.js)的 `settings`、`tools`、`clientModules`、`pluginManager`、`typert`、`configEditor`、`profileContext` | 服务能否注入、导入的 SDK 是否匹配、配置 schema 与严格 RPC 能否注册 |
-| 整包 Client 加载 | [Client 入口](../client.js)的模块加载器、公共 `Menu` / `Tooltip` / `StateDot` / `Modal` / `Button`、`remote.$mount`、`configForms`、slot 注册 | 模块和导出存在，RPC 两端匹配，设置主入口能加载，子功能失败不被误报为正常 |
-| 账号与反馈与遥测精简 | [PluginPolicy](../plugin-policy.js)的 `listPlugins()`、`setPluginEnabled()`、`ConfigEditor.edit()` | 条目身份、只读原因、`application` / warnings / error 结果、写后读回与宿主目标模块名 |
-| 精简官方搜索 | [SearchPolicy](../search-policy.js)的 ConfigEditor `entries()` / `edit()`、模式组合读回、Tools `guard` / `restrict` | 只改 `config.search`、跳过已停用 owner、保留抓取及 MCP、旧会话限制与卸载释放 |
-| 精简Todo工具 | [TodoPolicy](../todo-policy.js)的 `agentPresets.compositionInventory()`、Tools `guard` / `restrict`、Agent 生命周期事件 | 模式清单字段、旧 Agent 的工具限制、重新选择模式后的状态、卸载释放 |
-| 技能管理 | [SkillPolicy](../skill-policy.js)的 `skills.registerProvider()` / `snapshot()`、`agentPresets.serviceFor()` / `acquireScope()` / `compositionInventory()`、`createScope()`、`workspaceRegistry.list()` | provider 生命周期、用户与项目优先级、租约释放、模式服务隔离、导入项目字段 |
-| MCP 目录与启停 | [McpPolicy](../mcp-policy.js)与[McpProviders](../mcp-providers.js)的 bundle rows、模式清单、Loader entries、Fiber、scope、原生 manager | `fiberPhase` / `fiberState` 含义、Fiber 数字状态映射、归属去重、工具作用域、配置修订与原生写后读回 |
-| 任务通知 | [通知投影](../notifications.js)及 Host 注册、Client 的 `sessions.list` / `uiSession.sessionStatus` | 投影注册与释放、`turn/end` 原因、首次订阅基线、重连去重、提问与审批状态字段 |
-| 系统声音 | [SystemSounds](../system-sounds.js)、`connection.isLoopback`、subprocess `resolveExecutable` / `spawn` 与托管句柄 | 本机识别、参数与取消语义、平台真实试听、远程界面不会在服务器播放 |
+| 整包 Host 加载 | [Host 入口](../src/index.js)的 `settings`、`tools`、`clientModules`、`pluginManager`、`typert`、`configEditor`、`profileContext` | 服务能否注入、导入的 SDK 是否匹配、配置 schema 与严格 RPC 能否注册 |
+| 整包 Client 加载 | [Client 入口](../src/client.js)的模块加载器、公共 `Menu` / `Tooltip` / `StateDot` / `Modal` / `Button`、`remote.$mount`、`configForms`、slot 注册 | 模块和导出存在，RPC 两端匹配，设置主入口能加载，子功能失败不被误报为正常 |
+| 账号与反馈与遥测精简 | [PluginPolicy](../src/plugin-policy.js)的 `listPlugins()`、`setPluginEnabled()`、`ConfigEditor.edit()` | 条目身份、只读原因、`application` / warnings / error 结果、写后读回与宿主目标模块名 |
+| 精简官方搜索 | [SearchPolicy](../src/search-policy.js)的 ConfigEditor `entries()` / `edit()`、模式组合读回、Tools `guard` / `restrict` | 只改 `config.search`、跳过已停用 owner、保留抓取及 MCP、旧会话限制与卸载释放 |
+| 精简Todo工具 | [TodoPolicy](../src/todo-policy.js)的 `agentPresets.compositionInventory()`、Tools `guard` / `restrict`、Agent 生命周期事件 | 模式清单字段、旧 Agent 的工具限制、重新选择模式后的状态、卸载释放 |
+| 技能管理 | [SkillPolicy](../src/skill-policy.js)的 `skills.registerProvider()` / `snapshot()`、`agentPresets.serviceFor()` / `acquireScope()` / `compositionInventory()`、`createScope()`、`workspaceRegistry.list()` | provider 生命周期、用户与项目优先级、租约释放、模式服务隔离、导入项目字段 |
+| MCP 目录与启停 | [McpPolicy](../src/mcp-policy.js)与[McpProviders](../src/mcp-providers.js)的 bundle rows、模式清单、Loader entries、Fiber、scope、原生 manager | `fiberPhase` / `fiberState` 含义、Fiber 数字状态映射、归属去重、工具作用域、配置修订与原生写后读回 |
+| 任务通知 | [通知投影](../src/notifications.js)及 Host 注册、Client 的 `sessions.list` / `uiSession.sessionStatus` | 投影注册与释放、`turn/end` 原因、首次订阅基线、重连去重、提问与审批状态字段 |
+| 系统声音 | [SystemSounds](../src/system-sounds.js)、`connection.isLoopback`、subprocess `resolveExecutable` / `spawn` 与托管句柄 | 本机识别、参数与取消语义、平台真实试听、远程界面不会在服务器播放 |
 | 个性化 | `profileContext.home`、文件 RPC、宿主全局指令发现 | 正文落在同一个原生全局文件、冲突时不覆盖、禁用入口不改变正文及读取行为 |
 | 版本、外观与刷新 | `clientModules.graph().release`、boot release、theme service、桌面 updates bridge、侧栏 slot 与标题栏 | 显示的是宿主版本；桥协议、主题事件、slot props、窗口缩放和系统标题栏偏移 |
 
@@ -68,7 +72,7 @@
 
 ## 需要优先验证的初始化行为
 
-功能开关不是版本隔离机制。[Host 入口](../index.js)会在服务注入满足时注册通知投影、绑定 Todo、初始化 MCP 提供方和技能管理；这些操作并非都等到对应开关开启才执行。Client 也在 factory 中读取公共 UI 模块。因此必须先验证所有主开关关闭时的整包加载，再逐个开启功能；不能凭“默认关闭”判断旧版可用。
+功能开关不是版本隔离机制。[Host 入口](../src/index.js)会在服务注入满足时注册通知投影、绑定 Todo、初始化 MCP 提供方和技能管理；这些操作并非都等到对应开关开启才执行。Client 也在 factory 中读取公共 UI 模块。因此必须先验证所有主开关关闭时的整包加载，再逐个开启功能；不能凭“默认关闭”判断旧版可用。
 
 现有的局部不可用处理也不能替代版本验证。例如没有协议兼容的桌面更新桥时版本按钮只读，系统声音在不支持环境中只提供默认选项，技能或 MCP 的部分读取失败会返回不可用或未知。只有实际覆盖过的场景才能记为可降级，不能推及所有缺失接口。
 

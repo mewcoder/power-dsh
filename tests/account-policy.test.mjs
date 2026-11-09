@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { AccountPolicy } from '../account-policy.js';
-import { ACCOUNT_RPC } from '../rpc.js';
-import { OperationQueue } from '../operation-queue.js';
+import { AccountPolicy } from '../src/account-policy.js';
+import { ACCOUNT_RPC } from '../src/rpc.js';
+import { OperationQueue } from '../src/operation-queue.js';
 
 function setup({ preDisabled = false } = {}) {
   const rows = [

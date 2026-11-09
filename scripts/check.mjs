@@ -8,6 +8,16 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const read = (name) => readFile(path.join(root, name), 'utf8');
 const isFile = async (name) => (await stat(path.join(root, name))).isFile();
 const keys = (value) => Object.keys(value).sort();
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const matches = (pattern, name) => new RegExp(`^${pattern.split('*').map(escapeRegExp).join('[^/]*')}$`).test(name);
+async function listFiles(directory) {
+  const entries = await readdir(path.join(root, directory), { withFileTypes: true });
+  const files = await Promise.all(entries.map(entry => {
+    const name = `${directory}/${entry.name}`;
+    return entry.isDirectory() ? listFiles(name) : [name];
+  }));
+  return files.flat();
+}
 
 const manifest = JSON.parse(await read('package.json'));
 assert.equal(manifest.name, 'power-dsh');
@@ -17,27 +27,30 @@ assert.equal(manifest.dsh.client.platform, 'web');
 assert.ok(manifest.dsh.client.inject.includes('@deepseek-ai/dsh-client-ui-settings'));
 assert.ok(manifest.dsh.client.inject.includes('@deepseek-ai/dsh-client-locale'));
 
+const isShipped = (name) => manifest.files.some(pattern => matches(pattern, name));
 const resources = {
-  '.': './index.js',
-  './client': './client.js',
-  './icon': './icon.svg',
+  '.': './src/index.js',
+  './client': './src/client.js',
+  './icon': './assets/icon.svg',
 };
 for (const [key, target] of Object.entries(resources)) {
   assert.equal(manifest.exports[key], target);
   assert.ok(await isFile(target), `Missing resource: ${target}`);
-  assert.ok(manifest.files.includes(target.slice(2)), `Not in files: ${target}`);
+  assert.ok(isShipped(target.slice(2)), `Not in files: ${target}`);
 }
-assert.equal(manifest.exports['./locale/*.json'], './locale/*.json');
-for (const pattern of ['cordis.patch.yml', 'locale/*.json', 'docs/*.md', 'scripts/check.mjs', 'CHANGELOG.md']) {
+assert.equal(manifest.exports['./locale/*.json'], './assets/locale/*.json');
+for (const pattern of ['src/*.js', 'assets/locale/*.json', 'cordis.patch.yml', 'docs/*.md', 'scripts/*.mjs', 'tests/*.test.mjs', 'CHANGELOG.md', 'screenshots.json']) {
   assert.ok(manifest.files.includes(pattern), `Missing distribution entry: ${pattern}`);
 }
+assert.ok(!(await readdir(root)).some(name => /\.(?:[cm]?js|ts)$/.test(name)), 'Keep runtime source in src/, not the repository root.');
+assert.ok(!(await readdir(path.join(root, 'scripts'))).some(name => name.endsWith('.test.mjs')), 'Keep tests in tests/, not scripts/.');
 
 // This deliberately validates the minimal shell patch, not the full Loader YAML dialect.
 const patch = await read('cordis.patch.yml');
 assert.match(patch, /^- insert:\s*\n\s+- id: power-dsh\s*\n\s+name: ['"]power-dsh['"]\s*$/);
 
-const english = JSON.parse(await read('locale/en.json'));
-const chinese = JSON.parse(await read('locale/zh.json'));
+const english = JSON.parse(await read('assets/locale/en.json'));
+const chinese = JSON.parse(await read('assets/locale/zh.json'));
 assert.deepEqual(keys(english.meta), keys(chinese.meta));
 for (const dictionary of [english, chinese]) {
   assert.equal(dictionary.meta.title, 'PowerDSH', 'The plugin display title must be PowerDSH in both languages.');
@@ -46,7 +59,7 @@ for (const dictionary of [english, chinese]) {
   }
 }
 
-const client = await read('client.js');
+const client = await read('src/client.js');
 assert.ok(client.includes(`id: '${manifest.name}'`), 'Client factory id must match the package.');
 const dictionaryLiteral = client.match(/const dictionaries = (\{[\s\S]*?\n    \});/);
 assert.ok(dictionaryLiteral, 'Keep the inline dictionaries JSON-compatible.');
@@ -63,41 +76,51 @@ for (const [, key] of client.matchAll(/\bt\('([^']+)'\)/g)) {
   assert.ok(Object.hasOwn(dictionaries.en, key), `Missing UI translation: ${key}`);
 }
 
-const icon = await read('icon.svg');
+const icon = await read('assets/icon.svg');
 assert.ok(Buffer.byteLength(icon) <= 256 * 1024, 'Icon exceeds the Host size limit.');
 assert.match(icon, /<svg\b[^>]*xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
 assert.match(icon, /viewBox="0 0 24 24"/);
 assert.match(icon, /<\/svg>\s*$/);
 assert.doesNotMatch(icon, /<script\b|<foreignObject\b|\bhref\s*=/i);
 
-const docFiles = ['README.md', 'CHANGELOG.md', 'AGENTS.md', ...(await readdir(path.join(root, 'docs')))
-  .filter((name) => name.endsWith('.md')).map((name) => `docs/${name}`)];
+async function checkLocalTarget(name, rawTarget) {
+  const target = rawTarget.replace(/^<|>$/g, '').split('#')[0];
+  if (!target || /^[a-z][a-z\d+.-]*:/i.test(target)) return;
+  assert.ok(!path.isAbsolute(target), `Use repository-relative documentation links: ${name}`);
+  const resolved = path.relative(root, path.resolve(root, path.dirname(name), decodeURIComponent(target)));
+  assert.ok(resolved && resolved !== '..' && !resolved.startsWith(`..${path.sep}`), `Link leaves the repository: ${name} → ${target}`);
+  const info = await stat(path.join(root, resolved));
+  assert.ok(info.isFile() || info.isDirectory(), `Missing link target: ${name} → ${target}`);
+}
+const docFiles = ['README.md', 'CHANGELOG.md', 'AGENTS.md', ...(await listFiles('docs')).filter(name => name.endsWith('.md'))];
 for (const name of docFiles) {
   const markdown = await read(name);
-  for (const [, rawTarget] of markdown.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
-    const target = rawTarget.replace(/^<|>$/g, '').split('#')[0];
-    if (!target || /^[a-z][a-z\d+.-]*:/i.test(target)) continue;
-    assert.ok(!path.isAbsolute(target), `Use repository-relative documentation links: ${name}`);
-    const resolved = path.resolve(root, path.dirname(name), decodeURIComponent(target));
-    assert.ok(resolved.startsWith(root), `Link leaves the repository: ${name} → ${target}`);
-    assert.ok((await stat(resolved)).isFile(), `Missing link target: ${name} → ${target}`);
-  }
+  const targets = [...markdown.matchAll(/\[[^\]]*\]\(([^)]+)\)/g), ...markdown.matchAll(/<img\b[^>]*\bsrc=["']([^"']+)["']/g)];
+  for (const [, target] of targets) await checkLocalTarget(name, target);
+}
+const screenshots = JSON.parse(await read('screenshots.json'));
+assert.ok(Array.isArray(screenshots) && screenshots.length >= 1 && screenshots.length <= 8, 'Declare 1–8 screenshots.');
+for (const screenshot of screenshots) {
+  assert.equal(typeof screenshot, 'string');
+  await checkLocalTarget('screenshots.json', screenshot);
 }
 
-const sourceFiles = (await readdir(root)).filter(name => name.endsWith('.js'));
-const checkFiles = (await readdir(path.join(root, 'scripts'))).filter(name => name.endsWith('.mjs')).map(name => `scripts/${name}`);
-for (const name of [...sourceFiles, ...checkFiles]) {
-  assert.ok(manifest.files.includes(name), `Not in distribution: ${name}`);
+const codeFiles = (await Promise.all(['src', 'scripts', 'tests'].map(listFiles))).flat().filter(name => /\.(?:js|mjs)$/.test(name));
+for (const name of codeFiles) {
+  assert.ok(isShipped(name), `Not in distribution: ${name}`);
   const text = await read(name);
   for (const [, specifier] of text.matchAll(/(?:from\s*|import\s*)['"](\.[^'"]+)['"]/g)) {
     const resolved = path.relative(root, path.resolve(root, path.dirname(name), specifier));
-    assert.ok(manifest.files.includes(resolved), `Local import is not shipped: ${name} → ${specifier}`);
+    assert.ok(await isFile(resolved), `Missing local import: ${name} → ${specifier}`);
+    assert.ok(isShipped(resolved), `Local import is not shipped: ${name} → ${specifier}`);
   }
   const result = spawnSync(process.execPath, ['--check', path.join(root, name)], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr || result.error?.message || `Syntax check failed: ${name}`);
 }
-for (const resource of manifest.files.filter(name => !name.includes('*'))) {
-  assert.ok(await isFile(resource), `Missing distribution file: ${resource}`);
+const distributionFiles = [...codeFiles, ...await listFiles('assets'), ...await listFiles('docs'), ...await readdir(root)];
+for (const pattern of manifest.files) {
+  assert.ok(distributionFiles.some(name => matches(pattern, name)), `Empty distribution pattern: ${pattern}`);
+  if (!pattern.includes('*')) assert.ok(await isFile(pattern), `Missing distribution file: ${pattern}`);
 }
-console.log('Passed: JavaScript syntax, bundle manifest and resources, bilingual keys, SVG structure, and local documentation links.');
+console.log('Passed: repository layout, JavaScript syntax, bundle manifest and resources, bilingual keys, SVG, screenshots, and local documentation links.');
 console.log('Not checked: DSH installation, live slots, rendered icons, themes, locale switching, and unload behavior.');

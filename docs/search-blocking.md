@@ -18,7 +18,7 @@ UI 与 `power_dsh_settings(blockOfficialSearch: ...)` 共用 owner-only Host 操
 
 ## 实现与验证依据
 
-实现见 [SearchPolicy](../search-policy.js)，Host 配置与工具见 [index.js](../index.js)，严格 RPC 见 [rpc.js](../rpc.js)，界面文案与独立行见 [client.js](../client.js)。行为测试见 [search-policy.test.mjs](../scripts/search-policy.test.mjs)。
+实现见 [SearchPolicy](../src/search-policy.js)，Host 配置与工具见 [index.js](../src/index.js)，严格 RPC 见 [rpc.js](../src/rpc.js)，界面文案与独立行见 [client.js](../src/client.js)。行为测试见 [search-policy.test.mjs](../tests/search-policy.test.mjs)。
 
 本会话没有 `cordis_inspect_list` / `cordis_inspect_query`，接口依据是本机 DSH `0.2.2-rc.1` 安装包的 `dsh-tool-web`、`dsh-config-editor`、`dsh-agent-preset-registry` 和固定 SDK。`tool-web` 公开 `search` / `fetch` 两个布尔配置；ConfigEditor 编辑活动条目并等待 Loader 应用；模式清单不包含工具配置，必须另读声明并核对组合状态。参考仓库的版本和实现可能领先安装包，不据此推断本机默认提供方。
 

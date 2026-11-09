@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { SystemSounds } from '../system-sounds.js';
+import { SystemSounds } from '../src/system-sounds.js';
 
 function fixture({ platform = 'darwin', service = true, playback, resolve, timeoutMs = 1000, io = {} } = {}) {
   const effects = [];

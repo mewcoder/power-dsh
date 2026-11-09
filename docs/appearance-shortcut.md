@@ -20,4 +20,4 @@ SVG `use` 引用原生 Medium sprite：`dsw-icon-light-outline-medium`、`dsw-ic
 
 ## 验证重点
 
-检查三模式循环、原生设置同步、账号状态独立、收起与关闭隐藏、点击隔离、宽度变化和卸载清理。[Client 装配测试](../scripts/client-wiring.test.mjs)使用真实 Cordis 依赖检查，分别验证连接服务可用与暂不可用时设置入口持续注册，以及卸载时释放入口和监听。Client 测试与实际槽位注册不能替代浏览器点击及视觉验收，分层方法见[开发指南](development.md#验证方法与限制)。
+检查三模式循环、原生设置同步、账号状态独立、收起与关闭隐藏、点击隔离、宽度变化和卸载清理。[Client 装配测试](../tests/client-wiring.test.mjs)使用真实 Cordis 依赖检查，分别验证连接服务可用与暂不可用时设置入口持续注册，以及卸载时释放入口和监听。Client 测试与实际槽位注册不能替代浏览器点击及视觉验收，分层方法见[开发指南](development.md#验证方法与限制)。

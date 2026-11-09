@@ -14,9 +14,9 @@
 
 ## 文件与原生接入
 
-[文件模块](../personalization.js)直接读写固定的全局指令文件。读取返回绝对路径、原文与磁盘内容衍生的 SHA-256 revision，区分不存在与空文件。保存必须携带读取时的 revision；在同一个 Host 操作队列中执行，校验类型与长度、检查磁盘版本，写同目录临时文件，再检查版本并原子替换目标。临时文件使用独占创建及 0600 权限，成功和失败都清理临时文件。卸载会阻止后续操作。外部程序不参与 Mod 队列，最后一次版本检查与原子替换之间仍存在很短的竞争窗口，不承诺跨进程强事务。
+[文件模块](../src/personalization.js)直接读写固定的全局指令文件。读取返回绝对路径、原文与磁盘内容衍生的 SHA-256 revision，区分不存在与空文件。保存必须携带读取时的 revision；在同一个 Host 操作队列中执行，校验类型与长度、检查磁盘版本，写同目录临时文件，再检查版本并原子替换目标。临时文件使用独占创建及 0600 权限，成功和失败都清理临时文件。卸载会阻止后续操作。外部程序不参与 Mod 队列，最后一次版本检查与原子替换之间仍存在很短的竞争窗口，不承诺跨进程强事务。
 
-[Host](../index.js)仅声明 `personalizationEnabled` 开关，通过 `configForms` 保存。文件正文使用 owner-only `readPersonalization` / `savePersonalization` RPC，复用严格 Typert 合约与 `OperationQueue`，不经 settings 保存正文，不接受客户端传入任意文件路径。移除旧的 `getSettingsPath` 和 Mod 自行注册的 `systemPrompt.context`，避免同一份文件重复注入。
+[Host](../src/index.js)仅声明 `personalizationEnabled` 开关，通过 `configForms` 保存。文件正文使用 owner-only `readPersonalization` / `savePersonalization` RPC，复用严格 Typert 合约与 `OperationQueue`，不经 settings 保存正文，不接受客户端传入任意文件路径。移除旧的 `getSettingsPath` 和 Mod 自行注册的 `systemPrompt.context`，避免同一份文件重复注入。
 
 旧版 `globalPrompt` 配置不再读取、展示或写入；既有原始字段由精简策略保存白名单保留，不自动迁移或覆盖用户的全局文件。磁盘是新编辑器的事实源；旧内容需要用户主动复制并保存至全局文件。
 
@@ -38,8 +38,8 @@
 
 ## 验证
 
-[文件测试](../scripts/personalization.test.mjs)仅在临时目录操作，覆盖缺失时只读、显式创建、中文与字面变量、清空、已有内容、外部修改冲突、队列中的两个过期窗口、卸载阻止写入、长度与类型校验、符号链接保护和临时文件清理。
+[文件测试](../tests/personalization.test.mjs)仅在临时目录操作，覆盖缺失时只读、显式创建、中文与字面变量、清空、已有内容、外部修改冲突、队列中的两个过期窗口、卸载阻止写入、长度与类型校验、符号链接保护和临时文件清理。
 
-[Client 测试](../scripts/client.test.mjs)覆盖独立原生 Tab 和图标的注册清理、真实文件路径描述、简短 placeholder、文件 RPC 保存取消、慢请求防重复、失败保留草稿、磁盘 revision 冲突、不可读时禁止空写、长度与只读。
+[Client 测试](../tests/client.test.mjs)覆盖独立原生 Tab 和图标的注册清理、真实文件路径描述、简短 placeholder、文件 RPC 保存取消、慢请求防重复、失败保留草稿、磁盘 revision 冲突、不可读时禁止空写、长度与只读。
 
 额外在安装包导出的真实 `dsh-agent-instructions.apply` 上，用内存 fs/session 验证首次 baseline、外部版本变化后下一次 pre-step 替换、未变化时跳过正文重读、删除后移除；没有写入真实用户文件，没有发送模型请求。以上不等于 Inspect、具体已有会话的预设绑定或实际页面视觉验收；按[分层验证](development.md#验证方法与限制)分别说明。

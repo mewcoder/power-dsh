@@ -23,7 +23,7 @@ GitHub 仓库为 `mewcoder/power-dsh`，origin 已核对为新地址。首次源
 
 ## 插件卡片的名称与描述
 
-[包清单](../package.json)的 `name` 是技术包名 `power-dsh`，`description` 是通用简介；[中文元数据](../locale/zh.json)与[英文元数据](../locale/en.json)的 `meta.title`、`meta.description` 是本地化名称和简介。插件显示名、Client 设置入口与页面标题中英文均为 **PowerDSH**；设置页说明独立精简为「DSH 增强插件」／`A DSH enhancement plugin`。改名或改简介时按各自用途一起核对。
+[包清单](../package.json)的 `name` 是技术包名 `power-dsh`，`description` 是通用简介；[中文元数据](../assets/locale/zh.json)与[英文元数据](../assets/locale/en.json)的 `meta.title`、`meta.description` 是本地化名称和简介。插件显示名、Client 设置入口与页面标题中英文均为 **PowerDSH**；设置页说明独立精简为「DSH 增强插件」／`A DSH enhancement plugin`。改名或改简介时按各自用途一起核对。
 
 用户提供的市场「已安装」截图中，本地开发卡片显示技术包名、版本和路径，没有显示简介；因此调整本项目元数据后仍需在目标市场页面实际核对展示。公开市场的发现卡片还会使用目录条目的描述，目录描述可以比设置页简介更具体。
 
@@ -37,7 +37,7 @@ dsh-plugin, deepseek-harness, deepseek, dsh, mcp, notifications, skill-managemen
 
 `dsh-plugin` 同时是市场收录要求之一，其余标签用于准确表达宿主与功能。2026-11-08 的参考样本包括 [dsh-market](https://github.com/dsh-market/dsh-market) 的中英文用途、演示与安装入口，[dsh-unlag](https://github.com/regrevia/dsh-unlag) 的问题与效果说明，以及 [dsh-skill-mcp-manager](https://github.com/alone-tree/dsh-skill-mcp-manager) 的 Skills/MCP 定位与实际截图。参考的是信息表达和发现入口，stars 不作为质量或流量保证。
 
-README 面向使用者，标题固定为 `# power-dsh`，首屏使用已确认的中英品牌引用块，其后展示宽度为 560 的真实截图，保留「分类 / 功能 / 描述」三列功能表与使用入口。功能表始终反映当前代码，不记录逐项版本号；发版时由 Git 标签保留对应代码与 README 快照，详细变化记录在更新日志与 Release。开发流程、测试命令及 SDK 验收矩阵保留在维护文档中。截图在实际界面变化时更新。没有已发布产物、CI 或确定许可证时，不添加相应的成功徽章。本地 README 在用户确认推送后才会更新到 GitHub；Release 下载和市场入口待发布、收录后更新。
+README 面向使用者，标题固定为 `# power-dsh`，首屏使用已确认的中英品牌引用块，其后展示宽度为 560 的真实截图，保留「分类 / 功能 / 描述」三列功能表与使用入口。功能表使用 HTML `rowspan` 纵向合并「通用」「增强」「精简」分类，功能名称使用纯文本，不附逐项文档超链接；始终反映当前代码，不记录逐项版本号；发版时由 Git 标签保留对应代码与 README 快照，详细变化记录在更新日志与 Release。开发流程、测试命令及 SDK 验收矩阵保留在维护文档中。截图在实际界面变化时更新。没有已发布产物、CI 或确定许可证时，不添加相应的成功徽章。本地 README 在用户确认推送后才会更新到 GitHub；Release 下载和市场入口待发布、收录后更新。
 
 ## 选择分发方式
 
@@ -49,6 +49,14 @@ README 面向使用者，标题固定为 `# power-dsh`，首屏使用已确认�
 | GitHub 源码 | 仓库的提交或标签 | dsh-market 可检查 Git 来源；固定提交用于复现，升级需明确选新目标 |
 | GitHub Release 附件 | 某次 Release 的 `.tgz` | dsh-market 可跟踪其支持的 Release 来源；固定标签 URL 指向该版，`latest/download` 指向最新正式版 |
 | npm | 包名及确切版本 | 原生插件管理器支持符合其条件的注册表包版本查询与升级；dsh-market 也支持 npm 更新 |
+
+### 安装来源与依赖
+
+不发布 npm 包或 Release 附件时，用户仍可通过原生插件管理器安装 `github:mewcoder/power-dsh`，也可固定到已推送的提交或实际存在的标签。原生管理器调用 pnpm，负责获取 Git 源码和包清单声明的运行依赖；本项目的 JavaScript 入口无需构建，不需要另加 `prepare`。`private: true` 仅限制 npm 发布，不禁止 Git 或本地 tarball 安装。具体操作与当前验收状态见[安装说明](development.md#安装与使用)。
+
+普通 `npm pack` 不会自动包含 `node_modules/`，Release `.tgz` 同样需要安装时解析并获取运行依赖，不能承诺离线安装。本地链接目录保留自己的依赖树，开发者须先在源码目录安装依赖。需要共享宿主实例的 SDK 与普通依赖的声明方式仍按[首次发版准备](#首次发版前的准备)核对，不因选择 Git 来源而机械移动依赖。
+
+上述机制依据[官方安装指南](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md#从-github-安装构建脚本这道坎)及参考源码中 Plugin Manager 的 `installBundle()` → pnpm `add` 路径核对；上游主分支不等于全部历史发行版的验收结论。
 
 更新能力取决于用户实际安装的来源和管理器。发布 Release 不会自动替换用户正在运行的代码；不能承诺所有管理器都会给 Git 或压缩包安装提供与 npm 相同的更新入口。
 

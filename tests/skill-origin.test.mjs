@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { skillOrigin } from '../skill-origin.js';
+import { skillOrigin } from '../src/skill-origin.js';
 
 function reader(packages = {}) {
   const calls = [];
