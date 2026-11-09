@@ -4552,6 +4552,11 @@ void main() {
 `;
 
 // src/features/flowing-background/attachment.ts
+	const nativeStylesheets = {
+		layout: "@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css",
+		sidebar: "@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css",
+		workspace: "@deepseek-ai/dsh-client-ui-workspace/WorkspaceBrowser.module.css"
+	};
 	const failure = (stage, check, result, expected, actual) => ({
 		state: "unavailable",
 		stage,
@@ -4566,7 +4571,7 @@ void main() {
 	function nativeClasses(doc) {
 		let issue = null;
 		const read = (owner, name, required = true) => {
-			const module = owner === "layout" ? "@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css" : "@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css";
+			const module = nativeStylesheets[owner];
 			const sheets = doc.querySelectorAll(`style[data-plugin-css="${module}"]`);
 			if (sheets.length !== 1) {
 				if (required) issue ??= failure("styles", `${owner}.stylesheet`, sheets.length ? "ambiguous" : "missing", "1", String(sheets.length));
@@ -4583,12 +4588,20 @@ void main() {
 		const centerCol = read("layout", "centerCol");
 		const sidebarRoot = read("sidebar", "root");
 		const scrollFade = read("sidebar", "scrollFade", false);
+		const workspaceRoot = read("workspace", "root", false);
+		const workspaceBody = read("workspace", "treeBody", false);
+		const fade = read("workspace", "fade", false);
 		return frame && sidebarCol && centerCol && sidebarRoot ? { classes: {
 			frame,
 			sidebarCol,
 			centerCol,
 			sidebarRoot,
-			scrollFade
+			scrollFade,
+			workspaceFade: workspaceRoot && workspaceBody && fade ? {
+				root: workspaceRoot,
+				body: workspaceBody,
+				fade
+			} : null
 		} } : {
 			classes: null,
 			failure: issue
@@ -4699,7 +4712,13 @@ void main() {
 html[data-windows-titlebar] .${names.frame}:has(> .power-dsh-flowing-background)::before { background: transparent !important; }
 html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .power-dsh-flowing-background) > .${names.sidebarCol} { border-right: 0.5px solid var(--dsw-alias-border-l3) !important; }`;
 				if (sheet.textContent !== css) sheet.textContent = css;
-				const nextFades = new Set(names.scrollFade ? [...target.querySelectorAll(`.${names.sidebarRoot}`)].flatMap((root) => [...root.querySelectorAll(`.${names.scrollFade}[aria-hidden="true"]`)]) : []);
+				const nextFades = /* @__PURE__ */ new Set();
+				for (const sidebar of target.querySelectorAll(`.${names.sidebarRoot}`)) {
+					if (names.scrollFade) for (const fade of sidebar.querySelectorAll(`.${names.scrollFade}[aria-hidden="true"]`)) nextFades.add(fade);
+					const workspace = names.workspaceFade;
+					if (!workspace) continue;
+					for (const root of sidebar.querySelectorAll(`.${workspace.root}`)) for (const body of root.querySelectorAll(`.${workspace.body}`)) for (const fade of body.querySelectorAll(`:scope > .${workspace.fade}`)) if (fade.tagName.toLowerCase() === "span") nextFades.add(fade);
+				}
 				for (const [element, restore] of fades) if (!nextFades.has(element)) {
 					restore();
 					fades.delete(element);

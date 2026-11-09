@@ -12,11 +12,13 @@
 
 当前宿主没有公共背景插槽。`shell.overlay` 仅注册 id 为 `power-dsh-flowing-background`、返回 null 的生命周期控制组件，不在全窗口浮层中绘画，也不订阅 `usePanelInfo`、`useSessions` 或会话消息。
 
-用户本次已直接授权全局预览及必要的原生结构表面适配。适配器只寻找唯一、可见且结构符合已安装宿主的 AppFrame。类名映射只读自当前页面两个确切的官方 `style[data-plugin-css]` 标签：`@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css` 和 `@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css`；前者提取唯一、简单且分别以 `_frame`、`_sidebarCol`、`_centerCol` 结尾的类名，后者提取唯一以 `_root` 结尾的必需类名，并尝试读取以 `_scrollFade` 结尾的可选类名。`_scrollFade` 缺失或歧义仅跳过渐隐层适配，不阻断背景；每个标签及必需类名都必须唯一，再结合真实框架的语义直接子元素、`position:relative` 和 `display:grid` 核对目标；不采用 npm 固定哈希、模糊类名或猜测性后代选择器。画布直接挂在该 AppFrame 内，使用自有 `position:absolute; inset:0; z-index:-1` 绘图层，框架建立 `isolation:isolate` 并保留原生 `--dsw-alias-bg-base` 底色。全框架使用一张连续 Canvas，跨越侧边栏与主内容区；画布位于结构表面及内容下方，不给文字、按钮或卡片叠加前景颜色。
+用户本次已直接授权全局预览及必要的原生结构表面适配。适配器只寻找唯一、可见且结构符合已安装宿主的 AppFrame。必需框架类名映射只读自当前页面两个确切的官方 `style[data-plugin-css]` 标签：`@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css` 和 `@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css`；前者提取唯一、简单且分别以 `_frame`、`_sidebarCol`、`_centerCol` 结尾的类名，后者提取唯一以 `_root` 结尾的必需类名，并尝试读取以 `_scrollFade` 结尾的可选类名。`_scrollFade` 缺失或歧义仅跳过渐隐层适配，不阻断背景；每个标签及必需类名都必须唯一，再结合真实框架的语义直接子元素、`position:relative` 和 `display:grid` 核对目标；不采用 npm 固定哈希、模糊类名或猜测性后代选择器。画布直接挂在该 AppFrame 内，使用自有 `position:absolute; inset:0; z-index:-1` 绘图层，框架建立 `isolation:isolate` 并保留原生 `--dsw-alias-bg-base` 底色。全框架使用一张连续 Canvas，跨越侧边栏与主内容区；画布位于结构表面及内容下方，不给文字、按钮或卡片叠加前景颜色。
 
 为让底层画布透出，仅允许对已核对的 AppFrame `sidebarCol`、`centerCol`、原生 SidebarRoot、任意 phase 的主 ConversationRoot，以及该主内容内通过 `[data-composer-seat][data-conversation-region="composer"]` 核对的输入区外层，临时设置内联 `background-color:transparent` 和 `background-image:none`。主 ConversationRoot 通过原生 `[data-conversation-content]` 的直接父元素及 `[data-phase]` 关系核对，不限制为 hero。不得扩大到输入卡片、编辑器、文件卡片、菜单、弹窗、任意后代或全局主题 token；不替换宿主根节点、不注入宿主全局 CSS、不改原生布局尺寸。窄窗口下 AppFrame 带有 `data-sidebar-drawer` 时，不透明化 sidebarCol 或 SidebarRoot，保留模态侧栏抽屉的原生底色；离开抽屉模式后重新适配这些明确目标。按用户要求，Windows 顶部操作栏尽量透明：只为已核对 AppFrame 且直接拥有自有背景层的元素添加局部 `::before` 背景透明规则，受 `html[data-windows-titlebar]` 限制，规则与自有样式节点一并释放。仅改绘制底色，保留原生高度、拖动区域、菜单、悬浮反馈和按钮交互；不修改全局主题 token。右上角原生窗口按钮由 Electron `titleBarOverlay` 绘制，桌面 preload 从独立主题探针同步颜色；当前插件无公共接口修改该底色，因此不承诺该部分透明，不操作内部 IPC 或探针。其他全局面板若拥有独立的不透明内容表面，可继续保留其原生底色，不承诺让所有内容表面透明；操作系统原生标题栏不在本次适配范围。
 
 开启时同时隐藏原生 SidebarRoot 内、由同一官方样式模块唯一 `_scrollFade` 类名及 `aria-hidden="true"` 核对的底部滚动渐隐层，临时设置内联 `display:none !important`，避免 Windows 等平台在设置按钮上方留下侧栏底色阴影；抽屉模式同样隐藏。仅处理这个明确的装饰层，不修改列表滚动、设置按钮或其他渐变。此装饰层在部分发行构建中不存在；类名缺失或不唯一时保留该层原生效果，背景仍正常挂载，元数据变为唯一后可更新适配，失去唯一性时恢复原样且不重启动画。
+
+用户实屏反馈的 `_fade` 来自另一官方模块 `@deepseek-ai/dsh-client-ui-workspace/WorkspaceBrowser.module.css`，本功能额外只读该精确标签中唯一的 `_root`、`_treeBody`、`_fade` 简单类名。仅在已核对原生 SidebarRoot 内的工作区 root → treeBody 结构中，对 treeBody 的直接 span.fade 临时设置 `display:none !important`；已安装构建的该 span 没有 `aria-hidden`，不以此属性过滤。分组、平铺和搜索结果均复用这一结构，抽屉模式同样隐藏。该模块及三项类名全部为可选适配，缺失、歧义或样式未加载时不阻断背景、不猜测替代节点；加载、替换、关闭与第三方后写值遵循现有恢复规则，不重启动画。不按固定哈希或全局后缀匹配其他 fade。
 
 按用户要求，Windows 非抽屉侧栏在开启背景期间补回右侧分割线，使用原生同款 `0.5px solid var(--dsw-alias-border-l3)`。规则仅匹配已核对、直接拥有自有背景层的 AppFrame 的直接 sidebarCol，受 `html[data-windows-titlebar]` 与 `:not([data-sidebar-drawer])` 限制，浅深主题跟随原生边框 token；关闭或卸载时随自有样式节点移除，恢复 Windows 原生无分割线样式，抽屉与其他平台保持原生。
 
@@ -34,9 +36,9 @@
 
 ## 生命周期、权限与兼容
 
-Client 通过 `preferenceSlot` 将控制组件注册和配置订阅绑定到 slot/context 生命周期。适配器的 `MutationObserver` 在 body 跟踪目标框架和已批准结构表面的生命周期，在 head 通过 `childList`、`characterData` 变化跟踪官方样式模块加载或替换，只读取上述两个确切样式标签中的类名元数据，不读取消息内容或扫描业务事件。React effect 拥有结构表面样式快照、局部节点、尺寸观察、动画、visibilitychange、WebGL 上下文及媒体偏好监听。切换会话、运行状态或全局面板不重启动画；同一框架的类名映射或已批准结构表面变化只刷新目标适配，不重启动画。
+Client 通过 `preferenceSlot` 将控制组件注册和配置订阅绑定到 slot/context 生命周期。适配器的 `MutationObserver` 在 body 跟踪目标框架和已批准结构表面的生命周期，在 head 通过 `childList`、`characterData` 变化跟踪官方样式模块加载或替换，只读取上述两个必需样式标签及一个可选工作区样式标签中的类名元数据，不读取消息内容或扫描业务事件。React effect 拥有结构表面样式快照、局部节点、尺寸观察、动画、visibilitychange、WebGL 上下文及媒体偏好监听。切换会话、运行状态或全局面板不重启动画；同一框架的类名映射或已批准结构表面变化只刷新目标适配，不重启动画。
 
-上述框架挂载、结构表面背景处理及两个确切官方样式标签的只读类名元数据映射，属于现有用户授权结构适配的有限范围，不能扩大为任意样式扫描、宿主 DOM 读取或布局改写。没有 Host 业务方法、额外 RPC、网络请求、外部字体、视频、文件、凭据或进程操作，不读取会话正文、鼠标位置、侧栏条目内容或其他插件业务内容。设置控件继续使用宿主主题 token。
+上述框架挂载、结构表面背景处理及三个确切官方样式标签的只读类名元数据映射，属于现有用户授权结构适配的有限范围，不能扩大为任意样式扫描、宿主 DOM 读取或布局改写。没有 Host 业务方法、额外 RPC、网络请求、外部字体、视频、文件、凭据或进程操作，不读取会话正文、鼠标位置、侧栏条目内容或其他插件业务内容。设置控件继续使用宿主主题 token。
 
 接口依据为本机 DSH `0.2.2-rc.1` 的 Client Inspect：`Slots.listSubTree({root:'shell.overlay'})` 确认 root/list、独立 id、无 owner props；`Service.listService({service:'slots'})` 核对注册及依赖释放语义。本次直接读取已安装桌面包核实：`@deepseek-ai/dsh-client-ui-layout` 的 `lib/client.js` 第 74 行样式及 83–93 行类映射使用 `PIRFFq_frame`、`PIRFFq_sidebarCol`、`PIRFFq_centerCol`；`@deepseek-ai/dsh-client-ui-sidebar` 第 116–125 行使用 `kB3qhq_root`。同为 `0.2.2-rc.1` 的 npm 包却使用 `pI_x6G_*`、`hHd-Xa_root`，说明 CSS Modules 哈希会因构建而异，不能按版本号硬编码。实际适配因此以当前页面官方样式模块元数据和语义父子关系为准；主 ConversationRoot 仍通过 `[data-conversation-content]` 的直接父元素及 `[data-phase]` 核对。样式标签、必需简单类名或真实结构无法唯一确认时停止背景适配，不猜测替代目标。桌面与浏览器采用同一 Canvas 路径，未扩大跨版本实测承诺。
 
@@ -44,7 +46,7 @@ Client 通过 `preferenceSlot` 将控制组件注册和配置订阅绑定到 slo
 
 [diagnostics.ts](diagnostics.ts)按失败阶段选择独立的诊断呈现策略，集中拥有错误码、阶段标签、原因与恢复建议；策略的结果类型随阶段约束，拒绝不成立的阶段/结果组合。Client 只订阅故障状态、维护观察时间并装配设置行，不包含诊断业务分支。策略行为覆盖见[tests/diagnostics.test.mjs](tests/diagnostics.test.mjs)。
 
-背景运行故障使用 `PD-BACKGROUND-LAYOUT`、`PD-BACKGROUND-INIT` 或 `PD-BACKGROUND-ENVIRONMENT`，操作固定为 `flowing-background.attach`，不再归入设置保存错误。适配器只返回结构化的安全失败阶段、语义检查项、结果及预期/实际值；必需样式缺失与歧义、框架缺失/隐藏/歧义/布局不支持/挂载后样式变化、初始化失败及环境能力缺失分别定位。`scrollFade` 仍是可选项，不产生布局错误。
+背景运行故障使用 `PD-BACKGROUND-LAYOUT`、`PD-BACKGROUND-INIT` 或 `PD-BACKGROUND-ENVIRONMENT`，操作固定为 `flowing-background.attach`，不再归入设置保存错误。适配器只返回结构化的安全失败阶段、语义检查项、结果及预期/实际值；必需样式缺失与歧义、框架缺失/隐藏/歧义/布局不支持/挂载后样式变化、初始化失败及环境能力缺失分别定位。侧栏 `scrollFade` 与工作区列表 `fade` 均为可选适配，不产生布局错误。
 
 行内摘要显示失败原因与适用恢复建议，详情及复制报告包含稳定阶段/结果标识、检查项（如 `layout.frame`、`frame.display`）、预期与实际数量或允许的状态枚举、已保存开关未变与背景隐藏状态、首次观察时间、已确认的 DSH 版本和平台。只保存同一故障的首次观察时间，原因变化更新诊断，成功或关闭后撤去展示；不记录原始异常、机器路径、样式正文或消息内容。缺失项随原有观察器自动复查，布局不支持/歧义提示更新插件及重新加载，初始化失败或隔离样式变化才建议切换开关重试；持续失败引导复制诊断。主规则见[错误处理规范](../../../docs/error-handling.md)。
 
@@ -54,11 +56,12 @@ Client 通过 `preferenceSlot` 将控制组件注册和配置订阅绑定到 slo
 - 保存失败回到已保存值，不启动新效果，其他功能偏好保留；运行故障使用背景专属错误码，实际保存失败优先且不混入运行失败的原因。
 - 各失败分支报告稳定阶段、检查项、结果和安全的预期/实际值；可选装饰缺失不报错，原因变化更新详情与复制状态，同一原因重复检查保持观察时间；中英文恢复建议与原因匹配，成功清理反馈。
 - 不以会话、消息、运行状态或全局面板门控；已有对话、运行和设置页保持同一全局画布。
-- 仅两个确切官方样式标签及其所需简单类名唯一、且真实 AppFrame 可见并通过语义直接子元素与定位核对时可挂载；缺失、歧义或不支持时不绘画、不回退前景，设置页提供共享错误反馈。
+- 仅两个必需的确切官方样式标签及其所需简单类名唯一、且真实 AppFrame 可见并通过语义直接子元素与定位核对时可挂载；缺失、歧义或不支持时不绘画、不回退前景，设置页提供共享错误反馈。
 - 同版本不同构建哈希均以当前已加载样式模块为准；正确样式延迟到达可恢复挂载，同一框架的哈希或结构表面替换不重启动画，观察器随关闭和卸载释放。
 - 一张 Canvas 连续覆盖框架、侧边栏和主内容区；背景只从已批准结构表面透出，输入卡片、编辑器、文件卡片、菜单和弹窗保留原生表面与交互。窄窗口 `data-sidebar-drawer` 模式保留侧栏抽屉原生底色，退出该模式后再恢复侧栏透明适配。
 - 已有对话的输入区外层不再用原生 bg-base 渐变覆盖官网流动背景，浅深主题均能透出背景；输入卡片的底色、圆角、阴影、sticky 定位和层级保持原生。输入区外层的原始内联值与优先级随关闭、替换或卸载恢复；菜单本体、阴影与 macOS 模糊垫层保持原生，外围色块仍待实屏确认。
 - 开启时在装饰类名可唯一识别的构建中隐藏侧栏设置按钮上方的原生底部滚动渐隐层，包括抽屉模式；缺失或歧义时不阻断背景；关闭、卸载、初始化失败或节点替换后按所有权恢复原始 display 值与优先级。动态替换只更新该装饰层，不重启动画，不影响其他位置的渐隐层。
+- 工作区列表的底部 fade 只依据精确官方模块的唯一 root/treeBody/fade 映射及 span 直接子结构隐藏，兼容不同构建哈希；模块缺失、错误来源、标签/类名歧义均不阻断背景，恢复元数据后可适配，列表替换及关闭按所有权恢复，其他位置同名类不受影响。
 - Windows 顶部操作栏的 AppFrame `::before` 底色在开启期间透明，规则绑定当前唯一核对框架及其自有直接子层；关闭或卸载移除规则，拖动和菜单交互保持原生。两套构建哈希均使用动态映射；右上角原生窗口按钮底色保留。
 - Windows 非抽屉侧栏开启背景时显示主题色 0.5px 右侧分割线，关闭或卸载后移除规则；两套构建哈希均动态映射，抽屉模式及其他平台不受该规则影响。
 - 原始内联值与优先级能按所有权恢复；第三方后写值不被覆盖；结构表面替换不重启动画，框架替换后旧资源完整释放。
@@ -78,3 +81,7 @@ Windows 顶栏适配依据参考源码 AppFrame 的 `data-windows-titlebar` / `:
 已直接核对本机 `0.2.2-rc.1` 打包桌面版的 SidebarRoot 编译样式、类名映射与渲染代码：该构建包含 `_root`，但不存在 `_scrollFade`。此前错误地把参考源码中的新增装饰类名设为必需项，导致背景校验失败。现将其改为可选项，并补充缺失、歧义、延迟出现及再次失去唯一性时背景持续运行与装饰层恢复的回归；用户所报 Windows 构建仍待实屏复测。
 
 本轮诊断优化及阶段策略拆分已通过严格类型、构建新鲜度、356 项全仓测试、实际打包、独立生产安装与 diff 空白检查；编译产物已更新。覆盖保存/运行故障区分、诊断字段选择与脱敏、失败检查预期/实际值、中英文原因及恢复建议、时间与复制状态的更新、可选渐隐层兼容和资源清理。尚未执行本轮实际页面验收。
+
+本轮已直接核对本机 `0.2.2-rc.1` 工作区编译包：精确样式标签为 `@deepseek-ai/dsh-client-ui-workspace/WorkspaceBrowser.module.css`，本机构建映射为 `Kjh-qa_root/treeBody/fade`；用户 Windows 构建反馈 `Gakraw_fade`。底部 span 在分组、平铺和搜索结果渲染中存在，样式为 24px 底色渐变，macOS 原生隐藏。本次适配使用运行时模块映射，测试覆盖上述两套及另一套哈希、无 aria-hidden 的真实节点结构、可选元数据恢复及列表替换；实际 Windows 页面仍待复测。
+
+工作区 fade 补全已重建产物，通过严格类型、构建新鲜度、358 项全仓测试、实际打包、独立生产安装与 diff 空白检查；真实 Windows 展示尚待用户更新后复测。

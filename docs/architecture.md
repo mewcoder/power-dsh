@@ -57,11 +57,13 @@ DSH `0.2.2-rc.1` 的原生 logger 提供内存缓冲与 exporter；插件安装�
 
 [官网流动背景](../src/features/flowing-background/spec.md)拥有 `flowingBackgroundEnabled` 配置，默认 `false`、独立持久化，通过原生 `configForms` 保存。按用户本次全局预览请求，原开关现在控制包括侧边栏在内的整个界面，不增加模式或透明度控件。Client 在 `shell.overlay` additive slot 仅注册返回 null 的生命周期控制组件，不订阅会话或面板显示条件；已有对话、运行、设置及全局面板不停止动画。浮层不承担实际绘画，不读取消息正文或扫描业务事件。
 
-适配器只在唯一、可见且符合已安装宿主结构的 AppFrame 内追加 absolute、inset 0、z-index -1 的单张连续 Canvas；框架使用 `isolation:isolate` 和原生 bg-base 底色。当前类名只读自两个确切官方 `style[data-plugin-css]` 标签：`@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css` 提供唯一简单类名 `_frame`、`_sidebarCol`、`_centerCol`，`@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css` 提供唯一简单类名 `_root`；标签和所需类名均须唯一，再用语义直接子元素、relative 定位和 grid 布局核对真实目标。用户明确授权的原生表面适配仅包括 AppFrame sidebarCol、centerCol、原生 SidebarRoot，以及任意 phase 的主 ConversationRoot，临时设置其内联 background-color:transparent 与 background-image:none。不硬编码 npm CSS Modules 哈希，不猜测替代选择器，不修改全局主题 token、输入卡片、编辑器、文件卡片、菜单、弹窗或任意后代，不替换宿主根节点。其他全局面板的独立不透明内容表面和操作系统原生标题栏继续保留。
+适配器只在唯一、可见且符合已安装宿主结构的 AppFrame 内追加 absolute、inset 0、z-index -1 的单张连续 Canvas；框架使用 `isolation:isolate` 和原生 bg-base 底色。必需框架类名只读自两个确切官方 `style[data-plugin-css]` 标签：`@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css` 提供唯一简单类名 `_frame`、`_sidebarCol`、`_centerCol`，`@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css` 提供唯一简单类名 `_root`；标签和所需类名均须唯一，再用语义直接子元素、relative 定位和 grid 布局核对真实目标。用户明确授权的原生表面适配仅包括 AppFrame sidebarCol、centerCol、原生 SidebarRoot，以及任意 phase 的主 ConversationRoot，临时设置其内联 background-color:transparent 与 background-image:none。不硬编码 npm CSS Modules 哈希，不猜测替代选择器，不修改全局主题 token、输入卡片、编辑器、文件卡片、菜单、弹窗或任意后代，不替换宿主根节点。其他全局面板的独立不透明内容表面和操作系统原生标题栏继续保留。
+
+按用户反馈的底部阴影，额外可选读取 `@deepseek-ai/dsh-client-ui-workspace/WorkspaceBrowser.module.css` 的唯一 root/treeBody/fade 映射，仅隐藏原生 SidebarRoot 内工作区 root 下 treeBody 的直接 span.fade，兼容分组、平铺与搜索结果；模块或类名缺失、歧义不阻断背景。原有侧栏 scrollFade 同样为可选适配，具体样式与恢复范围以主 Spec 为准。
 
 样式快照保存原值和优先级，清理只恢复仍等于本功能写入值和优先级的属性，保留第三方后写值。目标原生表面或同一框架的类名映射替换时只刷新背景适配，不重启动画；框架替换、关闭和卸载释放旧资源并恢复所属样式。官方样式元数据缺失、标签或类名歧义、框架缺失或不受支持时不挂载、不回退前景，设置页使用共享错误反馈；正确官方样式延迟到达后可重新挂载并清理过期错误。
 
-绘图组件保留独立 WebGL shader 的蓝白柔和流动主体，参考 [DeepSeek 官网](https://www.deepseek.com/)的 WebGL pattern，不复制官网源码或资源、不承诺像素级复刻，不引入网络资源或新依赖。框架 clientWidth/clientHeight 与 `ResizeObserver` 驱动自有画布尺寸；`MutationObserver` 在 body 跟踪已批准结构表面，在 head 观察官方样式模块的 childList/characterData 变化，类名读取限于上述两个精确标签。减少动态效果时静态，页面隐藏时暂停；WebGL 不可用或上下文丢失时，仅在适配成功的框架底层回退 CSS 渐变。直接读取已安装 `0.2.2-rc.1` 桌面包发现其 CSS Modules 哈希与同版 npm 包不同，因此版本号不能决定类名，实际映射以当前加载的官方样式为准；源码、检查、安装与实际页面验收分别记录，以对应 Spec 为准。
+绘图组件保留独立 WebGL shader 的蓝白柔和流动主体，参考 [DeepSeek 官网](https://www.deepseek.com/)的 WebGL pattern，不复制官网源码或资源、不承诺像素级复刻，不引入网络资源或新依赖。框架 clientWidth/clientHeight 与 `ResizeObserver` 驱动自有画布尺寸；`MutationObserver` 在 body 跟踪已批准结构表面，在 head 观察官方样式模块的 childList/characterData 变化，类名读取限于上述两个必需标签和一个可选工作区标签。减少动态效果时静态，页面隐藏时暂停；WebGL 不可用或上下文丢失时，仅在适配成功的框架底层回退 CSS 渐变。直接读取已安装 `0.2.2-rc.1` 桌面包发现其 CSS Modules 哈希与同版 npm 包不同，因此版本号不能决定类名，实际映射以当前加载的官方样式为准；源码、检查、安装与实际页面验收分别记录，以对应 Spec 为准。
 
 ## 原生精简操作
 

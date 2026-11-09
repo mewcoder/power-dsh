@@ -14,7 +14,16 @@ export type AttachmentFailure<S extends keyof FailureResults = keyof FailureResu
   }
 }[S];
 export type AttachmentStatus = { state: 'attached' } | AttachmentFailure;
-interface NativeClasses { frame: string; sidebarCol: string; centerCol: string; sidebarRoot: string; scrollFade: string | null; }
+interface WorkspaceFadeClasses { root: string; body: string; fade: string; }
+interface NativeClasses {
+  frame: string; sidebarCol: string; centerCol: string; sidebarRoot: string;
+  scrollFade: string | null; workspaceFade: WorkspaceFadeClasses | null;
+}
+const nativeStylesheets = {
+  layout: '@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css',
+  sidebar: '@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css',
+  workspace: '@deepseek-ai/dsh-client-ui-workspace/WorkspaceBrowser.module.css',
+} as const;
 const failure = <S extends keyof FailureResults>(stage: S, check: string, result: FailureResults[S],
   expected?: string, actual?: string) =>
   ({ state: 'unavailable' as const, stage, check, result, ...(expected === undefined ? {} : { expected, actual }) });
@@ -22,9 +31,8 @@ const failure = <S extends keyof FailureResults>(stage: S, check: string, result
 /** CSS-module hashes differ between npm and Desktop builds of the same version. */
 function nativeClasses(doc: Document): { classes: NativeClasses; failure?: never } | { classes: null; failure: AttachmentFailure } {
   let issue: AttachmentFailure | null = null;
-  const read = (owner: 'layout' | 'sidebar', name: string, required = true) => {
-    const module = owner === 'layout' ? '@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css'
-      : '@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css';
+  const read = (owner: keyof typeof nativeStylesheets, name: string, required = true) => {
+    const module = nativeStylesheets[owner];
     const sheets = doc.querySelectorAll<HTMLStyleElement>(`style[data-plugin-css="${module}"]`);
     if (sheets.length !== 1) {
       if (required) issue ??= failure('styles', `${owner}.stylesheet`, sheets.length ? 'ambiguous' : 'missing', '1', String(sheets.length));
@@ -41,8 +49,13 @@ function nativeClasses(doc: Document): { classes: NativeClasses; failure?: never
   const centerCol = read('layout', 'centerCol');
   const sidebarRoot = read('sidebar', 'root');
   const scrollFade = read('sidebar', 'scrollFade', false);
+  const workspaceRoot = read('workspace', 'root', false);
+  const workspaceBody = read('workspace', 'treeBody', false);
+  const fade = read('workspace', 'fade', false);
+  const workspaceFade = workspaceRoot && workspaceBody && fade
+    ? { root: workspaceRoot, body: workspaceBody, fade } : null;
   return frame && sidebarCol && centerCol && sidebarRoot
-    ? { classes: { frame, sidebarCol, centerCol, sidebarRoot, scrollFade } }
+    ? { classes: { frame, sidebarCol, centerCol, sidebarRoot, scrollFade, workspaceFade } }
     : { classes: null, failure: issue! };
 }
 
@@ -120,11 +133,22 @@ export function watchBackground(
 html[data-windows-titlebar] .${names.frame}:has(> .power-dsh-flowing-background)::before { background: transparent !important; }
 html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .power-dsh-flowing-background) > .${names.sidebarCol} { border-right: 0.5px solid var(--dsw-alias-border-l3) !important; }`;
       if (sheet.textContent !== css) sheet.textContent = css;
-      // Some released builds omit this decoration; it must not gate the background.
-      const nextFades = new Set(names.scrollFade
-        ? [...target.querySelectorAll<HTMLElement>(`.${names.sidebarRoot}`)]
-          .flatMap(root => [...root.querySelectorAll<HTMLElement>(`.${names.scrollFade}[aria-hidden="true"]`)])
-        : []);
+      // Released builds place the bottom fade in either the shell or the workspace list.
+      const nextFades = new Set<HTMLElement>();
+      for (const sidebar of target.querySelectorAll<HTMLElement>(`.${names.sidebarRoot}`)) {
+        if (names.scrollFade) {
+          for (const fade of sidebar.querySelectorAll<HTMLElement>(`.${names.scrollFade}[aria-hidden="true"]`)) nextFades.add(fade);
+        }
+        const workspace = names.workspaceFade;
+        if (!workspace) continue;
+        for (const root of sidebar.querySelectorAll<HTMLElement>(`.${workspace.root}`)) {
+          for (const body of root.querySelectorAll<HTMLElement>(`.${workspace.body}`)) {
+            for (const fade of body.querySelectorAll<HTMLElement>(`:scope > .${workspace.fade}`)) {
+              if (fade.tagName.toLowerCase() === 'span') nextFades.add(fade);
+            }
+          }
+        }
+      }
       for (const [element, restore] of fades) {
         if (!nextFades.has(element)) { restore(); fades.delete(element); }
       }

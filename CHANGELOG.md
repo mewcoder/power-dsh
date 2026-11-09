@@ -60,6 +60,8 @@
 
 ### 修复
 
+- 补全[官网流动背景](src/features/flowing-background/spec.md)的 Windows 底部阴影适配：已定位到官方工作区会话列表的 `_fade`（用户构建为 `Gakraw_fade`），按其精确样式模块动态读取 root/treeBody/fade 映射，隐藏真实无 aria-hidden 的 span，覆盖分组、平铺与搜索结果；关闭和列表替换按所有权恢复，缺失或歧义不阻断背景，不写死构建哈希。Windows 实屏仍待复测。
+
 - 修复[官网流动背景](src/features/flowing-background/spec.md)在不含原生 `scrollFade` 装饰类名的 `0.2.2-rc.1` 构建中误报布局无法适配的问题：底部渐隐层改为可选适配，类名缺失或歧义时仍启动背景；必需框架校验保持不变。已直接核对本机打包桌面版缺少该类名，Windows 实屏仍待复测。
 
 - 开启[官网流动背景](src/features/flowing-background/spec.md)时，为 Windows 非抽屉侧栏补上原生同款 0.5px 主题色右侧分割线，关闭后恢复原样；抽屉模式及其他平台保持原生。尚待 Windows 实屏验收。

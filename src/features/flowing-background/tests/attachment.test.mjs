@@ -99,6 +99,80 @@ function fixture(layout = 'pI_x6G', sidebarName = 'hHd-Xa') {
   };
 }
 
+function workspaceFixture(f, sidebarRoot, hash) {
+  const sheet = new Element('style', { 'data-plugin-css': '@deepseek-ai/dsh-client-ui-workspace/WorkspaceBrowser.module.css' });
+  sheet.textContent = `.${hash}_root{}.${hash}_treeBody{}.${hash}_fade{background:linear-gradient(transparent,gray)}`;
+  f.head.append(sheet);
+  const root = new Element('div', {}, `${hash}_root`);
+  const body = new Element('div', {}, `${hash}_treeBody`);
+  const fade = new Element('span', {}, `${hash}_fade`);
+  body.append(fade); root.append(body); sidebarRoot.append(root);
+  return { sheet, root, body, fade };
+}
+
+test('workspace list bottom fades use their own stylesheet mapping and restore on list replacement', () => {
+  for (const hash of ['Gakraw', 'Kjh-qa', 'build_123']) {
+    const f = fixture();
+    const { sidebarRoot, target } = f.makeFrame();
+    const { body, fade } = workspaceFixture(f, sidebarRoot, hash);
+    fade.style.setProperty('display', 'inline', 'important');
+    const outside = new Element('span', {}, `${hash}_fade`);
+    f.body.append(outside);
+    const otherElement = new Element('div', {}, `${hash}_fade`);
+    const nested = new Element('span', {}, `${hash}_fade`);
+    otherElement.append(nested); body.append(otherElement);
+    const dispose = f.watch();
+    assert.equal(f.statuses.at(-1), 'attached');
+    assert.equal(fade.style.getPropertyValue('display'), 'none');
+    assert.equal(outside.style.getPropertyValue('display'), '');
+    assert.equal(otherElement.style.getPropertyValue('display'), '');
+    assert.equal(nested.style.getPropertyValue('display'), '');
+    target.setAttribute('data-sidebar-drawer', 'true'); f.flush();
+    assert.equal(fade.style.getPropertyValue('display'), 'none');
+    fade.remove();
+    const next = new Element('span', {}, `${hash}_fade`); body.append(next); f.flush();
+    assert.equal(fade.style.getPropertyValue('display'), 'inline');
+    assert.equal(fade.style.getPropertyPriority('display'), 'important');
+    assert.equal(next.style.getPropertyValue('display'), 'none');
+    assert.equal(f.starts.length, 1);
+    dispose();
+    assert.equal(next.style.getPropertyValue('display'), '');
+    assert.equal(f.observers.size, 0);
+  }
+});
+
+test('missing or ambiguous workspace decoration metadata cannot block the background and late unique styles recover', () => {
+  for (const reason of ['missing', 'wrong-owner', 'duplicate-sheet', 'duplicate-fade', 'missing-root', 'missing-body']) {
+    const f = fixture();
+    const { sidebarRoot } = f.makeFrame();
+    const { sheet, fade } = workspaceFixture(f, sidebarRoot, 'Gakraw');
+    const unique = sheet.textContent;
+    let extra;
+    if (reason === 'missing') sheet.remove();
+    if (reason === 'wrong-owner') sheet.setAttribute('data-plugin-css', 'unrelated/WorkspaceBrowser.module.css');
+    if (reason === 'duplicate-sheet') {
+      extra = new Element('style', { 'data-plugin-css': '@deepseek-ai/dsh-client-ui-workspace/WorkspaceBrowser.module.css' });
+      extra.textContent = unique; f.head.append(extra);
+    }
+    if (reason === 'duplicate-fade') sheet.textContent += '.other_fade{}';
+    if (reason === 'missing-root') sheet.textContent = '.Gakraw_treeBody{}.Gakraw_fade{}';
+    if (reason === 'missing-body') sheet.textContent = '.Gakraw_root{}.Gakraw_fade{}';
+    const dispose = f.watch();
+    assert.equal(f.statuses.at(-1), 'attached', reason);
+    assert.equal(fade.style.getPropertyValue('display'), '', reason);
+    sheet.setAttribute('data-plugin-css', '@deepseek-ai/dsh-client-ui-workspace/WorkspaceBrowser.module.css');
+    sheet.textContent = unique; extra?.remove(); f.head.append(sheet); f.flush();
+    assert.equal(fade.style.getPropertyValue('display'), 'none', reason);
+    sheet.remove(); f.flush();
+    assert.equal(fade.style.getPropertyValue('display'), '');
+    f.head.append(sheet); f.flush();
+    fade.style.setProperty('display', 'block', 'important');
+    dispose();
+    assert.equal(fade.style.getPropertyValue('display'), 'block');
+    assert.equal(f.starts.length, 1);
+  }
+});
+
 test('class mappings follow the actual npm and installed Desktop stylesheet hashes', () => {
   for (const [layout, sidebarName] of [['pI_x6G', 'hHd-Xa'], ['PIRFFq', 'kB3qhq']]) {
     const f = fixture(layout, sidebarName);
