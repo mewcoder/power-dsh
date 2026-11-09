@@ -58,6 +58,8 @@
 
 ### 修复
 
+- 修复[官网流动背景](src/features/flowing-background/spec.md)在不含原生 `scrollFade` 装饰类名的 `0.2.2-rc.1` 构建中误报布局无法适配的问题：底部渐隐层改为可选适配，类名缺失或歧义时仍启动背景；必需框架校验保持不变。已直接核对本机打包桌面版缺少该类名，Windows 实屏仍待复测。
+
 - 开启[官网流动背景](src/features/flowing-background/spec.md)时，为 Windows 非抽屉侧栏补上原生同款 0.5px 主题色右侧分割线，关闭后恢复原样；抽屉模式及其他平台保持原生。尚待 Windows 实屏验收。
 
 - 开启[官网流动背景](src/features/flowing-background/spec.md)时，将 Windows 顶部操作栏的 AppFrame 拖动背景透明化，关闭后恢复；保留原生菜单与拖动交互，右上角 Electron 原生窗口按钮底色暂保留。尚待 Windows 实屏验收。

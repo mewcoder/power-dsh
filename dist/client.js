@@ -4527,7 +4527,7 @@ void main() {
 		const centerCol = read(layout, "centerCol");
 		const sidebarRoot = read("@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css", "root");
 		const scrollFade = read("@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css", "scrollFade");
-		return frame && sidebarCol && centerCol && sidebarRoot && scrollFade ? {
+		return frame && sidebarCol && centerCol && sidebarRoot ? {
 			frame,
 			sidebarCol,
 			centerCol,
@@ -4586,7 +4586,7 @@ void main() {
 html[data-windows-titlebar] .${names.frame}:has(> .power-dsh-flowing-background)::before { background: transparent !important; }
 html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .power-dsh-flowing-background) > .${names.sidebarCol} { border-right: 0.5px solid var(--dsw-alias-border-l3) !important; }`;
 				if (sheet.textContent !== css) sheet.textContent = css;
-				const nextFades = new Set([...target.querySelectorAll(`.${names.sidebarRoot}`)].flatMap((root) => [...root.querySelectorAll(`.${names.scrollFade}[aria-hidden="true"]`)]));
+				const nextFades = new Set(names.scrollFade ? [...target.querySelectorAll(`.${names.sidebarRoot}`)].flatMap((root) => [...root.querySelectorAll(`.${names.scrollFade}[aria-hidden="true"]`)]) : []);
 				for (const [element, restore] of fades) if (!nextFades.has(element)) {
 					restore();
 					fades.delete(element);

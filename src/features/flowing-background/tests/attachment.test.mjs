@@ -141,6 +141,31 @@ test('missing or ambiguous official style metadata is never guessed and late loa
   }
 });
 
+test('released builds without unique scroll fade metadata still attach and refresh only the optional decoration', () => {
+  for (const reason of ['missing', 'ambiguous']) {
+    const f = fixture('PIRFFq', 'kB3qhq');
+    const { sidebarRoot } = f.makeFrame();
+    const fade = new Element('span', { 'aria-hidden': 'true' }, 'kB3qhq_scrollFade');
+    sidebarRoot.append(fade);
+    const unique = f.sidebarStyle.textContent;
+    const unsupported = reason === 'missing' ? '.kB3qhq_root{}' : `${unique}.other_scrollFade{}`;
+    f.sidebarStyle.textContent = unsupported;
+    const dispose = f.watch();
+    assert.equal(f.statuses.at(-1), 'attached', reason);
+    assert.equal(f.starts.length, 1);
+    assert.equal(sidebarRoot.style.getPropertyValue('background-color'), 'transparent');
+    assert.equal(fade.style.getPropertyValue('display'), '');
+    f.sidebarStyle.textContent = unique; f.flush();
+    assert.equal(fade.style.getPropertyValue('display'), 'none');
+    f.sidebarStyle.textContent = unsupported; f.flush();
+    assert.equal(fade.style.getPropertyValue('display'), '');
+    assert.equal(f.statuses.at(-1), 'attached');
+    assert.equal(f.starts.length, 1, 'Optional metadata changes must not restart the background.');
+    dispose();
+    assert.equal(f.observers.size, 0);
+  }
+});
+
 test('one frame-wide canvas sits below content and sidebar while card surfaces stay native', () => {
   const f = fixture();
   const { target, sidebar, sidebarRoot, center, root, card } = f.makeFrame();

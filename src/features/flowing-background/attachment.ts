@@ -2,7 +2,7 @@ import { startAnimation } from './animation.ts';
 import { styles } from './styles.ts';
 
 export type AttachmentStatus = 'attached' | 'unavailable';
-interface NativeClasses { frame: string; sidebarCol: string; centerCol: string; sidebarRoot: string; scrollFade: string; }
+interface NativeClasses { frame: string; sidebarCol: string; centerCol: string; sidebarRoot: string; scrollFade: string | null; }
 
 /** CSS-module hashes differ between npm and Desktop builds of the same version. */
 function nativeClasses(doc: Document): NativeClasses | null {
@@ -19,7 +19,7 @@ function nativeClasses(doc: Document): NativeClasses | null {
   const centerCol = read(layout, 'centerCol');
   const sidebarRoot = read('@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css', 'root');
   const scrollFade = read('@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css', 'scrollFade');
-  return frame && sidebarCol && centerCol && sidebarRoot && scrollFade
+  return frame && sidebarCol && centerCol && sidebarRoot
     ? { frame, sidebarCol, centerCol, sidebarRoot, scrollFade } : null;
 }
 
@@ -84,9 +84,11 @@ export function watchBackground(
 html[data-windows-titlebar] .${names.frame}:has(> .power-dsh-flowing-background)::before { background: transparent !important; }
 html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .power-dsh-flowing-background) > .${names.sidebarCol} { border-right: 0.5px solid var(--dsw-alias-border-l3) !important; }`;
       if (sheet.textContent !== css) sheet.textContent = css;
-      // The native bottom fade uses an opaque sidebar tint on Windows and Web.
-      const nextFades = new Set([...target.querySelectorAll<HTMLElement>(`.${names.sidebarRoot}`)]
-        .flatMap(root => [...root.querySelectorAll<HTMLElement>(`.${names.scrollFade}[aria-hidden="true"]`)]));
+      // Some released builds omit this decoration; it must not gate the background.
+      const nextFades = new Set(names.scrollFade
+        ? [...target.querySelectorAll<HTMLElement>(`.${names.sidebarRoot}`)]
+          .flatMap(root => [...root.querySelectorAll<HTMLElement>(`.${names.scrollFade}[aria-hidden="true"]`)])
+        : []);
       for (const [element, restore] of fades) {
         if (!nextFades.has(element)) { restore(); fades.delete(element); }
       }
