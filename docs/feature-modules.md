@@ -1,139 +1,58 @@
-# 按特性组织的架构方案
+# 特性模块约定
 
-状态：设计提案。本文描述下一步重构的目标，当前运行代码仍采用[架构规范](architecture.md)记录的结构；本方案没有引入构建工具、修改安装方式或迁移现有实现。[功能 Spec 规范](feature-spec.md)作为文档维护规则先行生效。
+按特性拆分已经实施。当前代码与宿主接入见[架构规范](architecture.md)，功能行为以模块内的[唯一主 Spec](README.md#功能规格spec)为准。一个 PowerDSH 安装项包含十七项功能，不单独发布功能包或提供新的动态插件市场。
 
-## 目标与当前问题
-
-保持一个 PowerDSH 安装项，在包内按用户能力划分特性模块。一个特性拥有自己的配置定义、Host 逻辑、Client 展示、RPC 协议、文案、Spec 和测试；装配层只负责组合与接入宿主。
-
-当前 [Client](../src/client.js)集中管理所有页面、样式、文案、订阅和交互；[Host 入口](../src/index.js)同时维护全部配置、实例创建、RPC 转发和设置工具。这些中央维护点使新增或删除特性必须检查其他功能的实现，仅移动到 `src/` 没有解决这一问题。[共享策略](../src/plugin-policy.js)的偏好保存已改为保留其他功能字段，模块化后继续保持这一约束。
-
-## 目标目录
-
-以下是建议结构，目录与文件按实际职责创建；仅有 Client 行为的特性不创建空 Host 或 RPC 文件。
+## 目录与所有权
 
 ```text
 src/
-  index.js                      # 保持对外 Host 入口，只转交装配
-  client.js                     # 保持对外 Client 入口
+  index.ts                      # Host 公开门面
+  client.ts                     # Client factory 源入口
   app/
-    host.js                     # Config 合并、Host 装配、稳定 RPC 门面
-    client.js                   # 设置页、侧栏容器、Client 装配
-    host-features.js             # 显式选择参与装配的 Host 特性
-    client-features.js           # 显式选择参与装配的 Client 特性
+    host.ts / client.ts         # 两端装配
+    host-features.ts            # Host 显式清单
+    client-features.ts          # Client 显式清单
+    config.ts / rpc.ts          # 配置及严格协议聚合
+    settings-tool.ts            # 具名工具贡献聚合
+    locales.ts                  # 由 Client 清单组合文案
   shared/
-    host/
-      operation-queue.js
-      plugin-policy.js          # 原生插件启停与写后读回的共享机制
-    client/
-      settings-shell.js         # 分类、设置行、错误与忙碌反馈
-      sidebar-shell.js          # Mod 自有容器与共享操作菜单
-    rpc/
-      codecs.js                 # 确有复用的校验，不存业务状态
-  features/
-    notifications/
-      spec.md                   # 此功能唯一主规格
-      definition.js             # id、分类、顺序等环境无关元数据
-      config.js                 # 本功能的 Host 配置 schema
-      host.js
-      client.js
-      rpc.js                    # Host/Client 共用的协议与校验
-      locales.js
-      system-sounds.js          # 通知内部子模块
-      tests/
-        host.test.mjs
-        client.test.mjs
-    double-click-rename/
-      spec.md
-      definition.js
-      config.js
-      client.js
-      locales.js
-      tests/
-        client.test.mjs
-    ...
-tests/
-  integration/                  # 完整装配、公开导出与特性组合
+    host/                      # 单队列、原生插件启停
+    client/                    # 设置、目录、侧栏外壳
+    rpc/                       # 复用的基础 codec
+    types/                     # 偏好、wire 与具名方法契约
+  features/<id>/
+    definition.ts              # 纯元数据：id、分类、顺序、配置键、Spec
+    config.ts                  # 本功能 schema，必要的设置工具贡献
+    client.ts / locales.ts     # 展示、交互、订阅与双语文案
+    spec.md                    # 唯一主规格
+    tests/                     # 功能行为测试
+    host.ts / rpc.ts           # 有真实 Host 行为或协议时提供
+    styles.ts                  # 有独立样式时提供
+    ...                        # 本功能内部策略、声音、来源等模块
 ```
 
-单文件够用的功能不强制细分页面、controller、service 等层。通知声音是任务通知的子能力，MCP 提供方目录属于 MCP 管理内部实现，不为了每个源文件再定义一种用户特性。「通用／增强／精简」只用于设置页分类，不作为模块依赖层级。
+[dist/index.js](../dist/index.js)、[index.d.ts](../dist/index.d.ts)和[client.js](../dist/client.js)是已生成并随源码提交的 Host、声明与 Client 入口；[tests/integration/](../tests/integration/)测试完整装配与功能组合，[tests/shared/](../tests/shared/)测试共享机制，[tests/helpers/](../tests/helpers/)提供内存夹具。不为纯 Client 功能创建空 Host、RPC 或样式文件。
 
-## 装配与依赖
+## 装配契约
 
-- 特性只能依赖 DSH 已核对的公共能力、本特性内部文件和 `shared/`；不直接导入其他特性的实现或状态。
-- Host 与 Client 使用分开的显式装配清单。移除一项装配登记即可从相应组合中排除该模块；保留检查，避免遗漏必需的另一端。首次迁移保留全部现有特性，暂不提供新的用户配置或构建裁剪产品。
-- `definition.js` 只含环境无关的数据；Host schema 和 Node 依赖不进入 Client 导入链，Client 不携带 Host 文件读写、进程管理或凭据访问代码。
-- 装配层合并配置、双语 key、设置贡献与 RPC 描述时检查重复和缺项。配置键、设置命名空间、包导出与已有 RPC 方法保持稳定；目录名不是配置迁移机制。
-- 每项设置声明它拥有的配置键、默认值、展示信息及保存操作。简单偏好与必须执行 Host 操作的精简开关分别绑定保存路径，设置页不再维护逐功能的条件分支。
-- 配置更新只修改请求所属字段，保留其他特性的偏好；共享策略不维护「所有功能字段」白名单。
-- 设置工具沿用公开的具名参数与操作，RPC 沿用严格校验及 owner 校验。装配可以聚合声明，不能以通用字符串分发器扩大远程可调用能力。
+- `definition.ts` 不导入 Host 或 Client，实现无关的数据可供两端使用。`config.ts` 拥有本功能全部配置，装配核对键归属；目录或 id 变化不构成用户配置迁移。
+- [Host 清单](../src/app/host-features.ts)组合 schema、具名设置工具、`createHost`、具名方法和 RPC；[Client 清单](../src/app/client-features.ts)组合对应定义、工厂、文案和协议。默认两端清单覆盖相同功能。
+- Client 工厂只贡献自己的设置、页面、侧栏、装饰层或动作；共享外壳处理布局和保存反馈，不判断某个功能的业务流程。刷新与重启共享菜单，各自拥有动作行为。官网流动背景独立拥有 `flowingBackgroundEnabled`，经原生 `configForms` 保存，通过 `shell.overlay` additive slot 仅注册返回 null 的生命周期控制组件。按用户明确授权，在唯一已核对的 AppFrame 底层挂单张全局 Canvas，并只适配主 Spec 列明的原生结构表面；不借用侧栏外壳、不读取会话内容，不将此例外扩大为任意宿主 DOM 改写。
+- RPC 在功能目录定义，Host/Client 复用同一组严格 codec；稳定聚合保留公开 id、方法与顺序，裁剪组合只挂载所选协议。不得改为可调用任意字符串方法的远程分发器。
+- 配置、设置、RPC 和文案聚合拒绝重复；每项操作仅改所属偏好，保留其他功能当前值。共享策略不维护全功能字段白名单。
+- 只依赖本特性、`shared/` 与已核对的宿主能力。禁止跨特性实现导入、特性反向依赖 `app/`，或共享层反向依赖特性。Client 模块图不得包含 Host、schema、Node、测试或独立 React。
 
-```mermaid
-flowchart TB
-  HostEntry[Host 入口] --> HostApp[Host 装配]
-  ClientEntry[Client 入口] --> ClientApp[Client 装配与设置外壳]
-  HostApp --> FeatureHost[各特性 Host]
-  ClientApp --> FeatureClient[各特性 Client]
-  FeatureClient --> Protocol[具名 RPC 协议]
-  Protocol --> FeatureHost
-  FeatureHost --> HostShared[共享队列与原生启停机制]
-  FeatureClient --> ClientShared[共享表单与侧栏容器]
-  HostShared --> DSH[DSH 公共能力]
-  ClientShared --> DSH
-```
+## 策略与生命周期
 
-## 策略模式的使用范围
+账号与遥测以各自目标、顺序和偏好复用原生启停策略；搜索保留其模式组合和旧 Agent 限制逻辑；Todo、Plan 与 Goal 只更新全局和模式声明，不干预已打开的 Agent；Goal 保留全局目标领域服务、续跑驱动和历史界面。通知、文件编辑、技能目录、MCP 与重启不强行继承同一个业务基类。
 
-账号精简和遥测精简已经共享 [PluginPolicy](../src/plugin-policy.js)，适合继续把目标匹配、操作顺序及偏好键作为策略差异，复用执行、原生结果检查和读回。是否使用继承或对象注入取决于是否减少重复，不为模式名称强行改写。
+模块参与装配、功能开关和内部持久状态是不同层次。关闭技能管理入口不恢复技能；卸载精简模块不自动启用原生目标。副作用归属功能子 context 或组件，Host 操作仍共享一个 owner-only 队列；音效保留独立并发语义，已交接的单次重启助手保留跨退出生命周期。官网流动背景的 Canvas、结构表面样式快照、动画与观察器归属自身控制组件；切换会话、运行状态或全局面板不重启动画，原生目标表面替换仅刷新背景适配。减弱动态效果时静态、页面隐藏时暂停，关闭、框架替换或卸载时释放资源，并只恢复仍属于本功能写入值和优先级的样式。各项差异写入本模块 Spec。
 
-搜索与 Todo 还涉及模式组合、现有 Agent 限制及生命周期，保留各自策略实现；只有相同的真实步骤才提取共享函数。通知、个性化编辑、技能目录、MCP 管理和应用重启有不同的操作语义，不要求实现同一个 `setEnabled()` 或继承统一业务基类。
+## 新增或调整功能
 
-「可插拔」在这里指特性拥有清晰的依赖与释放边界，并可由装配选择。它不自动意味着每项特性都发布一个 npm 包，或另建动态插件市场、扫描器、全局事件总线和服务定位器。现阶段继续交付一个 Cordis bundle，生命周期复用宿主 context。
-
-## 生命周期与开关
-
-区分模块是否参与装配、功能主开关，以及功能内部条目的状态。关闭设置入口不能自动清除技能限制；关闭精简开关必须按原规则启用目标；卸载整个模块也不能被解释成恢复所有持久化目标。每项差异写在该功能 Spec 中。
-
-每个特性在自己的子 context 中持有监听、计时器、投影和资源，随所属 context 释放。可选服务由该特性局部接入，缺少服务时按其 Spec 显示不可用或隐藏适当入口，不让辅助能力阻断全部设置页。配置写入继续经过同一 Host 队列与权限检查，不给每个功能另建可相互竞态的写入通道；音效等已有独立并发语义保持不变。
-
-刷新和重启共享的菜单由 Client 装配外壳拥有，特性只贡献自己的动作。删除刷新项不应删除重启项；没有可用动作时不显示空菜单。其他共享布局也明确一个所有者，不能让多个模块互相查询 DOM 或争用宿主 slot。
-
-## Spec 对应与现有功能迁移
-
-每个用户功能对应一份主 Spec，要求见[功能 Spec 规范](feature-spec.md)。当前继续使用现有功能文档；迁移某个模块时把该文档迁入模块的 `spec.md`，同步索引与引用，旧位置如需保留只作跳转说明，不保留第二份行为正文。
-
-| 建议特性 id | 当前主 Spec | 归属说明 |
-| --- | --- | --- |
-| `version-display` | [显示版本号](version-display.md) | 显示宿主版本与原生更新入口 |
-| `appearance-shortcut` | [外观快捷切换](appearance-shortcut.md) | 主题切换与入口定位 |
-| `refresh-button` | [刷新界面](refresh-button.md) | 操作菜单中的刷新项 |
-| `restart-button` | [重启应用](restart-button.md) | 重启确认、Host 操作与菜单项 |
-| `notifications` | [任务通知](notifications.md) | 包含系统声音子能力 |
-| `personalization` | [个性化](personalization.md) | 全局指令文件与编辑页 |
-| `skills` | [技能管理](skills.md) | 包含来源解析与调用策略 |
-| `mcp` | [MCP 管理](mcp.md) | 包含提供方目录、启停与工具展示 |
-| `account-blocking` | [精简官方登录与模型接入](account-blocking.md) | 使用共享原生启停机制 |
-| `search-blocking` | [精简官方搜索](search-blocking.md) | 保留独立搜索策略 |
-| `telemetry-blocking` | [反馈与遥测精简](telemetry-blocking.md) | 使用共享机制并保留目标顺序 |
-| `todo-blocking` | [精简Todo工具](todo-blocking.md) | 保留模式与 Agent 限制策略 |
-| `double-click-rename` | [屏蔽双击重命名](double-click-rename.md) | 局部 Client 事件监听 |
-
-## Client 拆分与分发约束
-
-当前 [Client](../src/client.js)通过 `window.__ModuleLoader__.load()` 提交单个 factory，使用宿主提供的 React 和公共组件；[包清单](../package.json)目前只有一个 `./client` 入口且没有构建步骤。不能直接把普通 ESM 导入拆到多个文件，就宣称符合现有宿主加载协议。
-
-建议在迁移 Client 前，先核对目标发行版的模块加载与产物格式。若需要打包，采用成熟工具的最小 Client 构建，将特性源码合并为宿主可加载的入口，并保持 React 和宿主公共模块的共享身份；Host 尽量继续直接使用 ESM。不要为了维持表面上的「无构建」而自制模块加载器、字符串拼接框架或跨功能全局对象。
-
-引入构建工具属于单独的实施选择，本文不添加依赖。若采用构建，必须同步[GitHub 源码安装](development.md#从-github-安装)与[分发流程](releasing.md)：Git 安装须有可执行且按宿主要求授权的构建途径，或改用已包含产物的来源。不得继续承诺用户从干净源码安装无需构建，也不因本机已有输出就认定 GitHub 安装可用。
-
-## 迁移顺序与验收
-
-1. 固定现有配置键、RPC、文案和行为，以现有行为测试为迁移前基线；先补齐每项主 Spec。
-2. 先选「屏蔽双击重命名」验证一个小型 Client 特性的完整归属，再用「账号精简」验证 Host 策略归属。Client 产物方案未确定时只先迁移 Host，不制造暂时无法加载的 Client 入口。
-3. 提取实际共享的设置外壳、侧栏菜单和队列；逐项迁移特性。每迁移一项，同时迁移文案、样式、协议和相关测试，避免目录下有新文件而业务继续留在大文件里。
-4. 在模块归属稳定后聚合 Config、设置贡献与严格 RPC 描述。删除旧的重复定义，再清理入口文件；配置保存不引入跨功能字段白名单。
-5. 更新检查脚本、打包清单和兼容检查的复制规则，使其覆盖嵌套模块与 Spec；检验未登记的 Spec、重复 id、非法跨特性导入和 Host 代码进入 Client 产物。
-6. 保留单特性行为测试，并用完整装配测试核对默认全关闭、各项独立开关、共享菜单组合、局部服务缺席、卸载释放、偏好保留及 Host/Client 协议匹配。装配排除测试使用内存配置，不修改真实 profile。
-7. 最终核对干净源码或实际 tarball 的安装、加载与真实页面，按影响重跑旧版 SDK 回归。新增构建与模块化后的验证结论单独记录，不沿用原安装证据。
-
-阶段验收的标准是：新增功能主要修改自己的模块、必要的显式装配登记和索引；其他特性无需了解它的实现。仅减少入口行数或创建更多文件夹不算完成模块化。
+1. 在自己的目录维护定义、配置、实现、文案、主 Spec 与必要测试，遵循[Spec 规范](feature-spec.md)。只创建确有职责的文件。
+2. 更新两端显式装配登记；有新 RPC 时更新稳定协议聚合，并在[功能索引](README.md#功能规格spec)登记主 Spec。公共配置键、工具参数、协议、已确认文案与用户行为不得因目录整理而改变。
+3. 运行源码使用严格 TypeScript；配置键/值、特性贡献及 Host 方法有具体类型，Client 远程方法从共享 Host 契约映射并添加传输结果包装。共享 wire 文件只声明数据形状，不共享业务状态；外部动态配置在有界适配层进入，运行时 codec 不因 TS 而移除。新增或改变契约时同步必要类型负例。
+4. 执行 `npm run build`，通过 tsdown 生成 Host ESM、Host 声明与 Client factory，三个产物与源码一并交付。工具仅为开发依赖；Git 和 npm/tarball 安装不运行构建或 `prepare`。
+5. 执行 `npm run check`、`npm run check:package`、`git diff --check`。检查涵盖所有模块与 Spec、递归测试、两端登记、非法依赖、双语 key、构建新鲜度和实际包中的运行资源；测试、脚本与开发规范不进入安装包，模块 Spec 随代码提供。
+6. 功能组合测试在内存环境排除登记，验证剩余设置、RPC、资源释放与偏好保留。实际安装和页面按[分层验证](development.md#验证方法与限制)执行，不能用目录结构或测试通过代替真实宿主验收。

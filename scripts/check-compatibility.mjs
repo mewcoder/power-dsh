@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { npmInvocation } from './lib/process.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const combinations = {
@@ -41,8 +42,8 @@ async function run(directory, name, command, args, environment = {}) {
   if (code !== 0) throw new Error(`${name} exited with ${code}; inspect ${log}`);
 }
 
-const npmCommand = process.env.npm_execpath ? process.execPath : 'npm';
-const npmArgs = args => process.env.npm_execpath ? [process.env.npm_execpath, ...args] : args;
+const npmCommand = process.execPath;
+const npmArgs = args => npmInvocation(args).args;
 for (const version of versions) {
   const directory = await mkdtemp(path.join(output, `${version}-`));
   const result = { version, directory, ...combinations[version], passed: false };
@@ -51,9 +52,9 @@ for (const version of versions) {
   try {
     for (const entry of await readdir(root, { withFileTypes: true })) {
       const includeFile = entry.isFile() && [
-        'package.json', 'pnpm-lock.yaml', '.gitignore', 'README.md', 'AGENTS.md', 'CHANGELOG.md', 'cordis.patch.yml', 'screenshots.json',
+        'package.json', 'pnpm-lock.yaml', '.gitignore', 'README.md', 'AGENTS.md', 'CHANGELOG.md', 'cordis.patch.yml', 'screenshots.json', 'tsconfig.json', 'tsdown.config.ts', '.node-version',
       ].includes(entry.name);
-      const includeDirectory = entry.isDirectory() && ['src', 'assets', 'scripts', 'tests', 'docs'].includes(entry.name);
+      const includeDirectory = entry.isDirectory() && ['src', 'dist', 'assets', 'scripts', 'tests', 'docs', '.github'].includes(entry.name);
       if (includeFile || includeDirectory) {
         await cp(path.join(root, entry.name), path.join(directory, entry.name), { recursive: true, force: false, errorOnExist: true });
       }
@@ -68,11 +69,13 @@ for (const version of versions) {
     };
     await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
     await run(directory, 'install', npmCommand, npmArgs(['install', '--ignore-scripts', '--no-audit', '--no-fund', '--registry=https://registry.npmjs.org']));
+    // Rebuild declarations against this isolated SDK, then verify freshness and behavior.
+    await run(directory, 'build', npmCommand, npmArgs(['run', 'build']));
     await run(directory, 'check', npmCommand, npmArgs(['run', 'check']));
     // Keep production imports unchanged while resolving the test's Context and
     // real Tools/Projection services from the historical SDK installation.
-    await run(directory, 'production-sdk-host', process.execPath, ['--test', 'tests/host-wiring.test.mjs'], {
-      POWER_DSH_HOST_TEST_ENTRY: pathToFileURL(path.join(root, 'src/index.js')).href,
+    await run(directory, 'production-sdk-host', process.execPath, ['--test', 'tests/integration/host-wiring.test.mjs'], {
+      POWER_DSH_HOST_TEST_ENTRY: pathToFileURL(path.join(root, 'dist/index.js')).href,
     });
     result.passed = true;
     console.log(`${version}: repository checks and production-SDK Host wiring passed.`);

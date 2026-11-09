@@ -6,16 +6,16 @@
 
 **最低已测基线为 `0.2.0-rc.1`，正式支持范围待最终产物与完整宿主验收后确定。** 这是目标 `0.2.0` / `0.2.1` 分支最早的实际发行版，无须证明所有更早版本均不可用。
 
-[2026-11-08 历史快照](compatibility-audit.md#sdk-验证方法与结果)覆盖两个分支的全部 12 个实际发行版；[2026-11-09 后续单版复测](compatibility-audit.md#后续单版复测)仅覆盖 `0.2.0-rc.1`，包含目录调整及清理修复工作区的隔离回归。测试对象、通过数量、方法和日志标识统一在调查中维护；单版结果不能扩展到其余版本，测试后的新增改动也不自动视为已测。
+[2026-11-08 历史快照](compatibility-audit.md#sdk-验证方法与结果)覆盖两个分支的全部 12 个实际发行版；[2026-11-09 后续单版复测](compatibility-audit.md#后续单版复测)覆盖目录调整与清理修复时的 `0.2.0-rc.1`；[模块化后的回归](compatibility-audit.md#模块化与-npm-产物回归)分别验证 `0.2.0-rc.1` 和 `0.2.1-rc.5` 的隔离 SDK、生产 Host 装配及本地 npm 产物解析。[TS/tsdown 迁移后](compatibility-audit.md#typescript-与-tsdown-迁移)复验这两版 SDK，并验证独立 npm 消费者使用公开声明。测试对象、通过数量、方法和日志标识统一在调查中维护；单版结果不能扩展到其余版本，测试后的新增改动也不自动视为已测。
 
-最终 tarball 的依赖解析、完整应用安装、页面、平台行为与升级仍待验收。后续发行版及新增功能不自动继承历史结果。
+标准 npm 包已完成独立生产依赖安装与 Node 入口解析；原生 DSH 中的完整安装、共享依赖身份、页面、平台行为与升级仍待验收。后续发行版及新增功能不自动继承历史结果。
 
 [包清单](../package.json)暂未声明 `engines.dsh`，不表示任意版本都兼容。开发 SDK 固定为 `0.2.2-rc.1`，但这不是候选最低版本的依据；旧宿主没有的接口也不会由普通 SDK 依赖自动补齐。
 
 | 目标 | 支持结论与证据边界 |
 | --- | --- |
 | `0.1.7-rc.2` | 仅适配前诊断，未对后续实现重新复测，不承诺支持；见[历史诊断](compatibility-audit.md#sdk-验证方法与结果) |
-| 已发布的 12 个 `0.2.0` / `0.2.1` 版本 | [历史全矩阵](compatibility-audit.md#sdk-验证方法与结果)通过；仅 `0.2.0-rc.1` 有上述后续复测，完整宿主待测 |
+| 已发布的 12 个 `0.2.0` / `0.2.1` 版本 | [历史全矩阵](compatibility-audit.md#sdk-验证方法与结果)通过；模块化后只复测 `0.2.0-rc.1` 与 `0.2.1-rc.5`，完整宿主待测 |
 | `0.2.2-alpha.2` | [历史 SDK 与 Host 装配回归](compatibility-audit.md#sdk-验证方法与结果)通过，完整宿主待测 |
 | `0.2.2-alpha.3` | 只有[标签接口证据](compatibility-audit.md#官方发行标签的接口证据)，没有独立完整测试 |
 | `0.2.2-rc.1` | 有历史 SDK 回归和[源码链接安装及部分偏好读回](compatibility-audit.md#安装与平台验证记录)，最终产物与完整页面待测 |
@@ -23,24 +23,37 @@
 
 ## 重启按钮的新增范围与证据
 
-重启按钮不能继承 2026-11-08 历史矩阵的兼容结论。后续源码与隔离检查也不能证明真实退出和重开；接口及编译证据集中见[安装与平台验证记录](compatibility-audit.md#安装与平台验证记录)，行为及完整验收条件见[重启应用 Spec](restart-button.md)。
+重启按钮不能继承 2026-11-08 历史矩阵的兼容结论。后续源码与隔离检查也不能证明真实退出和重开；接口及编译证据集中见[安装与平台验证记录](compatibility-audit.md#安装与平台验证记录)，行为及完整验收条件见[重启应用 Spec](../src/features/restart-button/spec.md)。
 
 | 环境 | 当前范围 | 已有证据与限制 |
 | --- | --- | --- |
-| macOS 打包桌面端 | 独立助手方案已实现；实际操作待验收 | 本机 `0.2.2-rc.1` ASAR preload / main 源码核对未发现公开 restart bridge；助手 AppleScript 编译通过，未实际执行助手、退出确认或重开 |
-| Windows、Linux | 当前不可用，按钮隐藏，设置仍可保存 | 不承诺跨平台重启，不增加平台警告常驻文案 |
-| 普通 Web、CLI、身份未校验的应用 | 当前不可用，按钮隐藏，设置仍可保存 | 不能因连接本机 macOS Host 或可见 `.app` 路径而认定可用 |
+| macOS 打包桌面端 | 显示重启设置行，菜单入口仍按 Host 能力确认；独立助手实际操作待验收 | 本机 `0.2.2-rc.1` ASAR preload / main 源码核对未发现公开 restart bridge；助手 AppleScript 编译通过，未实际执行助手、退出确认或重开 |
+| Windows、Linux | 重启设置行与菜单入口均隐藏，保留已有偏好和状态 | 不承诺跨平台重启，不增加平台警告常驻文案 |
+| 普通 Web、CLI | 重启设置行与菜单入口均隐藏，保留已有偏好和状态 | 普通浏览器连接本机 macOS Host 仍隐藏 |
+| macOS 打包桌面端但应用身份未校验 | 设置行可见，菜单入口隐藏，保留已有偏好和状态 | 不能只凭可见 `.app` 路径认定重启能力可用 |
 | 旧版及其他 DSH 版本 | 未验证 | 不沿用原有矩阵，也不从本机源码或参考插件外推 |
 
-实际验收分别覆盖公共确认与宿主退出确认、应用身份、助手交接、取消与超时、同路径重开、状态读回和偏好保留；页面断连不能作为成功依据。完整场景见[重启应用验收要求](restart-button.md#参考与验证)。
+实际验收分别覆盖公共确认与宿主退出确认、应用身份、助手交接、取消与超时、同路径重开、状态读回和偏好保留；页面断连不能作为成功依据。完整场景见[重启应用验收要求](../src/features/restart-button/spec.md#参考与验证)。
 
-## 精简官方搜索的新增范围与证据
+## 停用官方搜索的新增范围与证据
 
-接口依据为 DSH `0.2.2-rc.1` 安装包及固定 SDK 的 `tool-web`、ConfigEditor、Tools 与 Agent 生命周期，详见[精简官方搜索 Spec](search-blocking.md#实现与验证依据)。本功能不继承 2026-11-08 的历史测试覆盖结论；单版隔离复测不代替完整宿主中的实际安装与页面验证。
+接口依据为 DSH `0.2.2-rc.1` 安装包及固定 SDK 的 `tool-web`、ConfigEditor、Tools 与 Agent 生命周期，详见[停用官方搜索 Spec](../src/features/search-blocking/spec.md#实现与验证依据)。本功能不继承 2026-11-08 的历史测试覆盖结论；单版隔离复测不代替完整宿主中的实际安装与页面验证。
 
 ## 屏蔽双击重命名的新增范围与证据
 
-DSH `0.2.2-rc.1` 安装包已核对会话行事件标记，作为有限 DOM 例外的依据。标记变化可能使屏蔽失效，旧版历史矩阵和隔离测试均不能证明实际页面行为；具体接入与验收见[屏蔽双击重命名 Spec](double-click-rename.md)。
+DSH `0.2.2-rc.1` 安装包已核对会话行事件标记，作为有限 DOM 例外的依据。标记变化可能使屏蔽失效，旧版历史矩阵和隔离测试均不能证明实际页面行为；具体接入与验收见[屏蔽双击重命名 Spec](../src/features/double-click-rename/spec.md)。
+
+## 推理等级选择器的新增范围与证据
+
+推理等级按钮依赖 `dsh-client-ui-conversation` 的 `conversation.input.right`（session scope，`standardProps` 含 `sessionId`）与 `dsh-client-ui-model-selection` 的 `ctx.modelDirectories.directoryFor(sessionId)`（`store` / `load()` / `select()`），以及模型目录中的 `reasoning.efforts`、`defaultEffort`。接口依据为本机 DSH `0.2.2-rc.1` 安装包只读源码，运行时 Inspect 已核对 slot 的注册选项、标准 props 与单个 active 注册项，`modelDirectories` 未被 Service Inspect 编目、仍以该安装包源码为依据；`dsh.client.inject` 已声明这两个客户端模块，服务或 slot 缺席时按钮静默隐藏。它不继承 2026-11-08 的历史矩阵结论，也没有在新版或旧版上复测；具体接入与验收条件见[推理等级 Spec](../src/features/thinking-effort/spec.md)。
+
+## Plan 模式精简的新增范围与证据
+
+[停用 Plan 模式](../src/features/plan-blocking/spec.md)按用户确认仅面向新对话，依赖原生 `@deepseek-ai/dsh-plan-mode` 全局条目、模式嵌套声明与 composition inventory 读回。接口依据为本机 DSH `0.2.2-rc.1` 桌面发行包和同版 SDK，已有 Agent 的旧模式代际不被主动修改。保留 `dsh-client-ui-plan` 的历史计划呈现，不依赖新的工具或命令过滤 API。本功能没有继承已有历史版本矩阵结论，实际安装与页面尚待验收。
+
+## Goal 模式精简的新增范围与证据
+
+[停用 Goal 模式](../src/features/goal-blocking/spec.md)只启停新对话使用的原生目标命令和工具声明，依据为 DSH `0.2.2-rc.1` 桌面发行包及同版参考源码。全局 `dsh-goal`、`dsh-goal-round-driver` 和 `dsh-client-ui-goal` 均保留；续跑驱动在装载或卸载时会解除已有目标的运行，因此不将它作为精简目标。已有 Agent 保留旧模式代际，不主动暂停、完成或取消目标；第三方插件与原生 Goal API 仍可使用。新功能未继承历史矩阵结论，实际安装与页面待验收。
 
 ## 接口核对清单
 
@@ -48,15 +61,17 @@ DSH `0.2.2-rc.1` 安装包已核对会话行事件标记，作为有限 DOM 例�
 
 | 范围 | 关键依赖 | 核对重点 |
 | --- | --- | --- |
-| 整包 Host 加载 | [Host 入口](../src/index.js)的 `settings`、`tools`、`clientModules`、`pluginManager`、`typert`、`configEditor`、`profileContext` | 服务能否注入、导入的 SDK 是否匹配、配置 schema 与严格 RPC 能否注册 |
-| 整包 Client 加载 | [Client 入口](../src/client.js)的模块加载器、公共 `Menu` / `Tooltip` / `StateDot` / `Modal` / `Button`、`remote.$mount`、`configForms`、slot 注册 | 模块和导出存在，RPC 两端匹配，设置主入口能加载，子功能失败不被误报为正常 |
-| 账号与反馈与遥测精简 | [PluginPolicy](../src/plugin-policy.js)的 `listPlugins()`、`setPluginEnabled()`、`ConfigEditor.edit()` | 条目身份、只读原因、`application` / warnings / error 结果、写后读回与宿主目标模块名 |
-| 精简官方搜索 | [SearchPolicy](../src/search-policy.js)的 ConfigEditor `entries()` / `edit()`、模式组合读回、Tools `guard` / `restrict` | 只改 `config.search`、跳过已停用 owner、保留抓取及 MCP、旧会话限制与卸载释放 |
-| 精简Todo工具 | [TodoPolicy](../src/todo-policy.js)的 `agentPresets.compositionInventory()`、Tools `guard` / `restrict`、Agent 生命周期事件 | 模式清单字段、旧 Agent 的工具限制、重新选择模式后的状态、卸载释放 |
-| 技能管理 | [SkillPolicy](../src/skill-policy.js)的 `skills.registerProvider()` / `snapshot()`、`agentPresets.serviceFor()` / `acquireScope()` / `compositionInventory()`、`createScope()`、`workspaceRegistry.list()` | provider 生命周期、用户与项目优先级、租约释放、模式服务隔离、导入项目字段 |
-| MCP 目录与启停 | [McpPolicy](../src/mcp-policy.js)与[McpProviders](../src/mcp-providers.js)的 bundle rows、模式清单、Loader entries、Fiber、scope、原生 manager | `fiberPhase` / `fiberState` 含义、Fiber 数字状态映射、归属去重、工具作用域、配置修订与原生写后读回 |
-| 任务通知 | [通知投影](../src/notifications.js)及 Host 注册、Client 的 `sessions.list` / `uiSession.sessionStatus` | 投影注册与释放、`turn/end` 原因、首次订阅基线、重连去重、提问与审批状态字段 |
-| 系统声音 | [SystemSounds](../src/system-sounds.js)、`connection.isLoopback`、subprocess `resolveExecutable` / `spawn` 与托管句柄 | 本机识别、参数与取消语义、平台真实试听、远程界面不会在服务器播放 |
+| 整包 Host 加载 | [Host 入口](../src/index.ts)的 `settings`、`tools`、`clientModules`、`pluginManager`、`typert`、`configEditor`、`profileContext` | 服务能否注入、导入的 SDK 是否匹配、配置 schema 与严格 RPC 能否注册 |
+| 整包 Client 加载 | [Client 入口](../src/client.ts)的模块加载器、公共 `Menu` / `Tooltip` / `StateDot` / `Modal` / `Button`、`remote.$mount`、`configForms`、slot 注册 | 模块和导出存在，RPC 两端匹配，设置主入口能加载，子功能失败不被误报为正常 |
+| 账号与反馈与遥测精简 | [PluginPolicy](../src/shared/host/plugin-policy.ts)的 `listPlugins()`、`setPluginEnabled()`、`ConfigEditor.edit()` | 条目身份、只读原因、`application` / warnings / error 结果、写后读回与宿主目标模块名 |
+| 停用官方搜索 | [SearchPolicy](../src/features/search-blocking/search-policy.ts)的 ConfigEditor `entries()` / `edit()`、模式组合读回、Tools `guard` / `restrict` | 只改 `config.search`、跳过已停用 owner、保留抓取及 MCP、旧会话限制与卸载释放 |
+| 停用 Todo 工具 | [TodoPolicy](../src/features/todo-blocking/todo-policy.ts)的 ConfigEditor `entries()` / `edit()`、`agentPresets.compositionInventory()` 与全局 Plugin Manager | 模式声明读回、对新代际生效、旧 Agent 不受主动干预、待办历史保留、卸载写入保护 |
+| 停用 Plan 模式 | [PlanPolicy](../src/features/plan-blocking/plan-policy.ts)的 ConfigEditor `entries()` / `edit()`、`agentPresets.compositionInventory()` 与全局 Plugin Manager | 只匹配 Plan 模块、保留嵌套 group 和 section、对新模式代际生效、不干预旧 Agent、不移除历史卡片 |
+| 停用 Goal 模式 | [GoalPolicy](../src/features/goal-blocking/goal-policy.ts)的模式声明编辑、分模块数量与启停状态读回、全局 Plugin Manager | 仅目标命令与工具，不卸载目标服务或续跑驱动，不改已有目标状态，旧模式代际保留 |
+| 技能管理 | [SkillPolicy](../src/features/skills/skill-policy.ts)的 `skills.registerProvider()` / `snapshot()`、`agentPresets.serviceFor()` / `acquireScope()` / `compositionInventory()`、`createScope()`、`workspaceRegistry.list()` | provider 生命周期、用户与项目优先级、租约释放、模式服务隔离、导入项目字段 |
+| MCP 目录与启停 | [McpPolicy](../src/features/mcp/mcp-policy.ts)与[McpProviders](../src/features/mcp/mcp-providers.ts)的 bundle rows、模式清单、Loader entries、Fiber、scope、原生 manager | `fiberPhase` / `fiberState` 含义、Fiber 数字状态映射、归属去重、工具作用域、配置修订与原生写后读回 |
+| 任务通知 | [通知投影](../src/features/notifications/notifications.ts)及 Host 注册、Client 的 `sessions.list` / `uiSession.sessionStatus` | 投影注册与释放、`turn/end` 原因、首次订阅基线、重连去重、提问与审批状态字段 |
+| 系统声音 | [SystemSounds](../src/features/notifications/system-sounds.ts)、`connection.isLoopback`、subprocess `resolveExecutable` / `spawn` 与托管句柄 | 本机识别、参数与取消语义、平台真实试听、远程界面不会在服务器播放 |
 | 个性化 | `profileContext.home`、文件 RPC、宿主全局指令发现 | 正文落在同一个原生全局文件、冲突时不覆盖、禁用入口不改变正文及读取行为 |
 | 版本、外观与刷新 | `clientModules.graph().release`、boot release、theme service、桌面 updates bridge、侧栏 slot 与标题栏 | 显示的是宿主版本；桥协议、主题事件、slot props、窗口缩放和系统标题栏偏移 |
 
@@ -72,7 +87,7 @@ DSH `0.2.2-rc.1` 安装包已核对会话行事件标记，作为有限 DOM 例�
 
 ## 需要优先验证的初始化行为
 
-功能开关不是版本隔离机制。[Host 入口](../src/index.js)会在服务注入满足时注册通知投影、绑定 Todo、初始化 MCP 提供方和技能管理；这些操作并非都等到对应开关开启才执行。Client 也在 factory 中读取公共 UI 模块。因此必须先验证所有主开关关闭时的整包加载，再逐个开启功能；不能凭“默认关闭”判断旧版可用。
+功能开关不是版本隔离机制。[Host 入口](../src/index.ts)会在服务注入满足时注册通知投影、绑定 Todo、初始化 MCP 提供方和技能管理；这些操作并非都等到对应开关开启才执行。Client 也在 factory 中读取公共 UI 模块。因此必须先验证所有主开关关闭时的整包加载，再逐个开启功能；不能凭“默认关闭”判断旧版可用。
 
 现有的局部不可用处理也不能替代版本验证。例如没有协议兼容的桌面更新桥时版本按钮只读，系统声音在不支持环境中只提供默认选项，技能或 MCP 的部分读取失败会返回不可用或未知。只有实际覆盖过的场景才能记为可降级，不能推及所有缺失接口。
 
@@ -101,6 +116,6 @@ DSH `0.2.2-rc.1` 安装包已核对会话行事件标记，作为有限 DOM 例�
 - 最低支持版本已验证；尚有失败或未知的关键接口时不填写宽泛范围，也不发布为“全功能兼容”。若需要在旧版限制某功能，先明确决定并完成对应实现和验证。
 - 按已验证范围填写 `engines.dsh`，同时核对依赖和 DSH peer 约束；README、更新日志、Release 与市场展示使用相同结论。扩大范围需新发 Mod 版本，不能修改已发布版本的声明。
 - 指定本次承诺的平台及 profile 组合，并完成范围边界和升级验证。未来宿主版本不自动继承兼容结论，接近的版本号也不能代替接口检查。
-- 运行 `npm run check`，完成上述真实产物验收后，才进入[发版步骤](releasing.md#github-release-操作顺序)。仓库检查不执行历史宿主安装，不能单独证明兼容；未完成兼容矩阵时仅保留开发版和 Release 草稿。
+- 运行 `npm run check`，完成上述真实产物验收后，才进入[发版步骤](releasing.md#npm-发布与升级)。仓库检查不执行历史宿主安装，不能单独证明兼容；未完成兼容矩阵时仅保留开发版和 Release 草稿。
 
 历史测试与安装事实集中保存在[兼容性调查](compatibility-audit.md)，其证据边界不随文档更新扩大。接口发现优先使用目标运行时 Inspect，替代来源须记录确切发行包或标签；完成真实产物和宿主验收后再声明支持范围。

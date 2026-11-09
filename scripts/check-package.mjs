@@ -1,38 +1,27 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, readdir, realpath, rm } from 'node:fs/promises';
-import { spawnSync } from 'node:child_process';
+import { mkdtemp, mkdir, readFile, realpath, rm } from 'node:fs/promises';
+import { run as runProcess, runNpm } from './lib/process.mjs';
 import { isBuiltin } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { listFiles } from './lib/files.mjs';
+import { buildArtifacts } from './build.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
+await buildArtifacts({ check: true });
 const temporaryRoot = await realpath(tmpdir());
 const directory = await mkdtemp(path.join(temporaryRoot, 'power-dsh-package-check-'));
-function run(command, args, cwd = root) {
-  const result = spawnSync(command, args, { cwd, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
-  assert.equal(result.status, 0, result.stderr || result.error?.message || `${command} failed`);
-  return result.stdout;
-}
-async function listFiles(base, prefix = '') {
-  const nested = await Promise.all((await readdir(path.join(base, prefix), { withFileTypes: true })).map(entry => {
-    const name = path.posix.join(prefix, entry.name);
-    return entry.isDirectory() ? listFiles(base, name) : [name];
-  }));
-  return nested.flat();
-}
-
+const run = (command, args, cwd = root) => runProcess(command, args, cwd);
 try {
-  const npmCommand = process.env.npm_execpath ? process.execPath : 'npm';
-  const args = ['pack', '--ignore-scripts', '--json', '--pack-destination', directory];
-  if (process.env.npm_execpath) args.unshift(process.env.npm_execpath);
-  const [packed] = JSON.parse(run(npmCommand, args));
+  const [packed] = JSON.parse(runNpm(['pack', '--ignore-scripts', '--json', '--pack-destination', directory], root));
   assert.ok(packed && path.basename(packed.filename) === packed.filename, 'Invalid package filename');
   const files = new Set(packed.files.map(entry => entry.path));
   for (const name of files) {
     assert.ok(!path.posix.isAbsolute(name) && !name.split('/').includes('..'), `Invalid packed path: ${name}`);
     assert.doesNotMatch(name, /^(?:tests|scripts|reference|\.references|node_modules)\//, `Development files were shipped: ${name}`);
+    assert.doesNotMatch(name, /(?:^|\/)tests\//, `Feature tests were shipped: ${name}`);
     assert.notEqual(name, 'AGENTS.md', 'Do not ship repository collaboration instructions.');
     if (name.startsWith('docs/')) {
       // npm also includes a directory's README when selecting files below it.
@@ -63,12 +52,19 @@ try {
   }
   const screenshots = JSON.parse(await read('screenshots.json'));
   for (const name of screenshots) assert.ok(files.has(name), `Screenshot is missing: ${name}`);
-  for (const name of (await listFiles(path.join(root, 'src'))).filter(name => name.endsWith('.js'))) {
-    const target = `src/${name}`;
-    assert.ok(files.has(target), `Runtime source is missing: ${target}`);
-    assert.equal(await read(target), await readFile(path.join(root, target), 'utf8'), `Packed source differs: ${target}`);
+  for (const spec of (await listFiles(root, 'src/features')).filter(name => name.endsWith('/spec.md'))) {
+    assert.ok(files.has(spec), `Primary feature Spec is missing: ${spec}`);
   }
-  for (const name of actual.filter(name => name.startsWith('src/') && name.endsWith('.js'))) {
+  assert.equal(manifest.exports['.'], './dist/index.js');
+  assert.equal(manifest.types, './dist/index.d.ts');
+  const artifacts = ['dist/client.js', 'dist/index.d.ts', 'dist/index.js'];
+  assert.deepEqual(actual.filter(name => name.startsWith('dist/')).sort(), artifacts);
+  assert.ok(!actual.some(name => name.startsWith('src/') && /\.(?:ts|js)$/.test(name)), 'Ship generated runtime artifacts, not compiler inputs.');
+  for (const name of artifacts) {
+    assert.ok(files.has(name), `Generated artifact is missing: ${name}`);
+    assert.equal(await read(name), await readFile(path.join(root, name), 'utf8'), `Packed artifact differs: ${name}`);
+  }
+  for (const name of actual.filter(name => name.startsWith('dist/') && name.endsWith('.js'))) {
     run(process.execPath, ['--check', path.join(packageRoot, name)]);
     for (const [, specifier] of (await read(name)).matchAll(/(?:from\s*|import\s*)['"]([^'"]+)['"]/g)) {
       if (specifier.startsWith('.')) {

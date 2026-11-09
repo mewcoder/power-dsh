@@ -1,0 +1,48 @@
+import type { RpcDescriptor } from '../shared/types/protocol.ts';
+// Browser-safe aggregation of the feature-owned wire contracts.
+import { ACCOUNT_RPC } from '../features/account-blocking/rpc.ts';
+import { TELEMETRY_RPC } from '../features/telemetry-blocking/rpc.ts';
+import { TODO_RPC } from '../features/todo-blocking/rpc.ts';
+import { PLAN_RPC } from '../features/plan-blocking/rpc.ts';
+import { GOAL_RPC } from '../features/goal-blocking/rpc.ts';
+import { SEARCH_RPC } from '../features/search-blocking/rpc.ts';
+import { READ_PERSONALIZATION_RPC, SAVE_PERSONALIZATION_RPC } from '../features/personalization/rpc.ts';
+import { LIST_SKILLS_RPC, SET_SKILL_ENABLED_RPC } from '../features/skills/rpc.ts';
+import { LIST_MCP_SERVERS_RPC, SET_MCP_SERVER_ENABLED_RPC } from '../features/mcp/rpc.ts';
+import { LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC } from '../features/notifications/rpc.ts';
+import { RESTART_STATUS_RPC, RESTART_APP_RPC } from '../features/restart-button/rpc.ts';
+
+export {
+  ACCOUNT_RPC,
+  TELEMETRY_RPC,
+  TODO_RPC,
+  PLAN_RPC,
+  GOAL_RPC,
+  SEARCH_RPC,
+  READ_PERSONALIZATION_RPC, SAVE_PERSONALIZATION_RPC,
+  LIST_SKILLS_RPC, SET_SKILL_ENABLED_RPC,
+  LIST_MCP_SERVERS_RPC, SET_MCP_SERVER_ENABLED_RPC,
+  LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC,
+  RESTART_STATUS_RPC, RESTART_APP_RPC,
+};
+
+export function composeRpc<T extends RpcDescriptor[]>(descriptors: T): T {
+  const ids = new Set();
+  const methods = new Set();
+  for (const descriptor of descriptors) {
+    if (ids.has(descriptor.id)) throw new Error(`Duplicate RPC id: ${descriptor.id}`);
+    if (methods.has(descriptor.method)) throw new Error(`Duplicate RPC method: ${descriptor.method}`);
+    ids.add(descriptor.id);
+    methods.add(descriptor.method);
+  }
+  return descriptors;
+}
+
+export const MOD_RPC = composeRpc([
+  RESTART_STATUS_RPC, RESTART_APP_RPC,
+  LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC,
+  ACCOUNT_RPC, TELEMETRY_RPC, TODO_RPC, PLAN_RPC, GOAL_RPC, SEARCH_RPC,
+  READ_PERSONALIZATION_RPC, SAVE_PERSONALIZATION_RPC,
+  LIST_SKILLS_RPC, SET_SKILL_ENABLED_RPC,
+  LIST_MCP_SERVERS_RPC, SET_MCP_SERVER_ENABLED_RPC,
+]);

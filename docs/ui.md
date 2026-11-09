@@ -4,7 +4,7 @@
 
 以目标 DSH 的同类界面为参照：偏好设置对照通用设置页，管理列表对照插件管理页。先核对当前页面或安装包实现，再选择布局；本文尺寸是项目维护基线，不是官方设计 token。
 
-Mod 设置入口与页面标题中英文均为「PowerDSH」，技术包名与设置命名空间为 `power-dsh`。导航、外层面板和关闭行为交给宿主；内部按标题、简短说明、分类 Tab 和设置行组织。个性化是用户确认的独立设置 Tab：Mod「增强」分类只显示开关，开启后由原生设置侧栏展示「个性化」入口，编辑页采用大文本框与取消、保存按钮，不显示字符计数或常驻上限说明，详见[个性化](personalization.md)。减少装饰、卡片嵌套和重复入口，不展示未实现的控件或“即将上线”操作。
+Mod 设置入口与页面标题中英文均为「PowerDSH」，技术包名与设置命名空间为 `power-dsh`。导航、外层面板和关闭行为交给宿主；内部按标题、简短说明、分类 Tab 和设置行组织。个性化是用户确认的独立设置 Tab：Mod「增强」分类只显示开关，开启后由原生设置侧栏展示「个性化」入口，编辑页采用大文本框与取消、保存按钮，不显示字符计数或常驻上限说明，详见[个性化](../src/features/personalization/spec.md)。减少装饰、卡片嵌套和重复入口，不展示未实现的控件或“即将上线”操作。
 
 ## 设置页 Title 与描述
 
@@ -33,7 +33,7 @@ Mod 设置入口与页面标题中英文均为「PowerDSH」，技术包名与�
 - 装饰性 SVG 使用 `aria-hidden` 与 `focusable="false"`，名称交给按钮。
 - 在实际 16px 下与账号、通用设置等图标并排检查线宽、留白与细节密度；第三方市场图标不作为标准。
 
-原生依据：[图标组件](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-primitives/src/icons/index.tsx)、[图形与权重](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-primitives/src/icons/artwork.ts)。外观按钮的原生 sprite 用法见[外观快捷切换](appearance-shortcut.md#原生状态与图标)。不运行时导入宿主内部 UI 包。
+原生依据：[图标组件](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-primitives/src/icons/index.tsx)、[图形与权重](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-primitives/src/icons/artwork.ts)。外观按钮的原生 sprite 用法见[外观快捷切换](../src/features/appearance-shortcut/spec.md#原生状态与图标)。不运行时导入宿主内部 UI 包。
 
 ## 主题与基础样式
 
@@ -50,11 +50,35 @@ Mod 设置入口与页面标题中英文均为「PowerDSH」，技术包名与�
 
 字体与控件继承宿主，不加载外部字体。常用间距为 4、8、12、16、24px，优先对齐同类组件；分组使用留白和细线，不默认加阴影。不改变宿主全局字体、圆角或密度。
 
+## 官网流动背景
+
+「设置 → PowerDSH → 界面」提供「官网流动背景」开关，`flowingBackgroundEnabled` 默认 `false`、独立持久化，通过原生 `configForms` 保存。设置说明中文固定为「为界面添加柔和流动的蓝色渐变」，英文为「Add a softly flowing blue gradient to the interface」。用户明确要求全局预览，原开关现在控制整个界面效果，不增加模式、透明度或背景强度控件。
+
+全局使用一张跨越 AppFrame、侧边栏与主内容区的连续画布。已有对话、任务运行、设置页及其他全局面板均不触发隐藏，不再使用会话或面板门控。图案按官网 softness 100 做蓝→白→白两级宽范围混色，底部渐隐，不使用 CSS blur 处理文字或背景；视觉参考 [DeepSeek 官网](https://www.deepseek.com/)的 WebGL pattern，采用独立 WebGL shader，无外部网络资源或新依赖，不复制官网源码，也不承诺像素级复刻。
+
+`shell.overlay` 只保留返回 null 的生命周期控制组件，不在全窗口浮层绘画。适配器只从当前已加载的两个确切官方样式标签读取唯一简单类名映射，再核对真实 AppFrame 的语义直接子元素、relative 定位和 grid 布局；同版本不同构建的 CSS Modules 哈希不会被视为固定值。画布直接挂在唯一、可见且已核对结构的 AppFrame 内，使用 absolute、inset 0、负 z-index，框架建立 `isolation:isolate` 并保留原生 bg-base 底色，文字与控件绘制在其上方。
+
+按用户本次授权，仅临时把已核对的 sidebarCol、centerCol、原生 SidebarRoot、任意 phase 的主 ConversationRoot，以及其主内容内已核对的 composerSeat 外层的内联 background-color 设为 transparent、background-image 设为 none，让底层动画透出。输入卡片、编辑器、文件卡片、菜单和弹窗保留原生表面与交互；不修改全局主题 token 或任意后代。窄窗口中 AppFrame 出现 `data-sidebar-drawer` 时，sidebarCol 和 SidebarRoot 保留原生底色，不把模态侧栏抽屉透明化；退出抽屉模式后恢复目标适配。全局面板若另有独立的不透明内容表面，仍可保留其原生底色，不承诺每个内容区都透出动画；操作系统原生标题栏不作适配。
+
+保存所有临时样式原值和优先级，清理时只恢复仍属于本功能的写入，保留第三方后写值。原生目标表面或同一框架的类名映射动态替换时只刷新背景适配，不重启动画。官方样式元数据缺失、标签或类名歧义，或 AppFrame 缺失、不支持时不绘画，不回退前景；设置页复用共享错误反馈说明全局布局无法适配，不输出样式正文、DOM、机器路径或原始异常。正确官方样式延迟到达后可恢复挂载并移除过期反馈。
+
+动画按框架尺寸绘制，`ResizeObserver` 仅调整自有 Canvas；`MutationObserver` 在 body 跟踪已批准结构表面，在 head 观察官方样式模块加载、替换及文本变化，类名读取限于主 Spec 列明的两个精确标签。关闭、框架替换或卸载时移除节点、释放观察器、动画和 GPU，并恢复所属样式；`prefers-reduced-motion` 下保持静态，页面隐藏时暂停。WebGL 不可用或上下文丢失时，仅在适配成功的框架底层回退自有 CSS 渐变。用户报告的全局布局错误已定位为 npm 固定哈希与已安装桌面构建不一致；浏览器面板未连接，修复后的实际页面仍待验收，行为和本次检查状态以[官网流动背景 Spec](../src/features/flowing-background/spec.md)为准。
+
 ## 分类 Tab
 
-Mod 内按「通用」「增强」「精简」三个 Tab 组织十三个功能主开关和一个通知声音选项，默认选择「通用」。任务通知下方的「通知声音」开关单独一行，保留一句说明「开启任务通知提示音。」。声音开启时下方展开第二行「提示音」，右侧为宿主 Menu 下拉和小播放图标，默认「系统默认」；关闭时收起第二行、保留声音偏好，只显示开关行。任务通知关闭时隐藏通知声音和提示音设置，保留声音开关与提示音选择；重新开启时恢复显示。选中后保存并自动试听；重复选择当前声音或点击播放图标可重听。播放图标使用 20px 圆圈三角形、36px 按钮命中区域，提供「试听」可访问名称、提示和忙碌状态，不显示大文字按钮。目录不可用、保存或试听进行中禁止选择和重复试听。「提示音」行只显示一句说明「选择系统提示音。」；远程连接时下拉显示「系统默认」并禁用，不额外显示本机限制文案或重试按钮；目录或播放错误仍保留行内提示，目录加载失败可重试。通用包含显示版本号、外观快捷切换、显示刷新按钮、显示重启按钮和任务通知；声音设置随任务通知联动显示。重启开关 `showRestartButton` 默认关闭且独立持久化，说明固定为「重新启动 DSH 应用」。顶部使用原生横向 `ellipsis-outline` 图标的「更多操作」菜单，复用公共 `Menu`；刷新在上、重启在下，两个开关独立控制入口，只占原有单按钮位置。侧栏收起关闭菜单与重启确认，所有入口关闭或不可用时不显示空菜单。重启项保留现有环境限制，不增加平台警告常驻文案。点击先以宿主公共确认弹窗告知任务停止与未保存内容风险，再保留宿主退出确认，取消或退出超时不强杀、不重开，完整边界见[重启应用](restart-button.md)。增强包含个性化、技能管理和 MCP 管理；精简包含官方登录与模型接入、官方搜索、官方反馈与遥测、Todo 和屏蔽双击重命名。个性化、技能和 MCP 的内容页仍属于原生设置侧栏的独立入口，Mod「增强」只放入口开关。Tab 选择仅为当前页面状态，不持久化，也不改任何功能开关。
+Mod 内按「通用」「界面」「增强」「精简」四个 Tab 顺序组织十七个功能主开关和一个通知声音选项，默认选择「通用」。分类 id 依次为 `general`、`interface`、`enhance`、`simplify`；客户端「增强」分类沿用 `enhancements`。任务通知下方的「通知声音」开关单独一行，保留一句说明「开启任务通知提示音。」。声音开启时下方展开第二行「提示音」，右侧为宿主 Menu 下拉和小播放图标，默认「系统默认」；关闭时收起第二行、保留声音偏好，只显示开关行。任务通知关闭时隐藏通知声音和提示音设置，保留声音开关与提示音选择；重新开启时恢复显示。选中后保存并自动试听；重复选择当前声音或点击播放图标可重听。播放图标使用 20px 圆圈三角形、36px 按钮命中区域，提供「试听」可访问名称、提示和忙碌状态，不显示大文字按钮。目录不可用、保存或试听进行中禁止选择和重复试听。「提示音」行只显示一句说明「选择系统提示音。」；远程连接时下拉显示「系统默认」并禁用，不额外显示本机限制文案或重试按钮；目录或播放错误仍保留行内提示，目录加载失败可重试。设置按使用频率和功能关联性排序。通用依次包含任务通知、界面刷新、重启应用，刷新与重启相邻；声音设置紧随任务通知联动显示。界面依次包含快捷推理等级切换、外观快捷切换、官网流动背景、显示版本号；「推理等级切换按钮样式」紧随快捷推理等级切换主开关联动显示。重启开关 `showRestartButton` 默认关闭且独立持久化，说明固定为「重新启动应用」。顶部使用原生横向 `ellipsis-outline` 图标的「更多操作」菜单，复用公共 `Menu`；刷新在上、重启在下，两个开关独立控制入口，只占原有单按钮位置。侧栏收起关闭菜单与重启确认，所有入口关闭或不可用时不显示空菜单。重启设置行仅在 macOS 打包桌面端显示，菜单项仍需 Host 能力确认；Windows、Linux、普通 Web 隐藏重启设置行与菜单入口，隐藏时保留已有偏好，不清除状态，不增加平台警告常驻文案。点击先以宿主公共确认弹窗告知任务停止与未保存内容风险，再保留宿主退出确认，取消或退出超时不强杀、不重开，完整边界见[重启应用](../src/features/restart-button/spec.md)。增强依次包含技能管理、MCP 管理、个性化；精简包含官方登录与模型接入、官方搜索、官方反馈与遥测、Todo、Plan 模式、Goal 模式和屏蔽双击重命名。个性化、技能和 MCP 的内容页仍属于原生设置侧栏的独立入口，Mod「增强」只放入口开关。Tab 选择仅为当前页面状态，不持久化，也不改任何功能开关。
 
-采用内置插件页的文字下划线样式：13px / 20px 文字、`7px 1px 9px` 内边距、0.5px 底部分隔线，选中项下方为 2px 短线。颜色使用原生 label 与 border token，提供键盘焦点和 `tablist`、`tab`、`tabpanel` 及关联 id。仅当前 Tab 进入键盘顺序，左右方向键循环切换，Home/End 跳到首尾并移动焦点；保存中禁止切换，保证操作反馈与错误留在当前分类。参考 [PluginsSettingsSection](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-settings-plugins/src/client/PluginsSettingsSection.tsx) 与其样式，已对照本机安装包核对。三个分类固定声明，不增加通用分类注册框架。
+采用内置插件页的文字下划线样式：13px / 20px 文字、`7px 1px 9px` 内边距、0.5px 底部分隔线，选中项下方为 2px 短线。颜色使用原生 label 与 border token，提供键盘焦点和 `tablist`、`tab`、`tabpanel` 及关联 id。仅当前 Tab 进入键盘顺序，左右方向键循环切换，Home/End 跳到首尾并移动焦点；保存中禁止切换，保证操作反馈与错误留在当前分类。参考 [PluginsSettingsSection](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-settings-plugins/src/client/PluginsSettingsSection.tsx) 与其样式，已对照本机安装包核对。四个分类固定声明，不增加通用分类注册框架。
+
+## 状态提示与错误反馈
+
+全部功能遵循[错误处理规范](error-handling.md)，复用[共享错误反馈](../src/shared/client/error-feedback.ts)的摘要、错误信息展开与复制交互，不各自创建孤立样式或只显示「请重试」。详情的选字段、脱敏、恢复与生命周期由主规范统一维护；侧栏等紧凑入口保留自身容器，内部使用同一反馈组件。
+
+错误反馈参照 DSH `0.2.2-rc.1` 插件安装对话框的摘要／操作／展开详情层级与插件更新输出区域。页面错误采用单层设置卡片：`12px 14px` 内边距、`--dsw-radius-lg` 圆角、`--dsw-alias-settings-card-fill/stroke` 底色与 0.5px 描边；行内错误不额外套卡，紧凑侧栏反馈保留有界容器。摘要使用错误色，8px 下方同一操作行左侧为「错误信息」，右侧为可选「重试」；使用公共 `Button` 的 sm（28px、12px／18px），详情为 ghost、重试与复制为 outline，不覆盖原生按钮材质。详情按钮使用 `aria-expanded/aria-controls`、14px 原生 Regular 下箭头，展开旋转 180°，减弱动态效果时关闭过渡。诊断默认收起，展开后以无描边的 `--dsw-alias-bg-module-platform` 中性区域承载，12px 圆角与 `10px 12px` 内边距，正文 12px／18px 等宽、次要文字色、最大高度 200px 并可滚动和选择；长行换行，底部细线分隔的操作区右对齐复制，复制结果在其左侧显示。避免浏览器默认 summary 标记与卡片套卡片。参照 [InstallDialog](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-plugin-manager/src/client/PluginManagerPage.tsx)、[updateOutput 样式](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-plugin-manager/src/client/PluginManagerPage.module.css)及公共 [Button](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-primitives/src/Button.tsx)，均已核对当前桌面安装包；不导入官方功能插件内部组件。
+
+页面级状态提示紧跟标题与说明，位于分类 Tab、设置行或编辑器之前。沿用原生插件设置页的状态文字规格：13px／20px，与标题组间距 12px。加载、只读和版本信息缺失使用 `--dsw-alias-label-tertiary` 与 `role="status"`；配置不可用、文件读取失败使用 `--dsw-alias-state-error-primary` 与 `role="alert"`。颜色随宿主浅深主题变化，文案与控件禁用状态反映实际结果；状态恢复后移除提示。
+
+保存或校验失败留在相关控件旁：设置行的说明下方、编辑器输入框下方。采用原生配置字段的错误色，设置行错误为 12px／18px、上间距 4px，并通过错误 id、`aria-describedby` 与 `aria-invalid` 关联控件。原生依据为 [PluginInventorySettingsTab 样式](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-settings-plugin-inventory/src/client/PluginInventorySettingsTab.module.css)及[配置字段样式](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-primitives/src/settings-form/fields.module.css)。
 
 ## 控件与交互
 
@@ -66,7 +90,7 @@ Mod 内按「通用」「增强」「精简」三个 Tab 组织十三个功能�
 | 说明 | 12px / 18px，400，次要文字 token；上间距 4px |
 | 设置行 | 上下内边距 16px，左右内容间距 24px，控件垂直居中 |
 | 分隔线 | `0.5px solid var(--dsw-alias-border-l2)`；无额外顶线，末行无底线 |
-| 错误提示 | 对应行左侧说明下方，`role="alert"`，继承正文样式 |
+| 错误提示 | 对应行左侧说明下方，12px／18px，原生错误色与 `role="alert"`；遵循[状态反馈](#状态提示与错误反馈) |
 | 开关几何 | 36 × 20px 轨道、16 × 16px 滑块、2px 内边距，开启后平移 16px |
 | 轨道关闭 / 开启 | `--dsw-alias-border-l3` / `--dsw-alias-brand-primary` |
 | 滑块关闭 / 开启 | `--dsw-alias-switch-thumb` / `--dsw-alias-label-primary-foreground` |
@@ -75,6 +99,8 @@ Mod 内按「通用」「增强」「精简」三个 Tab 组织十三个功能�
 | 过渡 | 滑块、轨道颜色与透明度 120ms ease；保存中仅轻微淡化开关，`prefers-reduced-motion` 下关闭动画 |
 
 原生来源：[设置行样式](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-settings-general/src/client/DeveloperToolsRow.module.css)、[Switch 实现](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-primitives/src/Switch.tsx)与[样式](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-primitives/src/Switch.module.css)。宿主升级后重新核对，不用截图物理像素或 `0.9em` 近似推算字号。
+
+推理等级按钮是纯图形控件，默认用仪表盘，也可在设置「推理等级切换按钮样式」里切换为信号格。两种样式都在 28 × 28 命中区内居中放 20 × 14 的图形，不显示文字标签；档位名与下一档由公共 `Tooltip` 和按钮 `aria-label` 提供，视觉状态由点亮的格数表达，不只靠颜色。信号格按档位数等分高度，每根线条两端全圆角；仪表盘复刻宿主 `gauge-outline` 产品图标（16 × 16），浅色圆弧与 3 条浅色内刻度加一枚强调色指针和中心圆点，真实档位均匀铺满刻度、指针按档位从低（左）转到高（右）；「默认」不是档位，指针停在底部缺口并变灰，灰色与强调色的指针和圆心尺寸相同，仅切换颜色，圆心不描边；显示为 20 × 20 并垂直居中，切换时以中心为轴 180ms 平滑过渡，减弱动态效果时关闭动画。按钮材质对齐官方模型座位触发按钮：`--dsw-radius-sm` 圆角、无边框透明底、默认与 hover 均保持透明且无阴影，键盘 `focus-visible` 用 2px 主题色 outline、外偏移 2px；点亮格/刻度用宿主主题强调色 `--dsw-alias-state-business-primary`，未点亮部分继承次要文字色并降低透明度，随浅深色主题变化。工具行 `.standardControls` 的 12px gap 由本按钮自身的 `margin-left:-8px` 与 `margin-right:-8px` 在左右两侧各抵消为约 4px。按钮注册在 `conversation.input.right`，但以自身 `order:1` 视觉排在官方模型座位右侧，由右对齐的发送按钮锚定，避免模型座位文字变宽时推动按钮；这不改宿主 DOM/CSS，代价是 Tab 焦点顺序仍按 DOM 顺序（按钮先于模型座位），已在主 Spec 记录。它同样遵循下列语义与键盘要求。
 
 使用语义 HTML：按钮有名称、焦点与禁用态；开关使用 `role="switch"`、`aria-checked` 和关联标签，支持键盘。点击后滑块立即过渡到目标位置，保存中轻微淡化开关、设置 `aria-busy` 并禁止重复提交；成功采用已保存的值，失败回到已保存的值并显示原因；个性化开关按用户要求不显示行内提示文字，失败仍回到已保存的值。不添加后台状态提示或人为等待。输入错误关联字段，支持中文输入法；若新增对话框，管理初始焦点、圈定、Escape 和关闭后的焦点恢复。
 
@@ -100,7 +126,7 @@ Mod 内按「通用」「增强」「精简」三个 Tab 组织十三个功能�
 
 ## 确认弹窗
 
-重启确认复用宿主共享模块 `@deepseek-ai/dsh-client-ui-primitives` 的公共 `Modal` 与 `Button`，由 shell baseline 模块表获取，与原生插件卸载确认使用相同组合，不新增依赖或覆盖组件内部样式。标题「重启 DSH」，说明「运行中的任务会停止，未保存的内容可能丢失。」；footer 中依次为 outline「取消」和 primary「重启」，使用默认 md 尺寸。取消按钮通过 `data-modal-autofocus` 获得初始焦点；遮罩、关闭图标、Escape、Tab 约束与焦点恢复由 `Modal` 处理。按钮隐藏、开关关闭或其他重启已开始时撤销尚未确认的弹窗，旧回调不得提交操作。行为边界见[重启应用](restart-button.md)。
+重启确认复用宿主共享模块 `@deepseek-ai/dsh-client-ui-primitives` 的公共 `Modal` 与 `Button`，由 shell baseline 模块表获取，与原生插件卸载确认使用相同组合，不新增依赖或覆盖组件内部样式。标题「重启应用」，说明「运行中的任务会停止，未保存的内容可能丢失。」；footer 中依次为 outline「取消」和 primary「重启应用」，使用默认 md 尺寸。取消按钮通过 `data-modal-autofocus` 获得初始焦点；遮罩、关闭图标、Escape、Tab 约束与焦点恢复由 `Modal` 处理。按钮隐藏、开关关闭或其他重启已开始时撤销尚未确认的弹窗，旧回调不得提交操作。行为边界见[重启应用](../src/features/restart-button/spec.md)。
 
 ## 多行文本输入框
 
@@ -142,25 +168,29 @@ PowerDSH 设置页标题下只显示「DSH 增强插件」，英文为「A DSH e
 | --- | --- |
 | 显示版本号 | 在左上角显示版本号，点击检查更新 |
 | 外观快捷切换 | 在侧栏底部快捷切换外观 |
+| 官网流动背景 | 为界面添加柔和流动的蓝色渐变 |
 | 显示刷新按钮 | 重新加载当前界面 |
-| 显示重启按钮 | 重新启动 DSH 应用 |
+| 显示重启按钮 | 重新启动应用 |
 | 任务通知 | 任务完成、失败或需要确认时发送桌面通知。 |
 | 通知声音 | 开启任务通知提示音。 |
 | 提示音 | 选择系统提示音。 |
 | 个性化 | 管理全局提示词 |
 | 技能管理 | 在设置中管理技能 |
 | MCP 管理 | 在设置中管理 MCP |
-| 精简官方登录与模型接入 | 停用官方登录、账号界面及内置模型接入。 |
-| 精简官方搜索 | 停用内置网页搜索，保留网页抓取与第三方 MCP 搜索。 |
-| 精简官方反馈与遥测 | 停用使用统计、环境信息采集、会话日志及插件清单上报 |
-| 精简Todo工具 | harness执行过程中不再生成待办列表 |
+| 停用官方登录与模型接入 | 停用官方登录、账号界面及内置模型接入。 |
+| 停用官方搜索 | 关闭内置 WebSearch，保留 WebFetch。 |
+| 停用官方反馈与遥测 | 停用使用统计、环境信息采集、会话日志及插件清单上报 |
+| 停用 Todo 工具 | 新对话中不再生成待办列表 |
+| 停用 Plan 模式 | 停用新对话的内置计划模式 |
+| 停用 Goal 模式 | 停用新对话的内置目标模式 |
 | 屏蔽双击重命名 | 屏蔽侧栏会话标题的双击重命名操作 |
 
+- 「精简」保留为分类名称；停用能力的六项开关使用「停用…」，英文动作为 `Disable`；拦截操作保留「屏蔽双击重命名」，英文使用 `Block`。名称不改变配置键、启停语义和生效范围。
 - 可见文案通过 Client locale 服务，插件管理元数据放在 locale JSON；中英文语义一致，英文用 sentence case。切换语言同步更新标题、导航和内容。
 - 保留用户已确认的简洁中文文案，描述可理解的状态，不向用户暴露 service、fiber、slot 等实现名词。社区身份在项目介绍说明即可。
 - 不擅自添加多余的文字说明。已有标题、说明和控件足以表达用途时，不再补充操作指导、限制说明、实现细节或重复提示；用户已确认的文案不自行扩写。确有操作失败时，只在对应位置显示必要、简短且可处理的错误信息，技术限制与背景说明放入功能文档，不作为界面常驻文案。
 - placeholder 少用、少写，只在必要时给出简短提示，不堆叠说明或长示例；已有标题和描述足以说明用途时留空。个性化文本框按用户确认的文案使用「添加自定义指令」。
-- 选择器使用 `power-dsh-` 前缀，限定插件拥有的元素；不覆盖 body、宿主私有类、面板布局或其他插件，不查询其 DOM 推断位置。[屏蔽双击重命名](double-click-rename.md)已有用户明确批准的局部例外，仅允许读取当前双击事件路径中的会话行标记，不扫描文档或修改宿主节点。技能与 MCP 卡片页为避免滚动宽度跳动，允许唯一的宿主样式例外：仅给包含 `.power-dsh-skills-page` 或 `.power-dsh-mcp-page` 的设置内容滚动容器设置 `scrollbar-gutter:stable`，用 `[data-shortcut-modal="settings"] > div:has(.power-dsh-skills-page,.power-dsh-mcp-page)` 限定；不改面板尺寸、overflow、导航或其他页面，两页卸载后不再匹配。Windows 刷新按钮允许只读测量 Desktop preload 的原生菜单外层边界以避让标题栏，范围见[刷新定位](refresh-button.md#接入与定位)。
+- 选择器使用 `power-dsh-` 前缀，限定插件拥有的元素；不覆盖 body、宿主私有类、面板布局或其他插件，不查询其 DOM 推断位置。[屏蔽双击重命名](../src/features/double-click-rename/spec.md)已有用户明确批准的局部例外，仅允许读取当前双击事件路径中的会话行标记，不扫描文档或修改宿主节点。技能与 MCP 卡片页为避免滚动宽度跳动，允许唯一的宿主样式例外：仅给包含 `.power-dsh-skills-page` 或 `.power-dsh-mcp-page` 的设置内容滚动容器设置 `scrollbar-gutter:stable`，用 `[data-shortcut-modal="settings"] > div:has(.power-dsh-skills-page,.power-dsh-mcp-page)` 限定；不改面板尺寸、overflow、导航或其他页面，两页卸载后不再匹配。Windows 顶栏三点入口固定在侧栏按钮右侧 4px；仅当入口存在时，通过带自有元素 `:has()` 限定的根元素规则设置宿主 `--dsh-windows-menu-start` 变量，为原生菜单预留空间，入口隐藏或卸载即恢复；不再测量原生菜单，范围见[刷新定位](../src/features/refresh-button/spec.md#接入与定位)。
 - 长文案可换行、容器可缩放，不撑破面板；不要另加偏离原生参照行的窄屏密度。
 - 样式随组件卸载，其他副作用归属 context；不往 `document.body` 挂第二个应用。侧栏定位边界见[架构规范](architecture.md#侧栏接入)。
 
@@ -184,7 +214,7 @@ PowerDSH 设置页标题下只显示「DSH 增强插件」，英文为「A DSH e
 
 技能页的项目范围始终下拉选择已经导入的项目，显示原生项目名称，路径只作为选择值、悬停提示和同名区分。只有一个项目也保留下拉，无项目禁用并显示「暂无已导入项目」，不追加未导入的启动目录。全局隐藏项目选择；项目名称下拉与搜索同行，两个范围都不显示「全部来源」下拉，技能继续用同一套卡片。不展示模式选择，不把文件全路径常驻堆在卡面。
 
-技能开关读原生实际调用策略，仅对相应 DSH 范围生效，不修改共享文件。MCP 顶部说明为「管理 DSH 中可用的 MCP」，只提供全局列表，按「用户／内置」分组，说明分别为「用户配置的 MCP」「随模式或插件提供」。MCP 页不提供项目范围、项目文件扫描或项目实例展示。同一个全局原生实例在配置清单和运行目录中出现时合为一张卡片。名称使用实际 serverName，可管理项操作仍用原生标识；移除「当前配置」等来源标签，第二行并排显示已确认的本地／HTTP 类型标签与运行状态，下面的展开按钮显示该服务器的实际工具数量，展开后逐项显示完整工具名。展开按钮提供 `aria-expanded`、`aria-controls` 和关联名称、摘要；底部工具区为关联名称的 region，收起时隐藏且不渲染工具项。每张卡片按实例 id 独立保留本页手动状态，搜索、刷新及分组折叠不重置，不持久化；搜索工具名或本地／HTTP 类型文案可找到对应服务器，不自动展开卡片。「已关闭」与「运行中」统一显示在第二行类型标签旁的状态位置，关闭使用灰色 `idle` 圆点。第三行保留工具缺省文字：配置状态明确且开关关闭时显示静态「暂无可用工具」／`No available tools`；开启但没有已加载工具时显示静态「暂无已加载工具」／`No loaded tools`。两种缺省行均沿用工具入口的最小高度和间距。这两种状态不显示展开箭头和工具区，头部不可展开，取消可点击的悬浮与按下反馈；已展开的卡片在关闭或工具列表变空后立即收起，即使关闭后仍有缓存工具或运行状态尚未停用也不展示工具。重新开启且有工具后恢复本页原有展开偏好。没有简介时不补空白占位或编造文本。服务器长名称继续使用原生 Tooltip，保留只读原因、未知状态与行内错误。无原生持久化控制入口的条目显示「由提供插件管理」并保持只读。未知配置状态不可操作；运行状态不等于网络连接状态，不显示「在线」或「已连接」。页面挂载、窗口 focus 和写后读回时刷新，页面可见且无读取或写入进行时每 2 秒刷新运行状态，卸载释放定时器与监听；刷新保留搜索、分组与卡片展开状态。实现依据及许可见[第三方资源声明](third-party-notices.md)，行为范围见[技能管理](skills.md)、[MCP 管理](mcp.md)。
+技能开关读原生实际调用策略，仅对相应 DSH 范围生效，不修改共享文件。MCP 顶部说明为「管理 DSH 中可用的 MCP」，只提供全局列表，按「用户／内置」分组，说明分别为「用户配置的 MCP」「随模式或插件提供」。MCP 页不提供项目范围、项目文件扫描或项目实例展示。同一个全局原生实例在配置清单和运行目录中出现时合为一张卡片。名称使用实际 serverName，可管理项操作仍用原生标识；移除「当前配置」等来源标签，第二行并排显示已确认的本地／HTTP 类型标签与运行状态，下面的展开按钮显示该服务器的实际工具数量，展开后逐项显示完整工具名。展开按钮提供 `aria-expanded`、`aria-controls` 和关联名称、摘要；底部工具区为关联名称的 region，收起时隐藏且不渲染工具项。每张卡片按实例 id 独立保留本页手动状态，搜索、刷新及分组折叠不重置，不持久化；搜索工具名或本地／HTTP 类型文案可找到对应服务器，不自动展开卡片。「已关闭」与「运行中」统一显示在第二行类型标签旁的状态位置，关闭使用灰色 `idle` 圆点。第三行保留工具缺省文字：配置状态明确且开关关闭时显示静态「暂无可用工具」／`No available tools`；开启但没有已加载工具时显示静态「暂无已加载工具」／`No loaded tools`。两种缺省行均沿用工具入口的最小高度和间距。这两种状态不显示展开箭头和工具区，头部不可展开，取消可点击的悬浮与按下反馈；已展开的卡片在关闭或工具列表变空后立即收起，即使关闭后仍有缓存工具或运行状态尚未停用也不展示工具。重新开启且有工具后恢复本页原有展开偏好。没有简介时不补空白占位或编造文本。服务器长名称继续使用原生 Tooltip，保留只读原因、未知状态与行内错误。无原生持久化控制入口的条目显示「由提供插件管理」并保持只读。未知配置状态不可操作；运行状态不等于网络连接状态，不显示「在线」或「已连接」。页面挂载、窗口 focus 和写后读回时刷新，页面可见且无读取或写入进行时每 2 秒刷新运行状态，卸载释放定时器与监听；刷新保留搜索、分组与卡片展开状态。实现依据及许可见[第三方资源声明](third-party-notices.md)，行为范围见[技能管理](../src/features/skills/spec.md)、[MCP 管理](../src/features/mcp/spec.md)。
 
 行开关即时保存、不增加页级保存取消；操作中禁止重复提交和切换写入上下文，完成后以原生读回结果更新。加载失败显示可重试错误，不显示假空列表；目录不完整禁止写入。搜索仅使用「搜索技能」「搜索 MCP」。首版只做查看与启停，不出现未实现的安装、添加或编辑按钮。
 

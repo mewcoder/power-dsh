@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { mount, button, headerTrigger, headerMenu, headerPosition, headerAction, descendants } from '../../../../tests/helpers/client-fixture.mjs';
+
+test('refresh preference reveals the shared horizontal menu and only selecting Refresh reloads the page', async () => {
+  let reloads = 0;
+  let stopped = 0;
+  const app = await mount({ themeAvailable: false, reload: () => { reloads++; } });
+  assert.equal(app.renderHeader(), null);
+  const toggle = descendants(app.renderSettings()).find(node => node.props.id === 'settings-test-showRefreshButton');
+  await toggle.props.onClick();
+  assert.equal(reloads, 0);
+  assert.deepEqual(app.rpcCalls, []);
+  assert.equal(headerPosition(app).left, 220);
+  const control = headerTrigger(app);
+  assert.equal(control.props.className, 'power-dsh-header-button');
+  assert.equal(control.props['aria-haspopup'], 'menu');
+  assert.equal(control.props['aria-expanded'], false);
+  const glyphs = descendants(control).filter(node => node.props.glyph);
+  assert.deepEqual(glyphs.map(node => node.props.glyph), ['ellipsis-outline'], 'Use the installed native horizontal three-dot glyph.');
+  control.props.onClick({ stopPropagation() { stopped++; } });
+  assert.equal(reloads, 0, 'Opening a menu is not a refresh action.');
+  assert.equal(headerTrigger(app).props['aria-expanded'], true);
+  const menu = headerMenu(app);
+  assert.equal(menu.props.portal, true);
+  assert.equal(menu.props.autoFocus, true);
+  assert.deepEqual(Array.from(menu.props.items, item => item.id), ['refresh']);
+  menu.props.onClose();
+  assert.equal(reloads, 0);
+  assert.equal(headerTrigger(app).props['aria-expanded'], false);
+  headerAction(app, 'refresh').props.onClick();
+  assert.equal(reloads, 1);
+  assert.equal(stopped, 1);
+  assert.equal(headerTrigger(app).props['aria-expanded'], false);
+  app.resize(360);
+  assert.equal(headerPosition(app).left, 300);
+  assert.equal(app.renderHeader(false), null);
+  assert.equal(app.geometry().listeners, 0);
+  assert.equal(app.geometry().observeCount, app.geometry().disconnectCount);
+  app.unmount();
+});
+
+test('a failed menu refresh reports the error and selecting it again can retry', async () => {
+  let attempts = 0;
+  const app = await mount({ reload: () => { if (++attempts === 1) throw new Error('reload failed'); } });
+  app.set({ showRefreshButton: true });
+  headerAction(app, 'refresh').props.onClick();
+  assert.ok(descendants(app.renderHeader()).some(node => node.props.role === 'alert' && node.props.children.includes('refreshFailed')));
+  headerAction(app, 'refresh').props.onClick();
+  assert.equal(attempts, 2);
+  assert.ok(!descendants(app.renderHeader()).some(node => node.props.role === 'alert'));
+  app.unmount();
+});

@@ -6,7 +6,7 @@
 
 2026-11-08 的调查覆盖 DSH `0.2.0` / `0.2.1` 目标分支当时已发布的全部 12 个具体版本，**最低已测基线为 `0.2.0-rc.1`**。每版匹配 SDK 的 192 项测试、固定生产 SDK 配合对应 Host 服务的 3 项装配检查均通过，无失败或跳过；另有 `0.2.2-alpha.2` 及 `0.2.2-rc.1` SDK 回归。2026-11-09 的后续单版复测见[SDK 结果](#sdk-验证方法与结果)，仅覆盖 `0.2.0-rc.1`，不能将新增测试数量扩到其余版本。完整 DSH 的产物安装、Client 实际加载、系统通知和跨平台界面仍待验收。
 
-旧版没有 `tools.definitions()` 的阻碍已通过公开 `schemas()` / `get()` 适配，工具列表、作用域隔离及同名覆盖均保留，不读取私有注册表，也不为列目录连接 MCP。旧宿主内部生成 schema 会读取描述与参数，Mod 只消费名称、不保存或返回其余字段；这项取舍及失败语义已同步到 [MCP 规范](mcp.md)。此次不承诺尚未重新验证的 `0.1.7-rc.2`，也不把已发布版本的结果外推到未来的新 alpha / rc。
+旧版没有 `tools.definitions()` 的阻碍已通过公开 `schemas()` / `get()` 适配，工具列表、作用域隔离及同名覆盖均保留，不读取私有注册表，也不为列目录连接 MCP。旧宿主内部生成 schema 会读取描述与参数，Mod 只消费名称、不保存或返回其余字段；这项取舍及失败语义已同步到 [MCP 规范](../src/features/mcp/spec.md)。此次不承诺尚未重新验证的 `0.1.7-rc.2`，也不把已发布版本的结果外推到未来的新 alpha / rc。
 
 ## 同类插件怎么声明
 
@@ -74,6 +74,32 @@
 
 同日实际 tarball 经 `npm run check:package` 验证：28 个文件，入口、运行源码及导入、声明依赖、Client factory 登记、资源和开发文件排除通过；另在系统临时目录以 `npm install --omit=dev --ignore-scripts` 安装该 tarball，Host 和全部公开子路径可独立解析，不依赖仓库的 `node_modules`。这是 npm 产物与生产依赖验证，没有安装 DSH/profile 或激活真实页面，不等于 GitHub 来源及完整宿主验收。
 
+### 模块化与 npm 产物回归
+
+2026-11-09，基于 `37f174c` 的未提交模块化工作区，在 Node `24.14.0` 执行完整结构、构建新鲜度与行为检查，**248 通过、0 失败、0 跳过**。保留既有断言，新增功能排除组合、配置/文案/协议冲突、权限与装配校验；测试拆分也改变了顶层用例计数，不能只用数量推断覆盖提升。
+
+| SDK 目标 | Cordis / Schemastery | 仓库测试 | 固定生产 SDK + 对应 Host 装配 | 原始目录 |
+| --- | --- | --- | --- | --- |
+| `0.2.0-rc.1` | `4.0.4` / `3.18.4` | 248 通过、0 失败、0 跳过 | 7 通过、0 失败、0 跳过 | `0.2.0-rc.1-L2xpDC` |
+| `0.2.1-rc.5` | `4.0.5` / `3.18.5` | 248 通过、0 失败、0 跳过 | 7 通过、0 失败、0 跳过 | `0.2.1-rc.5-uuMwMJ` |
+
+日志仍为各目录的 `check.log` 与 `production-sdk-host.log`，汇总为 `summary-1794195440660.json`。这两版不替代旧的十二版历史矩阵，也不表示其他版本或真实 GUI 已完成模块化验收。
+
+实际标准 npm tarball 检查包含全部递归源码、十三份模块 Spec 与已校验 Client 产物，排除测试和开发脚本。在独立临时项目执行 `npm install --omit=dev --ignore-scripts` 后，Host 的十六个配置字段、所有公开导出和预生成 Client factory 均可解析，生产依赖树没有 esbuild。仅验证本地 npm 产物与依赖，未发布注册表或操作 DSH/profile；npm 安装来源、真实 RPC 传输、页面与平台行为仍待完整宿主验收。
+
+### TypeScript 与 tsdown 迁移
+
+2026-11-09，在同一未提交模块化工作区将运行源码迁为严格 TypeScript，使用 tsdown `0.23.7`、TypeScript `5.9.3` 与 Node `24.14.0`。完整 `tsc --noEmit`、编译型契约正负例、三个产物新鲜度及 **249 项行为测试**通过，0 失败、0 跳过；相较前一阶段新增首次技能租约无 key 的回归，不替换之前的 JS 快照计数。
+
+| 隔离 SDK | 仓库测试 | 当前编译 Host + 历史 SDK 装配 | 原始目录 |
+| --- | --- | --- | --- |
+| `0.2.0-rc.1` | 249 通过 | 7 通过 | `0.2.0-rc.1-FNPJSc` |
+| `0.2.1-rc.5` | 249 通过 | 7 通过 | `0.2.1-rc.5-Ws2LLx` |
+
+各目录保存 `install.log`、`build.log`、`check.log` 和 `production-sdk-host.log`，汇总 `summary-1794199390535.json`。隔离目录按该 SDK 重新编译声明并执行类型/行为检查；生产 Host 装配通过当前 `dist/index.js` 加载真实历史 Context、Tools 与投影服务。只更新这两版证据，不外推其他版本或完整宿主行为。
+
+标准 npm 包改为编译后的 Host ESM、公开声明、Client factory、十三份 Spec 与资源，不包含 TS 编译输入。独立临时项目安装生产依赖后，十六个配置字段与所有公开子路径可解析，Client factory 可登记，没有 TypeScript、tsdown、esbuild 或第二份 React；额外用独立 `usage.ts` 将包交给原生 `Context.plugin`，公开声明检查通过。公开入口只适配原生基础 Context，内部仍按注入后的结构化服务类型检查。上述验证没有安装 DSH/profile 或发布 npm，真实页面、RPC 传输与完整重启仍待验收。
+
 ### 方法边界与复现
 
 装配检查保持生产入口及其依赖导入不变，Context、真实 Tools 和通知投影服务由历史 SDK 解析；验证 Mod service、工具与投影注册，以及技能与 MCP 目录调用。Settings、Typert transport、Plugin Manager、技能 provider 和 Loader 仍有测试替身，不是完整应用启动；真实传输、完整 profile 组合与客户端页面仍需实际安装验收。
@@ -93,9 +119,9 @@ npm run check:compat -- 0.2.2-alpha.2
 
 ## 原调查中的适配
 
-[MCP 提供方](../src/mcp-providers.js)在 Fiber 尚未完成首次配置解析时，可从公开 `rawConfig.serverName` 读取字面量身份，避免等待依赖或加载中的服务器消失。优先使用已解析配置，不执行表达式，不读取命令、参数、环境变量、请求头或 URL；原始名称只用于标识声明，不证明连接成功。模式归属读取补充已验证配置的 id 回退。[MCP 规范](mcp.md)记录现行规则。
+[MCP 提供方](../src/features/mcp/mcp-providers.ts)在 Fiber 尚未完成首次配置解析时，可从公开 `rawConfig.serverName` 读取字面量身份，避免等待依赖或加载中的服务器消失。优先使用已解析配置，不执行表达式，不读取命令、参数、环境变量、请求头或 URL；原始名称只用于标识声明，不证明连接成功。模式归属读取补充已验证配置的 id 回退。[MCP 规范](../src/features/mcp/spec.md)记录现行规则。
 
-[通知注册测试](../tests/notifications.test.mjs)使用两端均提供的 `onChanged` 和 snapshot 结果验证注册、通知内容、卸载和重新加载，不要求新版才有的 summary keys 接口。[Todo 测试](../tests/todo-policy.test.mjs)在旧版使用其导出的真实 scheduler，新版使用真实 pipeline，保留执行拒绝及无关工具可执行的业务断言，不跳过旧版用例。[MCP 提供方测试](../tests/mcp-providers.test.mjs)补充旧版 schema 深克隆、父层过滤、同名覆盖、限制及错误传播；新版仍验证不读取 schema 的快路径。
+[通知注册测试](../src/features/notifications/tests/notifications.test.mjs)使用两端均提供的 `onChanged` 和 snapshot 结果验证注册、通知内容、卸载和重新加载，不要求新版才有的 summary keys 接口。原调查中的 [Todo 测试](../src/features/todo-blocking/tests/todo-policy.test.mjs)在旧版使用其导出的真实 scheduler，新版使用真实 pipeline，当时覆盖旧 Agent 的执行拒绝及无关工具可执行行为，不跳过旧版用例。现行 Todo 已调整为只对新对话生效，旧 Agent 保留工具执行能力；这一行为变更未继承原调查的历史兼容结论。[MCP 提供方测试](../src/features/mcp/tests/mcp-providers.test.mjs)补充旧版 schema 深克隆、父层过滤、同名覆盖、限制及错误传播；新版仍验证不读取 schema 的快路径。
 
 ## 下一步验收
 
