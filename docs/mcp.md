@@ -34,6 +34,6 @@ owner-only RPC 为 `listMcpServers()` 与 `setMcpServerEnabled(id, enabled)`，�
 
 ## 接口依据与验证
 
-以已有 DSH 源码和本机已安装包核对 MCP 客户端、Scope、Cordis Registry／Fiber、Loader、Plugin Manager、Settings 及模式清单；上游源码的 `mcpManager` 与本机是否实际提供该服务分别判断，不把新版字段或导出套到旧发行包。当前没有可用 Inspect 工具。市场参考与许可见[设计研究](skill-mcp-design.md#已做研究与边界)和[第三方声明](third-party-notices.md)，未复制第三方目录扫描器、独立连接器或 profile 接管逻辑。
+接口依据为 DSH `0.2.2-rc.1` 安装包及[历史标签核对](compatibility-audit.md#官方发行标签的接口证据)，覆盖 MCP 客户端、Scope、Cordis Registry／Fiber、Loader、Plugin Manager、Settings 及模式清单。上游源码的 `mcpManager` 与目标发行包是否实际提供该服务分别判断，不把新版字段或导出套到旧发行包。市场参考的确切提交、MIT 许可与边界见[来源研究](third-party-notices.md#技能与-mcp-来源研究)及[运行状态参考](third-party-notices.md#mcp-运行状态参考)，未复制第三方目录扫描器、独立连接器或 profile 接管逻辑。
 
 [策略测试](../tests/mcp-policy.test.mjs)、[提供方测试](../tests/mcp-providers.test.mjs)和 [Host 装配测试](../tests/host-wiring.test.mjs)覆盖真实 Cordis 作用域、模块身份、静态／动态去重、原生 Settings 更新、失败读回、白名单和卸载边界；原生 MCP 传输在测试中替换为不连接的插件。Client 测试覆盖仅全局的分组与搜索、卡片独立展开与折叠、工具完整展示和双语空态、开关与展开相互独立、运行状态标签及其与启用意图的区分、可见时空闲轮询与卸载清理、慢请求、过期响应、只读和错误恢复。仓库检查不代表实际远端连接或 GUI 已验收，不为测试而擅自启停用户真实 MCP。

@@ -24,6 +24,8 @@
 
 页面只显示开关，操作失败时显示原因，不后台订阅精简状态或显示核对提示。每次启停操作核对原生应用结果；手动在管理器改动目标后，可重新切换开关以应用设置。旧版已开启精简的用户更新后，也需重新应用精简，才会停用新增的反馈命令目标。
 
+保存精简偏好时只更新 `blockOfficialTelemetry`，保留其他功能的当前配置，不删除通知、提示音或双击屏蔽偏好；只移除明确废止的恢复快照与全屏设置字段。行为测试见[遥测策略测试](../tests/telemetry-plugins.test.mjs)。
+
 `power_dsh_settings` 调用时按需返回 `telemetry.protected` 和七个目标条目 `senders` 的 available、enabled、active 状态。实现见 [telemetry-policy.js](../src/telemetry-policy.js)。
 
 关闭精简会启用上述匹配目标，包括开启精简前已停用的模块。共用流程见[原生精简操作](architecture.md#原生精简操作)。停用或卸载 Mod 不会自动启用目标，撤销精简的方法见[安装与使用](development.md#安装与使用)。

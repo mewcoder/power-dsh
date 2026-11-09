@@ -39,7 +39,7 @@ for (const [key, target] of Object.entries(resources)) {
   assert.ok(isShipped(target.slice(2)), `Not in files: ${target}`);
 }
 assert.equal(manifest.exports['./locale/*.json'], './assets/locale/*.json');
-for (const pattern of ['src/*.js', 'assets/locale/*.json', 'cordis.patch.yml', 'docs/*.md', 'scripts/*.mjs', 'tests/*.test.mjs', 'CHANGELOG.md', 'screenshots.json']) {
+for (const pattern of ['src/*.js', 'assets/locale/*.json', 'cordis.patch.yml', 'docs/third-party-notices.md', 'CHANGELOG.md', 'screenshots.json']) {
   assert.ok(manifest.files.includes(pattern), `Missing distribution entry: ${pattern}`);
 }
 assert.ok(!(await readdir(root)).some(name => /\.(?:[cm]?js|ts)$/.test(name)), 'Keep runtime source in src/, not the repository root.');
@@ -107,12 +107,12 @@ for (const screenshot of screenshots) {
 
 const codeFiles = (await Promise.all(['src', 'scripts', 'tests'].map(listFiles))).flat().filter(name => /\.(?:js|mjs)$/.test(name));
 for (const name of codeFiles) {
-  assert.ok(isShipped(name), `Not in distribution: ${name}`);
+  if (name.startsWith('src/')) assert.ok(isShipped(name), `Runtime source is not shipped: ${name}`);
   const text = await read(name);
   for (const [, specifier] of text.matchAll(/(?:from\s*|import\s*)['"](\.[^'"]+)['"]/g)) {
     const resolved = path.relative(root, path.resolve(root, path.dirname(name), specifier));
     assert.ok(await isFile(resolved), `Missing local import: ${name} → ${specifier}`);
-    assert.ok(isShipped(resolved), `Local import is not shipped: ${name} → ${specifier}`);
+    if (name.startsWith('src/')) assert.ok(isShipped(resolved), `Runtime import is not shipped: ${name} → ${specifier}`);
   }
   const result = spawnSync(process.execPath, ['--check', path.join(root, name)], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr || result.error?.message || `Syntax check failed: ${name}`);

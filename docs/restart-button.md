@@ -1,6 +1,6 @@
 # 重启 DSH 应用
 
-本文记录新增重启按钮的行为边界与实现方案。当前源码已实现，尚未安装或完成实际页面及应用重启验收；已有历史版本矩阵不覆盖本功能。
+本文是重启按钮的行为规格。源码已实现，实际页面与完整应用重启尚未验收；已有历史版本矩阵不覆盖本功能。
 
 ## 入口与显隐
 
@@ -37,13 +37,13 @@ Host 操作采用 owner-only RPC，能力探测与执行均校验当前环境。
 
 ## 参考与验证
 
-确认弹窗直接复用公共 `Modal` 与 `Button`，参照 DSH 原生 [插件卸载确认](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-plugin-manager/src/client/PluginManagerPage.tsx)。本机 `0.2.2-rc.1` Web shell 安装产物已核对两者公共导出、Modal 的 `open/onClose/title/closeLabel/description/footer`、`data-modal-autofocus` 及 Button 的 `variant`，未使用仅在较新源码中出现的 `tone` 参数；本次仍无 Inspect 工具或实际浏览器页面验收。
+确认弹窗直接复用公共 `Modal` 与 `Button`，参照 DSH 原生 [插件卸载确认](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-plugin-manager/src/client/PluginManagerPage.tsx)。本机 `0.2.2-rc.1` Web shell 安装产物已核对两者公共导出、Modal 的 `open/onClose/title/closeLabel/description/footer`、`data-modal-autofocus` 及 Button 的 `variant`，未使用仅在较新源码中出现的 `tone` 参数；这些源码核对不代表实际页面验收。
 
 参考已有 [hulibuld/dsh-refresh-restart](https://github.com/hulibuld/dsh-refresh-restart/tree/3228af3fc3bcc27eb5b290831e43e5734d85901d)（本地 `reference/hulibuld/dsh-refresh-restart`，提交 `3228af3`，MIT），已阅读 `lib/restart.js`、`lib/platform.js`、Client 交互和许可证。仅借鉴外部助手、先退出再重开、取消退出不重开的思路，不复制代码；该参考的跨平台方案、强杀选项、DOM 接入和按 bundle ID 重开回退不属于本功能范围。
 
 另外核对了同类插件源码：[anweat/dsh-restart](https://github.com/anweat/dsh-restart/tree/556e4b4f60702c505863e1533a96b2166932b33d) 重开 Host 进程；[Ray1270/dsh-restart](https://github.com/Ray1270/dsh-restart/tree/dfb4168f2b51f8890373e1ce4761f5de16e8b093) 使用 Windows WMI / PowerShell 助手；[hadesybil-hub/dsh-restart-button](https://github.com/hadesybil-hub/dsh-restart-button/tree/e97171e7db14f7c4bfcf04249450ba0f9eed1dac) 当前只退出、不重开；[7gzgn/dsh-restart-dock](https://github.com/7gzgn/dsh-restart-dock/tree/308cae353be22472e8af0b2c949e052afc86520a) 的重启操作仅支持 Windows。它们未提供可替代本次 macOS 助手的公开桌面重启接口，未安装或运行这些插件。
 
-仓库检查覆盖语法、资源、双语文案与文档链接；Client 定向测试覆盖横向三点菜单、完整侧栏入口渲染、刷新与重启的独立开关、公共确认弹窗、取消及关闭回调、不重复提交、失效回调、隐藏后撤销和失败重试。最新通过数量以本次交付记录为准。原生组件负责的焦点约束与 Escape 行为已核对安装产物，尚未在实际页面验收。本机打包应用身份的只读探测返回可用。本机 `0.2.2-rc.1` 安装包源码核对未发现公开 restart bridge。助手 AppleScript 已通过 `osacompile` 编译检查，但未执行脚本；以上结果不能证明真实退出与重开已经成功。当前 Inspect 工具不可用，Agent Browser 离线；本次未安装插件、未运行 GUI、未触发应用退出或重开。已有旧版 SDK / Host 装配矩阵均不包含本功能，不能沿用为重启兼容性结论。
+[Client 行为测试](../tests/client.test.mjs)覆盖共享菜单、完整侧栏入口渲染、独立开关、确认与取消、重复及失效回调、隐藏后撤销和失败重试；[Host 重启测试](../tests/restart.test.mjs)覆盖平台、应用身份、固定参数、取消、失败与卸载边界。原生组件的焦点约束与 Escape 行为仅核对过安装产物，尚未在实际页面验收。助手 AppleScript 已有 `osacompile` 编译检查证据，但未执行完整退出与重开；不能据此认定重启成功。旧版 SDK / Host 装配矩阵不包含本功能，不能沿用为重启兼容性结论。
 
 后续验收应分别记录：
 

@@ -22,6 +22,8 @@
 
 UI 与 `power_dsh_settings` 调用同一个 owner-only Host 操作。开启时停用上述匹配目标，关闭时启用这些目标，包括原先已停用的目标；不记忆或恢复之前的启用状态。共用流程见[原生精简操作](architecture.md#原生精简操作)。
 
+保存精简偏好时只更新 `blockOfficialAccount`，保留通知、提示音、双击屏蔽、技能及其他功能配置，包括等待原生写锁期间保存的更新；只移除明确废止的恢复快照与全屏设置字段，不维护全功能配置白名单。行为测试见[账号策略测试](../tests/account-policy.test.mjs)。
+
 请通过开关或工具执行操作；直接修改布尔配置或在管理器单独启停目标后，再次执行开关操作可重新核对和应用期望状态。停用或卸载 Mod 不会自动启用目标，撤销精简的方法见[安装与使用](development.md#安装与使用)。
 
 目标定义见 [account-policy.js](../src/account-policy.js)，共享操作见 [plugin-policy.js](../src/plugin-policy.js)，Config 与 RPC 绑定见 [index.js](../src/index.js)。接口发现、测试和实际验证的区分见[开发指南](development.md#验证方法与限制)。

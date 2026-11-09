@@ -1,4 +1,4 @@
-const PREFERENCES = ['showVersion', 'showThemeSwitcher', 'showRefreshButton', 'showRestartButton', 'blockOfficialAccount', 'blockOfficialSearch', 'blockOfficialTelemetry', 'blockTodo', 'personalizationEnabled', 'skillManagerEnabled', 'mcpManagerEnabled', 'disabledSkills', 'globalPrompt'];
+const RETIRED_PREFERENCES = ['accountRestore', 'telemetryRestore', 'telemetryPluginRestore', 'settingsFullscreen'];
 
 // A block switch directly disables or enables its matching native plugins.
 export class PluginPolicy {
@@ -39,10 +39,11 @@ export class PluginPolicy {
       }
     }
     await this.ctx.configEditor.edit(this.ctx.fiber.entry, raw => {
-      // The native lock may have been acquired after unload. Keep only current preferences.
+      // The lock may arrive after unload or another feature's settings write.
       this.ensureActive();
-      const next = Object.fromEntries(PREFERENCES.filter(key => Object.hasOwn(raw, key)).map(key => [key, raw[key]]));
-      return { ...next, [this.flag]: blocked };
+      const next = { ...raw, [this.flag]: blocked };
+      for (const key of RETIRED_PREFERENCES) delete next[key];
+      return next;
     });
     this.ensureActive();
     return { blocked };

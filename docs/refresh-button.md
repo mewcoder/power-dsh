@@ -26,4 +26,4 @@ Windows 桌面的收起按钮在标题栏左侧，其右边已有“应用／编
 
 参考 [dsh-page-refresh](https://github.com/day-day-dream/dsh-page-refresh)（`251fbbd`）与 [dsh-refresh-restart](https://github.com/hulibuld/dsh-refresh-restart)（`3228af3`）的原生页面重载行为；对照 [dsh-unlag](https://github.com/regrevia/dsh-unlag)（`f013115`）后，不引入它的插件热重载、输入状态拦截和资源路由包装。
 
-实现依据包括已安装 DSH 0.2.2-rc.1 的侧栏 slot、`wide` owner props 和 Desktop preload 原生菜单。当前会话未提供 Inspect 工具，未执行运行时 Inspect 或安装应用。仓库检查覆盖设置、显隐、点击调用、Windows 原生菜单延迟挂载、尺寸变化、移除、重新挂载与卸载清理；真实 Windows 窗口的缩放、标题栏遮挡与视觉位置，以及刷新后后台任务继续、草稿恢复和原生导航确认尚需实际页面验证。
+实现依据包括已安装 DSH 0.2.2-rc.1 的侧栏 slot、`wide` owner props 和 Desktop preload 原生菜单。该依据属于安装包源码核对，不代表运行时 Inspect 或实际页面验收。仓库检查覆盖设置、显隐、点击调用、Windows 原生菜单延迟挂载、尺寸变化、移除、重新挂载与卸载清理；真实 Windows 窗口的缩放、标题栏遮挡与视觉位置，以及刷新后后台任务继续、草稿恢复和原生导航确认尚需实际页面验证。

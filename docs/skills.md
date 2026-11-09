@@ -49,7 +49,7 @@ owner-only RPC 为 `listSkills(cwd, scope)` 和 `setSkillEnabled(cwd, scope, nam
 
 ## 接口依据与验证
 
-本会话没有可用 Inspect 工具，接口以当前 App 安装包公开代码核实。市场与同类源码参考记录见[设计研究](skill-mcp-design.md#已做研究与边界)，没有复制或改编参考实现。关键依据是 `dsh-skill` 的分层目录与 rank、`dsh-skill-filesystem` 在 cwd 缺省时不添加项目根的行为、`dsh-scope` 的上下文所有权及原生技能三条消费链的调用策略检查。
+接口依据为 DSH `0.2.2-rc.1` 安装包公开实现：`dsh-skill` 的分层目录与 rank、`dsh-skill-filesystem` 在 cwd 缺省时不添加项目根的行为、`dsh-scope` 的上下文所有权及原生技能三条消费链的调用策略检查。市场与同类源码的确切提交、MIT 许可及参考边界见[来源研究](third-party-notices.md#技能与-mcp-来源研究)，没有复制或改编参考实现。跨版本结论见[版本兼容性](compatibility.md)。
 
 [Host 接线测试](../tests/host-wiring.test.mjs)用实际 Cordis injector 加载 Mod；[策略测试](../tests/skill-policy.test.mjs)覆盖目录范围、同名技能、项目隔离、作者规则、失败与生命周期；Client 测试覆盖两个范围、项目选择、过期响应和写入期间限制。额外用真实 SkillRegistry/Cordis 做纯内存验证，不改变用户真实技能或 profile。
 

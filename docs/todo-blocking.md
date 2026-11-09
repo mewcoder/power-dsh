@@ -20,6 +20,6 @@ ConfigEditor 保存完整模式配置作为 profile 覆盖；之后上游模式�
 
 ## 接口依据与验证
 
-已检索 dsh-market 的 Todo、任务与精简相关条目，未找到可直接复用的原生全局与模式 Todo 停用实现。接口核对以本机 DSH `0.2.2-rc.1` 安装包与同版本 SDK 的 Plugin Manager、ConfigEditor、Tools 为依据；本会话未暴露 Inspect 工具。对照官方参考仓库 `deepseek-ai/deepseek-harness`，提交 `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` 的 `packages/todo/tool-todo`、`packages/preset/agent-preset-registry`、`packages/boot/config-editor`、`packages/core/tools` 和 `packages/bundle/web-app/presets` 理解作用域与代际行为，没有复制工具或 UI 实现，也不引入依赖。
+已检索 dsh-market 的 Todo、任务与精简相关条目，未找到可直接复用的原生全局与模式 Todo 停用实现。接口核对以本机 DSH `0.2.2-rc.1` 安装包与同版本 SDK 的 Plugin Manager、ConfigEditor、Tools 为依据，属于源码与 SDK 核对证据。对照官方参考仓库 `deepseek-ai/deepseek-harness`，提交 `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` 的 `packages/todo/tool-todo`、`packages/preset/agent-preset-registry`、`packages/boot/config-editor`、`packages/core/tools` 和 `packages/bundle/web-app/presets` 理解作用域与代际行为，没有复制工具或 UI 实现，也不引入依赖。
 
-仓库检查与行为测试验证原生启停调用、配置保留、工具限制与错误路径；Client 测试验证第九开关、RPC 合约、即时反馈和失败恢复。实际安装应用、页面点击和完整应用重启另行验收，不以仓库测试代替运行时页面验证。
+仓库检查与行为测试验证原生启停调用、配置保留、工具限制与错误路径；Client 测试验证独立开关、RPC 合约、即时反馈和失败恢复。实际安装应用、页面点击和完整应用重启另行验收，不以仓库测试代替运行时页面验证。

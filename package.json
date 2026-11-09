@@ -38,17 +38,14 @@
     "cordis.patch.yml",
     "README.md",
     "CHANGELOG.md",
-    "AGENTS.md",
-    "docs/*.md",
-    "docs/designs/*.html",
+    "docs/third-party-notices.md",
     "docs/images/0.0.1/settings.webp",
-    "screenshots.json",
-    "scripts/*.mjs",
-    "tests/*.test.mjs"
+    "screenshots.json"
   ],
   "scripts": {
     "check": "node scripts/check.mjs && node --test tests/*.test.mjs",
-    "check:compat": "node scripts/check-compatibility.mjs"
+    "check:compat": "node scripts/check-compatibility.mjs",
+    "check:package": "node scripts/check-package.mjs"
   },
   "dependencies": {
     "@deepseek-ai/dsh-tools": "0.2.2-rc.1",

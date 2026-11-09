@@ -84,6 +84,8 @@ test('the renamed settings tool writes to the actual managed entry, including an
     assert.equal(Config.dict.blockDoubleClickRename.meta.default, false);
     assert.equal(tool.parameters.properties.blockDoubleClickRename.type, 'boolean');
     assert.equal(tool.parameters.properties.blockOfficialSearch.type, 'boolean');
+    assert.equal(tool.output.schema.properties.showRestartButton.type, 'boolean');
+    assert.ok(tool.output.schema.required.includes('showRestartButton'), 'Restart visibility must remain a required output field.');
     assert.deepEqual(writes, [], 'Reading preferences must not migrate or save an existing managed entry.');
     await tool.execute({ showVersion: true, blockDoubleClickRename: true }, { signal: new AbortController().signal });
     assert.deepEqual(writes, [

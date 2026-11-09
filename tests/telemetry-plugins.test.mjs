@@ -36,7 +36,11 @@ function setup({ preDisabled = [] } = {}) {
       },
     },
     configEditor: {
-      async edit(_entry, change) { Object.assign(values, change(structuredClone(values))); },
+      async edit(_entry, change) {
+        const next = change(structuredClone(values));
+        for (const key of Object.keys(values)) delete values[key];
+        Object.assign(values, next);
+      },
     },
   };
   return { ctx, values, rows, changes, policy: new TelemetryPolicy(ctx) };
@@ -76,6 +80,17 @@ test('unblock enables every target, including pre-disabled ones, with exporter b
     < app.changes.findIndex(([id]) => id === 'include:ui-message-feedback'));
   assert.ok(builtIns(app.rows).every(row => row.enabled));
   assert.deepEqual(app.values, { blockOfficialTelemetry: false });
+});
+
+test('telemetry toggles preserve notification, gesture and unrelated feature preferences', async () => {
+  const app = setup();
+  const preserved = { notificationsEnabled: true, notificationSoundEnabled: false, notificationSound: 'mac:Ping.aiff',
+    blockDoubleClickRename: true, disabledSkills: [{ name: 'review' }], futureFeature: { enabled: true } };
+  Object.assign(app.values, preserved);
+  await app.policy.setBlocked(true);
+  assert.deepEqual(app.values, { blockOfficialTelemetry: true, ...preserved });
+  await app.policy.setBlocked(false);
+  assert.deepEqual(app.values, { blockOfficialTelemetry: false, ...preserved });
 });
 
 test('a failed preference write can be retried without any recovery record', async () => {

@@ -14,6 +14,7 @@
 ## 关键约束
 
 - 用户明确任务优先；未确定的功能不视为已批准。保护已有未提交改动，保留社区身份与已确认文案。
+- 每项用户功能必须对应一份主 Spec，按[功能 Spec 规范](docs/feature-spec.md)维护；新增先明确规格，行为变更同步 Spec 与必要测试，功能与规格通过[索引](docs/README.md#功能规格spec)一一对应。
 - 遵循[目录职责](docs/development.md#目录职责)：源码放在 `src/`、测试放在 `tests/`、静态资源放在 `assets/`，保持无编译步骤与现有包导出键；不为目录整理而搬动或覆盖已有参考源码。
 - 每项增强提供独立、持久化开关，集中在 **设置 → PowerDSH**。优先复用宿主 slot、service、主题与 locale，副作用随 context 释放；精简的启停与读回遵循[架构规范](docs/architecture.md#原生精简操作)。全屏设置已撤销，不重新引入。
 - 编写或配置插件前按[源码与接口发现](docs/development.md#源码与接口发现)检索参考并核对目标 API，先 `cordis_inspect_list` 再定向查询。不得猜接口，或越过已确认的宿主布局、DOM 与内部 UI 接入边界。

@@ -18,9 +18,9 @@
 
 [Host](../src/index.js)仅声明 `personalizationEnabled` 开关，通过 `configForms` 保存。文件正文使用 owner-only `readPersonalization` / `savePersonalization` RPC，复用严格 Typert 合约与 `OperationQueue`，不经 settings 保存正文，不接受客户端传入任意文件路径。移除旧的 `getSettingsPath` 和 Mod 自行注册的 `systemPrompt.context`，避免同一份文件重复注入。
 
-旧版 `globalPrompt` 配置不再读取、展示或写入；既有原始字段由精简策略保存白名单保留，不自动迁移或覆盖用户的全局文件。磁盘是新编辑器的事实源；旧内容需要用户主动复制并保存至全局文件。
+旧版 `globalPrompt` 配置不再读取、展示或写入；既有原始字段在其他功能保存配置时保留，不自动迁移或覆盖用户的全局文件。磁盘是新编辑器的事实源；旧内容需要用户主动复制并保存至全局文件。
 
-当前 DSH 0.2.2-rc.1 的 standard、ptc、cordis 预设独立启用 `dsh-agent-instructions`。根级同名插件被 Web bundle 禁用不代表预设内也禁用；`group/sol` 是模型名，不是预设名。原生实现发现全局文件，在 `agent/pre-step` 对已有 baseline 做版本对账，因此已有会话的后续步骤也可读取外部保存的新内容；已经发送的请求不追溯修改。默认 standard 的指令预算为 65,536 字节，与其他项目指令共享，实际进入上下文的内容可能受原生预算裁剪。
+当前 DSH 0.2.2-rc.1 的 standard、ptc、cordis 预设独立启用 `dsh-agent-instructions`。根级同名插件被 Web bundle 禁用不代表预设内也禁用；原生实现发现全局文件，在 `agent/pre-step` 对已有 baseline 做版本对账，因此已有会话的后续步骤也可读取外部保存的新内容；已经发送的请求不追溯修改。默认 standard 的指令预算为 65,536 字节，与其他项目指令共享，实际进入上下文的内容可能受原生预算裁剪。
 
 全局文件由同一 DSH home 下启用原生指令机制的会话读取，可跨 profile 共用；minimal 或其他未启用原生指令读取的预设不会自动获得它。Mod 不擅自启停原生插件、不改预设、不额外追加回退上下文。远程设备使用各自的数据根目录，不能仅保存本机文件就同步过去。
 
@@ -34,7 +34,7 @@
 | [sryimnoob123/dsh-global-prompt](https://github.com/sryimnoob123/dsh-global-prompt) | `de3c329a28e8e611dcdbfc477a3599f258cea77a` | `index.js`：`resolveDshHome()/AGENTS.md`、启动时磁盘优先；MIT，声明 DSH >= 0.1.1-rc.1 |
 | [ZZJQ678/dsh-global-context](https://github.com/ZZJQ678/dsh-global-context) | `9e9875b5836c1f68910bf9551a55f4cac7f418d8` | `lib/index.js`、`lib/client.js`：独立文件编辑和保存交互；MIT，声明 DSH 0.1.2-rc.1。本项目采用原生 AGENTS 文件，不采用其自定义文件和 section 注入 |
 
-当前会话未提供 `cordis_inspect_list` / `cordis_inspect_query`，未声称完成 Inspect。依据为安装包 0.2.2-rc.1 的 `dsh-home-paths`、`dsh-agent-instructions`、`dsh-fs-local`、`dsh-agent-preset-registry`、`dsh-agent-loop` 以及 Web bundle 的各预设 patch。原生 README 对刷新时机描述偏保守；实现的 `agent/pre-step → compose → reconcile` 会探测全局文件版本，以实现与运行测试为准。参考插件对旧版 DSH 的声明不代表本项目兼容保证。
+接口依据为 DSH `0.2.2-rc.1` 安装包的 `dsh-home-paths`、`dsh-agent-instructions`、`dsh-fs-local`、`dsh-agent-preset-registry`、`dsh-agent-loop` 以及 Web bundle 的各预设 patch。原生 README 对刷新时机描述偏保守；实现的 `agent/pre-step → compose → reconcile` 会探测全局文件版本，以实现与运行测试为准。参考插件对旧版 DSH 的声明不代表本项目兼容保证。
 
 ## 验证
 

@@ -37,6 +37,6 @@ Client 观察原生 `uiSession.sessionStatus` 的 `pendingInteraction`，以交�
 
 ## 接口依据与验证
 
-已核对 DSH `0.2.2-rc.1` 安装包中的会话投影、列表与控制流、原生交互状态、桌面 preload、连接 `isLoopback` 及 subprocess 的 `spawn`、取消和托管范围退出接口。原生 `turnOutline` 和 `turnBoundary` 不保存结束原因，故使用上述最小摘要；桌面公开桥未提供通用通知方法，Client 直接使用浏览器 `Notification` API。当前会话未暴露 Inspect 工具，接口判断以实际安装包实现为依据。
+已核对 DSH `0.2.2-rc.1` 安装包中的会话投影、列表与控制流、原生交互状态、桌面 preload、连接 `isLoopback` 及 subprocess 的 `spawn`、取消和托管范围退出接口。原生 `turnOutline` 和 `turnBoundary` 不保存结束原因，故使用上述最小摘要；桌面公开桥未提供通用通知方法，Client 直接使用浏览器 `Notification` API。接口判断属于安装包源码核对证据，不能代替实际通知验收。
 
-摘要测试覆盖全部已知结束原因、未来原因、无关事件引用稳定性、输入校验，以及真实 Cordis 投影注册、释放和重新注册。原生声音测试覆盖本机 macOS 真实目录枚举（不播放）、目录与参数白名单、Windows 固定脚本、配置变更、重叠请求、超时和卸载取消；9 项测试已通过，不代表 Windows 实机播放已验证。Client 测试覆盖下拉保存、默认通知试听、具体提示音试听、静音横幅与单次播放、远程访问、失败及过期操作。另在 macOS 调用本机 Ping 文件，播放器正常退出；不据此宣称已确认人耳听到。实际下拉、试听、系统权限与声音仍需在运行中的 DSH 验收；当前浏览器面板离线，未安装此次改动。验证层次见[开发指南](development.md#验证方法与限制)，市场参考与提交见[第三方资源声明](third-party-notices.md#通知插件参考)。
+[摘要测试](../tests/notifications.test.mjs)覆盖已知及未来结束原因、无关事件引用稳定性、输入校验和真实 Cordis 投影的注册释放。[原生声音测试](../tests/system-sounds.test.mjs)覆盖 macOS 目录枚举、目录与参数白名单、Windows 固定脚本、配置变更、重叠请求、超时和卸载取消，不代表 Windows 实机播放已验证。[Client 测试](../tests/client.test.mjs)覆盖保存与试听、静音横幅、去重、远程访问、失败及过期操作。实际下拉、系统通知权限与声音仍需在运行中的 DSH 验收；播放器正常退出不等于实际听到声音。验证层次见[开发指南](development.md#验证方法与限制)，市场参考与提交见[第三方资源声明](third-party-notices.md#通知插件参考)。

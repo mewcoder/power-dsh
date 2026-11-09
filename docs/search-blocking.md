@@ -20,6 +20,6 @@ UI 与 `power_dsh_settings(blockOfficialSearch: ...)` 共用 owner-only Host 操
 
 实现见 [SearchPolicy](../src/search-policy.js)，Host 配置与工具见 [index.js](../src/index.js)，严格 RPC 见 [rpc.js](../src/rpc.js)，界面文案与独立行见 [client.js](../src/client.js)。行为测试见 [search-policy.test.mjs](../tests/search-policy.test.mjs)。
 
-本会话没有 `cordis_inspect_list` / `cordis_inspect_query`，接口依据是本机 DSH `0.2.2-rc.1` 安装包的 `dsh-tool-web`、`dsh-config-editor`、`dsh-agent-preset-registry` 和固定 SDK。`tool-web` 公开 `search` / `fetch` 两个布尔配置；ConfigEditor 编辑活动条目并等待 Loader 应用；模式清单不包含工具配置，必须另读声明并核对组合状态。参考仓库的版本和实现可能领先安装包，不据此推断本机默认提供方。
+接口依据为 DSH `0.2.2-rc.1` 安装包的 `dsh-tool-web`、`dsh-config-editor`、`dsh-agent-preset-registry` 和固定 SDK。`tool-web` 公开 `search` / `fetch` 两个布尔配置；ConfigEditor 编辑活动条目并等待 Loader 应用；模式清单不包含工具配置，必须另读声明并核对组合状态。参考仓库的版本和实现可能领先安装包，不据此推断本机默认提供方。
 
-市场按 Browser & Web 与搜索停用关键词检索，结果主要为搜索提供方及搜索路由插件，没有发现可直接复用的独立精简控制；沿用本项目已有的原生 ConfigEditor、Tools 限制与生命周期方式。市场入口：[dsh-market](https://dshmarket.com/browse/)。本次不安装插件或修改运行偏好，真实页面、完整宿主重载和旧版兼容仍需分别验收，不沿用既有历史矩阵作为新增功能的结论。
+市场按 Browser & Web 与搜索停用关键词检索，结果主要为搜索提供方及搜索路由插件，没有发现可直接复用的独立精简控制；沿用本项目已有的原生 ConfigEditor、Tools 限制与生命周期方式。市场入口：[dsh-market](https://dshmarket.com/browse/)。真实页面、完整宿主重载和旧版兼容仍需分别验收，不沿用既有历史矩阵作为新增功能的结论。

@@ -1,10 +1,12 @@
 # 架构规范
 
+当前实现结构见下文。下一步按用户特性拆分的目标、装配与策略边界、Client 产物约束及迁移顺序见[特性模块架构方案](feature-modules.md)；该方案尚未迁移运行代码。每项用户功能的行为由独立 Spec 维护，遵循[功能 Spec 规范](feature-spec.md)。
+
 ## 包与文件职责
 
 一个仓库交付一个 Cordis bundle，使用无需构建的 JavaScript 入口。目录职责见[开发指南](development.md#目录职责)；运行源码集中在 `src/`，测试放在 `tests/`，静态资源放在 `assets/`。包的 `.`、`./client`、`./icon` 和 `./locale/*.json` 导出键不变，由清单映射到新的实际路径。技术包名为 `power-dsh`，品牌与设置显示名为 **PowerDSH**；新安装的 Loader 条目、设置命名空间、设置页 id、Host/Client 包标识与 RPC 描述符均使用 `power-dsh`，驼峰与下划线形式分别使用 `powerDsh`、`power_dsh`。保留 `private: true`，未发布到 npm。
 
-当前本地安装已按用户授权，通过原生管理器从旧 `@local/dsh-mod` 替换为 `power-dsh`，运行条目为 `include:power-dsh`。旧 ID `dsh-mod`、`dsh-x-mod` 的设置回退和两个旧目录符号链接继续保留作兼容，不自动迁移配置。六项原生设置偏好已恢复，其他偏好保留备份、未自动迁移；不手工编辑 profile manifest 或 patch。安装与升级边界见[发布与升级](releasing.md#名称与准备状态)。
+旧 ID `dsh-mod`、`dsh-x-mod` 的设置回退用于兼容旧安装；它不等于完整配置迁移。安装与偏好读回的历史证据集中见[兼容性调查](compatibility-audit.md#安装与平台验证记录)，升级验证要求见[版本兼容性](compatibility.md#验证与记录)。
 
 | 文件 | 职责 |
 | --- | --- |
@@ -29,14 +31,16 @@
 | [client.js](../src/client.js) | 设置行、版本标记、外观、刷新与重启按钮、Client 文案与图标 |
 | [assets/locale/en.json](../assets/locale/en.json)、[assets/locale/zh.json](../assets/locale/zh.json) | 插件管理元数据 |
 | [assets/icon.svg](../assets/icon.svg) | 含许可的 Lucide Puzzle 图标 |
-| [scripts/check.mjs](../scripts/check.mjs) | 目录、语法、资源、文案、SVG、截图与本地文档链接检查 |
+| [scripts/check.mjs](../scripts/check.mjs)、[scripts/check-package.mjs](../scripts/check-package.mjs) | 仓库结构与文档资源检查，以及实际 tarball 的源码、导入、Client 登记和资源核对 |
 | [tests/host-wiring.test.mjs](../tests/host-wiring.test.mjs)、[tests/client.test.mjs](../tests/client.test.mjs) 等 | Host/Client 装配与功能行为回归 |
 
 新增运行资源时同步导出与分发清单。Patch 不覆盖宿主或其他插件；不添加安装脚本或隐式下载。当前没有独立数据库或网络客户端。
 
 ## Host 与 Client
 
-十三个功能主开关均为默认 false 的 volatile Config，通知声音子选项默认为 true，均由宿主 settings 持久化。版本、按钮显隐与个性化入口开关通过 `configForms` 保存；账号与遥测调用 Host 策略操作，不靠监听布尔配置异步执行副作用。精简功能的 UI 和工具共用同一操作。个性化的独立设置 Tab 随开关注册释放，正文通过 owner-only 文件 RPC 直接编辑 `$DSH_HOME/AGENTS.md`，由 DSH 原生 `dsh-agent-instructions` 读取，不再存入 Mod 配置或自行贡献提示词。关闭开关只移除编辑入口，详见[个性化](personalization.md)。技能管理通过独立 `skillManagerEnabled` 控制设置入口，`disabledSkills` 按用户或项目范围及项目根保存 DSH 专用限制；正文和原有技能文件不变。原生 provider 在 Host、preset 与 Agent 作用域执行双向调用限制，持久化后读回实际状态；详见[技能管理](skills.md)。MCP 管理通过 `mcpManagerEnabled` 控制独立入口，只合并全局原生配置与已有提供插件的全局实例，按用户与内置分组展示，不枚举工作区或 Agent 进行项目归属扫描，也不读取项目配置文件。Host 只向 Client 投影名称及安全元数据，不发送命令、参数、环境变量、请求头、URL 或原始配置；MCP RPC 响应只有 `{ complete, servers }`，不含范围、工作目录或工作区列表。可管理项通过原生 Plugin Manager 或 Settings 保存并读回，无对应持久化接口的条目只读。目录不建立连接，移除页面及卸载 Mod 不改变提供方实例。详见[MCP 管理](mcp.md)。
+Host 拥有持久化配置、文件访问、策略操作和安全数据投影；Client 负责设置入口、展示与交互。Config 由宿主 settings 持久化，普通偏好通过 `configForms` 保存；有副作用的精简操作由 UI 和工具共用 Host 方法，不靠监听布尔配置异步执行。各功能配置键、默认值和行为由[主 Spec](README.md#功能规格spec)维护。
+
+个性化使用 owner-only 文件 RPC 编辑原生全局指令；技能策略通过原生 provider 和 Host / preset / Agent 作用域限制调用；MCP 只投影已有全局配置及实例的白名单元数据，不拥有连接。文件冲突、技能优先级和 MCP 可写条件分别见[个性化](personalization.md)、[技能管理](skills.md)、[MCP 管理](mcp.md)。私有 locator、命令、环境变量、请求头及原始配置不进入目录 RPC。
 
 Client 由宿主模块加载器注册，factory id 与包名一致，React 取自宿主模块表。`dsh.client.inject` 是包依赖元数据，不保证服务激活顺序；服务依赖由 Cordis `inject` 声明。它不等同于 JavaScript 导入；不另装 React、加载 CDN 或运行时导入功能插件的内部 UI。技能页的项目下拉与页面悬浮提示明确复用 shell baseline 模块表中的公共 `@deepseek-ai/dsh-client-ui-primitives` 的 `Menu`、`Tooltip`，与原生组件同源；不声明额外 external 或从宿主源码路径导入，重启确认同样复用该共享模块的 `Modal` 与 `Button`，不调用浏览器原生确认框。具体约定见 [UI 下拉规范](ui.md#下拉选择)和[悬浮提示](ui.md#悬浮提示tooltip)。
 
@@ -44,11 +48,11 @@ Client 由宿主模块加载器注册，factory id 与包名一致，React 取�
 
 ## 任务通知
 
-`notificationsEnabled`、`notificationSoundEnabled` 与默认 `'default'` 的 `notificationSound` 通过宿主 `configForms` 独立持久化。Host 在 `sessionProjections` 注册 `powerDshNotifications`，只折叠 `turn/end` 为最近一轮的 `{seq, turn, reason}`；不保留回复、错误正文或工具参数。Client 订阅原生 `sessions.list` 的摘要与 `uiSession.sessionStatus` 的待交互对象，按序号和交互 key 去重，再调用浏览器 `Notification`。系统默认声音交给原生通知；指定本机提示音时通知静音，owner-only RPC 通过 [SystemSounds](../src/system-sounds.js) 播放目录白名单或固定 Windows 系统事件。Client 用 `connection.isLoopback` 限制本机选择与试听，Host 使用原生 subprocess 管理固定 argv、超时和卸载取消；不接收任意命令、路径或上传资源。投影、订阅和已显示通知均随所属 context 释放；不接管提问或审批，不新增模型工具、提示词或会话事件。触发、声音与权限边界见[任务通知](notifications.md)。
+Host 在 `sessionProjections` 注册最小结束摘要，Client 订阅原生会话列表与交互状态并调用浏览器通知；本机声音经 owner-only RPC 和托管 subprocess 播放。投影、订阅与进程归属 context。摘要字段、触发去重、声音白名单和权限边界由[任务通知 Spec](notifications.md)维护。
 
 ## 双击重命名屏蔽
 
-`blockDoubleClickRename` 默认关闭，通过宿主 Config 保存。Client 按已保存值安装或释放 `window` 的 `dblclick` 捕获监听，只读取当前事件路径中的会话行标记并停止传播；不修改会话权限或标题服务。该事件路径读取已获用户明确许可，其他插件 DOM 查询限制保持有效；具体范围与兼容依据见[屏蔽双击重命名](double-click-rename.md)。
+Client 根据持久化偏好安装和释放捕获监听。当前事件路径中会话行标记的读取是已获授权的有限 DOM 例外；范围、放行条件与兼容依据见[屏蔽双击重命名 Spec](double-click-rename.md)。
 
 ## 原生精简操作
 
@@ -56,27 +60,21 @@ Client 由宿主模块加载器注册，factory id 与包名一致，React 取�
 
 Host 只保留一个 `OperationQueue`，串行执行 UI 与工具请求。操作核对原生应用结果，再通过宿主 ConfigEditor 保存偏好；失败明确返回原因，可再次执行以重新应用。卸载关闭队列并停止后续写入，不等待正在申请热重载锁的操作。配置事件只读，不在 apply、配置事件或外层 HMR 事务里嵌套写入配置。
 
-配置与模块变更都通过宿主服务完成，不手写 profile，也不建立事务、回滚框架或持久化恢复记录。原生启停由 profile 持久化，Mod 卸载不会自动启用目标；使用注意事项见[安装与使用](development.md#安装与使用)。目标范围见[精简官方登录与模型接入](account-blocking.md)与[反馈与遥测精简](telemetry-blocking.md)。页面只显示开关和操作错误，不订阅后台精简状态。工具调用时可按需读取遥测模块状态。
+配置与模块变更通过宿主服务完成，不手写 profile，也不建立事务、回滚框架或持久化恢复记录。原生启停由 profile 持久化，Mod 卸载不会自动启用目标。页面展示偏好与操作错误，工具按需读回状态；目标范围和配置保留规则见[精简官方登录与模型接入](account-blocking.md)与[反馈与遥测精简](telemetry-blocking.md)。
 
-Todo 使用独立 `blockTodo`。全局条目复用 `PluginPolicy`，模式内条目通过 ConfigEditor 启停；旧代际 Agent 使用原生 Tools 限制与执行 guard。关闭释放限制，卸载不自动启用已停用条目；已有会话恢复、配置覆盖与界面边界见 [精简Todo工具](todo-blocking.md)。
-
-搜索使用独立 `blockOfficialSearch`。`SearchPolicy` 只切换活动的全局与模式内 `tool-web.config.search`，保留抓取及启停标记，通过原生 guard 和 Agent 限制覆盖旧代际；范围与恢复说明见[精简官方搜索](search-blocking.md)。
+Todo 的全局条目复用 `PluginPolicy`，模式内条目通过 ConfigEditor 启停；搜索通过 `SearchPolicy` 编辑活动配置。两者使用原生 Tools 限制、执行 guard 和 Agent 生命周期覆盖旧代际。具体范围、恢复限制和卸载行为见[精简Todo工具](todo-blocking.md)与[精简官方搜索](search-blocking.md)。
 
 ## 侧栏接入
 
-设置页与图标使用 `settings.section`、`settings.section.icon`。版本标记、外观与刷新按钮共用 `sidebar.footer.action` 中独立追加的零高度满宽容器 `power-dsh-footer`，固定定位且不新增底部行。外观按钮与设置同排，连接异常、重连、恢复提示及更新状态期间让位隐藏；状态来自原生连接服务和桌面更新桥，不读取其他插件 DOM，不替换品牌、设置或账号 launcher。刷新直接重载当前页面，具体边界见[刷新界面](refresh-button.md)。
+设置页与图标使用 `settings.section`、`settings.section.icon`。侧栏能力共用 `sidebar.footer.action` 中独立追加的零高度满宽容器 `power-dsh-footer`，固定定位且不新增底部行。状态来自原生连接服务和桌面桥；只测量自身容器，不读取其他插件 DOM，也不替换品牌、设置或账号 launcher。
 
-版本从 Host `clientModules.graph().release.version` 或 Client `window.__DSH_BOOT__.release.version` 读取，不硬编码 Mod 版本或更新目标版本。标记只测量自身容器宽度，在展开侧栏品牌右下方固定定位；桌面点击调用 `window.dshDesktop.updates.open()`，缺少协议兼容的更新桥时只显示版本。点击语义见[安装与使用](development.md#安装与使用)。
-
-版本定位包含 macOS 与 Windows 标题栏偏移，其他平台使用默认位置；这些值是当前布局适配，不是跨平台对齐保证。侧栏宽度、窗口缩放、系统标题栏和宿主布局变化后需实际验收。外观按钮的定位、原生 theme service 与 sprite 接入见[外观快捷切换](appearance-shortcut.md)。
+版本来源、更新桥和标题栏适配见[显示版本号](version-display.md)；原生 theme service、sprite 与避让规则见[外观快捷切换](appearance-shortcut.md)；顶部菜单与页面重载边界见[刷新界面](refresh-button.md)。定位值须在宿主布局、窗口缩放或系统标题栏变化后重新验收，不能视为跨平台对齐保证。
 
 ## 重启应用
 
-新增 `showRestartButton`，默认 `false`，由宿主 settings 独立持久化；Client 的设置保存只改变偏好，不执行重启。Client 的 `HeaderActions` 沿用 Mod 自有侧栏追加容器，在顶部使用原生横向 `ellipsis-outline` 图标与公共 `Menu` 统一承载刷新和重启；菜单只占一个位置，刷新在上、重启在下，两个开关独立控制入口，侧栏收起关闭菜单与确认。重启项沿用当前实现的环境能力限制，设置仍可保存，不加入平台常驻警告。
+Client 的 `HeaderActions` 在 Mod 自有侧栏容器内通过公共 `Menu` 承载刷新与重启，并复用公共 `Modal`、`Button` 确认。设置保存与重启执行分开；owner-only Host RPC 负责能力探测、执行及状态读回。
 
-点击先使用宿主公共 `Modal` 与 `Button` 确认，提示停止任务和未保存内容风险，再由 owner-only Host RPC 校验能力并执行。状态 RPC 返回 `supported`、`running`、`error`，当前 Host 存活时读回助手取消、超时或错误；请求进行中禁止重复提交，页面断连不能作为重启成功依据。
-
-本机 `0.2.2-rc.1` ASAR preload / main 源码未发现公开 restart bridge。确定由 Host 校验当前 `.app` 路径及 `com.deepseek.dsh` bundle 身份，再拉起 detached `/usr/bin/osascript` 外部助手，graceful quit 并保留宿主退出确认；确认当前应用退出后才由 `/usr/bin/open` 重开同一路径。取消、退出失败或等待超时不强杀、不重开；已启动的助手独立于 Host 正常退出，完成或取消后自行结束。当前源码已实现，尚未安装或验收实际页面、完整应用退出与重开，详见[重启应用](restart-button.md)。
+Host 校验打包应用身份后交接 detached 助手，助手在 Host 正常退出后仍可完成单次重开，随后自行结束。平台限制、固定命令、取消与超时语义以及跨退出生命周期例外见[重启应用 Spec](restart-button.md)；接口与实际验证证据见[兼容性调查](compatibility-audit.md#安装与平台验证记录)。
 
 ## 生命周期与扩展
 

@@ -17,15 +17,15 @@
 
 [包清单](../package.json)保留 `private: true`。已有 `dsh.bundle` 声明，无编译步骤。[更新日志](../CHANGELOG.md)保留「未发布」与首版草稿。新安装的 Loader 条目、设置命名空间、设置页 id、Host/Client 标识与 RPC 描述符统一为 `power-dsh`，对应技术形式为 `powerDsh`、`power_dsh`。
 
-GitHub 仓库为 `mewcoder/power-dsh`，origin 已核对为新地址。首次源码提交保留 `0.0.1` 待发布状态，仓库元数据、Release 下载地址与市场条目统一使用此地址。尚未创建版本标签、GitHub Release、npm 版本或市场投稿，实际发布前 Release 下载地址不可用。
+仓库元数据、Release 下载地址与市场条目统一使用 `mewcoder/power-dsh`。发版前核对实际 remote、标签、Release 与市场状态；待发布样例中的下载地址须在实际产物公开后才作为可用安装来源。
 
-经用户授权，已通过原生插件管理器移除旧 `@local/dsh-mod` 安装，并从新目录安装、启用 `power-dsh@0.0.1`；当前条目 `include:power-dsh` 为 active。重装前已在 DSH 私有目录备份原 profile 文件，未手工改写 profile。通过原生设置工具恢复并读回版本显示、主题快捷切换、刷新按钮、精简官方账号、精简官方反馈与遥测及精简Todo工具六项偏好；通知声音、个性化和技能/MCP 管理入口等其余偏好未自动迁移。旧 ID `dsh-mod`、`dsh-x-mod` 和两个旧目录符号链接仅保留作兼容。完整 GUI、重启及最终 tarball 升级仍须单独验收。
+旧 ID `dsh-mod`、`dsh-x-mod` 的设置回退用于兼容，不能作为偏好自动迁移保证。原生管理器重装与部分偏好读回的历史记录见[兼容性调查](compatibility-audit.md#安装与平台验证记录)；升级仍须验证实际产物、完整偏好和页面。
 
 ## 插件卡片的名称与描述
 
 [包清单](../package.json)的 `name` 是技术包名 `power-dsh`，`description` 是通用简介；[中文元数据](../assets/locale/zh.json)与[英文元数据](../assets/locale/en.json)的 `meta.title`、`meta.description` 是本地化名称和简介。插件显示名、Client 设置入口与页面标题中英文均为 **PowerDSH**；设置页说明独立精简为「DSH 增强插件」／`A DSH enhancement plugin`。改名或改简介时按各自用途一起核对。
 
-用户提供的市场「已安装」截图中，本地开发卡片显示技术包名、版本和路径，没有显示简介；因此调整本项目元数据后仍需在目标市场页面实际核对展示。公开市场的发现卡片还会使用目录条目的描述，目录描述可以比设置页简介更具体。
+本地开发卡片与公开市场发现卡片使用的字段可能不同，调整元数据后须在目标页面核对名称和简介的实际展示。公开市场目录描述可以比设置页简介更具体。
 
 ## GitHub 简介、标签与发现入口
 
@@ -62,7 +62,7 @@ README 面向使用者，标题固定为 `# power-dsh`，首屏使用已确认�
 
 ## DSH 兼容性
 
-兼容性是发版前置条件。各功能接口依赖、当前证据、旧版验证步骤、平台范围与升级要求统一见[版本兼容性](compatibility.md)。已完成已发布的 12 个 `0.2.0` / `0.2.1` 发行版的代码适配验证、SDK 测试与固定生产 SDK 的 Host 装配检查；最低已测基线与完整宿主验收候选为 `0.2.0-rc.1`，实际产物安装与页面仍待完成，详见[调查报告](compatibility-audit.md)。当前 SDK 版本不是最低宿主要求；没有 `engines.dsh` 也不代表全版本兼容。
+兼容性是发版前置条件。接口依赖、支持结论、平台范围与升级要求见[版本兼容性](compatibility.md)，历史全矩阵与后续单版复测分别见[调查报告](compatibility-audit.md#sdk-验证方法与结果)。最低已测基线及完整宿主验收候选为 `0.2.0-rc.1`；实际产物安装与页面仍待完成。当前 SDK 版本不是最低宿主要求，没有 `engines.dsh` 也不代表全版本兼容。
 
 先完成兼容矩阵，再按验证结果填写 `engines.dsh` 并核对范围边界，README、更新日志、Release 和市场展示采用相同结论。DSH 安装和 profile 启动优先检查 `engines.dsh`，没有它时才检查 DSH peer 依赖；本包目前没有 DSH peer 范围，因此开发期间没有声明式宿主版本拦截。
 
@@ -87,7 +87,7 @@ README 面向使用者，标题固定为 `# power-dsh`，首屏使用已确认�
 2. 完成最低 DSH 版本验证，填写兼容范围，并明确实际验证的平台。
 3. 按分发渠道核对 `private`：npm 发布前须移除 `private: true` 或设为 `false`，并同步调整检查脚本中的开发阶段 private 断言；DSH 官方参考索引生成器也会忽略 private 包。不要将这项规则套作 dsh-market 收录的明确门槛，后者按自己的贡献指南检查。
 4. 如果发布 npm，再次确认包名可用和账号权限；一次注册表查询不是名称预留。包名、patch 引用与 Client 注册 id 必须一致。
-5. 审阅项目和打包清单，确认没有凭据、参考仓库和个人日志；准备实际产物验收结果。
+5. 审阅项目和打包清单：安装包保留 `src/*.js`、`assets/icon.svg`、`assets/locale/*.json`、Bundle patch、README、CHANGELOG、截图清单、`docs/images/` 的发布截图及[第三方声明](third-party-notices.md)，另保留 npm 自动收录的[文档索引](README.md)作为导航。开发指南、规范、研究材料、主 Spec、测试与检查脚本留在仓库；确认包中没有凭据、参考仓库和个人日志，再准备实际产物验收结果。
 6. 核对官方 `@deepseek-ai/*` 包的依赖声明。市场指南推荐使用 `peerDependencies`；本包目前仍使用固定版本的 `dependencies`，调整时须同时核对宿主模块身份、更新锁文件并执行检查与安装验证。peer 范围须显式包含所支持的预发布分支，不将宽泛范围误当成包含所有 alpha / rc。此项属于上游推荐，不能不经验证机械移动依赖。
 
 以上许可证、兼容范围与实际产物验收是本项目的发布准备要求；市场自身的收录门槛见下文，不能将两者混为一谈。
@@ -97,12 +97,14 @@ README 面向使用者，标题固定为 `# power-dsh`，首屏使用已确认�
 以下是得到发版确认后执行的步骤。首版用 `0.0.1`，后续替换为目标版本。
 
 1. 修改包版本与更新日志，将「待发布」换为实际日期，并同步 README。
-2. 执行检查和打包预览：
+2. 执行仓库与实际产物检查（开发环境需系统 `tar` 命令）：
 
    ```sh
    npm run check
-   npm pack --dry-run --ignore-scripts
+   npm run check:package
    ```
+
+   `check:package` 在系统临时目录生成、解包并核对实际 npm tarball，结束清理临时产物；不安装 DSH 或改动 profile，不能替代第 3 步的宿主安装验收。
 
 3. 生成本地产物：
 

@@ -1,25 +1,25 @@
 # 开发指南
 
-本指南是开发与 AI 协作的执行入口。功能和界面约定见[文档索引](README.md)，发布操作另见[发布与升级](releasing.md)。
+本指南是开发与 AI 协作的执行入口。功能行为以[功能 Spec 索引](README.md#功能规格spec)为准，发布操作见[发布与升级](releasing.md)。
 
 ## 目录职责
 
 | 位置 | 职责与约定 |
 | --- | --- |
-| [src/](../src/) | Host 入口、Client、策略、RPC 及辅助模块；所有 JavaScript 源码保持同级，不引入编译步骤 |
+| [src/](../src/) | 当前 Host 入口、Client、策略、RPC 及辅助模块，无编译步骤；下一步结构见[特性模块架构方案](feature-modules.md)，实施时同步接入与分发约束 |
 | [tests/](../tests/) | 所有 `*.test.mjs` 测试，使用 Node.js 内置测试运行器；与运行时代码分开维护 |
-| [scripts/](../scripts/) | 仅保留仓库检查 `check.mjs` 与隔离兼容检查 `check-compatibility.mjs` |
+| [scripts/](../scripts/) | 仓库检查 `check.mjs`、实际产物检查 `check-package.mjs` 与隔离兼容检查 `check-compatibility.mjs` |
 | [assets/locale/](../assets/locale/) 与 [assets/icon.svg](../assets/icon.svg) | 双语元数据、文案与插件图标 |
-| [docs/](./) | 现行规范、功能说明、验证依据与设计资料；真实截图仍在 [docs/images/](images/)，设计草稿仍在 [docs/designs/](designs/) |
-| [cordis.patch.yml](../cordis.patch.yml) 与 [screenshots.json](../screenshots.json) | 保留在包根目录，分别作为 DSH Bundle 与市场截图入口 |
+| [docs/](./) | 现行规范、主 Spec、验证依据与架构方案；真实截图在 [images/](images/) |
+| [cordis.patch.yml](../cordis.patch.yml) 与 [screenshots.json](../screenshots.json) | 包根目录中的 DSH Bundle 与市场截图入口 |
 | 根目录的说明与配置 | [README](../README.md)、[CHANGELOG](../CHANGELOG.md)、[AGENTS](../AGENTS.md)、[package.json](../package.json)、[pnpm-lock.yaml](../pnpm-lock.yaml) 与 [.gitignore](../.gitignore) |
 | `reference/` 与 `.references/` | 本地忽略的第三方与官方参考源码；保留原位，不提交、不打包，不为整理目录而改动 |
 
-[包清单](../package.json)的公开导出键保持 `.`、`./client`、`./locale/*.json`、`./icon`，目标分别指向 `src/index.js`、`src/client.js`、`assets/locale/*.json`、`assets/icon.svg`。移动实现文件时同步相对导入、资源定位、测试引用和打包清单，不改变调用方的包路径。具体模块职责见[架构规范](architecture.md#包与文件职责)。
+[包清单](../package.json)的公开导出键保持 `.`、`./client`、`./locale/*.json`、`./icon`，目标分别为 `src/index.js`、`src/client.js`、`assets/locale/*.json`、`assets/icon.svg`。移动实现时同步相对导入、资源定位、测试引用和打包清单，不改变调用方的包路径。当前代码地图见[架构规范](architecture.md#包与文件职责)。
 
 ## 协作流程
 
-1. **读文档、确认范围。** 先读[仓库首页](../README.md)、[更新日志](../CHANGELOG.md)与[协作入口](../AGENTS.md)，再按[文档索引](README.md)读取产品、UI、架构和受影响功能说明。核对用户授权与已有约定；开发功能前完成[源码与接口发现](#源码与接口发现)。
+1. **读文档、确认范围。** 先读[仓库首页](../README.md)、[更新日志](../CHANGELOG.md)与[协作入口](../AGENTS.md)，再按[文档索引](README.md)读取产品、UI、架构和受影响的主 Spec。核对用户授权与已有约定；开发功能前完成[源码与接口发现](#源码与接口发现)。
 2. **检查工作区。** 运行以下命令并阅读目标文件，识别已有修改、未跟踪文件和协作者负责范围；不覆盖、回退或夹带无关改动。
 
    ```sh
@@ -28,51 +28,50 @@
    git diff
    ```
 
-3. **实现并同步。** 按[目录职责](#目录职责)修改最小必要范围，同步受影响的双语文案、资源与包清单、功能文档和更新日志。只为实际行为补必要测试，不为占位结构添加依赖或框架。不得替换宿主根节点、覆盖宿主布局、注入全局 CSS、查询其他插件 DOM 或运行时导入内部 UI 组件；仅遵循功能文档中已获授权的有限例外。
-4. **检查与打包预览。** 依照[环境与检查](#环境与检查)准备依赖，再执行：
+3. **先明确 Spec，再实现并同步。** 每项用户功能在[功能索引](README.md#功能规格spec)对应一份主 Spec，按[功能 Spec 规范](feature-spec.md)明确范围、配置、生命周期与验收条件，再修改最小必要范围；同步受影响的 Spec、必要测试、双语文案、资源与包清单及更新日志。只为实际行为补必要测试，不为占位结构添加依赖或框架。不得替换宿主根节点、覆盖宿主布局、注入全局 CSS、查询其他插件 DOM 或运行时导入内部 UI 组件；仅遵循主 Spec 中已获授权的有限例外。
+4. **检查仓库与实际产物。** 按[环境与检查](#环境与检查)准备依赖，再执行：
 
    ```sh
    npm run check
-   npm pack --dry-run --ignore-scripts
+   npm run check:package
    git diff --check
    ```
 
-   核对打包预览包含运行时代码、资源及 Bundle 入口，没有凭据、参考仓库或个人日志；目录调整后额外确认导出目标、资源路径和测试入口。按影响选择[分层验证](#验证方法与限制)与兼容检查，不把打包预览当成实际产物安装通过。纯文档任务至少核对本地链接与 diff；多人协作时按约定由负责整合者执行完整检查，并在交付中说明。
-5. **按授权安装验证。** 纯文档修改无需安装。任务已授权安装或运行预览时，按[修改与安装](#修改与安装)通过原生管理器执行，核对应用结果与运行代际，再验证实际页面、状态和生命周期；未获授权时停留在仓库检查，记录未验证部分。发布产物验收另遵循[发布流程](releasing.md#github-release-操作顺序)。
-6. **交付。** 再看 `git status --short` 与本次 diff，说明修改范围、检查结果、实际安装与页面验证情况、遗留限制。提交、推送、发布和市场投稿按各自授权执行；准备文档或本地检查不自动授予这些权限。
+   核对包中包含运行时代码、资源、Bundle 入口、用户首页与更新日志、发布截图及第三方声明，并保留 npm 自动收录的[文档索引](README.md)；开发指南、规范、研究材料、测试与脚本留在仓库，没有凭据、参考仓库或个人日志，具体清单见[发版准备](releasing.md#首次发版前的准备)。目录调整后确认导出目标、资源路径和测试入口。按影响选择[分层验证](#验证方法与限制)与兼容检查。纯文档任务核对本地链接与 diff，无需安装；多人协作时由负责整合者执行约定的完整检查。
+5. **按授权安装验证。** 任务已授权安装或运行预览时，按[修改与安装](#修改与安装)通过原生管理器执行，核对应用结果与运行代际，再验证实际页面、状态和生命周期。未获授权时记录未验证部分。发布产物另按[发布流程](releasing.md#github-release-操作顺序)验收。
+6. **交付。** 再看 `git status --short` 与本次 diff，说明修改范围、检查结果、实际安装与页面验证情况、遗留限制。提交、推送、发布和市场投稿按各自授权执行。
 
 ## 环境与检查
 
-需要 Node.js 22 或更新版本。Host 依赖 DSH 工具 SDK、Typert 与 schema 库，Client 复用宿主 React，项目下拉使用 Web shell 预置的公共 `Menu`；无编译步骤。
+需要 Node.js 22 或更新版本，同时满足 DSH 自身要求；实际产物检查还需系统 `tar` 命令。Host 依赖 DSH 工具 SDK、Typert 与 schema 库；Client 复用宿主 React 和 shell 预置公共 UI 模块，无编译步骤。
 
 ```sh
 pnpm install --ignore-scripts
 npm run check
 ```
 
-检查包含目录职责、JavaScript 语法、Bundle 资源与导出、双语 key、SVG、截图清单与本地文档链接，以及原生启停策略与 Client 行为测试。不安装插件，不修改 profile，也不替代宿主加载或真实页面检查。
+`check` 包含目录职责、JavaScript 语法、Bundle 资源与导出、双语 key、SVG、截图清单、本地文档链接及策略与 Client 测试。[实际产物检查](../scripts/check-package.mjs)通过 `npm run check:package` 在系统临时目录生成并用 `tar` 解包实际 npm tarball，核对 exports、全部运行源码及导入、声明依赖、Client factory 登记、图标许可、locale 和截图，并确认不携带测试、脚本、协作入口、开发指南、规范或研究材料；文档资源允许第三方声明、发布截图及 npm 自动收录的文档索引。结束清理临时产物。这些检查不下载依赖、不安装 DSH 或修改 profile，不能替代宿主加载和页面验收。
 
-历史版本复测运行 `npm run check:compat`，默认检查已发布的 12 个 `0.2.0` / `0.2.1` 版本：`0.2.0-rc.1–rc.2`、`0.2.1-alpha.1–alpha.5` 及 `0.2.1-rc.1–rc.5`；单版可运行 `npm run check:compat -- 0.2.0-rc.1`，也可额外检查 `0.2.2-alpha.2`。[兼容检查脚本](../scripts/check-compatibility.mjs)在忽略目录中复制源码和测试，安装匹配的 SDK / Cordis / schema（禁止安装脚本），执行完整仓库检查，再以生产 SDK 配合旧 Host 注入器、真实 Tools 和投影服务做装配检查。保留独立日志，不启动 DSH 应用或改动用户 profile。结果与限制见[兼容性调查](compatibility-audit.md)。
+历史版本检查默认覆盖已发布的 12 个 `0.2.0` / `0.2.1` 版本，也可指定单版：
+
+```sh
+npm run check:compat
+npm run check:compat -- 0.2.0-rc.1
+npm run check:compat -- 0.2.2-alpha.2
+```
+
+[兼容检查脚本](../scripts/check-compatibility.mjs)在忽略目录复制源码和测试，安装匹配 SDK / Cordis / schema（禁止安装脚本），执行仓库检查及固定生产 SDK 的 Host 装配检查，保留日志，不启动 DSH 或修改 profile。历史结果、后续单版复测及限制见[兼容性调查](compatibility-audit.md#sdk-验证方法与结果)。
 
 ## 源码与接口发现
 
-开发新插件或新增功能前，先直接在 [dsh-market](https://dshmarket.com/browse/) 按功能关键词和分类检索同类插件；用户点名插件时优先查该插件。找到源仓库后，直接将源码浅克隆到 `reference/<owner>/<repo>/`，阅读相关模块，优先参考已有插件的实际实现，再结合当前 API 和本项目约束决定如何接入，不只凭市场描述推测或从头设计。未找到可用参考时再自行实现。按作者分目录以避免同名仓库冲突；已有克隆先核对 remote、提交和本地改动，不覆盖或自动重置。
-
-例如，参考 UI 设置与交互实现：
+开发新插件或功能前，先在 [dsh-market](https://dshmarket.com/browse/) 按关键词和分类检索同类插件；用户点名时优先查该插件。找到源仓库后浅克隆到 `reference/<owner>/<repo>/`，阅读相关模块，再结合当前 API 和本项目约束决定接入方式。已有克隆先核对 remote、提交和本地改动，不覆盖或自动重置。未找到可用参考时再自行实现。
 
 ```sh
 git clone --depth 1 --single-branch https://github.com/wlj521/dsh-ui-tweaks.git reference/wlj521/dsh-ui-tweaks
-```
-
-阅读时核对许可证、目标 DSH 版本与实现方式，并记录实际参考的仓库、提交和相关模块。借鉴思路；复制或改编代码须遵循许可证并保留要求的声明，没有许可证时不默认允许复制。参考代码仍须满足本项目的接入约束，不因现成实现而引入全局 CSS、其他插件 DOM 查询或内部 UI 导入。参考源码无需安装依赖、执行脚本或安装插件。
-
-可将官方仓库浅克隆到 `.references/deepseek-harness`：
-
-```sh
 git clone --depth 1 --single-branch https://github.com/deepseek-ai/deepseek-harness.git .references/deepseek-harness
 ```
 
-[忽略规则](../.gitignore)覆盖 `.references/` 和 `reference/`，两处参考目录均不提交或打包，无需安装依赖或启动服务。上游主分支及第三方插件可能与本机发行版不同；当前运行时 Inspect 和已安装包源码是接口依据，参考仓库用于理解与对照。
+核对许可证、目标 DSH 版本和实现方式，在[第三方资源声明](third-party-notices.md)记录实际参考的仓库、提交和模块。复制或改编须遵循许可证；没有许可证不默认允许复制。参考源码无需安装依赖或执行脚本，仍须满足本项目接入约束。[忽略规则](../.gitignore)覆盖两个参考目录，不提交或打包。上游主分支可能领先目标发行版；接口依据应来自目标运行时 Inspect 或确切发行包，参考仓库用于理解与对照。
 
 在 Harness 内设计或修改插件时，加载适用技能，先 `cordis_inspect_list`，再用返回的方法定向查询：
 
@@ -80,87 +79,67 @@ git clone --depth 1 --single-branch https://github.com/deepseek-ai/deepseek-harn
 - 目标 service 方法、event 模式与 Config schema。
 - 主题 token、桌面桥与 Client 模块加载约定；Inspect 未暴露的部分再查安装包公开类型或实现。
 
-Inspect 是只读发现机制，不能当业务 service 调用。缺少目标版本依据时明确记录假设，不猜接口或兼容性。
-
-新增重启按钮的既有参考为 `reference/hulibuld/dsh-refresh-restart`，已核对 remote、无本地改动、提交 `3228af3` 和 MIT 许可证，并阅读 `lib/restart.js`、`lib/platform.js` 与 Client 交互；仅借鉴外部助手及退出后重开的思路，不复制代码。当前会话 Inspect 工具不可用，Agent Browser 离线；已提供的本机 `0.2.2-rc.1` ASAR preload / main 源码核对结论是未发现公开 restart bridge，不得猜测桌面重启接口。确定范围与验证边界见[重启应用](restart-button.md#参考与验证)。
+Inspect 是只读发现机制，不能当业务 service 调用。不可用时记录采用的确切发行包、源码及验证限制；缺少目标版本依据时明确假设，不猜接口或兼容性。
 
 ## 安装与使用
 
 ### 从 GitHub 安装
 
-项目尚未发布到 npm，可以使用 GitHub 源码作为安装来源。在 DSH 插件管理页选择安装第三方插件，输入：
+在 DSH 插件管理页选择安装第三方插件，输入：
 
 ```text
 github:mewcoder/power-dsh
 ```
 
-原生管理器通过 pnpm 安装 Git 来源及[包清单](../package.json)中声明的 `dependencies`。本项目使用直接运行的 JavaScript，没有 `build`、`prepare` 或安装脚本，用户无需先编译，也无需把 `node_modules/` 提交到仓库。安装需要能访问 GitHub 和依赖注册表；`private: true` 阻止 npm 发布，不阻止从 Git 安装。若依赖自身要求执行安装脚本，以原生管理器的具体提示为准。
+原生管理器通过 pnpm 获取 Git 来源及[包清单](../package.json)声明的运行依赖。本项目直接运行 JavaScript，没有 `build`、`prepare` 或安装脚本，无需先编译或提交 `node_modules/`。安装需要访问 GitHub 与依赖注册表；`private: true` 不阻止 Git 安装。依赖若要求执行安装脚本，以原生管理器提示为准。
 
-此来源获取远端已推送的代码，不包含本机尚未提交或推送的修改。可使用 `github:mewcoder/power-dsh#<commit>` 固定提交，待实际创建版本标签后也可固定标签。当前 GitHub 安装链路尚未做完整验收，不能以本地链接安装或 SDK 测试替代。
+Git 来源获取远端已推送代码。可用 `github:mewcoder/power-dsh#<commit>` 固定提交，标签须实际存在。来源验收状态见[兼容性调查](compatibility-audit.md#安装与平台验证记录)；本地链接安装和 SDK 测试不能替代 GitHub 安装验收。
 
 ### 本地开发安装
 
-本地目录使用链接安装，源码目录需要先准备自己的依赖。在仓库根目录执行：
+本地目录使用链接安装，先在仓库准备自己的依赖：
 
 ```sh
 pnpm install --ignore-scripts
 npm run check
 ```
 
-然后在 DSH 插件管理页选择安装第三方插件，输入本仓库的绝对目录。不要在用户 profile 下手动运行包管理器或编辑配置。GitHub 与 tarball 来源的依赖由原生管理器安装；普通 `npm pack` 产物只携带插件文件及依赖声明，不是包含全部依赖的离线安装包。分发渠道与验收见[发布与升级](releasing.md#选择分发方式)。
+然后在 DSH 插件管理页选择安装第三方插件，输入仓库绝对目录。不要在用户 profile 下运行包管理器或手写配置。GitHub 与 tarball 依赖由原生管理器安装；普通 `npm pack` 产物不包含全部依赖，不能作为离线安装包，见[分发方式](releasing.md#选择分发方式)。
 
 ### 启用与功能行为
 
-启用后进入 **设置 → PowerDSH**，按「通用」「增强」「精简」分类管理功能，当前范围为十三项（含未发布的重启按钮、精简官方搜索与屏蔽双击重命名），主开关均默认关闭且独立持久化；任务通知下的声音选项默认开启。分类范围与键盘交互见 [分类 Tab](ui.md#分类-tab)。开启「个性化」后，设置侧栏新增独立的 **个性化** Tab，可编辑并保存全局提示词；正文保存至原生 `$DSH_HOME/AGENTS.md`；关闭开关只移除编辑入口，文件及其原生生效行为保留，详见[个性化](personalization.md)。开启「技能管理」后新增独立「技能」设置页；单项启停仅对当前 DSH 配置生效，不修改共享技能文件，关闭页面入口保留限制，卸载整个 Mod 释放限制，详见[技能管理](skills.md)。开启「MCP 管理」后新增独立「MCP」设置页，只查看全局的已有提供插件与原生配置，按「用户／内置」分组并提供搜索，不显示范围 Tab 或项目下拉。可管理项通过原生持久化接口启停，无对应控制入口的模式及动态实例只读；不扫描项目文件或展示项目实例，详见[MCP 管理](mcp.md)。
+启用后进入 **设置 → PowerDSH**，按需开启功能。入口、默认值和操作行为以[十三项主 Spec](README.md#功能规格spec)为准，分类与键盘交互见 [UI 规范](ui.md#分类-tab)。
 
-账号与反馈与遥测精简开关开启时停用匹配目标，关闭时启用目标，包括原本已停用的目标。停用或卸载 Mod 不会自动启用其他插件；如需撤销精简，先关闭对应开关。
+安装和验收时注意：
 
-「精简Todo工具」启停全局和各模式中的 Todo 工具插件，保留会话界面和历史列表。模式启用后现有会话可能需要重新打开，完整范围见 [精简Todo工具](todo-blocking.md)。
-
-「精简官方登录与模型接入」沿用原有 `blockOfficialAccount` 和账号精简范围；「精简官方搜索」使用独立的 `blockOfficialSearch`，只关闭活动条目与模式内的搜索配置并限制旧会话，保留抓取选项、第三方 MCP 及各模块启停状态；恢复后旧会话可能需重新打开，详见[精简官方搜索](search-blocking.md)。
-
-「任务通知」在「通用」中开启，关闭时隐藏全部声音配置并保留偏好；点击主开关时申请浏览器通知权限；「通知声音」开关单独一行，开启后下方展开「提示音」下拉和小播放图标，关闭时收起第二行。下拉默认使用系统默认，选中后保存并自动试听，播放图标可重听；关闭声音隐藏选择和播放控件、保留偏好；具体提示音可能在专注模式下响铃，远程界面不触发服务器播放。页面需保持打开。四类触发、前台抑制和系统权限限制见[任务通知](notifications.md)。
-
-桌面端点击版本号会打开原生更新流程，可能开始下载，安装仍需原生确认；浏览器只显示版本。定位与兼容限制见[侧栏接入](architecture.md#侧栏接入)。
-
-新增「显示重启按钮」位于「通用」，`showRestartButton` 默认 `false` 并独立持久化，说明为「重新启动 DSH 应用」。侧栏顶部使用横向三点「更多操作」菜单，按刷新、重启排序；两项显示开关独立，菜单只占一个位置，侧栏收起关闭菜单和确认。当前重启项保留 macOS 打包桌面端的环境限制，设置仍可保存，不增加常驻平台警告。点击先经宿主公共确认弹窗，再保留宿主退出确认；独立助手只正常退出并在确认退出后重开当前已校验的同一路径，取消或超时不强杀、不重开。当前源码已实现，尚未安装或验收实际页面与完整应用重启，详见[重启应用](restart-button.md)。
-
-当前已按用户授权，通过原生管理器移除旧 `@local/dsh-mod` 并安装、启用 `power-dsh`，条目 `include:power-dsh` 为 active。重装前已备份原 profile，六项原生设置偏好已恢复，通知声音及管理入口等其余偏好未自动迁移。旧 ID `dsh-mod`、`dsh-x-mod` 与旧目录符号链接仍作兼容；不手工修改 profile，不把目录链接兼容视为配置迁移。详见[命名与安装状态](releasing.md#名称与准备状态)。
-
-「屏蔽双击重命名」位于「精简」，`blockDoubleClickRename` 默认关闭。此功能已获用户明确允许读取当前双击事件路径中的会话行标记；仅阻止会话行双击传播，保留菜单、键盘与单击操作，关闭或卸载释放监听。不扩大到文档扫描或其他 DOM 查询，依据与验证范围见[屏蔽双击重命名](double-click-rename.md)。
+- 精简会更改宿主持久配置。停用或卸载 Mod 不会自动恢复其他插件；需要撤销时先关闭对应精简开关，并核对实际目标，见[原生精简操作](architecture.md#原生精简操作)。
+- 桌面端点击版本号可能开始下载更新，见[显示版本号](version-display.md)。
+- 重启会退出应用，系统通知与声音依赖平台及权限；按对应主 Spec 的验收条件操作。
+- 旧 ID 设置回退与目录链接不等于完整配置迁移；升级时按[兼容性验证要求](compatibility.md#验证与记录)读回偏好。
 
 ## 修改与安装
 
-先读相关文档和实现，保护无关改动；同步受影响的双语文案、资源清单和文档。只为实际行为补必要测试，不为占位结构添加框架。
+Agent 使用原生 `plugin_manager`，不手写 profile manifest/patch，也不在 profile 下运行包管理器。安装影响同一 profile 的其他会话，须在任务授权范围内执行。
 
-安装方式见[安装与使用](#安装与使用)。Agent 通过原生 `plugin_manager`，不手写 profile manifest/patch，也不在 profile 下运行包管理器。安装影响同一 profile 的其他会话，只有任务已授权安装或运行预览时才执行。
-
-读取管理工具结果的 application、warnings 和诊断；如有 nextStep 按其提示处理。插件内调用的原生 ChangeResult 使用 error.diagnostic、error.code 或 restartReason，区分已应用、需重启和失败。更新已安装包后应确认运行代际；相同 slot id 不能证明加载了新代码。本仓库不提供替代 DSH GUI 的开发服务器，也不承诺保存后自动更新现有页面。
+读取管理工具结果的 application、warnings 和诊断；如有 nextStep 按提示处理。插件内原生 ChangeResult 使用 error.diagnostic、error.code 或 restartReason，区分已应用、需重启和失败。更新后确认运行代际；相同 slot id 不能证明加载了新代码。本仓库不提供替代 DSH GUI 的开发服务器，也不承诺保存后自动更新现有页面。
 
 ## 验证方法与限制
 
 | 层次 | 验证方法 | 证明范围 |
 | --- | --- | --- |
-| 仓库 | `npm run check` | 语法、资源、文案、链接和测试所覆盖的行为 |
-| 加载 | 原生管理器 application 与诊断 | 当前 profile 是否应用 Bundle，无 Loader 或 metadata 错误 |
-| 注册 | Inspect 查看 Mod 设置页、图标和侧栏追加容器 | Client 注册存在；不能证明实际视觉 |
-| 策略 | 通过同一 Host 操作开启、关闭，读回实际模块状态 | 开启精简停用目标、关闭精简启用目标、无关实例保留与重新应用结果 |
-| 生命周期 | 停用、重启用或重载，检查重复注册与监听清理 | 已执行场景的清理和持久状态 |
-| 布局夹具 | Chrome 无界面模式加载真实 Mod CSS 与核对过的原生设置结构 | 可单独验证滚动槽稳定宽度、两行简介、同排等高、来源底部对齐及窄屏列数；不代表当前 DSH GUI 验收 |
-| 页面 | 实际 DSH 中操作开关、更新入口、主题循环与异常重试 | 点击链路、焦点、语言和视觉表现 |
+| 仓库 | `npm run check` | 语法、资源、文案、链接和测试覆盖的行为 |
+| 实际产物 | `npm run check:package` | tarball 内源码、导出、依赖声明、Client 登记、资源及开发文件排除；不证明依赖下载或 DSH 激活 |
+| 加载 | 原生管理器 application 与诊断 | 当前 profile 是否应用 Bundle，是否有 Loader 或 metadata 错误 |
+| 注册 | Inspect 查看设置页、图标和侧栏追加容器 | Client 注册存在，不能证明实际视觉 |
+| 策略 | 同一 Host 开关操作并读回实际模块状态 | 目标启停、无关实例保留及重新应用结果 |
+| 生命周期 | 停用、重启用或重载，检查重复注册与监听清理 | 已执行场景的清理与持久状态 |
+| 布局夹具 | 用真实 Mod CSS 和核对过的原生结构验证布局 | 夹具中的尺寸和响应式行为，不能替代 DSH GUI |
+| 页面 | 在实际 DSH 操作并检查语言、焦点、主题与错误恢复 | 实际点击链路和视觉表现 |
 
-策略验证应分别核对账号与遥测目标的停用、启用和重载后的持久状态。已有运行结果不能替代新改动的验证，也不代表跨版本兼容。宿主接口核对、最低版本、平台与升级验收统一维护在[版本兼容性](compatibility.md)，完成矩阵后才能确定发布范围。
+按受影响主 Spec 选择场景；已有结果不替代新改动验证，也不代表跨版本兼容。确切宿主版本、接口依据、平台与升级证据集中维护在[兼容性调查](compatibility-audit.md)，支持结论见[版本兼容性](compatibility.md)。编译助手脚本不等于已经执行，页面断连不等于重启成功，注册成功不等于系统通知已经显示。
 
-任务通知的接口依据为已核对的 DSH `0.2.2-rc.1` 安装包：当前会话未提供 `cordis_inspect_list`／`cordis_inspect_query`，因此直接检查了投影注册、原生会话列表与交互状态、桌面 preload、连接本机标记和 subprocess 管理接口。通知摘要的单元测试与真实 Cordis 投影注册释放测试已经通过；系统声音目录与播放管理的 9 项测试通过，其中 macOS 仅实读目录，未播放音频，Windows 仅验证固定参数与生命周期；Client 行为以对应测试结果为准。当前 Agent Browser 面板离线，未完成实际页面和系统横幅验证，也未获授权安装此次改动；不能据此声称已安装或真实通知已验收。
-
-新增重启按钮的源码检查与隔离测试以本次实际运行结果为准，不纳入既有旧版测试矩阵。助手 AppleScript 已经 `osacompile` 编译检查，未执行脚本；编译成功不代表正常退出或重开通过。实际验收仍需分别覆盖公共确认弹窗取消、宿主确认取消、退出超时不强杀不重开、真实退出后同路径重开、状态错误读回及跨平台按钮隐藏。当前 Inspect 工具不可用、Agent Browser 离线，未安装本次改动、运行 GUI 或触发实际重启。
-
-实际浏览器点击、中英文与浅深主题切换、键盘焦点、逐像素对照及整个桌面应用重启尚未完整验收；未用抓包证明网络路径。版本标记的跨平台标题栏适配和外观按钮与底部控件、长昵称的空间都需真实页面复核，见[侧栏接入](architecture.md#侧栏接入)与[外观定位](appearance-shortcut.md#独立定位)。更新点击可能下载，不为验证而擅自触发。
-
-页面验收遵循 [UI 清单](ui.md#验收清单)。没有页面控制时如实报告静态、注册或状态检查，不用独立 HTML 模拟真实验证。测试改动用户语言、主题或开关后，恢复任务开始时状态；精简开关关闭会启用全部匹配目标，验收时需单独核对各目标，启停与卸载说明见[安装与使用](#安装与使用)。
+页面验收遵循 [UI 清单](ui.md#验收清单)。没有页面控制时如实报告静态、注册或状态检查。验收结束恢复任务开始时的语言、主题与开关；精简开关关闭可能启用全部匹配目标，须分别核对。
 
 ## 交付
 
-版本号、更新日志、GitHub Release、兼容范围及 dsh-market 收录见[发布与升级](releasing.md)。发布须由用户明确确认；准备文档和本地检查不构成提交、推送或发布授权。
-
-说明本次修改、验证方法与结果、未验证部分。涉及 UI 时给出实际入口；区分“检查通过”“已安装”“已注册”和“实际展示已验收”，不把它们合并为运行正常的结论。
+说明修改、验证方法与结果、未验证部分。涉及 UI 时给出实际入口，区分“检查通过”“已安装”“已注册”和“实际展示已验收”。版本、发布与市场操作见[发布与升级](releasing.md)，准备文档和本地检查不构成提交、推送或发布授权。

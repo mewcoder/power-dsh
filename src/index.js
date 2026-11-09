@@ -226,11 +226,7 @@ export function apply(ctx, config) {
           blockOfficialSearch: { type: 'boolean', required: true },
           blockDoubleClickRename: { type: 'boolean', required: true },
           blockOfficialTelemetry: { type: 'boolean', required: true },
-          showRestartButton: {
-        type: 'boolean',
-        description: 'Show the desktop application restart button when supported. This preference does not restart the application. Omit to keep it unchanged.',
-      },
-      blockTodo: { type: 'boolean', required: true },
+          blockTodo: { type: 'boolean', required: true },
           telemetry: {
             type: 'object', required: true, additionalProperties: false,
             properties: {

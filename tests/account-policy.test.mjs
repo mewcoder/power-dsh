@@ -116,9 +116,34 @@ test('a write waiting for the native lock cannot commit after unload', async () 
 test('saving current preferences drops obsolete data without storing previous plugin states', async () => {
   const app = setup();
   const disabledSkills = [{ name: 'review', description: 'Review', source: 'user-dsh', provider: 'filesystem', path: '/test/skills/review/SKILL.md' }];
-  Object.assign(app.values, { blockOfficialSearch: true, blockTodo: true, showRefreshButton: true, showRestartButton: true, personalizationEnabled: true, skillManagerEnabled: true, mcpManagerEnabled: true, disabledSkills, globalPrompt: '始终用中文回复 {{literal}}', accountRestore: { old: true }, telemetryRestore: {}, telemetryPluginRestore: {}, settingsFullscreen: false });
+  const preserved = { blockOfficialSearch: true, blockTodo: true, showRefreshButton: true, showRestartButton: true,
+    blockDoubleClickRename: true, notificationsEnabled: true, notificationSoundEnabled: false, notificationSound: 'mac:Glass.aiff',
+    personalizationEnabled: true, skillManagerEnabled: true, mcpManagerEnabled: true, disabledSkills,
+    globalPrompt: '始终用中文回复 {{literal}}', futureFeature: { enabled: true } };
+  Object.assign(app.values, preserved, { accountRestore: { old: true }, telemetryRestore: {}, telemetryPluginRestore: {}, settingsFullscreen: false });
   await app.policy.setBlocked(true);
-  assert.deepEqual(app.values, { blockOfficialSearch: true, blockTodo: true, showVersion: true, showRefreshButton: true, showRestartButton: true, blockOfficialAccount: true, personalizationEnabled: true, skillManagerEnabled: true, mcpManagerEnabled: true, disabledSkills, globalPrompt: '始终用中文回复 {{literal}}' });
+  assert.deepEqual(app.values, { ...preserved, showVersion: true, blockOfficialAccount: true });
+  await app.policy.setBlocked(false);
+  assert.deepEqual(app.values, { ...preserved, showVersion: true, blockOfficialAccount: false });
+});
+
+test('policy saves preserve preferences changed while waiting for the native edit lock', async () => {
+  const app = setup();
+  const entered = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  const edit = app.ctx.configEditor.edit;
+  app.ctx.configEditor.edit = async (...args) => {
+    entered.resolve();
+    await release.promise;
+    return edit(...args);
+  };
+  const saving = app.policy.setBlocked(true);
+  await entered.promise;
+  Object.assign(app.values, { notificationsEnabled: true, notificationSound: 'mac:Ping.aiff', blockDoubleClickRename: true });
+  release.resolve();
+  await saving;
+  assert.deepEqual(app.values, { showVersion: true, blockOfficialAccount: true,
+    notificationsEnabled: true, notificationSound: 'mac:Ping.aiff', blockDoubleClickRename: true });
 });
 
 test('unsupported profiles and invalid booleans fail before native mutation', async () => {
