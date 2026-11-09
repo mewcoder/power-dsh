@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { watchBackground } from '../attachment.ts';
 import { createClientFeature } from '../client.ts';
+import { locales } from '../locales.ts';
 import { createRuntime } from '../../../shared/client/runtime.ts';
 
 // Verifies DOM ownership and rollback; this fixture does not render pixels.
@@ -61,6 +62,7 @@ function fixture(layout = 'pI_x6G', sidebarName = 'hHd-Xa') {
   head.append(layoutStyle, sidebarStyle);
   const observers = new Set();
   const statuses = [];
+  const reports = [];
   const starts = [];
   let stops = 0;
   const doc = { body, head, querySelectorAll: selector => [...head.querySelectorAll(selector), ...body.querySelectorAll(selector)],
@@ -89,11 +91,11 @@ function fixture(layout = 'pI_x6G', sidebarName = 'hHd-Xa') {
     body.append(target);
     return { target, sidebar, sidebarRoot, center, root, content, card };
   };
-  return { doc, win, body, head, layoutStyle, sidebarStyle, statuses, observers, starts, makeFrame, stops: () => stops,
+  return { doc, win, body, head, layoutStyle, sidebarStyle, statuses, reports, observers, starts, makeFrame, stops: () => stops,
     flush: () => [...observers].forEach(observer => observer.callback()),
     watch: (animate = (canvas, _win, _doc, target) => {
       starts.push({ canvas, target }); return () => { stops++; };
-    }) => watchBackground(status => statuses.push(status), doc, win, animate),
+    }) => watchBackground(status => { statuses.push(status.state); reports.push(status); }, doc, win, animate),
   };
 }
 
@@ -366,19 +368,98 @@ test('the shell controller renders nothing and reports layout feedback until rec
   const settings = enabled => feature.useSettings({ snapshot: { value: { flowingBackgroundEnabled: enabled } } })[0];
   try {
     const dispose = effect();
-    assert.equal(settings(true).error, 'flowingBackgroundLayoutUnavailable');
+    const first = settings(true).failure;
+    assert.equal(first.code, 'PD-BACKGROUND-LAYOUT');
+    assert.equal(first.operation, 'flowing-background.attach');
+    assert.equal(first.context.stage, 'frame (flowingBackgroundStageFrame)');
+    assert.equal(first.context.check, 'app-frame');
+    assert.equal(first.context.result, 'missing (flowingBackgroundResultMissing)');
+    assert.equal(first.context.expected, '1 visible frame');
+    assert.equal(first.context.actual, '0');
+    assert.equal(first.context.state, 'flowingBackgroundStatePreserved');
+    assert.equal(first.context.recovery, 'flowingBackgroundRecoveryWait');
+    f.flush();
+    assert.equal(settings(true).failure.observedAt, first.observedAt);
+    const originalStyles = f.layoutStyle.textContent;
+    f.layoutStyle.textContent += '.other_frame{}'; f.flush();
+    assert.equal(settings(true).failure.context.check, 'layout.frame');
+    assert.equal(settings(true).failure.context.actual, '2');
+    assert.equal(settings(true).failure.context.recovery, 'flowingBackgroundRecoveryUpdate');
+    f.layoutStyle.textContent += '.third_frame{}'; f.flush();
+    assert.equal(settings(true).failure.context.actual, '3', 'Updated counts must replace the prior diagnostic.');
+    f.layoutStyle.textContent = originalStyles; f.flush();
+    assert.equal(settings(true).error, undefined, 'A runtime fault is not a settings-save error.');
     dispose();
-    assert.equal(settings(true).error, 'flowingBackgroundLayoutUnavailable');
-    assert.equal(settings(false).error, undefined);
+    assert.equal(settings(true).failure.code, 'PD-BACKGROUND-LAYOUT');
+    assert.equal(settings(false).failure, undefined);
     f.makeFrame();
     const disposeNext = effect();
-    assert.equal(settings(true).error, undefined);
+    assert.equal(settings(true).failure, undefined);
     disposeNext();
     assert.equal(f.observers.size, 0);
   } finally {
     if (previousDoc === undefined) delete globalThis.document; else globalThis.document = previousDoc;
     if (previousWin === undefined) delete globalThis.window; else globalThis.window = previousWin;
   }
+});
+
+test('background summaries and recovery guidance are bilingual while diagnostic identifiers stay stable', () => {
+  const previousDoc = globalThis.document;
+  const previousWin = globalThis.window;
+  try {
+    for (const language of ['en', 'zh']) {
+      const f = fixture(); f.makeFrame(); f.layoutStyle.remove();
+      globalThis.document = f.doc; globalThis.window = f.win;
+      let component, effect;
+      const React = { createElement: (type, props) => ({ type, props }), useLayoutEffect: fn => { effect = fn; },
+        useSyncExternalStore: (_subscribe, get) => get() };
+      const feature = createClientFeature(createRuntime(React, {}), { namespace: 'test',
+        t: key => locales[language][key], preferenceSlot: (_field, _slot, _options, view) => { component = view; } });
+      component({}).type();
+      const dispose = effect();
+      const current = () => feature.useSettings({ snapshot: { value: { flowingBackgroundEnabled: true } } })[0].failure;
+      assert.ok(current().message.includes(locales[language].flowingBackgroundStylesMissing));
+      assert.equal(current().context.check, 'layout.stylesheet');
+      assert.ok(current().context.stage.startsWith('styles ('));
+      assert.equal(current().context.recovery, locales[language].flowingBackgroundRecoveryWait);
+      f.head.append(f.layoutStyle);
+      f.layoutStyle.textContent += '.other_frame{}'; f.flush();
+      assert.ok(current().message.includes(locales[language].flowingBackgroundStylesAmbiguous));
+      assert.equal(current().context.recovery, locales[language].flowingBackgroundRecoveryUpdate);
+      assert.equal(current().context.actual, '2');
+      dispose();
+    }
+  } finally {
+    if (previousDoc === undefined) delete globalThis.document; else globalThis.document = previousDoc;
+    if (previousWin === undefined) delete globalThis.window; else globalThis.window = previousWin;
+  }
+});
+
+test('background diagnostics identify the failed check without copying DOM, styles or exceptions', () => {
+  const cases = [
+    ['styles', 'layout.stylesheet', 'missing', '1', '0', f => f.layoutStyle.remove()],
+    ['styles', 'layout.frame', 'ambiguous', '1', '2', f => { f.layoutStyle.textContent += '.other_frame{}'; }],
+    ['styles', 'sidebar.root', 'missing', '1', '0', f => { f.sidebarStyle.textContent = '.kB3qhq_scrollFade{}'; }],
+    ['frame', 'app-frame', 'hidden', '1 visible frame', '0', (_f, frame) => { frame.target.clientWidth = 0; }],
+    ['frame', 'app-frame', 'ambiguous', '1 visible frame', '2', f => f.makeFrame()],
+    ['frame', 'frame.position', 'unsupported', 'relative', 'static', (_f, frame) => { frame.target.position = 'static'; }],
+    ['frame', 'frame.display', 'unsupported', 'grid', 'flex', (_f, frame) => { frame.target.display = 'flex'; }],
+    ['frame', 'frame.center', 'missing', '1 direct child', '0', (_f, frame) => frame.center.remove()],
+    ['environment', 'mutation-observer', 'unsupported', 'available', 'missing', f => { f.win.MutationObserver = undefined; }],
+  ];
+  for (const [stage, check, result, expected, actual, change] of cases) {
+    const f = fixture('PIRFFq', 'kB3qhq');
+    const frame = f.makeFrame();
+    change(f, frame);
+    const dispose = f.watch();
+    assert.deepEqual(f.reports.at(-1), { state: 'unavailable', stage, check, result, expected, actual });
+    dispose();
+  }
+  const f = fixture(); f.makeFrame();
+  const dispose = f.watch(() => { throw new Error('token=do-not-copy /Users/private/data'); });
+  assert.deepEqual(f.reports.at(-1), { state: 'unavailable', stage: 'initialization', check: 'attachment.initialize', result: 'failed', expected: 'completed', actual: 'exception' });
+  assert.ok(!JSON.stringify(f.reports).includes('do-not-copy'));
+  dispose();
 });
 
 test('failed global attachment rolls back surfaces without retrying on its own mutations', () => {

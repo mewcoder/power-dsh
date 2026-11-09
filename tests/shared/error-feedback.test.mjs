@@ -10,28 +10,45 @@ function descendants(node) {
 }
 
 function fixture(language = 'en') {
-  const states = [];
-  const effects = [];
+  let states = [];
+  let effects = [];
   let cursor = 0;
   const React = {
     createElement(type, props, ...children) { return { type, props: { ...props, children } }; },
     useState(initial) {
       const index = cursor++;
       if (!(index in states)) states[index] = typeof initial === 'function' ? initial() : initial;
-      return [states[index], value => { states[index] = value; }];
+      const instanceStates = states;
+      return [states[index], value => { instanceStates[index] = value; }];
     },
     useRef(initial) { const index = cursor++; return states[index] ||= { current: initial }; },
     useId() { return `error-test-${cursor++}`; },
-    useEffect(callback) { const index = cursor++; if (!(index in states)) { states[index] = true; effects.push(callback()); } },
+    useEffect(callback) {
+      const index = cursor++;
+      if (!(index in states)) { states[index] = true; effects.push({ callback, cleanup: callback() }); }
+    },
   };
   const feedback = createErrorFeedback(React, 'button');
   const props = { t: key => locales[language][key] || key, message: 'Could not read the directory.', code: 'PD-SKILLS-LOAD', operation: 'listSkills' };
   const outer = feedback(props);
-  const detailsNode = descendants(outer).find(node => typeof node.type === 'function');
+  let detailsNode = descendants(outer).find(node => typeof node.type === 'function');
+  function dispose() { for (const effect of effects) effect.cleanup?.(); }
   return {
     props, feedback, outer,
-    render() { cursor = 0; return detailsNode.type(detailsNode.props); },
-    dispose() { for (const effect of effects) effect?.(); },
+    render(nextProps) {
+      if (nextProps) {
+        const next = descendants(feedback({ ...props, ...nextProps })).find(node => typeof node.type === 'function');
+        if (next.props.key !== detailsNode.props.key) { dispose(); states = []; effects = []; }
+        detailsNode = next;
+      }
+      cursor = 0;
+      return detailsNode.type(detailsNode.props);
+    },
+    restartEffects() {
+      dispose();
+      for (const effect of effects) effect.cleanup = effect.callback();
+    },
+    dispose,
   };
 }
 
@@ -73,6 +90,35 @@ test('diagnostic text is bounded and excludes credentials, URLs and Windows/POSI
   const report = diagnosticReport({ code: 'PD-TEST', operation: 'test', message: source, observedAt: '2026-11-09T00:00:00Z', version: '0.2.2-rc.1', config: 'not-selected' });
   assert.ok(!report.includes('not-selected'));
   assert.ok(report.includes('Code: PD-TEST'));
+});
+
+test('diagnostic context selects explicit bounded sanitized string fields without serializing extra data', () => {
+  const report = diagnosticReport({
+    code: 'PD-TEST', operation: 'test', message: 'Failed', observedAt: '2026-11-09T00:00:00Z',
+    context: {
+      stage: 'Loading\u0000 https://private.example/stage',
+      check: 'Authorization: Bearer private-check',
+      result: 'Failed at /Users/me/private/result.json',
+      expected: '1', actual: '0',
+      state: 'x'.repeat(10000),
+      recovery: 'Retry\npassword=private-recovery',
+      config: 'private-extra',
+      toJSON() { throw new Error('Arbitrary context must not be serialized'); },
+    },
+  });
+  assert.ok(report.includes('Stage: Loading [url]'));
+  assert.ok(report.includes('Check: [redacted]'));
+  assert.ok(report.includes('Result: Failed at [path]'));
+  assert.ok(report.includes('Expected: 1\nActual: 0'));
+  assert.ok(report.includes(`State: ${'x'.repeat(2048)}\nRecovery: Retry\n[redacted]`));
+  for (const value of ['\u0000', 'private.example', 'private-check', '/Users/me', 'private-recovery', 'private-extra']) {
+    assert.ok(!report.includes(value), value);
+  }
+  const invalid = diagnosticReport({ code: 'PD-TEST', operation: 'test', message: 'Failed', observedAt: 'now',
+    context: { stage: { secret: 'not-a-string' }, check: '', config: 'not-selected' } });
+  assert.ok(!invalid.includes('Stage:'));
+  assert.ok(invalid.endsWith('Check: '));
+  assert.ok(!invalid.includes('not-selected'));
 });
 
 test('shared errors expose one alert, associated id, authored code and optional retry without an automatic retry', async () => {
@@ -129,6 +175,30 @@ test('error information stays selectable and bilingual; copying writes only the 
   });
 });
 
+test('copied reports include only a confirmed platform alongside machine-readable failure evidence', async t => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  t.after(() => { if (previous) Object.defineProperty(globalThis, 'document', previous); else Reflect.deleteProperty(globalThis, 'document'); });
+  const copies = [];
+  await withBrowser(t, { writeText: async text => copies.push(text) }, async () => {
+    for (const platform of ['win32', 'darwin', 'linux', 'unknown']) {
+      Object.defineProperty(globalThis, 'document', { configurable: true,
+        value: { documentElement: { getAttribute: () => platform } } });
+      const app = fixture();
+      const view = app.render({ code: 'PD-BACKGROUND-LAYOUT', operation: 'flowing-background.attach',
+        observedAt: '2026-11-09T11:45:02.966Z', context: { stage: 'styles (样式识别)',
+          check: 'layout.frame', result: 'missing (未找到)', expected: '1', actual: '0', state: 'Saved setting unchanged' } });
+      await copyButton(view).props.onClick();
+      const report = copies.at(-1);
+      assert.equal(report.includes('Platform:'), platform !== 'unknown');
+      if (platform !== 'unknown') assert.ok(report.includes(`Platform: ${platform}`));
+      assert.ok(report.includes('Operation: flowing-background.attach'));
+      assert.ok(report.includes('Check: layout.frame\nResult: missing (未找到)\nExpected: 1\nActual: 0'));
+      assert.equal(report, descendants(view).find(node => node.type === 'pre').props.children[0]);
+      app.dispose();
+    }
+  });
+});
+
 test('clipboard absence and rejection retain error details and explain manual copying', async t => {
   for (const clipboard of [undefined, { writeText: async () => { throw new Error('Denied'); } }]) {
     await t.test(clipboard ? 'denied' : 'unavailable', async t => withBrowser(t, clipboard, async () => {
@@ -141,6 +211,50 @@ test('clipboard absence and rejection retain error details and explain manual co
       app.dispose();
     }));
   }
+});
+
+test('a changed diagnostic resets disclosure and copy state while retaining the supplied observation time', async t => {
+  const oldCopy = Promise.withResolvers();
+  const writes = [];
+  await withBrowser(t, { writeText(text) { writes.push(text); return writes.length === 1 ? oldCopy.promise : Promise.resolve(); } }, async () => {
+    const app = fixture();
+    const observedAt = '2026-11-09T11:45:02.966Z';
+    const first = { observedAt, context: { stage: 'Styles', check: 'layout.frame', result: 'Not found' } };
+    let view = app.render(first);
+    disclosure(view).props.onClick();
+    view = app.render();
+    assert.equal(disclosure(view).props['aria-expanded'], true);
+    const pending = copyButton(view).props.onClick();
+    assert.equal(copyButton(app.render()).props.disabled, true);
+    const next = { observedAt, context: { stage: 'Frame', check: 'frame.display', result: 'Unsupported' } };
+    view = app.render(next);
+    assert.equal(disclosure(view).props['aria-expanded'], false);
+    assert.equal(copyButton(view).props.disabled, false);
+    oldCopy.resolve(); await pending;
+    assert.equal(status(app.render()), undefined, 'The old copy must not mark the new diagnostic as copied.');
+    await copyButton(app.render()).props.onClick();
+    assert.ok(writes.at(-1).includes(`Observed: ${observedAt}`));
+    assert.ok(writes.at(-1).includes('Check: frame.display'));
+    assert.ok(!writes.at(-1).includes('Check: layout.frame'));
+    disclosure(app.render()).props.onClick();
+    const stable = descendants(app.render()).find(node => node.type === 'pre').props.children[0];
+    assert.equal(descendants(app.render(next)).find(node => node.type === 'pre').props.children[0], stable);
+    assert.equal(disclosure(app.render()).props['aria-expanded'], true);
+    app.dispose();
+  });
+});
+
+test('effect cleanup and restart reject late clipboard completion from the previous effect', async t => {
+  const gate = Promise.withResolvers();
+  await withBrowser(t, { writeText: () => gate.promise }, async () => {
+    const app = fixture();
+    const pending = copyButton(app.render()).props.onClick();
+    app.restartEffects();
+    gate.resolve(); await pending;
+    assert.equal(status(app.render()), undefined);
+    assert.equal(copyButton(app.render()).props.disabled, false);
+    app.dispose();
+  });
 });
 
 test('pending copies cannot overlap and completion after disposal cannot update feedback', async t => {

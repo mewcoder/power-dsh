@@ -11,12 +11,24 @@ export function sanitizeDiagnosticText(text: string): string {
     .slice(0, 2048);
 }
 
+export interface DiagnosticContext {
+  stage?: string;
+  check?: string;
+  result?: string;
+  expected?: string;
+  actual?: string;
+  state?: string;
+  recovery?: string;
+}
+
 export interface ErrorDiagnostic {
   code: string;
   operation: string;
   message: string;
   observedAt: string;
   version?: string;
+  platform?: 'win32' | 'darwin' | 'linux';
+  context?: DiagnosticContext;
 }
 
 /** Build copyable diagnostic text only from selected fields, never arbitrary error data. */
@@ -27,5 +39,15 @@ export function diagnosticReport(info: ErrorDiagnostic): string {
     `Message: ${sanitizeDiagnosticText(info.message)}`,
     `Observed: ${sanitizeDiagnosticText(info.observedAt)}`,
     ...(info.version ? [`DSH: ${sanitizeDiagnosticText(info.version)}`] : []),
+    ...(info.platform ? [`Platform: ${sanitizeDiagnosticText(info.platform)}`] : []),
+    ...([
+      ['Stage', info.context?.stage],
+      ['Check', info.context?.check],
+      ['Result', info.context?.result],
+      ['Expected', info.context?.expected],
+      ['Actual', info.context?.actual],
+      ['State', info.context?.state],
+      ['Recovery', info.context?.recovery],
+    ] as const).flatMap(([label, value]) => typeof value === 'string' ? [`${label}: ${sanitizeDiagnosticText(value)}`] : []),
   ].join('\n');
 }

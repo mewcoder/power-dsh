@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mount, descendants } from '../helpers/client-fixture.mjs';
+import { createSettingsPage } from '../../src/shared/client/settings-shell.ts';
 
 test('page feedback appears before settings controls and distinguishes failures from passive states', async t => {
   for (const state of [
@@ -44,6 +45,44 @@ test('failed settings saves keep feedback beside the control and associate it wi
     assert.equal(control().props['aria-checked'], false);
     assert.ok(!descendants(app.renderSettings()).some(node => node.props.className === 'power-dsh-notice'));
   } finally { app.unmount(); }
+});
+
+test('runtime diagnostics keep their cause and saved value while actual save failures take priority', async () => {
+  let cursor = 0;
+  const states = [];
+  const React = {
+    useId: () => 'runtime-settings',
+    useRef(value) { const i = cursor++; return states[i] ||= { current: value }; },
+    useState(value) { const i = cursor++; if (!(i in states)) states[i] = value;
+      return [states[i], next => { states[i] = next; }]; },
+  };
+  const runtime = { React, h: (type, props, ...children) => ({ type, props: { ...props, children } }),
+    useSnapshot: source => source.getSnapshot(), useMounted: () => ({ current: true }),
+    errorFeedback: props => ({ type: 'feedback', props: { ...props, role: 'alert' } }) };
+  const snapshot = { status: 'ready', writable: true, value: { flowingBackgroundEnabled: true } };
+  const issue = { message: 'Layout unavailable; the setting is unchanged.', code: 'PD-BACKGROUND-LAYOUT',
+    operation: 'flowing-background.attach', observedAt: '2026-11-09T11:45:02.966Z',
+    context: { stage: 'Style recognition', check: 'layout.frame', result: 'Not found' } };
+  const Page = createSettingsPage(runtime);
+  const props = { t: key => key, version: '0.2.2-rc.1', source: { getSnapshot: () => snapshot },
+    form: { set: async () => false }, features: [{ settings: [], useSettings: () => [{
+      field: 'flowingBackgroundEnabled', category: 'general', failure: issue,
+    }] }] };
+  const view = () => { cursor = 0; return descendants(Page(props)); };
+  const fault = () => view().find(node => node.props.role === 'alert');
+  assert.equal(fault().props.code, issue.code);
+  assert.equal(fault().props.operation, issue.operation);
+  assert.deepEqual(fault().props.context, issue.context);
+  assert.equal(fault().props.observedAt, issue.observedAt);
+  const control = view().find(node => node.props.role === 'switch');
+  assert.equal(control.props['aria-checked'], true);
+  assert.ok(control.props['aria-describedby'].includes(fault().props.id));
+  await control.props.onClick();
+  assert.equal(fault().props.code, 'PD-SETTINGS-SAVE');
+  assert.equal(fault().props.operation, 'settings.flowingBackgroundEnabled');
+  assert.equal(fault().props.context, undefined, 'The runtime cause must not be attributed to the failed save.');
+  assert.equal(fault().props.observedAt, undefined);
+  assert.equal(view().find(node => node.props.role === 'switch').props['aria-checked'], true);
 });
 
 test('settings route policy changes to their explicit injected Host methods', async () => {

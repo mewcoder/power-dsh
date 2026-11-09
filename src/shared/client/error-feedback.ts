@@ -1,4 +1,5 @@
 import { diagnosticReport, sanitizeDiagnosticText } from '../types/diagnostics.ts';
+import type { DiagnosticContext } from '../types/diagnostics.ts';
 import type { PublicPrimitives, ReactModule, Translate } from './types.ts';
 import type { CSSProperties, ReactElement } from 'react';
 
@@ -27,6 +28,8 @@ export interface ErrorFeedbackProps {
   message: string;
   code: string;
   operation: string;
+  context?: DiagnosticContext;
+  observedAt?: string;
   id?: string;
   placement?: 'page' | 'inline' | 'compact';
   className?: string;
@@ -38,31 +41,44 @@ export interface ErrorFeedbackProps {
 /** One visual treatment for product errors, with optional recovery and copyable details. */
 export function createErrorFeedback(React: ReactModule, Button: PublicPrimitives['Button']) {
   const h = React.createElement;
-  function ErrorDetails({ t, message, code, operation }: ErrorFeedbackProps) {
+  function ErrorDetails({ t, message, code, operation, context, observedAt: suppliedObservedAt }: ErrorFeedbackProps) {
     const [expanded, setExpanded] = React.useState(false);
     const panelId = React.useId();
     const [copyState, setCopyState] = React.useState<'idle' | 'pending' | 'copied' | 'failed'>('idle');
-    const [observedAt] = React.useState(() => new Date().toISOString());
+    const [mountedAt] = React.useState(() => new Date().toISOString());
+    const observedAt = suppliedObservedAt ?? mountedAt;
     const active = React.useRef(true);
+    const generation = React.useRef(0);
+    const pending = React.useRef(false);
     React.useEffect(() => {
       active.current = true;
-      return () => { active.current = false; };
+      pending.current = false;
+      setCopyState('idle');
+      return () => {
+        active.current = false;
+        generation.current++;
+        pending.current = false;
+      };
     }, []);
     const rawVersion = window.__DSH_BOOT__?.release?.version;
-    const report = diagnosticReport({ code, operation, message, observedAt,
+    const marker = typeof document !== 'undefined' ? document.documentElement?.getAttribute('data-platform') : null;
+    const platform = marker === 'win32' || marker === 'darwin' || marker === 'linux' ? marker : undefined;
+    const report = diagnosticReport({ code, operation, message, observedAt, context, platform,
       version: typeof rawVersion === 'string' ? rawVersion : undefined });
-    const pending = React.useRef(false);
     async function copy() {
       if (pending.current || !active.current) return;
+      const startedIn = generation.current;
       pending.current = true;
       setCopyState('pending');
       try {
         if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
         await navigator.clipboard.writeText(report);
-        if (active.current) setCopyState('copied');
+        if (active.current && generation.current === startedIn) setCopyState('copied');
       } catch {
-        if (active.current) setCopyState('failed');
-      } finally { pending.current = false; }
+        if (active.current && generation.current === startedIn) setCopyState('failed');
+      } finally {
+        if (generation.current === startedIn) pending.current = false;
+      }
     }
     return h('div', { className: 'power-dsh-error-details' },
       h(Button, { variant: 'ghost', size: 'sm', className: 'power-dsh-error-disclosure',
@@ -82,12 +98,15 @@ export function createErrorFeedback(React: ReactModule, Button: PublicPrimitives
   return function errorFeedback(props: ErrorFeedbackProps): ReactElement {
     const { t, code, operation, id, placement = 'inline', className = '', style, retry, disabled } = props;
     const message = sanitizeDiagnosticText(props.message);
+    const { context, observedAt } = props;
+    const diagnosticKey = JSON.stringify([code, operation, message, observedAt,
+      context?.stage, context?.check, context?.result, context?.expected, context?.actual, context?.state, context?.recovery]);
     return h('div', { id, role: 'alert', 'data-error-code': code,
       onClick: (event: import('react').MouseEvent<HTMLDivElement>) => event.stopPropagation(),
       className: `power-dsh-error power-dsh-feedback ${className}`.trim(), 'data-placement': placement, 'data-tone': 'error', style },
     message, h('style', null, styles),
     h('div', { className: 'power-dsh-error-actions', 'data-has-retry': Boolean(retry) },
-      h(ErrorDetails, { key: `${code}:${operation}:${message}`, t, message, code, operation }),
+      h(ErrorDetails, { key: diagnosticKey, t, message, code, operation, context, observedAt }),
       retry && h(Button, { variant: 'outline', size: 'sm', className: 'power-dsh-error-retry', disabled,
         onClick: retry }, t('retry'))));
   };

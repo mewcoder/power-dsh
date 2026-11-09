@@ -78,7 +78,7 @@ Mod 内按「通用」「界面」「增强」「精简」四个 Tab 顺序组�
 
 ## 状态提示与错误反馈
 
-全部功能遵循[错误处理规范](error-handling.md)，复用[共享错误反馈](../src/shared/client/error-feedback.ts)的摘要、错误信息展开与复制交互，不各自创建孤立样式或只显示「请重试」。详情的选字段、脱敏、恢复与生命周期由主规范统一维护；侧栏等紧凑入口保留自身容器，内部使用同一反馈组件。
+全部功能遵循[错误处理规范](error-handling.md)，复用[共享错误反馈](../src/shared/client/error-feedback.ts)的摘要、错误信息展开与复制交互，不各自创建孤立样式或只显示「请重试」。详情的选字段、脱敏、恢复与生命周期由主规范统一维护；设置保存与功能运行故障使用不同代码，功能诊断可附稳定检查标识、预期/实际结果、当前状态和适用恢复建议，复制报告便于 AI 与维护者定位；侧栏等紧凑入口保留自身容器，内部使用同一反馈组件。
 
 错误反馈参照 DSH `0.2.2-rc.1` 插件安装对话框的摘要／操作／展开详情层级与插件更新输出区域。页面错误采用单层设置卡片：`12px 14px` 内边距、`--dsw-radius-lg` 圆角、`--dsw-alias-settings-card-fill/stroke` 底色与 0.5px 描边；行内错误不额外套卡，紧凑侧栏反馈保留有界容器。摘要使用错误色，8px 下方同一操作行左侧为「错误信息」，右侧为可选「重试」；使用公共 `Button` 的 sm（28px、12px／18px），详情为 ghost、重试与复制为 outline，不覆盖原生按钮材质。详情按钮使用 `aria-expanded/aria-controls`、14px 原生 Regular 下箭头，展开旋转 180°，减弱动态效果时关闭过渡。诊断默认收起，展开后以无描边的 `--dsw-alias-bg-module-platform` 中性区域承载，12px 圆角与 `10px 12px` 内边距，正文 12px／18px 等宽、次要文字色、最大高度 200px 并可滚动和选择；长行换行，底部细线分隔的操作区右对齐复制，复制结果在其左侧显示。避免浏览器默认 summary 标记与卡片套卡片。参照 [InstallDialog](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-plugin-manager/src/client/PluginManagerPage.tsx)、[updateOutput 样式](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-plugin-manager/src/client/PluginManagerPage.module.css)及公共 [Button](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-primitives/src/Button.tsx)，均已核对当前桌面安装包；不导入官方功能插件内部组件。
 

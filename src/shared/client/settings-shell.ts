@@ -61,13 +61,17 @@ export function createSettingsPage(runtime: ClientRuntime) {
       const control = `${id}-${field}`;
       const busy = saving?.field === field;
       const checked = busy ? saving.value === true : snapshot.value?.[field] === true;
-      const fieldError = error?.field === field ? error.message : setting.error;
+      const saveError = error?.field === field ? error.message : undefined;
+      const failure = saveError ? undefined : setting.failure;
+      const fieldError = saveError ?? failure?.message ?? setting.error;
       return h('div', { className: 'power-dsh-setting-row', key: field },
         h('div', { className: 'power-dsh-setting-copy' },
           h('div', { id: `${control}-label`, className: 'power-dsh-setting-label' }, t(field)),
           h('div', { id: `${control}-description`, className: 'power-dsh-description' }, t(descriptionKey ?? '')),
           fieldError && errorFeedback({ t, id: `${control}-error`, message: fieldError,
-             code: 'PD-SETTINGS-SAVE', operation: `settings.${field}` })),
+             code: saveError ? 'PD-SETTINGS-SAVE' : failure?.code ?? 'PD-SETTINGS-RUNTIME',
+             operation: failure?.operation ?? `settings.${field}`,
+             context: failure?.context, observedAt: failure?.observedAt })),
         h('button', {
           id: control, type: 'button', role: 'switch', className: 'power-dsh-switch',
           'aria-checked': checked,

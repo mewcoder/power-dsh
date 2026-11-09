@@ -1,26 +1,49 @@
 import { startAnimation } from './animation.ts';
 import { styles } from './styles.ts';
 
-export type AttachmentStatus = 'attached' | 'unavailable';
+interface FailureResults {
+  styles: 'missing' | 'ambiguous';
+  frame: 'missing' | 'ambiguous' | 'hidden' | 'unsupported' | 'changed';
+  initialization: 'failed';
+  environment: 'missing' | 'unsupported';
+}
+export type AttachmentFailure<S extends keyof FailureResults = keyof FailureResults> = {
+  [K in S]: {
+    state: 'unavailable'; stage: K; result: FailureResults[K];
+    check: string; expected?: string; actual?: string;
+  }
+}[S];
+export type AttachmentStatus = { state: 'attached' } | AttachmentFailure;
 interface NativeClasses { frame: string; sidebarCol: string; centerCol: string; sidebarRoot: string; scrollFade: string | null; }
+const failure = <S extends keyof FailureResults>(stage: S, check: string, result: FailureResults[S],
+  expected?: string, actual?: string) =>
+  ({ state: 'unavailable' as const, stage, check, result, ...(expected === undefined ? {} : { expected, actual }) });
 
 /** CSS-module hashes differ between npm and Desktop builds of the same version. */
-function nativeClasses(doc: Document): NativeClasses | null {
-  const read = (module: string, name: string) => {
+function nativeClasses(doc: Document): { classes: NativeClasses; failure?: never } | { classes: null; failure: AttachmentFailure } {
+  let issue: AttachmentFailure | null = null;
+  const read = (owner: 'layout' | 'sidebar', name: string, required = true) => {
+    const module = owner === 'layout' ? '@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css'
+      : '@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css';
     const sheets = doc.querySelectorAll<HTMLStyleElement>(`style[data-plugin-css="${module}"]`);
-    if (sheets.length !== 1) return null;
+    if (sheets.length !== 1) {
+      if (required) issue ??= failure('styles', `${owner}.stylesheet`, sheets.length ? 'ambiguous' : 'missing', '1', String(sheets.length));
+      return null;
+    }
     const pattern = new RegExp(`\\.([A-Za-z0-9_-]+_${name})(?![A-Za-z0-9_-])`, 'g');
     const names = [...new Set([...(sheets[0].textContent ?? '').matchAll(pattern)].map(match => match[1]))];
-    return names.length === 1 ? names[0] : null;
+    if (names.length === 1) return names[0];
+    if (required) issue ??= failure('styles', `${owner}.${name}`, names.length ? 'ambiguous' : 'missing', '1', String(names.length));
+    return null;
   };
-  const layout = '@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css';
-  const frame = read(layout, 'frame');
-  const sidebarCol = read(layout, 'sidebarCol');
-  const centerCol = read(layout, 'centerCol');
-  const sidebarRoot = read('@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css', 'root');
-  const scrollFade = read('@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css', 'scrollFade');
+  const frame = read('layout', 'frame');
+  const sidebarCol = read('layout', 'sidebarCol');
+  const centerCol = read('layout', 'centerCol');
+  const sidebarRoot = read('sidebar', 'root');
+  const scrollFade = read('sidebar', 'scrollFade', false);
   return frame && sidebarCol && centerCol && sidebarRoot
-    ? { frame, sidebarCol, centerCol, sidebarRoot, scrollFade } : null;
+    ? { classes: { frame, sidebarCol, centerCol, sidebarRoot, scrollFade } }
+    : { classes: null, failure: issue! };
 }
 
 /** Restore a declaration only while it still belongs to this attachment. */
@@ -46,35 +69,48 @@ export function watchBackground(
   let current: { target: HTMLElement; layer: HTMLDivElement; refresh(classes: NativeClasses): void; dispose(): void } | null = null;
   let disposed = false;
   let failedTarget: HTMLElement | null = null;
-  const frames = (classes: NativeClasses) => [...new Set([...doc.querySelectorAll<HTMLElement>('[data-shell-overlay]')]
-    .map(overlay => overlay.parentElement).filter((target): target is HTMLElement => target !== null
-      && target.isConnected && target.clientWidth > 0 && target.clientHeight > 0
-      && win.getComputedStyle(target).position === 'relative'
-      && win.getComputedStyle(target).display === 'grid'
-      && target.querySelector(':scope > [data-shell-bottom]') !== null
-      && target.querySelector(':scope > [data-rightbar-col]') !== null
-      && target.matches(`.${classes.frame}`)
-      && target.querySelector(`:scope > .${classes.sidebarCol}`) !== null
-      && target.querySelector(`:scope > .${classes.centerCol}`) !== null))];
+  const findFrame = (classes: NativeClasses): { target: HTMLElement; failure?: never } | { target: null; failure: AttachmentFailure } => {
+    const roots = [...new Set([...doc.querySelectorAll<HTMLElement>('[data-shell-overlay]')]
+      .map(overlay => overlay.parentElement).filter((target): target is HTMLElement => target !== null
+        && target.isConnected && target.matches(`.${classes.frame}`)))];
+    const visible = roots.filter(target => target.clientWidth > 0 && target.clientHeight > 0);
+    if (visible.length !== 1) return { target: null, failure: failure('frame', 'app-frame',
+      visible.length > 1 ? 'ambiguous' : roots.length ? 'hidden' : 'missing', '1 visible frame', String(visible.length)) };
+    const target = visible[0];
+    const computed = win.getComputedStyle(target);
+    if (computed.position !== 'relative') return { target: null, failure: failure('frame', 'frame.position', 'unsupported', 'relative', ['static', 'absolute', 'fixed', 'sticky'].includes(computed.position) ? computed.position : 'other') };
+    if (computed.display !== 'grid') return { target: null, failure: failure('frame', 'frame.display', 'unsupported', 'grid', ['flex', 'block', 'none', 'inline', 'contents'].includes(computed.display) ? computed.display : 'other') };
+    for (const [check, selector] of [
+      ['frame.bottom', '[data-shell-bottom]'], ['frame.rightbar', '[data-rightbar-col]'],
+      ['frame.sidebar', `.${classes.sidebarCol}`], ['frame.center', `.${classes.centerCol}`],
+    ]) {
+      if (!target.querySelector(`:scope > ${selector}`)) return { target: null, failure: failure('frame', check, 'missing', '1 direct child', '0') };
+    }
+    return { target };
+  };
   const clear = () => { current?.dispose(); current = null; };
   const sync = () => {
     if (disposed) return;
-    const classes = nativeClasses(doc);
-    const candidates = classes ? frames(classes) : [];
-    const target = candidates.length === 1 ? candidates[0] : null;
-    if (current?.target === target && current?.layer.parentElement === target) {
+    const mapping = nativeClasses(doc);
+    if (!mapping.classes) { clear(); failedTarget = null; report(mapping.failure); return; }
+    const classes = mapping.classes;
+    const frame = findFrame(classes);
+    if (!frame.target) { clear(); failedTarget = null; report(frame.failure); return; }
+    const target = frame.target;
+    if (current?.target === target && current.layer.parentElement === target) {
+      if (win.getComputedStyle(target).isolation !== 'isolate') {
+        clear(); failedTarget = target; report(failure('frame', 'frame.isolation', 'changed', 'isolate', 'not isolated')); return;
+      }
       try {
-        if (!target || !classes || win.getComputedStyle(target).isolation !== 'isolate') throw new Error('Frame changed');
         current.refresh(classes);
         return;
       } catch {
-        clear(); failedTarget = target; report('unavailable'); return;
+        clear(); failedTarget = target; report(failure('initialization', 'attachment.refresh', 'failed', 'completed', 'exception')); return;
       }
     }
-    if (target && target === failedTarget) return;
+    if (target === failedTarget) return;
     failedTarget = null;
     clear();
-    if (!target || !classes) { report('unavailable'); return; }
     const restores: Array<() => void> = [];
     const surfaces = new Map<HTMLElement, () => void>();
     const fades = new Map<HTMLElement, () => void>();
@@ -139,14 +175,17 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
       target.appendChild(layer);
       stop = animate(canvas, win, doc, target);
       current = { target, layer, refresh, dispose };
-      report('attached');
+      report({ state: 'attached' });
     } catch {
       // Partial attachment never leaves a front layer or a retry driven by rollback mutations.
-      dispose(); failedTarget = target; report('unavailable');
+      dispose(); failedTarget = target; report(failure('initialization', 'attachment.initialize', 'failed', 'completed', 'exception'));
     }
   };
-  if (!doc.body || typeof win.MutationObserver !== 'function') {
-    report('unavailable'); return () => {};
+  if (!doc.body) {
+    report(failure('environment', 'document.body', 'missing', 'available', 'missing')); return () => {};
+  }
+  if (typeof win.MutationObserver !== 'function') {
+    report(failure('environment', 'mutation-observer', 'unsupported', 'available', 'missing')); return () => {};
   }
   const observer = new win.MutationObserver(sync);
   if (doc.head) observer.observe(doc.head, { childList: true, subtree: true, characterData: true });

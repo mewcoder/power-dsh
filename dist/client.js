@@ -13,7 +13,17 @@
 			`Operation: ${sanitizeDiagnosticText(info.operation)}`,
 			`Message: ${sanitizeDiagnosticText(info.message)}`,
 			`Observed: ${sanitizeDiagnosticText(info.observedAt)}`,
-			...info.version ? [`DSH: ${sanitizeDiagnosticText(info.version)}`] : []
+			...info.version ? [`DSH: ${sanitizeDiagnosticText(info.version)}`] : [],
+			...info.platform ? [`Platform: ${sanitizeDiagnosticText(info.platform)}`] : [],
+			...[
+				["Stage", info.context?.stage],
+				["Check", info.context?.check],
+				["Result", info.context?.result],
+				["Expected", info.context?.expected],
+				["Actual", info.context?.actual],
+				["State", info.context?.state],
+				["Recovery", info.context?.recovery]
+			].flatMap(([label, value]) => typeof value === "string" ? [`${label}: ${sanitizeDiagnosticText(value)}`] : [])
 		].join("\n");
 	}
 
@@ -40,39 +50,49 @@
 	/** One visual treatment for product errors, with optional recovery and copyable details. */
 	function createErrorFeedback(React, Button) {
 		const h = React.createElement;
-		function ErrorDetails({ t, message, code, operation }) {
+		function ErrorDetails({ t, message, code, operation, context, observedAt: suppliedObservedAt }) {
 			const [expanded, setExpanded] = React.useState(false);
 			const panelId = React.useId();
 			const [copyState, setCopyState] = React.useState("idle");
-			const [observedAt] = React.useState(() => (/* @__PURE__ */ new Date()).toISOString());
+			const [mountedAt] = React.useState(() => (/* @__PURE__ */ new Date()).toISOString());
+			const observedAt = suppliedObservedAt ?? mountedAt;
 			const active = React.useRef(true);
+			const generation = React.useRef(0);
+			const pending = React.useRef(false);
 			React.useEffect(() => {
 				active.current = true;
+				pending.current = false;
+				setCopyState("idle");
 				return () => {
 					active.current = false;
+					generation.current++;
+					pending.current = false;
 				};
 			}, []);
 			const rawVersion = window.__DSH_BOOT__?.release?.version;
+			const marker = typeof document !== "undefined" ? document.documentElement?.getAttribute("data-platform") : null;
 			const report = diagnosticReport({
 				code,
 				operation,
 				message,
 				observedAt,
+				context,
+				platform: marker === "win32" || marker === "darwin" || marker === "linux" ? marker : void 0,
 				version: typeof rawVersion === "string" ? rawVersion : void 0
 			});
-			const pending = React.useRef(false);
 			async function copy() {
 				if (pending.current || !active.current) return;
+				const startedIn = generation.current;
 				pending.current = true;
 				setCopyState("pending");
 				try {
 					if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
 					await navigator.clipboard.writeText(report);
-					if (active.current) setCopyState("copied");
+					if (active.current && generation.current === startedIn) setCopyState("copied");
 				} catch {
-					if (active.current) setCopyState("failed");
+					if (active.current && generation.current === startedIn) setCopyState("failed");
 				} finally {
-					pending.current = false;
+					if (generation.current === startedIn) pending.current = false;
 				}
 			}
 			return h("div", { className: "power-dsh-error-details" }, h(Button, {
@@ -111,6 +131,20 @@
 		return function errorFeedback(props) {
 			const { t, code, operation, id, placement = "inline", className = "", style, retry, disabled } = props;
 			const message = sanitizeDiagnosticText(props.message);
+			const { context, observedAt } = props;
+			const diagnosticKey = JSON.stringify([
+				code,
+				operation,
+				message,
+				observedAt,
+				context?.stage,
+				context?.check,
+				context?.result,
+				context?.expected,
+				context?.actual,
+				context?.state,
+				context?.recovery
+			]);
 			return h("div", {
 				id,
 				role: "alert",
@@ -124,11 +158,13 @@
 				className: "power-dsh-error-actions",
 				"data-has-retry": Boolean(retry)
 			}, h(ErrorDetails, {
-				key: `${code}:${operation}:${message}`,
+				key: diagnosticKey,
 				t,
 				message,
 				code,
-				operation
+				operation,
+				context,
+				observedAt
 			}), retry && h(Button, {
 				variant: "outline",
 				size: "sm",
@@ -353,7 +389,9 @@
 				const control = `${id}-${field}`;
 				const busy = saving?.field === field;
 				const checked = busy ? saving.value === true : snapshot.value?.[field] === true;
-				const fieldError = error?.field === field ? error.message : setting.error;
+				const saveError = error?.field === field ? error.message : void 0;
+				const failure = saveError ? void 0 : setting.failure;
+				const fieldError = saveError ?? failure?.message ?? setting.error;
 				return h("div", {
 					className: "power-dsh-setting-row",
 					key: field
@@ -367,8 +405,10 @@
 					t,
 					id: `${control}-error`,
 					message: fieldError,
-					code: "PD-SETTINGS-SAVE",
-					operation: `settings.${field}`
+					code: saveError ? "PD-SETTINGS-SAVE" : failure?.code ?? "PD-SETTINGS-RUNTIME",
+					operation: failure?.operation ?? `settings.${field}`,
+					context: failure?.context,
+					observedAt: failure?.observedAt
 				})), h("button", {
 					id: control,
 					type: "button",
@@ -4512,28 +4552,47 @@ void main() {
 `;
 
 // src/features/flowing-background/attachment.ts
-/** CSS-module hashes differ between npm and Desktop builds of the same version. */
+	const failure = (stage, check, result, expected, actual) => ({
+		state: "unavailable",
+		stage,
+		check,
+		result,
+		...expected === void 0 ? {} : {
+			expected,
+			actual
+		}
+	});
+	/** CSS-module hashes differ between npm and Desktop builds of the same version. */
 	function nativeClasses(doc) {
-		const read = (module, name) => {
+		let issue = null;
+		const read = (owner, name, required = true) => {
+			const module = owner === "layout" ? "@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css" : "@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css";
 			const sheets = doc.querySelectorAll(`style[data-plugin-css="${module}"]`);
-			if (sheets.length !== 1) return null;
+			if (sheets.length !== 1) {
+				if (required) issue ??= failure("styles", `${owner}.stylesheet`, sheets.length ? "ambiguous" : "missing", "1", String(sheets.length));
+				return null;
+			}
 			const pattern = new RegExp(`\\.([A-Za-z0-9_-]+_${name})(?![A-Za-z0-9_-])`, "g");
 			const names = [...new Set([...(sheets[0].textContent ?? "").matchAll(pattern)].map((match) => match[1]))];
-			return names.length === 1 ? names[0] : null;
+			if (names.length === 1) return names[0];
+			if (required) issue ??= failure("styles", `${owner}.${name}`, names.length ? "ambiguous" : "missing", "1", String(names.length));
+			return null;
 		};
-		const layout = "@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css";
-		const frame = read(layout, "frame");
-		const sidebarCol = read(layout, "sidebarCol");
-		const centerCol = read(layout, "centerCol");
-		const sidebarRoot = read("@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css", "root");
-		const scrollFade = read("@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css", "scrollFade");
-		return frame && sidebarCol && centerCol && sidebarRoot ? {
+		const frame = read("layout", "frame");
+		const sidebarCol = read("layout", "sidebarCol");
+		const centerCol = read("layout", "centerCol");
+		const sidebarRoot = read("sidebar", "root");
+		const scrollFade = read("sidebar", "scrollFade", false);
+		return frame && sidebarCol && centerCol && sidebarRoot ? { classes: {
 			frame,
 			sidebarCol,
 			centerCol,
 			sidebarRoot,
 			scrollFade
-		} : null;
+		} } : {
+			classes: null,
+			failure: issue
+		};
 	}
 	/** Restore a declaration only while it still belongs to this attachment. */
 	function change(element, property, value, priority = "important") {
@@ -4551,33 +4610,87 @@ void main() {
 		let current = null;
 		let disposed = false;
 		let failedTarget = null;
-		const frames = (classes) => [...new Set([...doc.querySelectorAll("[data-shell-overlay]")].map((overlay) => overlay.parentElement).filter((target) => target !== null && target.isConnected && target.clientWidth > 0 && target.clientHeight > 0 && win.getComputedStyle(target).position === "relative" && win.getComputedStyle(target).display === "grid" && target.querySelector(":scope > [data-shell-bottom]") !== null && target.querySelector(":scope > [data-rightbar-col]") !== null && target.matches(`.${classes.frame}`) && target.querySelector(`:scope > .${classes.sidebarCol}`) !== null && target.querySelector(`:scope > .${classes.centerCol}`) !== null))];
+		const findFrame = (classes) => {
+			const roots = [...new Set([...doc.querySelectorAll("[data-shell-overlay]")].map((overlay) => overlay.parentElement).filter((target) => target !== null && target.isConnected && target.matches(`.${classes.frame}`)))];
+			const visible = roots.filter((target) => target.clientWidth > 0 && target.clientHeight > 0);
+			if (visible.length !== 1) return {
+				target: null,
+				failure: failure("frame", "app-frame", visible.length > 1 ? "ambiguous" : roots.length ? "hidden" : "missing", "1 visible frame", String(visible.length))
+			};
+			const target = visible[0];
+			const computed = win.getComputedStyle(target);
+			if (computed.position !== "relative") return {
+				target: null,
+				failure: failure("frame", "frame.position", "unsupported", "relative", [
+					"static",
+					"absolute",
+					"fixed",
+					"sticky"
+				].includes(computed.position) ? computed.position : "other")
+			};
+			if (computed.display !== "grid") return {
+				target: null,
+				failure: failure("frame", "frame.display", "unsupported", "grid", [
+					"flex",
+					"block",
+					"none",
+					"inline",
+					"contents"
+				].includes(computed.display) ? computed.display : "other")
+			};
+			for (const [check, selector] of [
+				["frame.bottom", "[data-shell-bottom]"],
+				["frame.rightbar", "[data-rightbar-col]"],
+				["frame.sidebar", `.${classes.sidebarCol}`],
+				["frame.center", `.${classes.centerCol}`]
+			]) if (!target.querySelector(`:scope > ${selector}`)) return {
+				target: null,
+				failure: failure("frame", check, "missing", "1 direct child", "0")
+			};
+			return { target };
+		};
 		const clear = () => {
 			current?.dispose();
 			current = null;
 		};
 		const sync = () => {
 			if (disposed) return;
-			const classes = nativeClasses(doc);
-			const candidates = classes ? frames(classes) : [];
-			const target = candidates.length === 1 ? candidates[0] : null;
-			if (current?.target === target && current?.layer.parentElement === target) try {
-				if (!target || !classes || win.getComputedStyle(target).isolation !== "isolate") throw new Error("Frame changed");
-				current.refresh(classes);
-				return;
-			} catch {
+			const mapping = nativeClasses(doc);
+			if (!mapping.classes) {
 				clear();
-				failedTarget = target;
-				report("unavailable");
+				failedTarget = null;
+				report(mapping.failure);
 				return;
 			}
-			if (target && target === failedTarget) return;
+			const classes = mapping.classes;
+			const frame = findFrame(classes);
+			if (!frame.target) {
+				clear();
+				failedTarget = null;
+				report(frame.failure);
+				return;
+			}
+			const target = frame.target;
+			if (current?.target === target && current.layer.parentElement === target) {
+				if (win.getComputedStyle(target).isolation !== "isolate") {
+					clear();
+					failedTarget = target;
+					report(failure("frame", "frame.isolation", "changed", "isolate", "not isolated"));
+					return;
+				}
+				try {
+					current.refresh(classes);
+					return;
+				} catch {
+					clear();
+					failedTarget = target;
+					report(failure("initialization", "attachment.refresh", "failed", "completed", "exception"));
+					return;
+				}
+			}
+			if (target === failedTarget) return;
 			failedTarget = null;
 			clear();
-			if (!target || !classes) {
-				report("unavailable");
-				return;
-			}
 			const restores = [];
 			const surfaces = /* @__PURE__ */ new Map();
 			const fades = /* @__PURE__ */ new Map();
@@ -4644,15 +4757,19 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 					refresh,
 					dispose
 				};
-				report("attached");
+				report({ state: "attached" });
 			} catch {
 				dispose();
 				failedTarget = target;
-				report("unavailable");
+				report(failure("initialization", "attachment.initialize", "failed", "completed", "exception"));
 			}
 		};
-		if (!doc.body || typeof win.MutationObserver !== "function") {
-			report("unavailable");
+		if (!doc.body) {
+			report(failure("environment", "document.body", "missing", "available", "missing"));
+			return () => {};
+		}
+		if (typeof win.MutationObserver !== "function") {
+			report(failure("environment", "mutation-observer", "unsupported", "available", "missing"));
 			return () => {};
 		}
 		const observer = new win.MutationObserver(sync);
@@ -4685,19 +4802,123 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		};
 	}
 
+// src/features/flowing-background/diagnostics.ts
+	const frameCopy = {
+		missing: {
+			reason: "flowingBackgroundFrameMissing",
+			recovery: "flowingBackgroundRecoveryWait"
+		},
+		hidden: {
+			reason: "flowingBackgroundFrameHidden",
+			recovery: "flowingBackgroundRecoveryWait"
+		},
+		ambiguous: {
+			reason: "flowingBackgroundFrameAmbiguous",
+			recovery: "flowingBackgroundRecoveryUpdate"
+		},
+		unsupported: {
+			reason: "flowingBackgroundFrameUnsupported",
+			recovery: "flowingBackgroundRecoveryUpdate"
+		},
+		changed: {
+			reason: "flowingBackgroundFrameChanged",
+			recovery: "flowingBackgroundRecoveryRetry"
+		}
+	};
+	const resultLabels = {
+		missing: "flowingBackgroundResultMissing",
+		ambiguous: "flowingBackgroundResultAmbiguous",
+		hidden: "flowingBackgroundResultHidden",
+		unsupported: "flowingBackgroundResultUnsupported",
+		changed: "flowingBackgroundResultChanged",
+		failed: "flowingBackgroundResultFailed"
+	};
+	const strategies = {
+		styles: {
+			code: "PD-BACKGROUND-LAYOUT",
+			stage: "flowingBackgroundStageStyles",
+			resolve(result) {
+				if (result === "missing") return {
+					reason: "flowingBackgroundStylesMissing",
+					recovery: "flowingBackgroundRecoveryWait"
+				};
+				return {
+					reason: "flowingBackgroundStylesAmbiguous",
+					recovery: "flowingBackgroundRecoveryUpdate"
+				};
+			}
+		},
+		frame: {
+			code: "PD-BACKGROUND-LAYOUT",
+			stage: "flowingBackgroundStageFrame",
+			resolve: (result) => frameCopy[result]
+		},
+		initialization: {
+			code: "PD-BACKGROUND-INIT",
+			stage: "flowingBackgroundStageInitialization",
+			resolve: () => ({
+				reason: "flowingBackgroundInitializationFailed",
+				recovery: "flowingBackgroundRecoveryRetry"
+			})
+		},
+		environment: {
+			code: "PD-BACKGROUND-ENVIRONMENT",
+			stage: "flowingBackgroundStageEnvironment",
+			resolve: () => ({
+				reason: "flowingBackgroundEnvironmentUnavailable",
+				recovery: "flowingBackgroundRecoveryUpdate"
+			})
+		}
+	};
+	/** Compare only the authored evidence used to identify an observed background fault. */
+	function sameFailure(left, right) {
+		return left.stage === right.stage && left.check === right.check && left.result === right.result && left.expected === right.expected && left.actual === right.actual;
+	}
+	/** Select a stage strategy, then assemble localized feedback and stable copyable evidence. */
+	function presentFailure(issue, observedAt, t) {
+		const strategy = strategies[issue.stage];
+		const copy = strategy.resolve(issue.result);
+		return {
+			message: `${t("flowingBackgroundLayoutUnavailable")} ${t(copy.reason)} ${t(copy.recovery)}`,
+			code: strategy.code,
+			operation: "flowing-background.attach",
+			observedAt,
+			context: {
+				stage: `${issue.stage} (${t(strategy.stage)})`,
+				check: issue.check,
+				result: `${issue.result} (${t(resultLabels[issue.result])})`,
+				expected: issue.expected,
+				actual: issue.actual,
+				state: t("flowingBackgroundStatePreserved"),
+				recovery: t(copy.recovery)
+			}
+		};
+	}
+
 // src/features/flowing-background/client.ts
 	function createClientFeature(runtime, env) {
 		const { React, h, observable, useSnapshot } = runtime;
-		let unavailable = false;
-		const attachment = observable(() => unavailable);
+		let fault = null;
+		const attachment = observable(() => fault);
 		function BackgroundController() {
-			React.useLayoutEffect(() => watchBackground((status) => {
-				const next = status === "unavailable";
-				if (unavailable !== next) {
-					unavailable = next;
-					attachment.notify();
-				}
-			}), []);
+			React.useLayoutEffect(() => {
+				let firstReport = true;
+				return watchBackground((status) => {
+					if (status.state === "attached") {
+						if (fault) {
+							fault = null;
+							attachment.notify();
+						}
+					} else if (firstReport || !fault || !sameFailure(fault.issue, status)) {
+						fault = {
+							issue: status,
+							observedAt: (/* @__PURE__ */ new Date()).toISOString()
+						};
+						attachment.notify();
+					}
+					firstReport = false;
+				});
+			}, []);
 			return null;
 		}
 		function Background() {
@@ -4716,9 +4937,10 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			settings: [setting],
 			useSettings({ snapshot }) {
 				const failed = useSnapshot(attachment);
+				if (!failed || snapshot.value?.flowingBackgroundEnabled !== true) return [setting];
 				return [{
 					...setting,
-					error: failed && snapshot.value?.flowingBackgroundEnabled === true ? env.t("flowingBackgroundLayoutUnavailable") : void 0
+					failure: presentFailure(failed.issue, failed.observedAt, env.t)
 				}];
 			}
 		};
@@ -4738,12 +4960,58 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		en: {
 			flowingBackgroundEnabled: "Homepage flowing background",
 			flowingBackgroundDescription: "Add a softly flowing blue gradient to the interface",
-			flowingBackgroundLayoutUnavailable: "The application layout could not be adapted. The background stays hidden; the native interface is preserved. Toggle the background off and on to retry."
+			flowingBackgroundLayoutUnavailable: "The background could not be displayed. The native interface is preserved.",
+			flowingBackgroundStageStyles: "Style recognition",
+			flowingBackgroundStageFrame: "Application layout checks",
+			flowingBackgroundStageInitialization: "Background initialization",
+			flowingBackgroundStageEnvironment: "Browser capabilities",
+			flowingBackgroundStylesMissing: "Required application styles have not been identified.",
+			flowingBackgroundStylesAmbiguous: "Required application styles could not be identified uniquely.",
+			flowingBackgroundFrameMissing: "A required application layout element was not found.",
+			flowingBackgroundFrameHidden: "The application frame has no visible area.",
+			flowingBackgroundFrameAmbiguous: "More than one application frame was found.",
+			flowingBackgroundFrameUnsupported: "The application layout does not meet the background requirements.",
+			flowingBackgroundFrameChanged: "The application frame styles changed after the background was attached.",
+			flowingBackgroundInitializationFailed: "An unexpected error occurred while preparing the background.",
+			flowingBackgroundEnvironmentUnavailable: "A required browser capability or document element is unavailable.",
+			flowingBackgroundResultMissing: "Not found",
+			flowingBackgroundResultAmbiguous: "Not unique",
+			flowingBackgroundResultHidden: "No visible area",
+			flowingBackgroundResultUnsupported: "Unsupported",
+			flowingBackgroundResultChanged: "Changed after attachment",
+			flowingBackgroundResultFailed: "Initialization failed",
+			flowingBackgroundStatePreserved: "The saved background setting is unchanged. The background is hidden and the native interface is preserved.",
+			flowingBackgroundRecoveryWait: "Checks resume automatically when the page layout or styles change. If the problem persists after loading, update PowerDSH and reload the interface; copy the error information if it still fails.",
+			flowingBackgroundRecoveryUpdate: "Update PowerDSH and reload the interface. If the problem persists, copy the error information for a bug report.",
+			flowingBackgroundRecoveryRetry: "Turn the background off and on to retry. If the problem persists, copy the error information for a bug report."
 		},
 		zh: {
 			flowingBackgroundEnabled: "官网流动背景",
 			flowingBackgroundDescription: "为界面添加柔和流动的蓝色渐变",
-			flowingBackgroundLayoutUnavailable: "未能适配应用布局，背景已隐藏并保留原生界面。关闭后重新开启官网流动背景可重试。"
+			flowingBackgroundLayoutUnavailable: "背景未能显示，已保留原生界面。",
+			flowingBackgroundStageStyles: "样式识别",
+			flowingBackgroundStageFrame: "应用布局检查",
+			flowingBackgroundStageInitialization: "背景初始化",
+			flowingBackgroundStageEnvironment: "浏览器能力检查",
+			flowingBackgroundStylesMissing: "尚未识别到必需的应用样式。",
+			flowingBackgroundStylesAmbiguous: "无法唯一识别必需的应用样式。",
+			flowingBackgroundFrameMissing: "未找到必需的应用布局元素。",
+			flowingBackgroundFrameHidden: "应用框架当前没有可见区域。",
+			flowingBackgroundFrameAmbiguous: "检测到多个应用框架，无法确认背景目标。",
+			flowingBackgroundFrameUnsupported: "当前应用布局不符合背景挂载要求。",
+			flowingBackgroundFrameChanged: "背景挂载后，应用框架样式发生了变化。",
+			flowingBackgroundInitializationFailed: "准备背景时发生了意外错误。",
+			flowingBackgroundEnvironmentUnavailable: "当前缺少必需的浏览器能力或页面元素。",
+			flowingBackgroundResultMissing: "未找到",
+			flowingBackgroundResultAmbiguous: "不唯一",
+			flowingBackgroundResultHidden: "无可见区域",
+			flowingBackgroundResultUnsupported: "不支持",
+			flowingBackgroundResultChanged: "挂载后发生变化",
+			flowingBackgroundResultFailed: "初始化失败",
+			flowingBackgroundStatePreserved: "背景开关的已保存值未更改，背景暂时隐藏，原生界面已保留。",
+			flowingBackgroundRecoveryWait: "页面布局或样式变化后会自动重新检查。加载完成后仍失败，请更新 PowerDSH 并重新加载界面；仍无法恢复请复制错误信息反馈。",
+			flowingBackgroundRecoveryUpdate: "请更新 PowerDSH 并重新加载界面；仍失败请复制错误信息反馈。",
+			flowingBackgroundRecoveryRetry: "可关闭后重新开启背景重试；仍失败请复制错误信息反馈。"
 		}
 	};
 

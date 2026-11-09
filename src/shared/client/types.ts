@@ -84,7 +84,13 @@ export interface ClientEnvironment {
 export interface SavingSetting { field: PreferenceKey; value: PreferenceValue; }
 export interface SettingError { field: PreferenceKey; message: string; }
 export interface SettingsViewContext { snapshot: FormSnapshot; disabled: boolean; saving: SavingSetting | null; error: SettingError | null; save(field: PreferenceKey, next: PreferenceValue): Promise<void>; id: string; }
+export interface SettingFailure {
+  message: string; code: string; operation: string;
+  context?: import('../types/diagnostics.ts').DiagnosticContext;
+  observedAt?: string;
+}
 export interface SettingContribution {
+  failure?: SettingFailure;
   field: PreferenceKey; description?: string; category?: 'general' | 'interface' | 'enhancements' | 'simplify'; hidden?: boolean; hideError?: boolean; error?: string;
   save?(next: PreferenceValue, context: { mounted: ReactTypes.MutableRefObject<boolean> }): Promise<void>;
   canSave?(next: PreferenceValue): boolean; render?(): ReactTypes.ReactNode;
