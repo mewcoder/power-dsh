@@ -5,12 +5,13 @@ export const styles = `
 .power-dsh-effort-bars { display:block; flex:none; }
 .power-dsh-effort-bar-on { fill:var(--dsw-alias-state-business-primary); }
 .power-dsh-effort-bar-off { fill:currentColor; }
-.power-dsh-effort-arc-track { stroke:currentColor; stroke-width:1.2; opacity:.35; }
-.power-dsh-effort-arc-tick { stroke:currentColor; stroke-width:1; opacity:.3; }
+.power-dsh-effort-arc-track { stroke:currentColor; stroke-width:1.2; opacity:.42; }
+.power-dsh-effort-arc-tick { stroke:currentColor; stroke-width:.95; opacity:.55; }
 .power-dsh-effort-arc-needle, .power-dsh-effort-arc-hub { color:var(--dsw-alias-state-business-primary); }
 .power-dsh-effort-arc-needle { stroke:currentColor; stroke-width:1.2; transform-box:view-box; transform-origin:8px 8.5px; transition:transform 180ms cubic-bezier(.2,.7,.3,1); }
 .power-dsh-effort-arc-hub { fill:currentColor; stroke:none; }
 .power-dsh-effort-arc-auto { color:var(--dsw-alias-label-tertiary); }
+.power-dsh-effort-arc-max { color:var(--dsw-alias-state-warn-primary); }
 @media (prefers-reduced-motion:reduce) { .power-dsh-effort-arc-needle { transition:none; } }
 `;
 

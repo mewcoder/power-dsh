@@ -65,7 +65,7 @@ test('system sound menu saves a native choice, previews it once, and sends one s
   app.set({ notificationsEnabled: true });
   await loadedSoundSettings(app);
   const settingRows = () => descendants(app.renderSettings()).filter(node => node.props.className === 'power-dsh-setting-row');
-  assert.equal(settingRows().length, 4, 'General on Web contains notifications, its sound controls and refresh; unsupported restart stays hidden.');
+  assert.equal(settingRows().length, 3, 'General on Web contains notifications and its sound controls; refresh and unsupported restart live elsewhere or stay hidden.');
   const menu = () => descendants(app.renderSettings()).find(node => node.type === 'native-menu-fixture' && node.props.items?.some(item => item.id === 'mac:Ping.aiff'));
   soundControl(app, 'select').props.onClick();
   assert.equal(menu().props.open, true);
@@ -87,7 +87,7 @@ test('system sound menu saves a native choice, previews it once, and sends one s
   assert.equal(app.soundPlays.length, 3);
   assert.equal(soundControl(app, 'select'), undefined);
   assert.equal(soundControl(app, 'preview'), undefined);
-  assert.equal(settingRows().length, 3, 'Sound disabled collapses only the tone-selection row.');
+  assert.equal(settingRows().length, 2, 'Sound disabled collapses only the tone-selection row.');
   assert.equal(app.notifications[1].options.silent, true);
   app.unmount();
 });
@@ -232,13 +232,13 @@ test('sound settings appear only while notifications are on and preserve choices
   app.set({ notificationSound: 'mac:Ping.aiff' });
   await loadedSoundSettings(app);
   const rows = () => descendants(app.renderSettings()).filter(node => node.props.className === 'power-dsh-setting-row');
-  assert.equal(rows().length, 2);
+  assert.equal(rows().length, 1);
   assert.equal(notificationSoundSwitch(app), undefined);
   assert.equal(soundControl(app, 'select'), undefined);
   assert.equal(soundControl(app, 'preview'), undefined);
 
   await notificationSwitch(app).props.onClick();
-  assert.equal(rows().length, 4);
+  assert.equal(rows().length, 3);
   assert.equal(notificationSoundSwitch(app).props['aria-checked'], true);
   assert.ok(soundControl(app, 'select').props.children.includes('Ping'));
   soundControl(app, 'select').props.onClick();
@@ -251,7 +251,7 @@ test('sound settings appear only while notifications are on and preserve choices
   await staleSoundToggle();
   await staleMenu.props.onSelect('mac:Glass.aiff');
   assert.equal(saves, savesBeforeStaleCallbacks, 'Hidden sound callbacks must not write preferences.');
-  assert.equal(rows().length, 2);
+  assert.equal(rows().length, 1);
   assert.equal(notificationSoundSwitch(app), undefined);
   assert.equal(soundControl(app, 'select'), undefined);
   assert.equal(soundControl(app, 'preview'), undefined);
@@ -267,7 +267,7 @@ test('sound settings appear only while notifications are on and preserve choices
   await notificationSwitch(app).props.onClick();
   assert.equal(notificationSoundSwitch(app), undefined);
   await notificationSwitch(app).props.onClick();
-  assert.equal(rows().length, 3);
+  assert.equal(rows().length, 2);
   assert.equal(notificationSoundSwitch(app).props['aria-checked'], false);
   assert.equal(soundControl(app, 'select'), undefined);
   assert.equal(app.settingsProps().source.getSnapshot().value.notificationSound, 'mac:Ping.aiff');

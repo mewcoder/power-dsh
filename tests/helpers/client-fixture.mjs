@@ -47,7 +47,7 @@ export function mcpCatalogFixture(overrides = {}) {
   return { complete: true, servers: [mcpFixture()], ...overrides };
 }
 
-export async function mount({ featureIds, localeLanguage, restartStatus = { supported: true, running: false, error: '' }, restartReply, desktop = false, themeAvailable = true, updates, rpcError, rpcReply, formReply, formLoad, fileText = '', fileReply, fileReadError, skillCatalog, skillList, skillReply, skillReadError, mcpCatalog, mcpList, mcpReply, mcpReadError, writable = true, reload = () => {}, windows = false, notificationPermission = 'granted', notificationRequest, notificationFailure = false, notificationServices = true, notificationsAvailable = true, localConnection = true, soundCatalog, soundReply, soundListError, modelDirectory, modelSelectReply, modelDirectoriesAvailable = true } = {}) {
+export async function mount({ featureIds, localeLanguage, restartStatus = { supported: true, running: false, error: '' }, restartReply, desktop = false, themeAvailable = true, updates, rpcError, rpcReply, formReply, formLoad, fileText = '', fileReply, fileReadError, wallpaper, wallpaperReply, wallpaperReadError, wallpaperClearError, skillCatalog, skillList, skillReply, skillReadError, mcpCatalog, mcpList, mcpReply, mcpReadError, writable = true, reload = () => {}, windows = false, notificationPermission = 'granted', notificationRequest, notificationFailure = false, notificationServices = true, notificationsAvailable = true, localConnection = true, soundCatalog, soundReply, soundListError, modelDirectory, modelSelectReply, modelDirectoriesAvailable = true } = {}) {
   let plugin;
   const nativeLauncher = { native: true };
   const entries = new Map([['settings.launcher:single', nativeLauncher]]);
@@ -109,11 +109,24 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     cursor = 0;
     return wrapped.type(wrapped.props);
   }
+  let settingsOpen = true;
+  let settingsCloses = 0;
+  let settingsOpens = 0;
+  function disposeComponent(type) {
+    hookScopes.get(type)?.effects.forEach(effect => effect?.dispose?.());
+    hookScopes.delete(type);
+  }
+  function closeSettings() {
+    settingsOpen = false;
+    settingsCloses++;
+    const page = entries.get('settings.section:power-dsh')?.component({ t: key => key });
+    if (page) disposeComponent(page.type);
+  }
   let cursor = 0;
   let observeCount = 0;
   let disconnectCount = 0;
   let edge = 280;
-  let settings = { status: 'ready', writable, value: { blockDoubleClickRename: false, notificationsEnabled: false, notificationSoundEnabled: true, notificationSound: 'default', blockTodo: false, blockPlan: false, blockGoal: false, showThemeSwitcher: false, personalizationEnabled: false, skillManagerEnabled: false, mcpManagerEnabled: false, globalPrompt: '', thinkingEffortGlyph: 'arc' } };
+  let settings = { status: 'ready', writable, value: { blockDoubleClickRename: false, notificationsEnabled: false, notificationSoundEnabled: true, notificationSound: 'default', blockTodo: false, blockPlan: false, blockGoal: false, showThemeSwitcher: false, personalizationEnabled: false, skillManagerEnabled: false, mcpManagerEnabled: false, globalPrompt: '', thinkingEffortGlyph: 'arc', flowingBackgroundKind: 'pattern', flowingBackgroundOpacity: 100, flowingBackgroundBlur: 0 } };
   let theme = { preference: 'system' };
   const calls = [];
   const rpcCalls = [];
@@ -165,6 +178,8 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   };
   let fileVersion = 1;
   const fileValue = () => ({ path: '/test-dsh-home/AGENTS.md', text: fileText, revision: fileVersion.toString(16).padStart(64, '0') });
+  let wallpaperValue = wallpaper ?? null;
+  const wallpaperWrites = [];
   let rpcDescriptors = [];
   function FakeMenu(props) {
     return { type: 'native-menu-fixture', props: { ...props, children: [props.anchor,
@@ -201,7 +216,16 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     },
     useId: () => 'settings-test',
     useEffect(fn, deps) { return this.useLayoutEffect(fn, deps); },
-    useSyncExternalStore: (_subscribe, get) => get(),
+    // React compares snapshots by identity and re-renders forever on a fresh object;
+    // mirror that contract so an unstable getSnapshot fails here instead of in the GUI.
+    useSyncExternalStore: (_subscribe, get) => {
+      const first = get();
+      const second = get();
+      if (first !== null && typeof first === 'object' && first !== second) {
+        throw new Error('The result of getSnapshot should be cached');
+      }
+      return first;
+    },
     useState(init) {
       const id = cursor++;
       if (!(id in hookStates)) hookStates[id] = typeof init === 'function' ? init() : init;
@@ -221,6 +245,15 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     },
   };
   const context = vm.createContext({
+    // Minimal reader so the wallpaper picker can be exercised without a real File API.
+    FileReader: class {
+      constructor() { this.result = null; this.onerror = null; this.onload = null; }
+      readAsDataURL(file) {
+        this.result = file.dataUrl;
+        if (file.dataUrl) this.onload?.();
+        else this.onerror?.(new Error('read failed'));
+      }
+    },
     ResizeObserver: class {
       constructor(callback) { this.callback = callback; }
       observe(element) { observeCount++; if (element === menuElement) menuResizeListeners.add(this.callback); }
@@ -360,6 +393,24 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
             skillValue = { ...skillValue, skills: skillValue.skills.map(skill => skill.name === name ? { ...skill, enabled, modelInvocable: enabled, userInvocable: enabled } : skill) };
             return { ok: true, value: skillView(blocked, revision) };
           }
+          if (descriptor.method === 'readWallpaper') return wallpaperReadError
+            ? { ok: false, error: { message: wallpaperReadError } } : { ok: true, value: wallpaperValue };
+          if (descriptor.method === 'saveWallpaper') {
+            wallpaperWrites.push({ dataUrl: blocked, name: revision });
+            if (wallpaperReply) {
+              const result = await wallpaperReply(blocked, revision);
+              if (result.ok) wallpaperValue = result.value;
+              return result;
+            }
+            wallpaperValue = { name: revision, mime: 'image/png', bytes: 4, dataUrl: blocked };
+            return { ok: true, value: wallpaperValue };
+          }
+          if (descriptor.method === 'clearWallpaper') {
+            wallpaperWrites.push({ cleared: true });
+            if (wallpaperClearError) return { ok: false, error: { message: wallpaperClearError } };
+            wallpaperValue = null;
+            return { ok: true, value: { cleared: true } };
+          }
           if (descriptor.method === 'readPersonalization') return fileReadError
             ? { ok: false, error: { message: fileReadError } } : { ok: true, value: fileValue() };
           if (descriptor.method === 'savePersonalization') {
@@ -415,7 +466,9 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
         const entry = { options, component };
         const key = options.name + ':' + (options.id || 'single');
         entries.set(key, entry);
-        return () => { if (entries.get(key) === entry) entries.delete(key); };
+        return () => {
+          if (entries.get(key) === entry) entries.delete(key);
+        };
       },
     },
   };
@@ -471,6 +524,14 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     intervals: () => [...intervals.values()].map(timer => timer.ms),
     tickIntervals: () => Promise.all([...intervals.values()].map(timer => timer.fn())),
     setFile(text) { fileText = text; fileVersion++; },
+    wallpaperWrites,
+    settingsVisibility: () => ({ open: settingsOpen, closes: settingsCloses, opens: settingsOpens }),
+    renderTunePanel() {
+      const entry = entries.get('shell.overlay:power-dsh-background-tune');
+      if (!entry) return null;
+      return renderComponent(React.createElement(entry.component, { t: key => key }));
+    },
+    setWallpaper(value) { wallpaperValue = value; },
     reloadInstructions() {
       return entries.get('settings.section:power-dsh-personalization').component({ t: key => key }).props.loadInstructions();
     },
@@ -478,7 +539,8 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       return entries.get('settings.section:power-dsh').component({ t: key => key }).props;
     },
     renderSettings() {
-      const wrapped = entries.get('settings.section:power-dsh').component({ t: key => key });
+      if (!settingsOpen) return null;
+      const wrapped = entries.get('settings.section:power-dsh').component({ t: key => key, close: closeSettings });
       return renderComponent(wrapped);
     },
     selectSettingsTab(id) {

@@ -6,11 +6,11 @@ interface SettingsPageProps extends PageSlotProps { source: SnapshotSource<FormS
 
 export function createSettingsPage(runtime: ClientRuntime) {
   const { React, h, useSnapshot, useMounted, errorFeedback } = runtime;
-  function SettingsPage({ t, source, form, version, features }: SettingsPageProps) {
+  function SettingsPage({ t, source, form, version, features, close }: SettingsPageProps) {
     const snapshot = useSnapshot(source);
     const [activeTab, setActiveTab] = React.useState('general');
     const tabRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
-    const tabs = ['general', 'interface', 'enhancements', 'simplify'].map(id => ({ id }));
+    const tabs = ['general', 'interface', 'enhancements', 'simplify', 'other'].map(id => ({ id }));
     const [saving, setSaving] = React.useState<SavingSetting | null>(null);
     const [error, setError] = React.useState<SettingError | null>(null);
     const pending = React.useRef(false);
@@ -49,7 +49,7 @@ export function createSettingsPage(runtime: ClientRuntime) {
       event.preventDefault();
       selectTab(tabs[nextIndex].id, true);
     }
-    const viewContext = { snapshot, disabled, saving, error, save, id };
+    const viewContext = { snapshot, disabled, saving, error, save, id, leaveSettings: close };
     const fields = features.flatMap(feature => feature.useSettings ? feature.useSettings(viewContext) : feature.settings || []);
     const allSettings = features.flatMap(feature => feature.settings || []);
     // Hidden operation descriptors can still be called by a feature-owned custom row.

@@ -11,6 +11,7 @@ interface DisabledSkillPreference {
 }
 interface Preferences {
   showVersion: boolean;
+  whaleMotionEnabled: boolean;
   showThemeSwitcher: boolean;
   showRefreshButton: boolean;
   showRestartButton: boolean;
@@ -31,6 +32,10 @@ interface Preferences {
   showThinkingEffortSwitcher: boolean;
   thinkingEffortGlyph: string;
   flowingBackgroundEnabled: boolean;
+  flowingBackgroundKind: string;
+  flowingBackgroundOpacity: number;
+  flowingBackgroundBlur: number;
+  archiveManagerEnabled: boolean;
 }
 type PreferenceKey = keyof Preferences;
 interface LiveValue<T> {
@@ -51,8 +56,8 @@ type SettingsOutput = Pick<Preferences, SettingsParameter> & {
   version: string | null;
   telemetry: TelemetryStatus;
 };
-type FeatureId = 'version-display' | 'appearance-shortcut' | 'refresh-button' | 'restart-button' | 'notifications' | 'personalization' | 'skills' | 'mcp' | 'account-blocking' | 'search-blocking' | 'telemetry-blocking' | 'todo-blocking' | 'plan-blocking' | 'goal-blocking' | 'double-click-rename' | 'thinking-effort' | 'flowing-background';
-type FeatureCategory = 'general' | 'interface' | 'enhance' | 'simplify';
+type FeatureId = 'version-display' | 'appearance-shortcut' | 'refresh-button' | 'restart-button' | 'notifications' | 'personalization' | 'skills' | 'mcp' | 'account-blocking' | 'search-blocking' | 'telemetry-blocking' | 'todo-blocking' | 'plan-blocking' | 'goal-blocking' | 'double-click-rename' | 'thinking-effort' | 'flowing-background' | 'archive' | 'whale-motion';
+type FeatureCategory = 'general' | 'interface' | 'enhance' | 'simplify' | 'other';
 interface FeatureDefinition {
   readonly id: FeatureId;
   readonly category: FeatureCategory;
@@ -109,6 +114,15 @@ interface PersonalizationFile {
   text: string;
   revision: string;
 }
+interface WallpaperAsset {
+  name: string;
+  mime: string;
+  bytes: number;
+  dataUrl: string;
+}
+interface WallpaperCleared {
+  cleared: true;
+}
 interface SoundEntry {
   id: string;
   name: string;
@@ -128,6 +142,23 @@ interface RestartStatus {
 interface RestartAccepted {
   accepted: true;
 }
+interface ArchiveWorkspaceRow {
+  workspaceId: string;
+  title: string;
+}
+interface ArchiveSessionRow {
+  sessionId: string;
+  title: string;
+  workspaceId: string;
+  workspaceTitle: string;
+  updatedAt: number;
+  createdAt: number;
+}
+interface ArchiveCatalog {
+  complete: boolean;
+  workspaces: ArchiveWorkspaceRow[];
+  sessions: ArchiveSessionRow[];
+}
 /** Named Host operations, before the transport adds its result envelope. */
 interface PowerDshMethods {
   restartStatus(): Promise<RestartStatus>;
@@ -142,10 +173,16 @@ interface PowerDshMethods {
   setSearchBlocked(blocked: boolean): Promise<PolicyResult>;
   readPersonalization(): Promise<PersonalizationFile>;
   savePersonalization(text: string, revision: string): Promise<PersonalizationFile>;
+  readWallpaper(): Promise<WallpaperAsset | null>;
+  saveWallpaper(dataUrl: string, name: string): Promise<WallpaperAsset>;
+  clearWallpaper(): Promise<WallpaperCleared>;
   listSkills(cwd: string, scope: string): Promise<SkillCatalog>;
   setSkillEnabled(cwd: string, scope: string, name: string, enabled: boolean): Promise<SkillCatalog>;
   listMcpServers(): Promise<McpCatalog>;
   setMcpServerEnabled(id: string, enabled: boolean): Promise<McpCatalog>;
+  listArchivedSessions(): Promise<ArchiveCatalog>;
+  restoreArchivedSession(sessionId: string): Promise<ArchiveCatalog>;
+  deleteArchivedSession(sessionId: string): Promise<ArchiveCatalog>;
 }
 type PowerDshMethod = keyof PowerDshMethods;
 interface Codec<T> {
@@ -245,6 +282,68 @@ interface NativePresets {
 }
 interface NativeAgent {
   ctx: NativeContext;
+}
+interface NativeWorkspaceView {
+  workspaceId: string;
+  title: string;
+  path: string;
+  sessionIds: readonly string[];
+}
+interface NativeWorkspaceBaseline {
+  items: readonly NativeWorkspaceView[];
+  archivedSessionIds: readonly string[];
+  pinnedSessionIds: readonly string[];
+}
+interface NativeWorkspaceController {
+  follow(signal: AbortSignal): AsyncIterable<{
+    type: string;
+    value?: NativeWorkspaceBaseline;
+  }>;
+  unarchiveSession(request: {
+    sessionId: string;
+  }): Promise<{
+    archivedSessionIds: readonly string[];
+  }>;
+}
+type NativeSessionTitleObservation = {
+  sessionId: string;
+  status: 'fulfilled';
+  value: {
+    session: {
+      createdAt: number;
+    };
+    title?: {
+      title: string;
+      updatedAt: number;
+    };
+  };
+} | {
+  sessionId: string;
+  status: 'rejected';
+  reason: unknown;
+};
+interface NativeSessionQuery {
+  readTitleSnapshots(sessionIds: readonly string[], signal?: AbortSignal): Promise<readonly NativeSessionTitleObservation[]>;
+  listSessions(signal?: AbortSignal): Promise<readonly {
+    header: {
+      id: string;
+    };
+    live: boolean;
+  }[]>;
+}
+interface NativeSessionPersistence {
+  stat(sessionId: string, options?: {
+    signal?: AbortSignal;
+  }): Promise<{
+    header: {
+      id: string;
+      cwd?: string;
+    };
+    location?: {
+      kind: string;
+      path: string;
+    };
+  } | undefined>;
 }
 interface NativeSkill {
   name: string;
@@ -473,6 +572,9 @@ interface NativeContext {
       title: string;
     }[];
   };
+  workspaceController?: NativeWorkspaceController;
+  sessionQuery?: NativeSessionQuery;
+  sessionPersistence?: NativeSessionPersistence;
   workingDirectory: {
     defaultDirectory: string;
   };

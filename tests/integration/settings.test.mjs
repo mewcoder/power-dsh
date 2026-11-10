@@ -52,8 +52,9 @@ test('runtime diagnostics keep their cause and saved value while actual save fai
   const states = [];
   const React = {
     useId: () => 'runtime-settings',
+    useEffect(fn) { fn(); },
     useRef(value) { const i = cursor++; return states[i] ||= { current: value }; },
-    useState(value) { const i = cursor++; if (!(i in states)) states[i] = value;
+    useState(value) { const i = cursor++; if (!(i in states)) states[i] = typeof value === 'function' ? value() : value;
       return [states[i], next => { states[i] = next; }]; },
   };
   const runtime = { React, h: (type, props, ...children) => ({ type, props: { ...props, children } }),
@@ -104,21 +105,22 @@ test('settings route policy changes to their explicit injected Host methods', as
   app.unmount();
 });
 
-test('settings group eighteen switches under four panels and default to General', async () => {
+test('settings group twenty switches under five panels and default to General', async () => {
   const app = await mount({ desktop: true });
   app.set({ notificationsEnabled: true });
   const groups = {
-    general: ['notificationsEnabled', 'notificationSoundEnabled', 'showRefreshButton', 'showRestartButton'],
-    interface: ['showThinkingEffortSwitcher', 'showThemeSwitcher', 'flowingBackgroundEnabled', 'showVersion'],
-    enhancements: ['skillManagerEnabled', 'mcpManagerEnabled', 'personalizationEnabled'],
-    simplify: ['blockOfficialAccount', 'blockOfficialSearch', 'blockOfficialTelemetry', 'blockTodo', 'blockPlan', 'blockGoal', 'blockDoubleClickRename'],
+    general: ['notificationsEnabled', 'notificationSoundEnabled'],
+    interface: ['showThinkingEffortSwitcher', 'showThemeSwitcher', 'flowingBackgroundEnabled', 'whaleMotionEnabled', 'showVersion'],
+    enhancements: ['skillManagerEnabled', 'mcpManagerEnabled', 'personalizationEnabled', 'archiveManagerEnabled'],
+    simplify: ['blockOfficialAccount', 'blockOfficialSearch', 'blockOfficialTelemetry', 'blockTodo', 'blockPlan', 'blockGoal'],
+    other: ['showRefreshButton', 'showRestartButton', 'blockDoubleClickRename'],
   };
   const fields = [];
   for (const [id, expected] of Object.entries(groups)) {
     if (id !== 'general') app.selectSettingsTab(id);
     const view = descendants(app.renderSettings());
     const tabs = view.filter(node => node.props.role === 'tab');
-    assert.deepEqual(tabs.map(tab => tab.props.children[0]), ['generalTab', 'interfaceTab', 'enhancementsTab', 'simplifyTab']);
+    assert.deepEqual(tabs.map(tab => tab.props.children[0]), ['generalTab', 'interfaceTab', 'enhancementsTab', 'simplifyTab', 'otherTab']);
     assert.equal(tabs.filter(tab => tab.props['aria-selected']).length, 1);
     assert.equal(tabs.filter(tab => tab.props.tabIndex === 0).length, 1);
     for (const tab of tabs) {
@@ -137,7 +139,7 @@ test('settings group eighteen switches under four panels and default to General'
     fields.push(...actual);
     assert.ok(!view.some(node => node.type === 'textarea'));
   }
-  assert.equal(new Set(fields).size, 18);
+  assert.equal(new Set(fields).size, 20);
   app.unmount();
 });
 
@@ -145,10 +147,11 @@ test('settings tabs support wrapping arrow keys, Home and End with selection and
   const app = await mount();
   const tabs = () => descendants(app.renderSettings()).filter(node => node.props.role === 'tab');
   for (const [key, expected] of [
-    ['ArrowLeft', 'simplify'], ['ArrowRight', 'general'], ['ArrowRight', 'interface'],
-    ['ArrowRight', 'enhancements'], ['ArrowRight', 'simplify'], ['ArrowRight', 'general'],
-    ['End', 'simplify'], ['ArrowLeft', 'enhancements'], ['ArrowLeft', 'interface'],
-    ['ArrowLeft', 'general'], ['Home', 'general'],
+    ['ArrowLeft', 'other'], ['ArrowRight', 'general'], ['ArrowRight', 'interface'],
+    ['ArrowRight', 'enhancements'], ['ArrowRight', 'simplify'], ['ArrowRight', 'other'],
+    ['ArrowRight', 'general'], ['End', 'other'], ['ArrowLeft', 'simplify'],
+    ['ArrowLeft', 'enhancements'], ['ArrowLeft', 'interface'], ['ArrowLeft', 'general'],
+    ['Home', 'general'],
   ]) {
     let prevented = false;
     tabs().find(tab => tab.props['aria-selected']).props.onKeyDown({ key, preventDefault() { prevented = true; } });

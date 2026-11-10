@@ -549,3 +549,119 @@ test('failed global attachment rolls back surfaces without retrying on its own m
   assert.equal(sidebar.style.getPropertyValue('background-color'), '');
   dispose();
 });
+
+test('live appearance notifications restyle the same artwork and release their subscription', () => {
+  const f = fixture();
+  f.makeFrame();
+  let appearance = { opacity: 100, blur: 0 };
+  let notify;
+  let starts = 0;
+  let stops = 0;
+  let released = false;
+  const dispose = watchBackground(() => {}, f.doc, f.win, () => {
+    starts++;
+    return () => { stops++; };
+  }, appearance, () => appearance, listener => {
+    notify = listener;
+    return () => { released = true; };
+  });
+  const layer = f.body.querySelector('.power-dsh-flowing-background');
+  const canvas = layer.children.find(child => child.tagName === 'canvas');
+  appearance = { opacity: 35, blur: 16 };
+  notify();
+  assert.equal(layer.style.getPropertyValue('opacity'), '0.35');
+  assert.equal(canvas.style.getPropertyValue('filter'), 'blur(16px)');
+  for (const property of ['position', 'inset', 'width', 'height']) {
+    assert.equal(canvas.style.getPropertyValue(property), '', 'Blur preserves the original canvas framing.');
+  }
+  appearance = { opacity: 100, blur: 0 };
+  notify();
+  assert.equal(layer.style.getPropertyValue('opacity'), '');
+  assert.equal(canvas.style.getPropertyValue('filter'), '');
+  for (const property of ['position', 'inset', 'width', 'height']) {
+    assert.equal(canvas.style.getPropertyValue(property), '', 'Zero blur restores the original artwork geometry.');
+  }
+  assert.equal(f.body.querySelector('.power-dsh-flowing-background'), layer);
+  assert.equal(starts, 1);
+  assert.equal(stops, 0);
+  dispose();
+  assert.equal(stops, 1);
+  assert.equal(released, true);
+  notify();
+  assert.equal(starts, 1);
+});
+
+test('opacity and frosted blur are written to the owned layer and canvas only', () => {
+  const f = fixture();
+  f.makeFrame();
+  const dispose = watchBackground(() => {}, f.doc, f.win, () => () => {}, { opacity: 50, blur: 12 });
+  const layer = f.body.querySelector('.power-dsh-flowing-background');
+  assert.ok(layer, 'the background layer attaches');
+  assert.equal(layer.style.getPropertyValue('opacity'), '0.5');
+  const canvas = layer.children.find(child => child.tagName === 'canvas');
+  assert.ok(canvas);
+  assert.equal(canvas.style.getPropertyValue('filter'), 'blur(12px)');
+  dispose();
+
+  const clear = fixture();
+  clear.makeFrame();
+  const disposeClear = watchBackground(() => {}, clear.doc, clear.win, () => () => {}, { opacity: 100, blur: 0 });
+  const clearLayer = clear.body.querySelector('.power-dsh-flowing-background');
+  assert.equal(clearLayer.style.getPropertyValue('opacity'), '', 'full opacity keeps no inline override');
+  assert.equal(clearLayer.children.find(child => child.tagName === 'canvas').style.getPropertyValue('filter'), '');
+  disposeClear();
+});
+
+test('a wallpaper layer uses a cover image and never starts the GPU frame chain', () => {
+  const f = fixture();
+  f.makeFrame();
+  const starts = [];
+  const dispose = watchBackground(() => {}, f.doc, f.win, (canvas, _win, _doc, target) => {
+    starts.push({ canvas, target });
+    return () => {};
+  }, { opacity: 80, blur: 8, wallpaper: { dataUrl: 'data:image/png;base64,AAAA', name: 'sky.png' } });
+  const layer = f.body.querySelector('.power-dsh-flowing-background');
+  assert.ok(layer);
+  assert.equal(layer.attributes.get('data-kind'), 'wallpaper');
+  assert.equal(layer.style.getPropertyValue('opacity'), '0.8');
+  const image = layer.children.find(child => child.tagName === 'img');
+  assert.ok(image, 'The wallpaper renders as an image');
+  assert.equal(image.attributes.get('alt'), '', 'The decorative image stays out of the accessibility tree');
+  assert.equal(image.attributes.get('draggable'), 'false');
+  assert.equal(image.style.getPropertyValue('filter'), 'blur(8px)');
+  for (const property of ['position', 'inset', 'width', 'height']) {
+    assert.equal(image.style.getPropertyValue(property), '', 'Blur cannot enlarge the cover box.');
+  }
+  assert.equal(layer.children.some(child => child.tagName === 'canvas'), false);
+  assert.equal(starts.length, 0, 'No WebGL chain is created for a static wallpaper');
+  dispose();
+});
+
+test('wallpaper blur preserves image framing across the full range and clears old padding', () => {
+  const f = fixture();
+  f.makeFrame();
+  let appearance = { opacity: 100, blur: 999, wallpaper: { dataUrl: 'data:image/png;base64,AAAA', name: 'sky.png' } };
+  let notify;
+  const dispose = watchBackground(() => {}, f.doc, f.win, () => {
+    throw new Error('A wallpaper must not start a GPU chain.');
+  }, appearance, () => appearance, listener => { notify = listener; return () => {}; });
+  const layer = f.body.querySelector('.power-dsh-flowing-background');
+  const image = layer.children.find(child => child.tagName === 'img');
+  const frame = layer.parentElement;
+  // Simulate an existing layer with geometry left by the previous blur behavior.
+  image.style.setProperty('position', 'absolute');
+  image.style.setProperty('inset', '-120px');
+  image.style.setProperty('width', 'calc(100% + 240px)');
+  image.style.setProperty('height', 'calc(100% + 240px)');
+  for (const blur of [999, 40, 16, 8, 0]) {
+    appearance = { ...appearance, blur };
+    notify();
+    assert.equal(image.style.getPropertyValue('filter'), blur ? `blur(${Math.min(40, blur)}px)` : '');
+    assert.equal(layer.children.find(child => child.tagName === 'img'), image);
+    for (const property of ['position', 'inset', 'width', 'height']) {
+      assert.equal(image.style.getPropertyValue(property), '', 'Changing blur never scales or repositions the image.');
+    }
+    for (const property of ['filter', 'inset', 'width', 'height']) assert.equal(frame.style.getPropertyValue(property), '');
+  }
+  dispose();
+});

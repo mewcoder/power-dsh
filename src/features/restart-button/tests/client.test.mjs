@@ -5,7 +5,7 @@ import { mount, headerTrigger, headerMenu, headerPosition, openHeaderMenu, heade
 test('restart opens shared Modal and Buttons, and sends only one request after explicit confirmation', async () => {
   const app = await mount({ desktop: true });
   assert.equal(app.renderHeader(), null);
-  const toggle = descendants(app.renderSettings()).find(node => node.props.id === 'settings-test-showRestartButton');
+  const toggle = descendants(app.selectSettingsTab('other')).find(node => node.props.id === 'settings-test-showRestartButton');
   await toggle.props.onClick();
   assert.equal(app.restartCalls.length, 0);
   app.renderHeader();
@@ -81,7 +81,7 @@ test('Web and Windows hide the restart setting while preserving its preference a
     const app = await mount(options);
     try {
       app.set({ showRestartButton: true, showRefreshButton: true });
-      const fields = descendants(app.renderSettings()).filter(node => node.props.role === 'switch').map(node => node.props.id);
+      const fields = descendants(app.selectSettingsTab('other')).filter(node => node.props.role === 'switch').map(node => node.props.id);
       assert.equal(fields.includes('settings-test-showRestartButton'), false, 'Unsupported platforms do not offer the restart switch.');
       assert.equal(fields.includes('settings-test-showRefreshButton'), true);
       assert.deepEqual(Array.from(openHeaderMenu(app).props.items, item => item.id), ['refresh']);

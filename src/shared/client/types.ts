@@ -44,7 +44,7 @@ export type PreferenceKey = keyof PreferenceValues;
 export type PreferenceValue = PreferenceValues[PreferenceKey];
 export interface FormSnapshot { status: 'loading' | 'ready' | 'unavailable'; writable: boolean; value?: Partial<PreferenceValues>; }
 export interface SettingsForm extends SnapshotSource<FormSnapshot> { set<K extends PreferenceKey>(field: K, value: PreferenceValues[K]): Promise<boolean>; }
-export interface PageSlotProps { t: Translate; }
+export interface PageSlotProps { t: Translate; close?: () => void; }
 export interface SlotProps extends PageSlotProps { wide: boolean; }
 /** Session-scoped composer slots additionally carry the owning session id. */
 export interface ComposerSlotProps extends PageSlotProps { sessionId?: string }
@@ -69,13 +69,13 @@ export interface ClientContext {
   inject(services: string[], callback: (ctx: ClientContext) => void): void;
   on(event: string, callback: Listener): void;
   remote: { $mount(options: { package: string; descriptors: readonly RpcDescriptor[] }): Promise<void>; powerDsh: PowerDshRemote };
-  slots: { inject(name: string, callback: () => void | Dispose): void; register(options: SlotOptions & { name: string }, component: SlotComponent): Dispose };
+  slots: { inject(name: string, callback: () => void | Dispose): void; register(options: (SlotOptions & { name: string }) | { name: 'sidebar.brand.mark'; priority: number }, component: SlotComponent): Dispose };
   locale: { register(namespace: string, language: string, dictionary: Record<string, string>): Dispose; bind(namespace: string): Translate };
   configForms: ConfigForms; connection: Connection; theme: ThemeService;
   sessions: { list: SnapshotSource<{ phase: string; ids: string[]; byId: Record<string, SessionRow> }> };
   uiSession: { sessionStatus: SnapshotSource<ReadonlyMap<string, SessionStatus>> };
 }
-export type SavePreference = <K extends PreferenceKey>(field: K, value: PreferenceValues[K], unavailable?: string, type?: 'boolean' | 'string') => Promise<void>;
+export type SavePreference = <K extends PreferenceKey>(field: K, value: PreferenceValues[K], unavailable?: string, type?: 'boolean' | 'string' | 'number') => Promise<void>;
 export interface ClientEnvironment {
   ctx: ClientContext; form: SettingsForm; source: SnapshotSource<FormSnapshot>; t: Translate; version: string | null; namespace: string;
   savePreference: SavePreference;
@@ -83,7 +83,7 @@ export interface ClientEnvironment {
 }
 export interface SavingSetting { field: PreferenceKey; value: PreferenceValue; }
 export interface SettingError { field: PreferenceKey; message: string; }
-export interface SettingsViewContext { snapshot: FormSnapshot; disabled: boolean; saving: SavingSetting | null; error: SettingError | null; save(field: PreferenceKey, next: PreferenceValue): Promise<void>; id: string; }
+export interface SettingsViewContext { snapshot: FormSnapshot; disabled: boolean; saving: SavingSetting | null; error: SettingError | null; save(field: PreferenceKey, next: PreferenceValue): Promise<void>; id: string; leaveSettings?: () => void; }
 export interface SettingFailure {
   message: string; code: string; operation: string;
   context?: import('../types/diagnostics.ts').DiagnosticContext;
@@ -91,7 +91,7 @@ export interface SettingFailure {
 }
 export interface SettingContribution {
   failure?: SettingFailure;
-  field: PreferenceKey; description?: string; category?: 'general' | 'interface' | 'enhancements' | 'simplify'; hidden?: boolean; hideError?: boolean; error?: string;
+  field: PreferenceKey; description?: string; category?: 'general' | 'interface' | 'enhancements' | 'simplify' | 'other'; hidden?: boolean; hideError?: boolean; error?: string;
   save?(next: PreferenceValue, context: { mounted: ReactTypes.MutableRefObject<boolean> }): Promise<void>;
   canSave?(next: PreferenceValue): boolean; render?(): ReactTypes.ReactNode;
 }

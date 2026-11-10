@@ -28,7 +28,7 @@
 	}
 
 // src/shared/client/error-feedback.ts
-	const styles$11 = `
+	const styles$12 = `
 .power-dsh-feedback { min-width:0; color:var(--dsw-alias-state-error-primary); font:inherit; font-size:12px; line-height:18px; overflow-wrap:anywhere; }
 .power-dsh-feedback[data-placement="page"] { margin:12px 0 0; padding:12px 14px; border:.5px solid var(--dsw-alias-settings-card-stroke); border-radius:var(--dsw-radius-lg); background:var(--dsw-alias-settings-card-fill); font-size:13px; line-height:20px; }
 .power-dsh-feedback[data-placement="inline"] { margin:4px 0 0; }
@@ -154,7 +154,7 @@
 				"data-placement": placement,
 				"data-tone": "error",
 				style
-			}, message, h("style", null, styles$11), h("div", {
+			}, message, h("style", null, styles$12), h("div", {
 				className: "power-dsh-error-actions",
 				"data-has-retry": Boolean(retry)
 			}, h(ErrorDetails, {
@@ -275,7 +275,7 @@
 	}
 
 // src/shared/client/shell-styles.ts
-	const styles$10 = `
+	const styles$11 = `
 .power-dsh-page { min-width:0; width:100%; color:var(--dsw-alias-label-primary); font:inherit; line-height:22px; overflow-wrap:anywhere; }
 .power-dsh-page > header { display:flex; flex-direction:column; gap:12px; }
 .power-dsh-page .power-dsh-title { margin:0; color:var(--dsw-alias-label-primary); font-size:16px; font-weight:500; line-height:24px; }
@@ -313,7 +313,7 @@
 // src/shared/client/settings-shell.ts
 	function createSettingsPage(runtime) {
 		const { React, h, useSnapshot, useMounted, errorFeedback } = runtime;
-		function SettingsPage({ t, source, form, version, features }) {
+		function SettingsPage({ t, source, form, version, features, close }) {
 			const snapshot = useSnapshot(source);
 			const [activeTab, setActiveTab] = React.useState("general");
 			const tabRefs = React.useRef({});
@@ -321,7 +321,8 @@
 				"general",
 				"interface",
 				"enhancements",
-				"simplify"
+				"simplify",
+				"other"
 			].map((id) => ({ id }));
 			const [saving, setSaving] = React.useState(null);
 			const [error, setError] = React.useState(null);
@@ -377,7 +378,8 @@
 				saving,
 				error,
 				save,
-				id
+				id,
+				leaveSettings: close
 			};
 			const fields = features.flatMap((feature) => feature.useSettings ? feature.useSettings(viewContext) : feature.settings || []);
 			const allSettings = features.flatMap((feature) => feature.settings || []);
@@ -429,7 +431,7 @@
 			return h("section", {
 				className: "power-dsh-page",
 				"aria-label": t("title")
-			}, h("style", null, styles$10 + features.map((feature) => feature.styles || "").join("")), h("header", null, h("h2", { className: "power-dsh-title" }, t("title")), h("p", { className: "power-dsh-description" }, t("description"))), notice && (noticeError ? errorFeedback({
+			}, h("style", null, styles$11 + features.map((feature) => feature.styles || "").join("")), h("header", null, h("h2", { className: "power-dsh-title" }, t("title")), h("p", { className: "power-dsh-description" }, t("description"))), notice && (noticeError ? errorFeedback({
 				t,
 				message: notice,
 				code: "PD-SETTINGS-LOAD",
@@ -468,7 +470,7 @@
 	}
 
 // src/shared/client/sidebar-styles.ts
-	const styles$9 = `
+	const styles$10 = `
 .power-dsh-header-seat { display:block; width:100%; height:0; }
 .power-dsh-header-seat .power-dsh-header-menu { position:fixed; top:12px; z-index:5; width:28px; height:28px; pointer-events:auto; -webkit-app-region:no-drag; }
 html[data-platform="darwin"] .power-dsh-header-seat .power-dsh-header-menu { top:11px; }
@@ -554,7 +556,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			return h("span", {
 				className: "power-dsh-header-seat",
 				ref: seat
-			}, h("style", null, styles$9), h("span", {
+			}, h("style", null, styles$10), h("span", {
 				className: "power-dsh-header-menu",
 				style: position === null ? { visibility: "hidden" } : { left: position }
 			}, h(Menu, {
@@ -600,7 +602,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/account-blocking/client.ts
-	function createClientFeature$16(runtime, env) {
+	function createClientFeature$18(runtime, env) {
 		const { ctx } = env;
 		const setAccountBlocked = async (blocked) => {
 			const result = await ctx.remote.powerDsh.setAccountBlocked(blocked);
@@ -618,7 +620,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/account-blocking/definition.ts
-	const definition$16 = Object.freeze({
+	const definition$18 = Object.freeze({
 		id: "account-blocking",
 		category: "simplify",
 		order: 8,
@@ -627,7 +629,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/account-blocking/locales.ts
-	const locales$17 = {
+	const locales$19 = {
 		"en": {
 			"blockOfficialAccount": "Disable official sign-in and model integrations",
 			"blockAccountDescription": "Disable official sign-in, account UI, and built-in model integrations."
@@ -702,10 +704,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 
 // src/features/account-blocking/rpc.ts
 	const ACCOUNT_RPC = policyRpc("setAccountBlocked", "AccountPolicyResult");
-	const rpc$10 = [ACCOUNT_RPC];
+	const rpc$12 = [ACCOUNT_RPC];
 
 // src/features/appearance-shortcut/styles.ts
-	const styles$8 = `
+	const styles$9 = `
 .power-dsh-appearance-seat { display:block; width:100%; height:0; }
 .power-dsh-appearance-seat .power-dsh-appearance-button { position:fixed; bottom:16px; z-index:5; display:flex; align-items:center; justify-content:center; box-sizing:border-box; width:32px; height:32px; padding:0; border:0; border-radius:var(--dsw-radius-md); background:transparent; color:var(--dsw-alias-label-primary); font:inherit; cursor:pointer; pointer-events:auto; -webkit-app-region:no-drag; }
 .power-dsh-appearance-seat .power-dsh-appearance-button:hover { background-color:var(--dsw-alias-interactive-bg-hover); }
@@ -715,7 +717,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 `;
 
 // src/features/appearance-shortcut/client.ts
-	function createClientFeature$15(runtime, env) {
+	function createClientFeature$17(runtime, env) {
 		const { React, h, observable, useSnapshot, NativeIcon, errorFeedback } = runtime;
 		const { ctx, source, t } = env;
 		const themeChoices = [
@@ -767,7 +769,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			return h("span", {
 				className: "power-dsh-appearance-seat",
 				ref: seat
-			}, h("style", null, styles$8), h("button", {
+			}, h("style", null, styles$9), h("button", {
 				type: "button",
 				className: "power-dsh-appearance-button",
 				title: error || title,
@@ -900,7 +902,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/appearance-shortcut/definition.ts
-	const definition$15 = Object.freeze({
+	const definition$17 = Object.freeze({
 		id: "appearance-shortcut",
 		category: "interface",
 		order: 4,
@@ -909,7 +911,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/appearance-shortcut/locales.ts
-	const locales$16 = {
+	const locales$18 = {
 		"en": {
 			"showThemeSwitcher": "Appearance shortcut",
 			"themeSwitcherDescription": "Quickly switch appearance at the bottom of the sidebar",
@@ -934,7 +936,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	function isGestureNode(node) {
 		return typeof node === "object" && node !== null && "getAttribute" in node && typeof node.getAttribute === "function";
 	}
-	function createClientFeature$14(runtime, env) {
+	function createClientFeature$16(runtime, env) {
 		const { ctx, form, savePreference } = env;
 		function bindDoubleClickRenameBlocker(form) {
 			let listening = false;
@@ -989,16 +991,16 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/double-click-rename/definition.ts
-	const definition$14 = Object.freeze({
+	const definition$16 = Object.freeze({
 		id: "double-click-rename",
-		category: "simplify",
-		order: 12,
+		category: "other",
+		order: 3,
 		keys: Object.freeze(["blockDoubleClickRename"]),
 		spec: "src/features/double-click-rename/spec.md"
 	});
 
 // src/features/double-click-rename/locales.ts
-	const locales$15 = {
+	const locales$17 = {
 		"en": {
 			"blockDoubleClickRename": "Block double-click renaming",
 			"blockDoubleClickRenameDescription": "Disable double-click renaming of session titles in the sidebar"
@@ -1010,7 +1012,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	};
 
 // src/shared/client/catalog-styles.ts
-	const styles$7 = `
+	const styles$8 = `
 /* Reserve the host scroll gutter only for the options column containing this page. */
 [data-shortcut-modal="settings"] > div:has(:is(.power-dsh-skills-page,.power-dsh-mcp-page)) { scrollbar-gutter:stable; }
 /* Adapted from DSH PluginInventorySettingsTab (MIT); see docs/third-party-notices.md. */
@@ -1095,7 +1097,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/mcp/styles.ts
-	const styles$6 = `
+	const styles$7 = `
 .power-dsh-mcp-page .power-dsh-skill-cards { align-items:start; }
 .power-dsh-mcp-page .power-dsh-skill-card-content[data-expandable="true"] { cursor:pointer; }
 .power-dsh-mcp-page .power-dsh-mcp-runtime { display:inline-flex; flex:none; align-items:center; gap:6px; min-height:18px; white-space:nowrap; color:var(--dsw-alias-label-secondary); font-size:12px; line-height:18px; }
@@ -1133,10 +1135,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		disabled: "idle",
 		unknown: "idle"
 	};
-	function createClientFeature$13(runtime, env) {
+	function createClientFeature$15(runtime, env) {
 		const { React, h, Tooltip, StateDot, observable, useSnapshot, useMounted, errorFeedback } = runtime;
 		const { ctx, form, source, t, savePreference, preferenceSlot, namespace } = env;
-		const styles = styles$10 + styles$7 + styles$6;
+		const styles = styles$11 + styles$8 + styles$7;
 		const { SkillSearchIcon, SkillChevron } = createCatalogUI(runtime);
 		function McpIcon({ size = 16 }) {
 			return h("svg", {
@@ -1535,7 +1537,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/mcp/definition.ts
-	const definition$13 = Object.freeze({
+	const definition$15 = Object.freeze({
 		id: "mcp",
 		category: "enhance",
 		order: 8,
@@ -1544,7 +1546,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/mcp/locales.ts
-	const locales$14 = {
+	const locales$16 = {
 		"en": {
 			"mcpManagerEnabled": "MCP management",
 			"mcpManagerDescription": "Manage MCP in settings",
@@ -1727,10 +1729,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 	const LIST_MCP_SERVERS_RPC = mcpRpc("listMcpServers", []);
 	const SET_MCP_SERVER_ENABLED_RPC = mcpRpc("setMcpServerEnabled", ["id", "enabled"]);
-	const rpc$9 = [LIST_MCP_SERVERS_RPC, SET_MCP_SERVER_ENABLED_RPC];
+	const rpc$11 = [LIST_MCP_SERVERS_RPC, SET_MCP_SERVER_ENABLED_RPC];
 
 // src/features/notifications/styles.ts
-	const styles$5 = `
+	const styles$6 = `
 .power-dsh-page .power-dsh-sound-controls { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; flex:none; max-width:50%; }
 .power-dsh-page .power-dsh-sound-select { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; gap:12px; min-height:36px; max-width:100%; padding:0 14px; border:0; border-radius:var(--dsw-radius-md); background:var(--dsw-alias-bg-module-platform); color:var(--dsw-alias-label-primary); font:inherit; font-size:14px; line-height:22px; cursor:pointer; }
 .power-dsh-page .power-dsh-sound-preview { display:inline-flex; align-items:center; justify-content:center; flex:none; width:36px; height:36px; padding:0; border:0; border-radius:var(--dsw-radius-md); background:transparent; color:var(--dsw-alias-label-secondary); cursor:pointer; }
@@ -1743,10 +1745,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 `;
 
 // src/features/notifications/client.ts
-	function createClientFeature$12(runtime, env) {
+	function createClientFeature$14(runtime, env) {
 		const { React, h, Menu, observable, useSnapshot, errorFeedback } = runtime;
 		const { ctx, form, source, t, savePreference } = env;
-		const styles = styles$5;
+		const styles = styles$6;
 		let active = true;
 		ctx.effect(() => () => {
 			active = false;
@@ -2219,7 +2221,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/notifications/definition.ts
-	const definition$12 = Object.freeze({
+	const definition$14 = Object.freeze({
 		id: "notifications",
 		category: "general",
 		order: 0,
@@ -2232,7 +2234,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/notifications/locales.ts
-	const locales$13 = {
+	const locales$15 = {
 		"en": {
 			"notificationsEnabled": "Task notifications",
 			"notificationsDescription": "Send desktop notifications when tasks finish, fail, or need confirmation.",
@@ -2347,10 +2349,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			} })
 		}
 	};
-	const rpc$8 = [LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC];
+	const rpc$10 = [LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC];
 
 // src/features/personalization/styles.ts
-	const styles$4 = `
+	const styles$5 = `
 .power-dsh-page .power-dsh-prompt-editor { display:flex; flex-direction:column; gap:8px; padding:16px 0; }
 .power-dsh-page .power-dsh-prompt-input { box-sizing:border-box; display:block; width:100%; max-width:100%; min-height:260px; margin:0; padding:12px 14px; resize:vertical; border:.5px solid var(--dsw-alias-border-l4); border-radius:var(--dsw-radius-lg); background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-primary); font:inherit; font-size:14px; line-height:22px; transition:border-color 120ms ease,box-shadow 120ms ease; }
 .power-dsh-page .power-dsh-prompt-input::placeholder { color:var(--dsw-alias-label-caption); }
@@ -2360,10 +2362,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 `;
 
 // src/features/personalization/client.ts
-	function createClientFeature$11(runtime, env) {
+	function createClientFeature$13(runtime, env) {
 		const { React, h, observable, useSnapshot, useMounted, errorFeedback } = runtime;
 		const { ctx, source, t, savePreference, preferenceSlot, namespace } = env;
-		const styles = styles$10 + styles$4;
+		const styles = styles$11 + styles$5;
 		function PersonalizationIcon({ size = 16 }) {
 			return h("svg", {
 				width: size,
@@ -2558,7 +2560,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/personalization/definition.ts
-	const definition$11 = Object.freeze({
+	const definition$13 = Object.freeze({
 		id: "personalization",
 		category: "enhance",
 		order: 9,
@@ -2567,7 +2569,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/personalization/locales.ts
-	const locales$12 = {
+	const locales$14 = {
 		"en": {
 			"personalizationTab": "Personalization",
 			"personalizationEnabled": "Personalization",
@@ -2621,10 +2623,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 	const READ_PERSONALIZATION_RPC = fileRpc("readPersonalization", []);
 	const SAVE_PERSONALIZATION_RPC = fileRpc("savePersonalization", ["text", "revision"]);
-	const rpc$7 = [READ_PERSONALIZATION_RPC, SAVE_PERSONALIZATION_RPC];
+	const rpc$9 = [READ_PERSONALIZATION_RPC, SAVE_PERSONALIZATION_RPC];
 
 // src/features/refresh-button/client.ts
-	function createClientFeature$10(runtime, env) {
+	function createClientFeature$12(runtime, env) {
 		const { React, useSnapshot } = runtime;
 		const { source, t } = env;
 		function useHeaderAction({ wide, latestWide, mounted }) {
@@ -2661,16 +2663,16 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/refresh-button/definition.ts
-	const definition$10 = Object.freeze({
+	const definition$12 = Object.freeze({
 		id: "refresh-button",
-		category: "general",
+		category: "other",
 		order: 1,
 		keys: Object.freeze(["showRefreshButton"]),
 		spec: "src/features/refresh-button/spec.md"
 	});
 
 // src/features/refresh-button/locales.ts
-	const locales$11 = {
+	const locales$13 = {
 		"en": {
 			"showRefreshButton": "Show refresh button",
 			"refreshDescription": "Reload the current interface",
@@ -2686,7 +2688,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	};
 
 // src/features/restart-button/client.ts
-	function createClientFeature$9(runtime, env) {
+	function createClientFeature$11(runtime, env) {
 		const { React, h, Modal, Button, observable, useSnapshot } = runtime;
 		const { ctx, form, source, t } = env;
 		function isMacDesktop() {
@@ -2829,16 +2831,16 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/restart-button/definition.ts
-	const definition$9 = Object.freeze({
+	const definition$11 = Object.freeze({
 		id: "restart-button",
-		category: "general",
+		category: "other",
 		order: 2,
 		keys: Object.freeze(["showRestartButton"]),
 		spec: "src/features/restart-button/spec.md"
 	});
 
 // src/features/restart-button/locales.ts
-	const locales$10 = {
+	const locales$12 = {
 		"en": {
 			"showRestartButton": "Show restart button",
 			"restartDescription": "Restart the application",
@@ -2898,10 +2900,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			} })
 		}
 	};
-	const rpc$6 = [RESTART_STATUS_RPC, RESTART_APP_RPC];
+	const rpc$8 = [RESTART_STATUS_RPC, RESTART_APP_RPC];
 
 // src/features/search-blocking/client.ts
-	function createClientFeature$8(runtime, env) {
+	function createClientFeature$10(runtime, env) {
 		const { ctx } = env;
 		const setSearchBlocked = async (blocked) => {
 			const result = await ctx.remote.powerDsh.setSearchBlocked(blocked);
@@ -2919,7 +2921,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/search-blocking/definition.ts
-	const definition$8 = Object.freeze({
+	const definition$10 = Object.freeze({
 		id: "search-blocking",
 		category: "simplify",
 		order: 9,
@@ -2928,7 +2930,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/search-blocking/locales.ts
-	const locales$9 = {
+	const locales$11 = {
 		"en": {
 			"blockOfficialSearch": "Disable official search",
 			"blockSearchDescription": "Disable built-in WebSearch while keeping WebFetch."
@@ -2941,10 +2943,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 
 // src/features/search-blocking/rpc.ts
 	const SEARCH_RPC = policyRpc("setSearchBlocked", "SearchPolicyResult");
-	const rpc$5 = [SEARCH_RPC];
+	const rpc$7 = [SEARCH_RPC];
 
 // src/features/skills/styles.ts
-	const styles$3 = `
+	const styles$4 = `
 .power-dsh-page .power-dsh-skill-navigation { display:flex; align-items:flex-end; flex-wrap:wrap; gap:12px; margin-top:14px; border-bottom:.5px solid var(--dsw-alias-border-l2); }
 .power-dsh-page .power-dsh-skill-navigation > .power-dsh-tabs { margin-top:0; border-bottom:0; }
 .power-dsh-skills-page .power-dsh-tab:focus-visible { color:var(--dsw-alias-label-primary); }
@@ -2963,10 +2965,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 `;
 
 // src/features/skills/client.ts
-	function createClientFeature$7(runtime, env) {
+	function createClientFeature$9(runtime, env) {
 		const { React, h, Menu, Tooltip, observable, useSnapshot, useMounted, errorFeedback } = runtime;
 		const { ctx, form, source, t, savePreference, preferenceSlot, namespace } = env;
-		const styles = styles$10 + styles$7 + styles$3;
+		const styles = styles$11 + styles$8 + styles$4;
 		const { SkillSearchIcon, SkillChevron } = createCatalogUI(runtime);
 		function SkillsIcon({ size = 16 }) {
 			return h("svg", {
@@ -3397,7 +3399,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/skills/definition.ts
-	const definition$7 = Object.freeze({
+	const definition$9 = Object.freeze({
 		id: "skills",
 		category: "enhance",
 		order: 7,
@@ -3406,7 +3408,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/skills/locales.ts
-	const locales$8 = {
+	const locales$10 = {
 		"en": {
 			"skillManagerEnabled": "Skill management",
 			"skillManagerDescription": "Manage skills in settings",
@@ -3539,10 +3541,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		"name",
 		"enabled"
 	]);
-	const rpc$4 = [LIST_SKILLS_RPC, SET_SKILL_ENABLED_RPC];
+	const rpc$6 = [LIST_SKILLS_RPC, SET_SKILL_ENABLED_RPC];
 
 // src/features/telemetry-blocking/client.ts
-	function createClientFeature$6(runtime, env) {
+	function createClientFeature$8(runtime, env) {
 		const { ctx } = env;
 		const setTelemetryBlocked = async (blocked) => {
 			const result = await ctx.remote.powerDsh.setTelemetryBlocked(blocked);
@@ -3560,7 +3562,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/telemetry-blocking/definition.ts
-	const definition$6 = Object.freeze({
+	const definition$8 = Object.freeze({
 		id: "telemetry-blocking",
 		category: "simplify",
 		order: 10,
@@ -3569,7 +3571,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/telemetry-blocking/locales.ts
-	const locales$7 = {
+	const locales$9 = {
 		"en": {
 			"blockOfficialTelemetry": "Disable official feedback and telemetry",
 			"blockTelemetryDescription": "Disable usage statistics, environment data collection, Session-log uploads, and plugin inventory reporting"
@@ -3582,10 +3584,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 
 // src/features/telemetry-blocking/rpc.ts
 	const TELEMETRY_RPC = policyRpc("setTelemetryBlocked", "TelemetryPolicyResult");
-	const rpc$3 = [TELEMETRY_RPC];
+	const rpc$5 = [TELEMETRY_RPC];
 
 // src/features/todo-blocking/client.ts
-	function createClientFeature$5(runtime, env) {
+	function createClientFeature$7(runtime, env) {
 		const { ctx } = env;
 		const setTodoBlocked = async (blocked) => {
 			const result = await ctx.remote.powerDsh.setTodoBlocked(blocked);
@@ -3603,7 +3605,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/todo-blocking/definition.ts
-	const definition$5 = Object.freeze({
+	const definition$7 = Object.freeze({
 		id: "todo-blocking",
 		category: "simplify",
 		order: 11,
@@ -3612,7 +3614,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/todo-blocking/locales.ts
-	const locales$6 = {
+	const locales$8 = {
 		"en": {
 			"blockTodo": "Disable Todo tool",
 			"blockTodoDescription": "Stop generating to-do lists in new conversations"
@@ -3625,10 +3627,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 
 // src/features/todo-blocking/rpc.ts
 	const TODO_RPC = policyRpc("setTodoBlocked", "TodoPolicyResult");
-	const rpc$2 = [TODO_RPC];
+	const rpc$4 = [TODO_RPC];
 
 // src/features/plan-blocking/client.ts
-	function createClientFeature$4(runtime, env) {
+	function createClientFeature$6(runtime, env) {
 		const { ctx } = env;
 		const setPlanBlocked = async (blocked) => {
 			const result = await ctx.remote.powerDsh.setPlanBlocked(blocked);
@@ -3646,7 +3648,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/plan-blocking/definition.ts
-	const definition$4 = Object.freeze({
+	const definition$6 = Object.freeze({
 		id: "plan-blocking",
 		category: "simplify",
 		order: 11.5,
@@ -3655,7 +3657,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/plan-blocking/locales.ts
-	const locales$5 = {
+	const locales$7 = {
 		en: {
 			blockPlan: "Disable Plan mode",
 			blockPlanDescription: "Disable the built-in Plan mode for new conversations"
@@ -3668,10 +3670,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 
 // src/features/plan-blocking/rpc.ts
 	const PLAN_RPC = policyRpc("setPlanBlocked", "PlanPolicyResult");
-	const rpc$1 = [PLAN_RPC];
+	const rpc$3 = [PLAN_RPC];
 
 // src/features/goal-blocking/client.ts
-	function createClientFeature$3(runtime, env) {
+	function createClientFeature$5(runtime, env) {
 		const { ctx } = env;
 		const setGoalBlocked = async (blocked) => {
 			const result = await ctx.remote.powerDsh.setGoalBlocked(blocked);
@@ -3689,7 +3691,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/goal-blocking/definition.ts
-	const definition$3 = Object.freeze({
+	const definition$5 = Object.freeze({
 		id: "goal-blocking",
 		category: "simplify",
 		order: 11.75,
@@ -3698,7 +3700,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/goal-blocking/locales.ts
-	const locales$4 = {
+	const locales$6 = {
 		en: {
 			blockGoal: "Disable Goal mode",
 			blockGoalDescription: "Disable the built-in Goal mode for new conversations"
@@ -3711,10 +3713,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 
 // src/features/goal-blocking/rpc.ts
 	const GOAL_RPC = policyRpc("setGoalBlocked", "GoalPolicyResult");
-	const rpc = [GOAL_RPC];
+	const rpc$2 = [GOAL_RPC];
 
 // src/features/version-display/styles.ts
-	const styles$2 = `
+	const styles$3 = `
 .power-dsh-version-seat { display:block; flex:1 1 100%; min-width:0; width:100%; height:0; }
 .power-dsh-version-seat .power-dsh-version-badge { position:fixed; left:207px; top:30px; z-index:5; box-sizing:border-box; margin:0; padding:0; border:0; border-radius:2px; background:transparent; color:var(--dsw-alias-label-secondary); font:inherit; font-size:12px; font-weight:400; line-height:16px; letter-spacing:0; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; pointer-events:auto; cursor:pointer; -webkit-app-region:no-drag; }
 html[data-platform="darwin"] .power-dsh-version-seat .power-dsh-version-badge { top:64px; }
@@ -3726,7 +3728,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 `;
 
 // src/features/version-display/client.ts
-	function createClientFeature$2(runtime, env) {
+	function createClientFeature$4(runtime, env) {
 		const { React, h, useSnapshot, useMounted, errorFeedback } = runtime;
 		const { source, t, version } = env;
 		function VersionBadge({ wide, t, source, version }) {
@@ -3769,7 +3771,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 			return h("span", {
 				className: "power-dsh-version-seat",
 				ref: seat
-			}, h("style", null, styles$2), h("button", {
+			}, h("style", null, styles$3), h("button", {
 				type: "button",
 				className: "power-dsh-version-badge",
 				style: { maxWidth: `${available}px` },
@@ -3801,7 +3803,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 	}
 
 // src/features/version-display/definition.ts
-	const definition$2 = Object.freeze({
+	const definition$4 = Object.freeze({
 		id: "version-display",
 		category: "interface",
 		order: 6,
@@ -3810,7 +3812,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 	});
 
 // src/features/version-display/locales.ts
-	const locales$3 = {
+	const locales$5 = {
 		"en": {
 			"showVersion": "Show version number",
 			"versionDescription": "Show the version number at the upper left. Click it to check for updates",
@@ -3881,14 +3883,16 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 	const ARC_CENTER_X = 8;
 	const ARC_CENTER_Y = 8.5;
 	const ARC_TRACK = "M3.4041 13.096C2.49514 12.187 1.87614 11.0288 1.62537 9.76798C1.37459 8.50716 1.50331 7.20028 1.99525 6.01261C2.48719 4.82494 3.32025 3.80981 4.3891 3.09557C5.45795 2.38134 6.71458 2.00008 8.0001 2C9.28563 2.00008 10.5423 2.38134 11.6111 3.09557C12.68 3.80981 13.513 4.82494 14.005 6.01261C14.4969 7.20028 14.6256 8.50716 14.3748 9.76798C14.1241 11.0288 13.5051 12.187 12.5961 13.096";
-	const ARC_TICK_INNER = 5.2;
-	const ARC_TICK_OUTER = 6.2;
+	const ARC_TICK_INNER = 5;
+	const ARC_TICK_OUTER = 6.25;
 	const ARC_START_DEG = 225;
 	const ARC_SWEEP_DEG = 270;
 	const ARC_TICK_FRACTIONS = [
+		0,
 		.25,
 		.5,
-		.75
+		.75,
+		1
 	];
 	const ARC_HUB_RADIUS = 1;
 	/** A fixed host-style gauge: light arc and ticks, plus one accent needle that turns from low to high. */
@@ -3939,22 +3943,23 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 	}
 
 // src/features/thinking-effort/styles.ts
-	const styles$1 = `
+	const styles$2 = `
 .power-dsh-effort-button { display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; width:28px; height:28px; min-width:28px; order:1; margin-left:-8px; margin-right:-8px; padding:0; border:none; border-radius:var(--dsw-radius-sm); outline:none; box-shadow:none; background:transparent; color:var(--dsw-alias-label-secondary); font:inherit; cursor:pointer; }
 .power-dsh-effort-button:focus-visible { outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
 .power-dsh-effort-button:disabled { cursor:default; }
 .power-dsh-effort-bars { display:block; flex:none; }
 .power-dsh-effort-bar-on { fill:var(--dsw-alias-state-business-primary); }
 .power-dsh-effort-bar-off { fill:currentColor; }
-.power-dsh-effort-arc-track { stroke:currentColor; stroke-width:1.2; opacity:.35; }
-.power-dsh-effort-arc-tick { stroke:currentColor; stroke-width:1; opacity:.3; }
+.power-dsh-effort-arc-track { stroke:currentColor; stroke-width:1.2; opacity:.42; }
+.power-dsh-effort-arc-tick { stroke:currentColor; stroke-width:.95; opacity:.55; }
 .power-dsh-effort-arc-needle, .power-dsh-effort-arc-hub { color:var(--dsw-alias-state-business-primary); }
 .power-dsh-effort-arc-needle { stroke:currentColor; stroke-width:1.2; transform-box:view-box; transform-origin:8px 8.5px; transition:transform 180ms cubic-bezier(.2,.7,.3,1); }
 .power-dsh-effort-arc-hub { fill:currentColor; stroke:none; }
 .power-dsh-effort-arc-auto { color:var(--dsw-alias-label-tertiary); }
+.power-dsh-effort-arc-max { color:var(--dsw-alias-state-warn-primary); }
 @media (prefers-reduced-motion:reduce) { .power-dsh-effort-arc-needle { transition:none; } }
 `;
-	const settingsStyles = `
+	const settingsStyles$1 = `
 .power-dsh-page .power-dsh-effort-style-select { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; gap:12px; min-height:36px; max-width:100%; padding:0 14px; border:0; border-radius:var(--dsw-radius-md); background:var(--dsw-alias-bg-module-platform); color:var(--dsw-alias-label-primary); font:inherit; font-size:14px; line-height:22px; cursor:pointer; }
 .power-dsh-page .power-dsh-effort-style-select:disabled { opacity:.5; cursor:default; }
 .power-dsh-page .power-dsh-effort-style-select:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
@@ -3962,7 +3967,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 `;
 
 // src/features/thinking-effort/client.ts
-	const EMPTY_SNAPSHOT = {
+	const EMPTY_SNAPSHOT$1 = {
 		current: null,
 		groups: [],
 		status: "idle",
@@ -3980,10 +3985,10 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 			return null;
 		}
 	}
-	function createClientFeature$1(runtime, env) {
+	function createClientFeature$3(runtime, env) {
 		const { React, h, Tooltip, Menu, observable, useSnapshot, errorFeedback } = runtime;
 		const { ctx, t, savePreference, preferenceSlot, source } = env;
-		const emptyStore = observable(() => EMPTY_SNAPSHOT);
+		const emptyStore = observable(() => EMPTY_SNAPSHOT$1);
 		let directories = null;
 		const availability = observable(() => directories !== null);
 		ctx.inject(["modelDirectories"], (child) => {
@@ -3998,13 +4003,14 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 				};
 			});
 		});
-		function renderGraphic(glyph, count, active, rotation) {
+		function renderGraphic(glyph, count, active, rotation, isMax) {
 			if (glyph === "arc") {
 				const geometry = arcGeometry(count, active);
+				const stateClass = geometry.auto ? " power-dsh-effort-arc-auto" : isMax ? " power-dsh-effort-arc-max" : "";
 				return h("svg", {
 					className: "power-dsh-effort-bars",
-					width: 20,
-					height: 20,
+					width: 24,
+					height: 24,
 					viewBox: "0 0 16 16",
 					"aria-hidden": true,
 					focusable: false
@@ -4022,7 +4028,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 					y2: tick.y2,
 					strokeLinecap: "round"
 				})), geometry.needle && h("line", {
-					className: `power-dsh-effort-arc-needle${geometry.auto ? " power-dsh-effort-arc-auto" : ""}`,
+					className: `power-dsh-effort-arc-needle${stateClass}`,
 					x1: geometry.needle.x1,
 					y1: geometry.needle.y1,
 					x2: geometry.needle.x2,
@@ -4030,7 +4036,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 					strokeLinecap: "round",
 					style: { transform: `rotate(${rotation}deg)` }
 				}), h("circle", {
-					className: `power-dsh-effort-arc-hub${geometry.auto ? " power-dsh-effort-arc-auto" : ""}`,
+					className: `power-dsh-effort-arc-hub${stateClass}`,
 					cx: geometry.hub.cx,
 					cy: geometry.hub.cy,
 					r: geometry.hub.r
@@ -4091,7 +4097,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 					rotation
 				});
 			}
-			const graphic = renderGraphic(glyph, count, active, rotation);
+			const graphic = renderGraphic(glyph, count, active, rotation, selected.id === "max");
 			const button = h("button", {
 				type: "button",
 				className: "power-dsh-effort-button",
@@ -4117,7 +4123,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 					});
 				}
 			}, graphic);
-			return h(React.Fragment, null, h("style", null, styles$1), h(Tooltip, {
+			return h(React.Fragment, null, h("style", null, styles$2), h(Tooltip, {
 				label: hint,
 				side: "top",
 				portal: true,
@@ -4224,12 +4230,12 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 		return {
 			settings: [mainSetting, glyphSetting],
 			useSettings,
-			styles: settingsStyles
+			styles: settingsStyles$1
 		};
 	}
 
 // src/features/thinking-effort/definition.ts
-	const definition$1 = Object.freeze({
+	const definition$3 = Object.freeze({
 		id: "thinking-effort",
 		category: "interface",
 		order: 3,
@@ -4238,7 +4244,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 	});
 
 // src/features/thinking-effort/locales.ts
-	const locales$2 = {
+	const locales$4 = {
 		"en": {
 			"showThinkingEffortSwitcher": "Quick reasoning level switch",
 			"thinkingEffort": "Reasoning level",
@@ -4540,7 +4546,7 @@ void main() {
 	}
 
 // src/features/flowing-background/styles.ts
-	const styles = `
+	const styles$1 = `
 .power-dsh-flowing-background {
   position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none !important;
   user-select: none; contain: strict;
@@ -4548,6 +4554,63 @@ void main() {
 .power-dsh-flowing-background canvas {
   display: block; width: 100%; height: 100%; pointer-events: none !important;
   background: linear-gradient(180deg, rgba(156, 193, 231, .4) 0%, transparent 100%);
+}
+.power-dsh-flowing-background img.power-dsh-wallpaper {
+  display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none !important;
+  background: var(--dsw-alias-bg-base);
+}
+`;
+	const settingsStyles = `
+.power-dsh-page .power-dsh-background-controls { display:inline-flex; align-items:center; flex:none; gap:8px; }
+.power-dsh-page .power-dsh-background-style-select { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; gap:12px; min-height:36px; max-width:100%; padding:0 14px; border:0; border-radius:var(--dsw-radius-md); background:var(--dsw-alias-bg-module-platform); color:var(--dsw-alias-label-primary); font:inherit; font-size:14px; line-height:22px; cursor:pointer; }
+.power-dsh-page .power-dsh-background-style-select:disabled { opacity:.5; cursor:default; }
+.power-dsh-page .power-dsh-background-style-select:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
+@media (hover:hover) { .power-dsh-page .power-dsh-background-style-select:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover); } }
+.power-dsh-page .power-dsh-background-tune-trigger { display:inline-flex; align-items:center; justify-content:center; flex:none; width:28px; height:28px; padding:0; }
+
+.power-dsh-page .power-dsh-slider-field { display:inline-flex; align-items:center; gap:10px; min-width:190px; justify-content:flex-end; }
+.power-dsh-page .power-dsh-slider { box-sizing:border-box; width:150px; margin:0; accent-color:var(--dsw-alias-state-business-primary); cursor:pointer; }
+.power-dsh-page .power-dsh-slider:disabled { opacity:.5; cursor:default; }
+.power-dsh-page .power-dsh-slider-value { min-width:44px; text-align:right; font-variant-numeric:tabular-nums; color:var(--dsw-alias-label-secondary); font-size:13px; }
+:is(.power-dsh-page, .power-dsh-background-panel) .power-dsh-wallpaper-field { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; }
+:is(.power-dsh-page, .power-dsh-background-panel) .power-dsh-wallpaper-details { display:flex; align-items:center; gap:12px; min-width:0; }
+:is(.power-dsh-page, .power-dsh-background-panel) .power-dsh-wallpaper-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; }
+:is(.power-dsh-page, .power-dsh-background-panel) .power-dsh-wallpaper-action { flex:none; white-space:nowrap; }
+:is(.power-dsh-page, .power-dsh-background-panel) .power-dsh-wallpaper-preview { display:block; width:56px; height:36px; border-radius:var(--dsw-radius-sm); object-fit:cover; border:.5px solid var(--dsw-alias-border-l4); }
+:is(.power-dsh-page, .power-dsh-background-panel) .power-dsh-wallpaper-name { max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-secondary); font-size:13px; }
+:is(.power-dsh-page, .power-dsh-background-panel) .power-dsh-wallpaper-input { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+`;
+	const panelStyles = `
+.power-dsh-background-panel {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 60;
+  box-sizing: border-box; display: flex; flex-direction: column; isolation: isolate;
+  width: min(380px, calc(100vw - 48px)); max-height: calc(100vh - 48px);
+  padding: 0 0 24px; overflow: hidden; border: 0; border-radius: var(--dsw-radius-panel);
+  background: transparent; color: var(--dsw-alias-label-primary);
+  box-shadow: var(--dsw-elevation-prominent); pointer-events: auto; font: inherit;
+}
+.power-dsh-background-panel-material {
+  position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-2) 32%, transparent);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.power-dsh-background-panel-head { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 8px; padding: 22px 14px 12px 24px; }
+.power-dsh-background-panel-title { margin: 0; font-size: 16px; line-height: 24px; font-weight: 500; }
+.power-dsh-background-panel-close { flex: none; width: 28px; height: 28px; padding: 0; color: var(--dsw-alias-label-secondary); }
+.power-dsh-background-panel-body { display: flex; flex-direction: column; gap: 20px; min-height: 0; padding: 8px 24px 0; overflow-y: auto; }
+.power-dsh-background-panel-slider { display: flex; flex-direction: column; gap: 10px; }
+.power-dsh-background-panel-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.power-dsh-background-panel-label { font-size: 14px; line-height: 22px; color: var(--dsw-alias-label-primary); }
+.power-dsh-background-panel-value { font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-secondary); }
+.power-dsh-background-panel .power-dsh-slider { box-sizing: border-box; width: 100%; margin: 0; accent-color: var(--dsw-alias-brand-primary); cursor: pointer; }
+.power-dsh-background-panel .power-dsh-slider:disabled { opacity: .4; cursor: not-allowed; }
+.power-dsh-background-panel .power-dsh-setting-row { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding-top: 20px; border-top: .5px solid var(--dsw-alias-border-l2); }
+.power-dsh-background-panel .power-dsh-setting-label { font-size: 14px; line-height: 22px; }
+.power-dsh-background-panel .power-dsh-description { margin-top: 4px; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); }
+.power-dsh-background-panel .power-dsh-wallpaper-name { flex: 1; min-width: 0; max-width: none; }
+.power-dsh-background-panel .power-dsh-wallpaper-preview { flex: none; width: 64px; height: 42px; }
+@media (max-width:360px) {
+  .power-dsh-background-panel .power-dsh-wallpaper-field { grid-template-columns:minmax(0,1fr); }
 }
 `;
 
@@ -4618,8 +4681,34 @@ void main() {
 			else element.style.removeProperty(property);
 		};
 	}
-	/** User-requested global preview: one canvas underneath the verified app frame. */
-	function watchBackground(report, doc = document, win = window, animate = startAnimation) {
+	/** Apply opacity and frosted blur to an owned layer without re-attaching it. */
+	function applyAppearance(layer, appearance) {
+		const alpha = Math.min(100, Math.max(0, Number.isFinite(appearance.opacity) ? appearance.opacity : 100)) / 100;
+		const opacity = alpha < 1 ? String(alpha) : "";
+		if (layer.style.getPropertyValue("opacity") !== opacity) {
+			if (opacity) layer.style.setProperty("opacity", opacity);
+			else layer.style.removeProperty("opacity");
+		}
+		const blur = Math.min(40, Math.max(0, Number.isFinite(appearance.blur) ? appearance.blur : 0));
+		const artwork = layer.querySelector(".power-dsh-artwork");
+		if (!artwork) return;
+		const declarations = {
+			filter: blur > 0 ? `blur(${blur}px)` : "",
+			position: "",
+			inset: "",
+			width: "",
+			height: ""
+		};
+		for (const [property, value] of Object.entries(declarations)) {
+			if (artwork.style.getPropertyValue(property) === value) continue;
+			if (value) artwork.style.setProperty(property, value);
+			else artwork.style.removeProperty(property);
+		}
+	}
+	function watchBackground(report, doc = document, win = window, animate = startAnimation, appearance = {
+		opacity: 100,
+		blur: 0
+	}, readAppearance, subscribeAppearance) {
 		let current = null;
 		let disposed = false;
 		let failedTarget = null;
@@ -4708,7 +4797,8 @@ void main() {
 			const surfaces = /* @__PURE__ */ new Map();
 			const fades = /* @__PURE__ */ new Map();
 			const refresh = (names) => {
-				const css = `${styles}
+				if (readAppearance) applyAppearance(layer, readAppearance());
+				const css = `${styles$1}
 html[data-windows-titlebar] .${names.frame}:has(> .power-dsh-flowing-background)::before { background: transparent !important; }
 html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .power-dsh-flowing-background) > .${names.sidebarCol} { border-right: 0.5px solid var(--dsw-alias-border-l3) !important; }`;
 				if (sheet.textContent !== css) sheet.textContent = css;
@@ -4749,12 +4839,27 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			};
 			const layer = doc.createElement("div");
 			layer.className = "power-dsh-flowing-background";
+			const initial = readAppearance ? readAppearance() : appearance;
+			const wallpaper = initial.wallpaper ?? null;
+			layer.setAttribute("data-kind", wallpaper ? "wallpaper" : "pattern");
 			layer.setAttribute("aria-hidden", "true");
 			const sheet = doc.createElement("style");
-			sheet.textContent = styles;
-			const canvas = doc.createElement("canvas");
-			layer.append(sheet, canvas);
+			sheet.textContent = styles$1;
 			let stop = () => {};
+			let canvas = null;
+			if (wallpaper) {
+				const image = doc.createElement("img");
+				image.className = "power-dsh-wallpaper power-dsh-artwork";
+				image.setAttribute("alt", "");
+				image.setAttribute("draggable", "false");
+				image.src = wallpaper.dataUrl;
+				layer.append(sheet, image);
+			} else {
+				canvas = doc.createElement("canvas");
+				canvas.className = "power-dsh-artwork";
+				layer.append(sheet, canvas);
+			}
+			applyAppearance(layer, initial);
 			const dispose = () => {
 				stop();
 				layer.remove();
@@ -4769,7 +4874,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				restores.push(change(target, "background-color", "var(--dsw-alias-bg-base)"));
 				refresh(classes);
 				target.appendChild(layer);
-				stop = animate(canvas, win, doc, target);
+				if (canvas) stop = animate(canvas, win, doc, target);
 				current = {
 					target,
 					layer,
@@ -4813,9 +4918,13 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			]
 		});
 		sync();
+		const offAppearance = subscribeAppearance?.(() => {
+			if (!disposed && current && readAppearance) applyAppearance(current.layer, readAppearance());
+		});
 		return () => {
 			if (disposed) return;
 			disposed = true;
+			offAppearance?.();
 			observer.disconnect();
 			clear();
 		};
@@ -4915,13 +5024,148 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 	}
 
 // src/features/flowing-background/client.ts
-	function createClientFeature(runtime, env) {
-		const { React, h, observable, useSnapshot } = runtime;
+	const KINDS = ["pattern", "wallpaper"];
+	const MAX_WALLPAPER_BYTES = 26214400;
+	const ACCEPTED = [
+		"image/png",
+		"image/jpeg",
+		"image/webp"
+	];
+	function resolveKind(value) {
+		return value === "wallpaper" ? "wallpaper" : "pattern";
+	}
+	/** Clamp a numeric preference, falling back when it is missing or malformed. */
+	function resolveNumber(value, fallback, min, max) {
+		const parsed = typeof value === "number" ? value : Number(value);
+		return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
+	}
+	/** Keeps the lifecycle controller renderable in environments without a live form source. */
+	const EMPTY_SNAPSHOT = {
+		status: "ready",
+		writable: false,
+		value: {}
+	};
+	const EMPTY_SOURCE = {
+		subscribe: () => () => {},
+		getSnapshot: () => EMPTY_SNAPSHOT
+	};
+	/** Read a picked image as a data URL without leaving the renderer. */
+	function readImage(file) {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onerror = () => reject(/* @__PURE__ */ new Error("read failed"));
+			reader.onload = () => {
+				const result = reader.result;
+				if (typeof result === "string" && /^data:image\/(?:png|jpeg|webp);base64,/.test(result)) resolve(result);
+				else reject(/* @__PURE__ */ new Error("read failed"));
+			};
+			reader.readAsDataURL(file);
+		});
+	}
+	function createClientFeature$2(runtime, env) {
+		const { React, h, Menu, Button, Tooltip, observable, useSnapshot, errorFeedback } = runtime;
+		const { ctx, t, source } = env;
 		let fault = null;
 		const attachment = observable(() => fault);
+		let wallpaper = {
+			status: "idle",
+			value: null,
+			error: ""
+		};
+		const wallpaperSource = observable(() => wallpaper);
+		let generation = 0;
+		let active = true;
+		ctx?.effect?.(() => () => {
+			active = false;
+			generation++;
+		});
+		const publishWallpaper = (patch) => {
+			wallpaper = {
+				...wallpaper,
+				...patch
+			};
+			wallpaperSource.notify();
+		};
+		const loadWallpaper = async () => {
+			const current = ++generation;
+			if (wallpaper.status !== "ready") publishWallpaper({
+				status: "loading",
+				error: ""
+			});
+			try {
+				const reply = await ctx.remote.powerDsh.readWallpaper();
+				if (!active || current !== generation) return;
+				if (!reply.ok) throw new Error(reply.error.message);
+				publishWallpaper({
+					status: "ready",
+					value: reply.value,
+					error: ""
+				});
+			} catch (failure) {
+				if (!active || current !== generation) return;
+				publishWallpaper({
+					status: "error",
+					error: errorMessage(failure) || t("flowingBackgroundWallpaperReadFailed")
+				});
+			}
+		};
+		const saveWallpaper = async (dataUrl, name) => {
+			const current = ++generation;
+			const reply = await ctx.remote.powerDsh.saveWallpaper(dataUrl, name);
+			if (!active || current !== generation) return;
+			if (!reply.ok) throw new Error(reply.error.message || t("flowingBackgroundWallpaperSaveFailed"));
+			publishWallpaper({
+				status: "ready",
+				value: reply.value,
+				error: ""
+			});
+		};
+		const clearWallpaper = async () => {
+			const current = ++generation;
+			const reply = await ctx.remote.powerDsh.clearWallpaper();
+			if (!active || current !== generation) return;
+			if (!reply.ok) throw new Error(reply.error.message || t("flowingBackgroundWallpaperSaveFailed"));
+			publishWallpaper({
+				status: "ready",
+				value: null,
+				error: ""
+			});
+		};
+		ctx?.effect?.(() => {
+			const sync = () => {
+				const snapshot = source.getSnapshot();
+				if (snapshot.status !== "ready") return;
+				if (snapshot.value?.flowingBackgroundEnabled !== true) return;
+				if (resolveKind(snapshot.value?.flowingBackgroundKind) !== "wallpaper") return;
+				if (wallpaper.status === "idle") loadWallpaper();
+			};
+			sync();
+			return source.subscribe(sync);
+		});
+		const readStyle = (snapshot) => ({
+			kind: resolveKind(snapshot.value?.flowingBackgroundKind),
+			opacity: resolveNumber(snapshot.value?.flowingBackgroundOpacity, 100, 0, 100),
+			blur: resolveNumber(snapshot.value?.flowingBackgroundBlur, 0, 0, 40)
+		});
 		function BackgroundController() {
+			const snapshot = useSnapshot(source ?? EMPTY_SOURCE);
+			const asset = useSnapshot(wallpaperSource);
+			const { kind } = readStyle(snapshot);
+			const dataUrl = kind === "wallpaper" ? asset.value?.dataUrl : void 0;
+			const name = kind === "wallpaper" ? asset.value?.name : void 0;
 			React.useLayoutEffect(() => {
 				let firstReport = true;
+				const read = () => {
+					const current = readStyle(source?.getSnapshot() ?? EMPTY_SOURCE.getSnapshot());
+					return {
+						opacity: panelState.open ? panelState.opacity : current.opacity,
+						blur: panelState.open ? panelState.blur : current.blur,
+						wallpaper: dataUrl ? {
+							dataUrl,
+							name: name ?? ""
+						} : null
+					};
+				};
 				return watchBackground((status) => {
 					if (status.state === "attached") {
 						if (fault) {
@@ -4936,8 +5180,15 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 						attachment.notify();
 					}
 					firstReport = false;
+				}, void 0, void 0, void 0, read(), read, (listener) => {
+					const offForm = (source ?? EMPTY_SOURCE).subscribe(listener);
+					const offPanel = panelStore.subscribe(listener);
+					return () => {
+						offForm();
+						offPanel();
+					};
 				});
-			}, []);
+			}, [dataUrl, name]);
 			return null;
 		}
 		function Background() {
@@ -4948,37 +5199,537 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			order: -100,
 			locale: env.namespace
 		}, Background);
-		const setting = {
+		let panelState = {
+			open: false,
+			opacity: 100,
+			blur: 0,
+			saving: false,
+			error: ""
+		};
+		const panelStore = observable(() => panelState);
+		const publishPanel = (patch) => {
+			if (Object.entries(patch).every(([key, value]) => panelState[key] === value)) return;
+			panelState = {
+				...panelState,
+				...patch
+			};
+			panelStore.notify();
+		};
+		const openPanel = (leave) => {
+			const snapshot = source.getSnapshot();
+			if (!leave || panelState.open || snapshot.status !== "ready" || !snapshot.writable) return;
+			const { kind, opacity, blur } = readStyle(snapshot);
+			publishPanel({
+				open: true,
+				opacity,
+				blur,
+				saving: false,
+				error: ""
+			});
+			leave();
+			if (kind === "wallpaper" && wallpaper.status === "idle") loadWallpaper();
+		};
+		const finishPanel = () => publishPanel({
+			open: false,
+			error: ""
+		});
+		const savePanel = async () => {
+			if (!active || !panelState.open || panelState.saving) return false;
+			const snapshot = source.getSnapshot();
+			if (snapshot.status !== "ready" || !snapshot.writable) return false;
+			const { opacity, blur } = panelState;
+			publishPanel({
+				saving: true,
+				error: ""
+			});
+			try {
+				const saved = readStyle(source.getSnapshot());
+				if (opacity !== saved.opacity) await env.savePreference("flowingBackgroundOpacity", opacity, void 0, "number");
+				if (blur !== saved.blur) await env.savePreference("flowingBackgroundBlur", blur, void 0, "number");
+				return true;
+			} catch (failure) {
+				if (active) publishPanel({
+					...readStyle(source.getSnapshot()),
+					error: errorMessage(failure) || t("saveFailed")
+				});
+				return false;
+			} finally {
+				if (active) publishPanel({ saving: false });
+			}
+		};
+		let panelCommit;
+		const commitPanel = () => {
+			if (panelCommit) return panelCommit;
+			const task = savePanel();
+			panelCommit = task;
+			task.then(() => {
+				if (panelCommit === task) panelCommit = void 0;
+			});
+			return task;
+		};
+		const closePanel = async () => {
+			if (pickingState.picking) return;
+			if (await commitPanel()) finishPanel();
+		};
+		ctx?.effect?.(() => {
+			const off = source.subscribe(() => {
+				const snapshot = source.getSnapshot();
+				if (panelState.open && (snapshot.status !== "ready" || !snapshot.writable || snapshot.value?.flowingBackgroundEnabled !== true)) finishPanel();
+			});
+			return () => {
+				off();
+				if (panelState.open) finishPanel();
+			};
+		});
+		function TuningPanel() {
+			const state = useSnapshot(panelStore);
+			const asset = useSnapshot(wallpaperSource);
+			const operation = useSnapshot(pickingStore);
+			const snapshot = useSnapshot(source);
+			const { kind } = readStyle(snapshot);
+			const title = t(kind === "wallpaper" ? "flowingBackgroundTuneWallpaperTitle" : "flowingBackgroundTunePatternTitle");
+			if (!state.open) return null;
+			return h("div", {
+				className: "power-dsh-background-panel",
+				role: "dialog",
+				"aria-label": title,
+				"aria-busy": state.saving,
+				onKeyDown: (event) => {
+					if (event.key === "Escape") {
+						event.preventDefault();
+						event.stopPropagation();
+						closePanel();
+					}
+				}
+			}, h("style", null, settingsStyles + panelStyles + styles$12), h("div", {
+				className: "power-dsh-background-panel-material",
+				"aria-hidden": true
+			}), h("div", { className: "power-dsh-background-panel-head" }, h("h2", { className: "power-dsh-background-panel-title" }, title), h(Button, {
+				type: "button",
+				variant: "ghost",
+				size: "sm",
+				className: "power-dsh-background-panel-close",
+				"aria-label": t("flowingBackgroundTuneDone"),
+				title: t("flowingBackgroundTuneDone"),
+				disabled: state.saving || operation.picking,
+				onClick: closePanel
+			}, h("svg", {
+				width: 14,
+				height: 14,
+				viewBox: "0 0 14 14",
+				fill: "none",
+				stroke: "currentColor",
+				strokeWidth: 1.4,
+				strokeLinecap: "round",
+				"aria-hidden": true,
+				focusable: false
+			}, h("path", { d: "m3 3 8 8M11 3l-8 8" })))), h("div", { className: "power-dsh-background-panel-body" }, panelSlider("flowingBackgroundOpacity", "flowingBackgroundOpacity", 100 - state.opacity, 0, 100, 5, "%"), panelSlider("flowingBackgroundBlur", "flowingBackgroundBlur", state.blur, 0, 40, 4, "px"), kind === "wallpaper" && wallpaperRow(asset, operation, state.saving), state.error && errorFeedback({
+				t,
+				message: state.error,
+				code: "PD-BACKGROUND-STYLE-SAVE",
+				operation: "background.tune",
+				retry: async () => {
+					await commitPanel();
+				}
+			})));
+		}
+		function panelSlider(field, labelKey, value, min, max, step, unit) {
+			const control = `power-dsh-tune-${field}`;
+			return h("div", {
+				className: "power-dsh-background-panel-slider",
+				key: field
+			}, h("div", { className: "power-dsh-background-panel-row" }, h("label", {
+				htmlFor: control,
+				className: "power-dsh-background-panel-label"
+			}, t(labelKey)), h("span", { className: "power-dsh-background-panel-value" }, `${value}${unit}`)), h("input", {
+				key: field,
+				id: control,
+				type: "range",
+				className: "power-dsh-slider",
+				min,
+				max,
+				step,
+				value,
+				disabled: panelState.saving,
+				"aria-label": t(labelKey),
+				"aria-valuetext": `${value}${unit}`,
+				onChange: (event) => {
+					if (!panelState.open || panelState.saving) return;
+					const next = Math.min(max, Math.max(min, Number(event.currentTarget.value)));
+					if (Number.isFinite(next)) publishPanel(field === "flowingBackgroundOpacity" ? { opacity: 100 - next } : { blur: next });
+				},
+				onPointerUp: () => commitPanel(),
+				onKeyUp: (event) => {
+					if ([
+						"ArrowLeft",
+						"ArrowRight",
+						"ArrowUp",
+						"ArrowDown",
+						"Home",
+						"End",
+						"PageUp",
+						"PageDown"
+					].includes(event.key)) return commitPanel();
+				},
+				onBlur: () => commitPanel()
+			}));
+		}
+		ctx?.slots?.inject?.("shell.overlay", () => ctx.slots.register({
+			name: "shell.overlay",
+			id: "power-dsh-background-tune",
+			order: -99,
+			locale: env.namespace
+		}, TuningPanel));
+		let menuOpen = false;
+		const menuStore = observable(() => menuOpen);
+		const setMenu = (next) => {
+			if (menuOpen !== next) {
+				menuOpen = next;
+				menuStore.notify();
+			}
+		};
+		let pickingState = {
+			picking: false,
+			error: ""
+		};
+		const pickingStore = observable(() => pickingState);
+		const publishPicking = (patch) => {
+			if (patch.picking === pickingState.picking && patch.error === pickingState.error) return;
+			pickingState = {
+				...pickingState,
+				...patch
+			};
+			pickingStore.notify();
+		};
+		const setPicking = (next) => publishPicking({ picking: next });
+		const setWallpaperError = (message) => publishPicking({ error: message });
+		let fileInput = null;
+		const kindLabel = (kind) => t(kind === "wallpaper" ? "flowingBackgroundKindWallpaper" : "flowingBackgroundKindPattern");
+		const mainSetting = {
 			field: "flowingBackgroundEnabled",
 			description: "flowingBackgroundDescription"
 		};
+		const kindSetting = {
+			field: "flowingBackgroundKind",
+			description: "flowingBackgroundKindDescription",
+			hidden: true,
+			save: async (next) => {
+				if (next !== "pattern" && next !== "wallpaper") throw new Error(t("saveFailed"));
+				try {
+					await env.savePreference("flowingBackgroundKind", next, void 0, "string");
+					if (next === "pattern") {
+						const saved = readStyle(source.getSnapshot());
+						if (saved.opacity !== 100) await env.savePreference("flowingBackgroundOpacity", 100, void 0, "number");
+						if (saved.blur !== 0) await env.savePreference("flowingBackgroundBlur", 0, void 0, "number");
+					}
+				} finally {
+					if (active && panelState.open) {
+						const { opacity, blur } = readStyle(source.getSnapshot());
+						publishPanel({
+							opacity,
+							blur
+						});
+					}
+				}
+			}
+		};
+		const opacitySetting = {
+			field: "flowingBackgroundOpacity",
+			description: "flowingBackgroundOpacityDescription",
+			hidden: true
+		};
+		const blurSetting = {
+			field: "flowingBackgroundBlur",
+			description: "flowingBackgroundBlurDescription",
+			hidden: true
+		};
+		const canEditWallpaper = () => {
+			const snapshot = source.getSnapshot();
+			return active && panelState.open && snapshot.status === "ready" && snapshot.writable && snapshot.value?.flowingBackgroundEnabled === true && readStyle(snapshot).kind === "wallpaper";
+		};
+		function wallpaperRow(asset, operation, disabled) {
+			const control = "power-dsh-tune-wallpaper";
+			const busy = operation.picking || asset.status === "loading";
+			const failure = operation.error || asset.error;
+			const choose = () => {
+				if (!disabled && !busy && canEditWallpaper()) fileInput?.click();
+			};
+			async function picked(event) {
+				const input = event.currentTarget;
+				const file = input.files?.[0];
+				input.value = "";
+				if (!file || disabled || !canEditWallpaper() || pickingState.picking) return;
+				setWallpaperError("");
+				if (!ACCEPTED.includes(file.type)) {
+					setWallpaperError(t("flowingBackgroundWallpaperUnsupported"));
+					return;
+				}
+				if (file.size > MAX_WALLPAPER_BYTES) {
+					setWallpaperError(t("flowingBackgroundWallpaperTooLarge"));
+					return;
+				}
+				setPicking(true);
+				try {
+					const dataUrl = await readImage(file);
+					if (!canEditWallpaper()) return;
+					await saveWallpaper(dataUrl, file.name);
+				} catch (failure) {
+					setWallpaperError(errorMessage(failure) || t("flowingBackgroundWallpaperSaveFailed"));
+				} finally {
+					setPicking(false);
+				}
+			}
+			async function remove() {
+				if (disabled || busy || !canEditWallpaper()) return;
+				setWallpaperError("");
+				setPicking(true);
+				try {
+					await clearWallpaper();
+				} catch (failure) {
+					setWallpaperError(errorMessage(failure) || t("flowingBackgroundWallpaperSaveFailed"));
+				} finally {
+					setPicking(false);
+				}
+			}
+			return h("div", {
+				className: "power-dsh-setting-row",
+				key: "flowingBackgroundWallpaper"
+			}, h("div", { className: "power-dsh-setting-copy" }, h("div", {
+				id: `${control}-label`,
+				className: "power-dsh-setting-label"
+			}, t("flowingBackgroundWallpaper")), h("div", {
+				id: `${control}-description`,
+				className: "power-dsh-description"
+			}, t("flowingBackgroundWallpaperDescription")), failure && errorFeedback({
+				t,
+				id: `${control}-error`,
+				message: failure,
+				code: "PD-BACKGROUND-WALLPAPER",
+				operation: "saveWallpaper",
+				retry: asset.status === "error" ? loadWallpaper : void 0
+			})), h("div", { className: "power-dsh-wallpaper-field" }, h("div", { className: "power-dsh-wallpaper-details" }, asset.value && h("img", {
+				className: "power-dsh-wallpaper-preview",
+				src: asset.value.dataUrl,
+				alt: "",
+				"aria-hidden": true,
+				draggable: false
+			}), h("span", {
+				className: "power-dsh-wallpaper-name",
+				title: asset.value?.name
+			}, asset.value ? asset.value.name : t("flowingBackgroundWallpaperEmpty"))), h("div", {
+				className: "power-dsh-wallpaper-actions",
+				role: "group",
+				"aria-labelledby": `${control}-label`
+			}, h(Button, {
+				type: "button",
+				variant: "outline",
+				size: "sm",
+				className: "power-dsh-wallpaper-action",
+				disabled: disabled || busy,
+				"aria-describedby": `${control}-description${failure ? ` ${control}-error` : ""}`,
+				"aria-busy": busy,
+				onClick: choose
+			}, t(asset.value ? "flowingBackgroundWallpaperReplace" : "flowingBackgroundWallpaperChoose")), asset.value && h(Button, {
+				type: "button",
+				variant: "outline",
+				size: "sm",
+				className: "power-dsh-wallpaper-action",
+				disabled: disabled || busy,
+				onClick: remove
+			}, t("flowingBackgroundWallpaperRemove"))), h("input", {
+				ref: (element) => {
+					fileInput = element;
+				},
+				type: "file",
+				className: "power-dsh-wallpaper-input",
+				tabIndex: -1,
+				accept: ACCEPTED.join(","),
+				"aria-hidden": true,
+				disabled: disabled || busy,
+				onChange: picked
+			})));
+		}
+		function useSettings({ snapshot, disabled, saving, error, save, id, leaveSettings }) {
+			const failed = useSnapshot(attachment);
+			const opened = useSnapshot(menuStore);
+			const openedTune = useSnapshot(panelStore).open;
+			const enabled = snapshot.value?.flowingBackgroundEnabled === true;
+			const { kind } = readStyle(snapshot);
+			const main = !failed || !enabled ? mainSetting : {
+				...mainSetting,
+				failure: presentFailure(failed.issue, failed.observedAt, t)
+			};
+			function kindRow() {
+				if (!enabled) return null;
+				const field = "flowingBackgroundKind";
+				const control = `${id}-${field}`;
+				const busy = saving?.field === field;
+				const fieldError = error?.field === field ? error.message : "";
+				const adjustment = h(Tooltip, {
+					label: t("flowingBackgroundTuneOpen"),
+					side: "top",
+					portal: true
+				}, h(Button, {
+					type: "button",
+					variant: "ghost",
+					size: "sm",
+					className: "power-dsh-background-tune-trigger",
+					id: `${id}-flowingBackgroundTune`,
+					disabled: disabled || !leaveSettings,
+					"aria-label": t("flowingBackgroundTuneOpen"),
+					"aria-haspopup": "dialog",
+					"aria-expanded": openedTune,
+					onClick: () => {
+						if (!disabled) {
+							setMenu(false);
+							openPanel(leaveSettings);
+						}
+					}
+				}, h("svg", {
+					width: 16,
+					height: 16,
+					viewBox: "0 0 16 16",
+					fill: "none",
+					stroke: "currentColor",
+					strokeWidth: 1.4,
+					strokeLinecap: "round",
+					"aria-hidden": true,
+					focusable: false
+				}, h("path", { d: "M2 4h3m4 0h5M2 12h5m4 0h3" }), h("circle", {
+					cx: 7,
+					cy: 4,
+					r: 2
+				}), h("circle", {
+					cx: 9,
+					cy: 12,
+					r: 2
+				}))));
+				const selector = h(Menu, {
+					open: opened && !disabled,
+					onClose: () => setMenu(false),
+					selectedId: kind,
+					align: "end",
+					portal: true,
+					autoFocus: true,
+					minWidthFromAnchor: true,
+					items: KINDS.map((item) => ({
+						id: item,
+						label: kindLabel(item)
+					})),
+					onSelect: (next) => {
+						setMenu(false);
+						return save(field, next);
+					},
+					anchor: h(Button, {
+						type: "button",
+						variant: "ghost",
+						size: "md",
+						className: "power-dsh-background-style-select",
+						disabled: disabled || busy,
+						"aria-label": t("flowingBackgroundKind"),
+						"aria-describedby": `${control}-description${fieldError ? ` ${control}-error` : ""}`,
+						"aria-invalid": Boolean(fieldError),
+						"aria-haspopup": "menu",
+						"aria-expanded": opened && !disabled,
+						"aria-busy": busy,
+						onClick: () => {
+							if (!disabled) setMenu(!opened);
+						}
+					}, kindLabel(kind), h("svg", {
+						width: 16,
+						height: 16,
+						viewBox: "0 0 16 16",
+						fill: "none",
+						stroke: "currentColor",
+						strokeWidth: 1.4,
+						strokeLinecap: "round",
+						strokeLinejoin: "round",
+						"aria-hidden": true,
+						focusable: false
+					}, h("path", { d: "m4 6 4 4 4-4" })))
+				});
+				return h("div", {
+					className: "power-dsh-setting-row",
+					key: field
+				}, h("div", { className: "power-dsh-setting-copy" }, h("div", {
+					id: `${control}-label`,
+					className: "power-dsh-setting-label"
+				}, t("flowingBackgroundKind")), h("div", {
+					id: `${control}-description`,
+					className: "power-dsh-description"
+				}, t("flowingBackgroundKindDescription")), fieldError && errorFeedback({
+					t,
+					id: `${control}-error`,
+					message: fieldError,
+					code: "PD-BACKGROUND-KIND-SAVE",
+					operation: `settings.${field}`
+				})), h("div", { className: "power-dsh-background-controls" }, adjustment, selector));
+			}
+			return [main, {
+				...kindSetting,
+				hidden: false,
+				render: kindRow
+			}];
+		}
 		return {
-			settings: [setting],
-			useSettings({ snapshot }) {
-				const failed = useSnapshot(attachment);
-				if (!failed || snapshot.value?.flowingBackgroundEnabled !== true) return [setting];
-				return [{
-					...setting,
-					failure: presentFailure(failed.issue, failed.observedAt, env.t)
-				}];
+			settings: [
+				mainSetting,
+				kindSetting,
+				opacitySetting,
+				blurSetting
+			],
+			useSettings,
+			styles: settingsStyles + panelStyles,
+			api: {
+				wallpaperSource,
+				loadWallpaper,
+				saveWallpaper,
+				clearWallpaper
 			}
 		};
 	}
 
 // src/features/flowing-background/definition.ts
-	const definition = Object.freeze({
+	const definition$2 = Object.freeze({
 		id: "flowing-background",
 		category: "interface",
 		order: 5,
-		keys: Object.freeze(["flowingBackgroundEnabled"]),
+		keys: Object.freeze([
+			"flowingBackgroundEnabled",
+			"flowingBackgroundKind",
+			"flowingBackgroundOpacity",
+			"flowingBackgroundBlur"
+		]),
 		spec: "src/features/flowing-background/spec.md"
 	});
 
 // src/features/flowing-background/locales.ts
-	const locales$1 = {
+	const locales$3 = {
 		en: {
-			flowingBackgroundEnabled: "Homepage flowing background",
-			flowingBackgroundDescription: "Add a softly flowing blue gradient to the interface",
+			flowingBackgroundEnabled: "Custom background",
+			flowingBackgroundDescription: "Choose a soft animated background for the interface",
+			flowingBackgroundOpacity: "Background fade",
+			flowingBackgroundOpacityDescription: "0% preserves the original background; 100% fades it out",
+			flowingBackgroundBlur: "Background blur",
+			flowingBackgroundBlurDescription: "0px keeps the background sharp; higher values add blur",
+			flowingBackgroundKind: "Background type",
+			flowingBackgroundKindDescription: "Choose the built-in flow or your own wallpaper",
+			flowingBackgroundKindPattern: "Homepage flow",
+			flowingBackgroundKindWallpaper: "Custom wallpaper",
+			flowingBackgroundWallpaper: "Wallpaper image",
+			flowingBackgroundWallpaperDescription: "PNG / JPEG / WebP · Max 25 MB",
+			flowingBackgroundWallpaperEmpty: "No wallpaper",
+			flowingBackgroundWallpaperChoose: "Choose image",
+			flowingBackgroundWallpaperReplace: "Replace",
+			flowingBackgroundWallpaperRemove: "Remove",
+			flowingBackgroundTuneOpen: "Adjust background",
+			flowingBackgroundTunePatternTitle: "Adjust homepage flow",
+			flowingBackgroundTuneWallpaperTitle: "Adjust wallpaper",
+			flowingBackgroundTuneDone: "Close",
+			flowingBackgroundWallpaperReadFailed: "The saved wallpaper could not be read.",
+			flowingBackgroundWallpaperSaveFailed: "The wallpaper could not be saved.",
+			flowingBackgroundWallpaperUnsupported: "Choose a PNG, JPEG or WebP image.",
+			flowingBackgroundWallpaperTooLarge: "The image must be no larger than 25 MB.",
 			flowingBackgroundLayoutUnavailable: "The background could not be displayed. The native interface is preserved.",
 			flowingBackgroundStageStyles: "Style recognition",
 			flowingBackgroundStageFrame: "Application layout checks",
@@ -5005,8 +5756,30 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			flowingBackgroundRecoveryRetry: "Turn the background off and on to retry. If the problem persists, copy the error information for a bug report."
 		},
 		zh: {
-			flowingBackgroundEnabled: "官网流动背景",
-			flowingBackgroundDescription: "为界面添加柔和流动的蓝色渐变",
+			flowingBackgroundEnabled: "自定义背景",
+			flowingBackgroundDescription: "为界面选择柔和的动态背景",
+			flowingBackgroundOpacity: "背景淡化",
+			flowingBackgroundOpacityDescription: "0% 保持原始背景，100% 完全淡出背景",
+			flowingBackgroundBlur: "背景模糊",
+			flowingBackgroundBlurDescription: "0px 保持清晰，数值越大背景越模糊",
+			flowingBackgroundKind: "背景类型",
+			flowingBackgroundKindDescription: "选择官网流动图案或自己的壁纸",
+			flowingBackgroundKindPattern: "官网流动",
+			flowingBackgroundKindWallpaper: "自定义壁纸",
+			flowingBackgroundWallpaper: "壁纸图片",
+			flowingBackgroundWallpaperDescription: "PNG / JPEG / WebP · 最大 25 MB",
+			flowingBackgroundWallpaperEmpty: "未设置壁纸",
+			flowingBackgroundWallpaperChoose: "选择图片",
+			flowingBackgroundWallpaperReplace: "更换",
+			flowingBackgroundWallpaperRemove: "移除",
+			flowingBackgroundTuneOpen: "调节背景",
+			flowingBackgroundTunePatternTitle: "官网流动调节",
+			flowingBackgroundTuneWallpaperTitle: "自定义壁纸调节",
+			flowingBackgroundTuneDone: "关闭",
+			flowingBackgroundWallpaperReadFailed: "无法读取已保存的壁纸。",
+			flowingBackgroundWallpaperSaveFailed: "壁纸保存失败。",
+			flowingBackgroundWallpaperUnsupported: "请选择 PNG、JPEG 或 WebP 图片。",
+			flowingBackgroundWallpaperTooLarge: "图片不能超过 25 MB。",
 			flowingBackgroundLayoutUnavailable: "背景未能显示，已保留原生界面。",
 			flowingBackgroundStageStyles: "样式识别",
 			flowingBackgroundStageFrame: "应用布局检查",
@@ -5034,49 +5807,917 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		}
 	};
 
+// src/features/flowing-background/rpc.ts
+	const wallpaperCodec = {
+		mode: "strict",
+		typeSymbol: "power-dsh#WallpaperAsset",
+		create: () => ({ parse(value) {
+			if (!isRecord(value) || typeof value.name !== "string" || typeof value.mime !== "string" || typeof value.bytes !== "number" || typeof value.dataUrl !== "string" || !value.dataUrl.startsWith("data:image/")) throw new TypeError("Invalid wallpaper asset");
+			return {
+				name: value.name,
+				mime: value.mime,
+				bytes: value.bytes,
+				dataUrl: value.dataUrl
+			};
+		} })
+	};
+	const nullableWallpaperCodec = {
+		mode: "strict",
+		typeSymbol: "power-dsh#WallpaperAsset?",
+		create: () => ({ parse(value) {
+			return value === null ? null : wallpaperCodec.create().parse(value);
+		} })
+	};
+	const clearedCodec = {
+		mode: "strict",
+		typeSymbol: "power-dsh#WallpaperCleared",
+		create: () => ({ parse(value) {
+			if (!isRecord(value) || value.cleared !== true) throw new TypeError("Invalid wallpaper clear result");
+			return { cleared: true };
+		} })
+	};
+	function descriptor(method, fields, result) {
+		return {
+			id: `power-dsh#powerDsh/${method}`,
+			service: "powerDsh",
+			namespace: "powerDsh",
+			method,
+			invocation: { kind: "direct" },
+			parameters: fields.map((name) => ({
+				name,
+				wire: name,
+				source: "json",
+				codec: stringCodec
+			})),
+			result
+		};
+	}
+	const READ_WALLPAPER_RPC = descriptor("readWallpaper", [], nullableWallpaperCodec);
+	const SAVE_WALLPAPER_RPC = descriptor("saveWallpaper", ["dataUrl", "name"], wallpaperCodec);
+	const CLEAR_WALLPAPER_RPC = descriptor("clearWallpaper", [], clearedCodec);
+	const rpc$1 = [
+		READ_WALLPAPER_RPC,
+		SAVE_WALLPAPER_RPC,
+		CLEAR_WALLPAPER_RPC
+	];
+
+// src/features/archive/archive-catalog.ts
+	function comparator(sortBy) {
+		if (sortBy === "created") return (a, b) => b.createdAt - a.createdAt;
+		return (a, b) => b.updatedAt - a.updatedAt;
+	}
+	/**
+	* Group archived sessions by workspace, keeping the native workspace order and
+	* placing sessions without a workspace in one trailing group. Search matches
+	* the session title or its workspace title; the optional project filter keeps
+	* one workspace, and the optional sort orders rows inside each group.
+	*/
+	function groupArchivedSessions(catalog, query, ungroupedLabel, options = {}) {
+		const sortBy = options.sortBy ?? "updated";
+		const projectId = options.projectId ?? "";
+		const needle = query.trim().toLocaleLowerCase();
+		const rows = catalog.sessions.filter((row) => {
+			if (projectId && row.workspaceId !== projectId) return false;
+			return !needle || `${row.title} ${row.workspaceTitle}`.toLocaleLowerCase().includes(needle);
+		});
+		const order = [];
+		const groups = /* @__PURE__ */ new Map();
+		for (const workspace of catalog.workspaces) {
+			order.push(workspace.workspaceId);
+			groups.set(workspace.workspaceId, {
+				key: workspace.workspaceId,
+				title: workspace.title,
+				sessions: []
+			});
+		}
+		const ungroupedKey = "__ungrouped__";
+		for (const row of rows) {
+			const key = row.workspaceId || ungroupedKey;
+			let group = groups.get(key);
+			if (!group) {
+				group = {
+					key,
+					title: row.workspaceTitle || ungroupedLabel,
+					sessions: []
+				};
+				groups.set(key, group);
+				order.push(key);
+			}
+			group.sessions.push(row);
+		}
+		const compare = comparator(sortBy);
+		return order.map((key) => groups.get(key)).filter((group) => group.sessions.length > 0).map((group) => ({
+			...group,
+			sessions: [...group.sessions].sort(compare)
+		}));
+	}
+
+// src/features/archive/styles.ts
+	const styles = `
+.power-dsh-archive-page .power-dsh-skill-panel { gap:18px; }
+.power-dsh-archive-page .power-dsh-archive-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.power-dsh-archive-page .power-dsh-archive-toolbar .power-dsh-skill-search-field { flex:1 1 220px; width:auto; }
+.power-dsh-archive-page .power-dsh-archive-select { box-sizing:border-box; display:inline-flex; align-items:center; gap:8px; height:36px; max-width:220px; border:.5px solid var(--dsw-alias-border-l4); border-radius:var(--dsw-radius-md); padding:0 10px 0 12px; background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-primary); font:inherit; font-size:13px; cursor:pointer; }
+.power-dsh-archive-page .power-dsh-archive-select:disabled { opacity:.5; cursor:default; }
+.power-dsh-archive-page .power-dsh-archive-select:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
+.power-dsh-archive-page .power-dsh-archive-select-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.power-dsh-archive-page .power-dsh-archive-select > svg { flex:none; color:var(--dsw-alias-label-tertiary); }
+.power-dsh-archive-page .power-dsh-archive-menu { min-width:0; max-width:100%; }
+.power-dsh-archive-page .power-dsh-archive-group { display:flex; flex-direction:column; gap:8px; }
+.power-dsh-archive-page .power-dsh-archive-group-header { display:flex; align-items:center; gap:8px; min-height:28px; }
+.power-dsh-archive-page .power-dsh-archive-group-folder { display:inline-flex; flex:none; color:var(--dsw-alias-label-tertiary); }
+.power-dsh-archive-page .power-dsh-archive-group-title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-primary); font-size:14px; line-height:22px; font-weight:500; }
+.power-dsh-archive-page .power-dsh-archive-count { flex:none; margin-left:auto; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
+.power-dsh-archive-page .power-dsh-archive-rows { margin:0; padding:0; list-style:none; overflow:hidden; border:.5px solid var(--dsw-alias-settings-card-stroke); border-radius:var(--dsw-radius-xl); background:var(--dsw-alias-settings-card-fill); }
+.power-dsh-archive-page .power-dsh-archive-row { display:flex; align-items:center; gap:12px; padding:12px 14px; }
+.power-dsh-archive-page .power-dsh-archive-row + .power-dsh-archive-row { border-top:.5px solid var(--dsw-alias-border-l2); }
+.power-dsh-archive-page .power-dsh-archive-row-main { display:flex; flex:1 1 auto; flex-direction:column; gap:2px; min-width:0; }
+.power-dsh-archive-page .power-dsh-archive-row-title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-primary); font-size:14px; line-height:20px; }
+.power-dsh-archive-page .power-dsh-archive-row-time { color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
+.power-dsh-archive-page .power-dsh-archive-restore { flex:none; height:28px; padding:0 12px; font-size:12px; line-height:18px; }
+.power-dsh-archive-page .power-dsh-archive-row-actions { display:flex; flex:none; align-items:center; gap:8px; }
+.power-dsh-archive-page .power-dsh-archive-icon { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border:0; border-radius:var(--dsw-radius-md); padding:0; background:transparent; color:var(--dsw-alias-label-tertiary); cursor:pointer; }
+.power-dsh-archive-page .power-dsh-archive-icon:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover); }
+.power-dsh-archive-page .power-dsh-archive-icon[data-danger="true"]:hover:not(:disabled) { color:var(--dsw-alias-state-error-primary); }
+.power-dsh-archive-page .power-dsh-archive-icon:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
+.power-dsh-archive-page .power-dsh-archive-icon:disabled { opacity:.4; cursor:default; }
+`;
+
+// src/features/archive/client.ts
+	function createClientFeature$1(runtime, env) {
+		const { React, h, Menu, Modal, Button, Tooltip, observable, useSnapshot, useMounted, errorFeedback } = runtime;
+		const { ctx, t, savePreference, preferenceSlot, namespace } = env;
+		const styles$13 = styles$11 + styles$8 + styles;
+		const { SkillSearchIcon } = createCatalogUI(runtime);
+		function ArchiveIcon({ size = 16 }) {
+			return h("svg", {
+				width: size,
+				height: size,
+				viewBox: "0 0 24 24",
+				fill: "none",
+				stroke: "currentColor",
+				strokeWidth: 2,
+				strokeLinecap: "round",
+				strokeLinejoin: "round",
+				"aria-hidden": true,
+				focusable: false
+			}, h("rect", {
+				x: 2,
+				y: 3,
+				width: 20,
+				height: 5,
+				rx: 1
+			}), h("path", { d: "M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" }), h("path", { d: "M10 12h4" }));
+		}
+		function FolderIcon({ size = 16 }) {
+			return h("svg", {
+				width: size,
+				height: size,
+				viewBox: "0 0 24 24",
+				fill: "none",
+				stroke: "currentColor",
+				strokeWidth: 2,
+				strokeLinecap: "round",
+				strokeLinejoin: "round",
+				"aria-hidden": true,
+				focusable: false
+			}, h("path", { d: "M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2z" }));
+		}
+		function TrashIcon({ size = 16 }) {
+			return h("svg", {
+				width: size,
+				height: size,
+				viewBox: "0 0 24 24",
+				fill: "none",
+				stroke: "currentColor",
+				strokeWidth: 2,
+				strokeLinecap: "round",
+				strokeLinejoin: "round",
+				"aria-hidden": true,
+				focusable: false
+			}, h("path", { d: "M3 6h18" }), h("path", { d: "M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" }), h("path", { d: "M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" }), h("path", { d: "M10 11v6M14 11v6" }));
+		}
+		const deleteErrorKeys = [
+			"archiveDeleteUnavailable",
+			"archiveDeleteLive",
+			"archiveDeleteUnsupported",
+			"archiveDeleteUnsafe",
+			"archiveNotArchived",
+			"archiveDeleteIncomplete",
+			"archiveDeleteCheckFailed",
+			"archiveDeleteStatFailed",
+			"archiveDeleteUnarchiveFailed",
+			"archiveDeleteRemoveFailed"
+		];
+		const archiveErrorMessage = (message, fallback) => {
+			if (message?.includes("archiveUnavailable")) return t("archiveUnavailable");
+			const key = message ? deleteErrorKeys.find((candidate) => message.includes(candidate)) : void 0;
+			return t(key ?? fallback);
+		};
+		function ArchiveSelect({ label, value, options, disabled, onChange }) {
+			const [open, setOpen] = React.useState(false);
+			const current = options.find((option) => option.id === value) ?? options[0];
+			return h(Menu, {
+				open: open && !disabled,
+				align: "end",
+				portal: true,
+				autoFocus: true,
+				minWidthFromAnchor: true,
+				className: "power-dsh-archive-menu",
+				selectedId: value,
+				items: options.map((option) => ({
+					id: option.id,
+					label: option.label
+				})),
+				onClose: () => setOpen(false),
+				onSelect: (id) => {
+					setOpen(false);
+					if (id !== value) onChange(id);
+				},
+				anchor: h("button", {
+					type: "button",
+					className: "power-dsh-archive-select",
+					disabled: Boolean(disabled),
+					"aria-haspopup": "menu",
+					"aria-expanded": open && !disabled,
+					"aria-label": label,
+					onClick: () => setOpen((state) => !state)
+				}, h("span", { className: "power-dsh-archive-select-label" }, current?.label ?? label), h("svg", {
+					width: 16,
+					height: 16,
+					viewBox: "0 0 16 16",
+					fill: "none",
+					stroke: "currentColor",
+					strokeWidth: 1.4,
+					strokeLinecap: "round",
+					strokeLinejoin: "round",
+					"aria-hidden": true
+				}, h("path", { d: "m4 6 4 4 4-4" })))
+			});
+		}
+		function ArchivePage({ t, archiveSource, loadArchivedSessions, restoreArchivedSession, deleteArchivedSession }) {
+			const snapshot = useSnapshot(archiveSource);
+			const catalog = snapshot.value;
+			const [query, setQuery] = React.useState("");
+			const [sortBy, setSortBy] = React.useState("updated");
+			const [projectId, setProjectId] = React.useState("");
+			const [restoring, setRestoring] = React.useState(null);
+			const [deleting, setDeleting] = React.useState(null);
+			const [confirming, setConfirming] = React.useState(null);
+			const [error, setError] = React.useState(null);
+			const mounted = useMounted();
+			const pending = React.useRef(false);
+			const busy = snapshot.status === "loading" || restoring !== null || deleting !== null;
+			React.useEffect(() => {
+				loadArchivedSessions();
+				const refresh = () => {
+					loadArchivedSessions();
+				};
+				window.addEventListener("focus", refresh);
+				return () => window.removeEventListener("focus", refresh);
+			}, []);
+			const groups = catalog ? groupArchivedSessions(catalog, query, t("archiveUngrouped"), {
+				sortBy,
+				projectId
+			}) : [];
+			const sortOptions = [{
+				id: "updated",
+				label: t("archiveSortUpdated")
+			}, {
+				id: "created",
+				label: t("archiveSortCreated")
+			}];
+			const projectOptions = [{
+				id: "all",
+				label: t("archiveAllProjects")
+			}, ...(catalog?.workspaces ?? []).map((workspace) => ({
+				id: workspace.workspaceId,
+				label: workspace.title
+			}))];
+			const projectValue = projectId || "all";
+			const disabled = busy || snapshot.status !== "ready" || !catalog?.complete;
+			async function restore(sessionId) {
+				if (disabled || pending.current) return;
+				pending.current = true;
+				setRestoring(sessionId);
+				setError(null);
+				try {
+					await restoreArchivedSession(sessionId);
+				} catch (failure) {
+					if (mounted.current) setError({
+						id: sessionId,
+						message: archiveErrorMessage(errorMessage(failure), "archiveRestoreFailed")
+					});
+				} finally {
+					pending.current = false;
+					if (mounted.current) setRestoring(null);
+				}
+			}
+			async function confirmDelete(sessionId) {
+				if (pending.current) return;
+				pending.current = true;
+				setDeleting(sessionId);
+				setError(null);
+				try {
+					await deleteArchivedSession(sessionId);
+					if (mounted.current) setConfirming(null);
+				} catch (failure) {
+					if (mounted.current) {
+						setConfirming(null);
+						setError({
+							id: sessionId,
+							message: archiveErrorMessage(errorMessage(failure), "archiveDeleteFailed")
+						});
+					}
+				} finally {
+					pending.current = false;
+					if (mounted.current) setDeleting(null);
+				}
+			}
+			const renderRow = (row) => {
+				const rowBusy = restoring === row.sessionId || deleting === row.sessionId;
+				const time = row.updatedAt > 0 ? new Date(row.updatedAt).toLocaleString() : "";
+				return h("li", {
+					key: row.sessionId,
+					className: "power-dsh-archive-row",
+					"data-archive": row.sessionId
+				}, h("div", { className: "power-dsh-archive-row-main" }, h(Tooltip, {
+					label: row.title || row.sessionId,
+					side: "top",
+					portal: true,
+					delayMs: 0,
+					maxWidth: 480
+				}, h("span", {
+					className: "power-dsh-archive-row-title",
+					tabIndex: 0
+				}, row.title || t("archiveUntitled"))), time && h("span", { className: "power-dsh-archive-row-time" }, time), error?.id === row.sessionId && errorFeedback({
+					t,
+					id: `${row.sessionId}-error`,
+					message: error.message,
+					code: "PD-ARCHIVE-ACTION",
+					operation: "archiveSession"
+				})), h("div", { className: "power-dsh-archive-row-actions" }, h("button", {
+					type: "button",
+					className: "power-dsh-archive-icon",
+					"data-danger": "true",
+					"data-delete": row.sessionId,
+					"aria-label": t("archiveDelete"),
+					disabled: disabled || rowBusy,
+					"aria-busy": deleting === row.sessionId,
+					onClick: () => {
+						if (mounted.current) setConfirming(row);
+					}
+				}, h(TrashIcon)), h("button", {
+					type: "button",
+					className: "power-dsh-prompt-action power-dsh-archive-restore",
+					"data-restore": row.sessionId,
+					disabled: disabled || rowBusy,
+					"aria-busy": restoring === row.sessionId,
+					onClick: () => restore(row.sessionId)
+				}, t(rowBusy ? "archiveRestoring" : "archiveRestore"))));
+			};
+			return h("section", {
+				className: "power-dsh-page power-dsh-skills-page power-dsh-archive-page",
+				"aria-label": t("archiveTab")
+			}, h("style", null, styles$13), h("header", null, h("h2", { className: "power-dsh-title" }, t("archiveTab")), h("p", { className: "power-dsh-description" }, t("archiveDescription"))), snapshot.status === "loading" && h("p", {
+				className: "power-dsh-notice",
+				role: "status"
+			}, t("loading")), snapshot.status === "error" && errorFeedback({
+				t,
+				message: snapshot.error || t("archiveLoadFailed"),
+				code: "PD-ARCHIVE-LOAD",
+				operation: "listArchivedSessions",
+				placement: "page",
+				retry: loadArchivedSessions,
+				disabled: busy
+			}), h("div", { className: "power-dsh-skill-panel" }, catalog && h("div", { className: "power-dsh-archive-toolbar" }, h("label", { className: "power-dsh-skill-search-field" }, h(SkillSearchIcon), h("input", {
+				type: "search",
+				value: query,
+				disabled: busy,
+				placeholder: t("archiveSearch"),
+				"aria-label": t("archiveSearch"),
+				onChange: (event) => {
+					if (mounted.current) setQuery(event.target.value);
+				}
+			})), h(ArchiveSelect, {
+				label: t("archiveSortLabel"),
+				value: sortBy,
+				options: sortOptions,
+				disabled: busy,
+				onChange: (value) => {
+					if (mounted.current) setSortBy(value);
+				}
+			}), h(ArchiveSelect, {
+				label: t("archiveProjectLabel"),
+				value: projectValue,
+				options: projectOptions,
+				disabled: busy,
+				onChange: (value) => {
+					if (mounted.current) setProjectId(value === "all" ? "" : value);
+				}
+			})), catalog && snapshot.status === "ready" && groups.map((group) => h("section", {
+				key: group.key,
+				className: "power-dsh-archive-group",
+				"aria-label": group.title
+			}, h("div", { className: "power-dsh-archive-group-header" }, h("span", { className: "power-dsh-archive-group-folder" }, h(FolderIcon)), h("span", { className: "power-dsh-archive-group-title" }, group.title), h("span", { className: "power-dsh-archive-count" }, t("archiveCount").replace("{count}", () => String(group.sessions.length)))), h("ul", { className: "power-dsh-archive-rows" }, group.sessions.map(renderRow)))), catalog && snapshot.status === "ready" && groups.length === 0 && h("p", { className: "power-dsh-skill-empty" }, t(query || projectId ? "archiveNoMatches" : "archiveEmpty"))), error && !(catalog?.sessions ?? []).some((row) => row.sessionId === error.id) && errorFeedback({
+				t,
+				message: error.message,
+				code: "PD-ARCHIVE-ACTION",
+				operation: "archiveSession",
+				placement: "page"
+			}), confirming && h(Modal, {
+				open: true,
+				onClose: () => {
+					if (deleting === null) setConfirming(null);
+				},
+				title: t("archiveDeleteTitle"),
+				closeLabel: t("close"),
+				description: t("archiveDeleteDescription").replace("{name}", () => confirming.title || t("archiveUntitled")),
+				footer: h(React.Fragment, null, h(Button, {
+					variant: "outline",
+					"data-modal-autofocus": true,
+					disabled: deleting !== null,
+					onClick: () => {
+						if (deleting === null) setConfirming(null);
+					}
+				}, t("cancel")), h(Button, {
+					variant: "primary",
+					disabled: deleting !== null,
+					onClick: () => {
+						confirmDelete(confirming.sessionId);
+					}
+				}, t(deleting !== null ? "archiveDeleting" : "archiveDeleteConfirm")))
+			}));
+		}
+		let active = true;
+		let archive = {
+			status: "loading",
+			value: null,
+			error: ""
+		};
+		const archiveSource = observable(() => archive);
+		let generation = 0;
+		ctx.effect(() => () => {
+			active = false;
+			generation++;
+		});
+		const loadArchivedSessions = async () => {
+			const current = ++generation;
+			if (archive.status !== "ready") {
+				archive = {
+					...archive,
+					status: "loading",
+					error: ""
+				};
+				archiveSource.notify();
+			}
+			try {
+				const result = await ctx.remote.powerDsh.listArchivedSessions();
+				if (!active || current !== generation) return;
+				if (!result.ok) throw new Error(result.error.message);
+				archive = {
+					status: "ready",
+					value: result.value,
+					error: ""
+				};
+			} catch (failure) {
+				if (!active || current !== generation) return;
+				archive = {
+					...archive,
+					status: "error",
+					error: archiveErrorMessage(errorMessage(failure), "archiveLoadFailed")
+				};
+			}
+			archiveSource.notify();
+		};
+		const restoreArchivedSession = async (sessionId) => {
+			const current = ++generation;
+			const result = await ctx.remote.powerDsh.restoreArchivedSession(sessionId);
+			if (!active || current !== generation) return;
+			if (!result.ok) {
+				await loadArchivedSessions();
+				throw new Error(result.error.message);
+			}
+			archive = {
+				status: "ready",
+				value: result.value,
+				error: ""
+			};
+			archiveSource.notify();
+		};
+		const deleteArchivedSession = async (sessionId) => {
+			const current = ++generation;
+			const result = await ctx.remote.powerDsh.deleteArchivedSession(sessionId);
+			if (!active || current !== generation) return;
+			if (!result.ok) {
+				await loadArchivedSessions();
+				throw new Error(result.error.message);
+			}
+			archive = {
+				status: "ready",
+				value: result.value,
+				error: ""
+			};
+			archiveSource.notify();
+		};
+		preferenceSlot("archiveManagerEnabled", "settings.section", {
+			id: "power-dsh-archive",
+			order: 54,
+			locale: namespace,
+			label: () => t("archiveTab")
+		}, (props) => h(ArchivePage, {
+			...props,
+			archiveSource,
+			loadArchivedSessions,
+			restoreArchivedSession,
+			deleteArchivedSession
+		}));
+		preferenceSlot("archiveManagerEnabled", "settings.section.icon", { id: "power-dsh-archive" }, ArchiveIcon);
+		return {
+			settings: [{
+				field: "archiveManagerEnabled",
+				description: "archiveManagerDescription",
+				save: (next) => savePreference("archiveManagerEnabled", next === true, "archiveOutdated"),
+				hideError: true
+			}],
+			api: {
+				archiveSource,
+				loadArchivedSessions,
+				restoreArchivedSession,
+				deleteArchivedSession
+			}
+		};
+	}
+
+// src/features/archive/definition.ts
+	const definition$1 = Object.freeze({
+		id: "archive",
+		category: "enhance",
+		order: 10,
+		keys: Object.freeze(["archiveManagerEnabled"]),
+		spec: "src/features/archive/spec.md"
+	});
+
+// src/features/archive/locales.ts
+	const locales$2 = {
+		"en": {
+			"archiveManagerEnabled": "Archive management",
+			"archiveManagerDescription": "Review and restore archived sessions",
+			"archiveTab": "Archive",
+			"archiveDescription": "Review and restore archived sessions in DSH",
+			"archiveSearch": "Search archived sessions",
+			"archiveEmpty": "No archived sessions",
+			"archiveNoMatches": "No matching archived sessions",
+			"archiveCount": "{count} sessions",
+			"archiveSortLabel": "Sort",
+			"archiveSortUpdated": "Last updated",
+			"archiveSortCreated": "Created",
+			"archiveProjectLabel": "Project",
+			"archiveAllProjects": "All projects",
+			"archiveRestore": "Restore",
+			"archiveRestoring": "Restoring…",
+			"archiveRestoreFailed": "Could not restore this session. Please try again.",
+			"archiveDelete": "Delete",
+			"archiveDeleteTitle": "Delete session?",
+			"archiveDeleteDescription": "This permanently deletes session “{name}” and its transcript. This cannot be undone.",
+			"archiveDeleteConfirm": "Delete permanently",
+			"archiveDeleting": "Deleting…",
+			"archiveDeleteFailed": "Could not delete this session. Please try again.",
+			"archiveDeleteLive": "This session is still running. Stop it before deleting.",
+			"archiveDeleteUnavailable": "Deleting sessions is unavailable in this Host.",
+			"archiveDeleteUnsupported": "This session store cannot be deleted safely.",
+			"archiveDeleteUnsafe": "Refusing to delete through a symbolic link.",
+			"archiveNotArchived": "This session is not archived.",
+			"archiveDeleteIncomplete": "Could not fully remove this session. It may still appear.",
+			"archiveDeleteCheckFailed": "Could not read the archive state. Please try again.",
+			"archiveDeleteStatFailed": "Could not locate this session's storage, so nothing was deleted.",
+			"archiveDeleteUnarchiveFailed": "Could not update the archive state, so nothing was deleted.",
+			"archiveDeleteRemoveFailed": "Could not delete the session files. Check disk permissions and try again.",
+			"archiveLoadFailed": "Could not load archived sessions. Please try again.",
+			"archiveUnavailable": "Archive management is currently unavailable.",
+			"archiveUntitled": "Untitled session",
+			"archiveUngrouped": "Ungrouped",
+			"archiveOutdated": "Archive management is not loaded in the Host yet. Re-enable power-dsh, then try again."
+		},
+		"zh": {
+			"archiveManagerEnabled": "归档管理",
+			"archiveManagerDescription": "查看并恢复已归档会话",
+			"archiveTab": "归档",
+			"archiveDescription": "查看并恢复 DSH 中已归档的会话",
+			"archiveSearch": "搜索已归档会话",
+			"archiveEmpty": "暂无归档会话",
+			"archiveNoMatches": "未找到匹配的归档会话",
+			"archiveCount": "{count} 个会话",
+			"archiveSortLabel": "排序方式",
+			"archiveSortUpdated": "更新时间",
+			"archiveSortCreated": "创建时间",
+			"archiveProjectLabel": "项目",
+			"archiveAllProjects": "所有项目",
+			"archiveRestore": "取消归档",
+			"archiveRestoring": "正在取消归档…",
+			"archiveRestoreFailed": "无法恢复此会话，请重试。",
+			"archiveDelete": "删除",
+			"archiveDeleteTitle": "删除会话？",
+			"archiveDeleteDescription": "将永久删除会话“{name}”及其对话记录，此操作不可恢复。",
+			"archiveDeleteConfirm": "永久删除",
+			"archiveDeleting": "正在删除…",
+			"archiveDeleteFailed": "无法删除此会话，请重试。",
+			"archiveDeleteLive": "该会话仍在运行，请先停止后再删除。",
+			"archiveDeleteUnavailable": "当前 Host 不支持删除会话。",
+			"archiveDeleteUnsupported": "该会话存储无法安全删除。",
+			"archiveDeleteUnsafe": "拒绝通过符号链接删除。",
+			"archiveNotArchived": "该会话不在归档中。",
+			"archiveDeleteIncomplete": "未能彻底移除该会话，可能仍会显示。",
+			"archiveDeleteCheckFailed": "无法读取归档状态，请重试。",
+			"archiveDeleteStatFailed": "无法定位该会话的存储文件，未执行删除。",
+			"archiveDeleteUnarchiveFailed": "无法更新归档状态，未执行删除。",
+			"archiveDeleteRemoveFailed": "删除会话文件失败，请检查磁盘权限后重试。",
+			"archiveLoadFailed": "无法加载归档会话，请重试。",
+			"archiveUnavailable": "归档管理暂不可用。",
+			"archiveUntitled": "未命名会话",
+			"archiveUngrouped": "未归类",
+			"archiveOutdated": "归档管理尚未在后端加载，请重新启用 power-dsh 后重试。"
+		}
+	};
+
+// src/features/archive/rpc.ts
+	const archiveCatalogCodec = {
+		mode: "strict",
+		typeSymbol: "power-dsh#ArchiveCatalog",
+		create: () => ({ parse(value) {
+			if (!isRecord(value) || typeof value.complete !== "boolean" || !isArray(value.workspaces) || !isArray(value.sessions)) throw new TypeError("Invalid archive catalog");
+			const workspaces = value.workspaces.map((row) => {
+				if (!isRecord(row) || !hasStrings(row, ["workspaceId", "title"])) throw new TypeError("Invalid archive workspace");
+				return {
+					workspaceId: row.workspaceId,
+					title: row.title
+				};
+			});
+			const sessions = value.sessions.map((row) => {
+				if (!isRecord(row) || !hasStrings(row, [
+					"sessionId",
+					"title",
+					"workspaceId",
+					"workspaceTitle"
+				]) || typeof row.updatedAt !== "number" || !Number.isFinite(row.updatedAt) || typeof row.createdAt !== "number" || !Number.isFinite(row.createdAt)) throw new TypeError("Invalid archive session");
+				return {
+					sessionId: row.sessionId,
+					title: row.title,
+					workspaceId: row.workspaceId,
+					workspaceTitle: row.workspaceTitle,
+					updatedAt: row.updatedAt,
+					createdAt: row.createdAt
+				};
+			});
+			return {
+				complete: value.complete,
+				workspaces,
+				sessions
+			};
+		} })
+	};
+	function archiveRpc(method, fields) {
+		return {
+			id: `power-dsh#powerDsh/${method}`,
+			service: "powerDsh",
+			namespace: "powerDsh",
+			method,
+			invocation: { kind: "direct" },
+			parameters: fields.map((name) => ({
+				name,
+				wire: name,
+				source: "json",
+				codec: stringCodec
+			})),
+			result: archiveCatalogCodec
+		};
+	}
+	const LIST_ARCHIVED_SESSIONS_RPC = archiveRpc("listArchivedSessions", []);
+	const RESTORE_ARCHIVED_SESSION_RPC = archiveRpc("restoreArchivedSession", ["sessionId"]);
+	const DELETE_ARCHIVED_SESSION_RPC = archiveRpc("deleteArchivedSession", ["sessionId"]);
+	const rpc = [
+		LIST_ARCHIVED_SESSIONS_RPC,
+		RESTORE_ARCHIVED_SESSION_RPC,
+		DELETE_ARCHIVED_SESSION_RPC
+	];
+
+// src/features/whale-motion/geometry.ts
+	const FISH_PATH = "M22.9168 1.43018C22.6713 1.31018 22.5658 1.53918 22.4223 1.65519C22.3733 1.69269 22.3318 1.74169 22.2903 1.78669C21.9317 2.1697 21.5127 2.42121 20.9657 2.39121C20.1657 2.34621 19.4827 2.59771 18.8787 3.20973C18.7502 2.45521 18.3236 2.0047 17.6746 1.71569C17.3351 1.56568 16.9916 1.41518 16.7536 1.08867C16.5876 0.856163 16.5421 0.597155 16.4591 0.341647C16.4061 0.187643 16.3536 0.0301382 16.1761 0.00363739C15.9836 -0.0263635 15.9081 0.135141 15.8326 0.270145C15.5306 0.822162 15.4136 1.43018 15.4251 2.0462C15.4516 3.43174 16.0366 4.53527 17.1991 5.3203C17.3311 5.4103 17.3651 5.5003 17.3236 5.63181C17.2441 5.90231 17.1501 6.16482 17.0671 6.43533C17.0141 6.60784 16.9351 6.64584 16.7501 6.57033C16.1121 6.30383 15.5611 5.90931 15.074 5.4328C14.2475 4.63328 13.5 3.75075 12.568 3.05973C12.349 2.89822 12.13 2.74822 11.9034 2.60522C10.9524 1.68169 12.028 0.923165 12.277 0.833162C12.5375 0.739159 12.3675 0.41615 11.5259 0.42015C10.6844 0.42365 9.91439 0.705658 8.93286 1.08117C8.78935 1.13767 8.63835 1.17867 8.48384 1.21267C7.59332 1.04367 6.66829 1.00617 5.70226 1.11517C3.88321 1.31768 2.43016 2.1777 1.36213 3.64575C0.0790928 5.4103 -0.222916 7.41536 0.146595 9.50642C0.535106 11.7105 1.66014 13.535 3.38869 14.9616C5.18125 16.4406 7.24581 17.1657 9.60138 17.0266C11.0319 16.9441 12.6245 16.7526 14.421 15.2321C14.874 15.4576 15.3496 15.5476 16.1381 15.6151C16.7456 15.6716 17.3306 15.5851 17.7836 15.4911C18.4931 15.3411 18.4441 14.6841 18.1876 14.5636C16.1081 13.595 16.5646 13.9891 16.1496 13.67C17.2061 12.42 18.8202 10.1979 19.3182 7.17235C19.3672 6.83834 19.4297 6.36783 19.4222 6.09732C19.4182 5.93231 19.4562 5.86831 19.6447 5.84931C20.1657 5.78931 20.6712 5.64681 21.1357 5.3913C22.4833 4.65528 23.0268 3.44624 23.1548 1.9972C23.1738 1.77569 23.1508 1.54668 22.9168 1.43018ZM11.1749 14.4736C9.15936 12.889 8.18184 12.3675 7.77832 12.39C7.40081 12.4125 7.46881 12.8445 7.55182 13.126C7.63882 13.404 7.75182 13.5955 7.91033 13.8396C8.01983 14.0011 8.09533 14.2411 7.80083 14.4216C7.15181 14.8231 6.02327 14.2866 5.97027 14.2601C4.65673 13.4865 3.5587 12.4655 2.78467 11.069C2.03715 9.72493 1.60314 8.28289 1.53164 6.74384C1.51264 6.37233 1.62214 6.24082 1.99215 6.17332C2.47916 6.08332 2.98118 6.06432 3.46769 6.13582C5.52476 6.43633 7.27581 7.35586 8.74385 8.8129C9.58188 9.64243 10.2159 10.634 10.8689 11.6025C11.5634 12.631 12.3105 13.611 13.262 14.4146C13.598 14.6961 13.866 14.9101 14.1225 15.0681C13.349 15.1546 12.058 15.1731 11.1749 14.4746L11.1749 14.4736ZM12.141 8.25988C12.141 8.09488 12.273 7.96338 12.439 7.96338C12.4765 7.96338 12.5105 7.97088 12.541 7.98188C12.5825 7.99688 12.6205 8.01938 12.6505 8.05338C12.7035 8.10588 12.7335 8.18088 12.7335 8.25988C12.7335 8.42489 12.6015 8.55639 12.4355 8.55639C12.2695 8.55639 12.141 8.42489 12.141 8.25988ZM15.1415 9.79893C14.949 9.87793 14.7565 9.94544 14.5715 9.95294C14.2845 9.96794 13.9715 9.85143 13.8015 9.70893C13.5375 9.48742 13.3485 9.36342 13.2695 8.97691C13.2355 8.8119 13.2545 8.55639 13.2845 8.40989C13.3525 8.09438 13.277 7.89187 13.0545 7.70787C12.8735 7.55786 12.643 7.51636 12.39 7.51636C12.2955 7.51636 12.209 7.47486 12.1445 7.44136C12.039 7.38886 11.9519 7.25735 12.035 7.09585C12.0615 7.04335 12.19 6.91584 12.22 6.89334C12.5635 6.69784 12.9595 6.76184 13.326 6.90834C13.6655 7.04735 13.9225 7.30236 14.292 7.66287C14.6695 8.09838 14.7375 8.21838 14.9525 8.54539C15.1225 8.8009 15.277 9.06341 15.3831 9.36392C15.4471 9.55142 15.3641 9.70493 15.1415 9.79893Z";
+	const TAIL_SHAPES = [
+		"M22.917,1.430 L22.858,1.407 L22.805,1.397 L22.756,1.398 L22.711,1.409 L22.670,1.429 L22.631,1.454 L22.595,1.485 L22.560,1.519 L22.526,1.554 L22.492,1.590 L22.457,1.624 L22.422,1.655 L22.410,1.665 L22.398,1.675 L22.387,1.685 L22.376,1.696 L22.364,1.707 L22.353,1.718 L22.343,1.729 L22.332,1.741 L22.322,1.752 L22.311,1.764 L22.301,1.775 L22.290,1.787 L22.199,1.880 L22.106,1.967 L22.009,2.047 L21.909,2.120 L21.806,2.186 L21.699,2.244 L21.588,2.293 L21.473,2.333 L21.353,2.363 L21.229,2.383 L21.100,2.393 L20.966,2.391 L20.768,2.386 L20.575,2.394 L20.387,2.414 L20.203,2.447 L20.024,2.494 L19.849,2.554 L19.678,2.628 L19.510,2.716 L19.347,2.817 L19.187,2.933 L19.031,3.064 L18.879,3.210 L18.840,3.027 L18.790,2.857 L18.728,2.699 L18.654,2.551 L18.568,2.415 L18.472,2.288 L18.365,2.171 L18.247,2.064 L18.118,1.965 L17.980,1.874 L17.832,1.791 L17.675,1.716 L17.590,1.678 L17.505,1.640 L17.421,1.600 L17.338,1.559 L17.256,1.515 L17.176,1.468 L17.098,1.418 L17.023,1.363 L16.950,1.303 L16.881,1.238 L16.815,1.167 L16.754,1.089 L16.715,1.030 L16.680,0.970 L16.649,0.910 L16.622,0.848 L16.597,0.786 L16.575,0.724 L16.555,0.661 L16.535,0.597 L16.517,0.533 L16.498,0.470 L16.479,0.406 L16.459,0.342 L16.446,0.303 L16.432,0.265 L16.417,0.228 L16.402,0.191 L16.384,0.157 L16.364,0.125 L16.342,0.095 L16.317,0.069 L16.288,0.046 L16.255,0.027 L16.218,0.013 L16.176,0.004 L16.130,0.000 L16.089,0.004 L16.052,0.014 L16.018,0.029 L15.988,0.050 L15.960,0.075 L15.935,0.103 L15.912,0.134 L15.891,0.167 L15.871,0.201 L15.852,0.236 L15.833,0.270 L15.761,0.409 L15.697,0.551 L15.640,0.694 L15.590,0.839 L15.547,0.986 L15.511,1.134 L15.482,1.284 L15.459,1.435 L15.441,1.586 L15.430,1.739 L15.425,1.892 L15.425,2.046 L15.443,2.387 L15.485,2.715 L15.550,3.032 L15.638,3.336 L15.750,3.629 L15.886,3.908 L16.045,4.176 L16.228,4.430 L16.435,4.672 L16.666,4.901 L16.920,5.117 L17.199,5.320 L17.230,5.343 L17.257,5.365 L17.280,5.388 L17.299,5.412 L17.315,5.436 L17.326,5.460 L17.335,5.486 L17.339,5.513 L17.340,5.540 L17.338,5.569 L17.332,5.600 L17.324,5.632 L17.303,5.699 L17.283,5.766 L17.262,5.833 L17.240,5.900 L17.219,5.967 L17.197,6.034 L17.175,6.100 L17.153,6.167 L17.131,6.234 L17.109,6.301 L17.088,6.368 L17.067,6.435 L17.053,6.476 L17.038,6.510 L17.021,6.540 L17.002,6.564 L16.982,6.582 L16.958,6.596 L16.932,6.604 L16.903,6.607 L16.870,6.605 L16.834,6.599 L16.794,6.587 L16.750,6.570 L16.592,6.501 L16.438,6.427 L16.288,6.347 L16.140,6.263 L15.996,6.174 L15.855,6.080 L15.718,5.982 L15.583,5.880 L15.452,5.774 L15.323,5.664 L15.197,5.550 L15.074,5.433 L14.869,5.231 L14.666,5.027 L14.465,4.822 L14.264,4.616 L14.063,4.410 L13.861,4.206 L13.656,4.003 L13.448,3.804 L13.237,3.610 L13.020,3.420 L12.797,3.236 L12.568,3.060 L12.513,3.020 L12.458,2.980 L12.404,2.941 L12.349,2.902 L12.294,2.864 L12.239,2.826 L12.183,2.788 L12.128,2.751 L12.072,2.714 L12.016,2.677 L11.960,2.641 L11.903,2.605 L11.706,2.378 L11.584,2.160 L11.526,1.951 L11.522,1.755 L11.564,1.573 L11.640,1.407 L11.742,1.257 L11.858,1.127 L11.980,1.018 L12.097,0.932 L12.199,0.869 L12.277,0.833 L12.333,0.805 L12.370,0.770 L12.388,0.728 L12.385,0.683 L12.361,0.637 L12.315,0.590 L12.246,0.545 L12.153,0.505 L12.035,0.470 L11.892,0.443 L11.722,0.426 L11.526,0.420 L11.317,0.427 L11.110,0.444 L10.904,0.472 L10.698,0.510 L10.491,0.556 L10.282,0.611 L10.070,0.674 L9.854,0.744 L9.634,0.820 L9.407,0.902 L9.174,0.989 L8.933,1.081 L8.897,1.095 L8.860,1.108 L8.824,1.121 L8.787,1.133 L8.750,1.144 L8.712,1.155 L8.675,1.166 L8.637,1.176 L8.599,1.186 L8.561,1.195 L8.522,1.204 L8.484,1.213 L8.260,1.173 L8.036,1.139 L7.809,1.111 L7.582,1.088 L7.352,1.071 L7.121,1.060 L6.889,1.054 L6.655,1.054 L6.419,1.061 L6.182,1.073 L5.943,1.091 L5.702,1.115 L5.255,1.179 L4.823,1.271 L4.407,1.390 L4.006,1.535 L3.620,1.707 L3.251,1.906 L2.896,2.131 L2.558,2.382 L2.235,2.659 L1.928,2.963 L1.637,3.291 L1.362,3.646 L1.062,4.092 L0.801,4.547 L0.579,5.012 L0.395,5.485 L0.247,5.966 L0.135,6.454 L0.057,6.949 L0.012,7.450 L0.000,7.957 L0.019,8.469 L0.068,8.986 L0.147,9.506 L0.259,10.050 L0.402,10.577 L0.574,11.088 L0.776,11.583 L1.006,12.062 L1.265,12.526 L1.552,12.972 L1.866,13.403 L2.208,13.817 L2.575,14.215 L2.969,14.597 L3.389,14.962 L3.843,15.316 L4.308,15.638 L4.784,15.928 L5.273,16.185 L5.772,16.410 L6.284,16.601 L6.807,16.758 L7.342,16.882 L7.889,16.971 L8.448,17.025 L9.019,17.043 L9.601,17.027 L9.962,17.003 L10.330,16.971 L10.705,16.925 L11.087,16.863 L11.477,16.778 L11.874,16.669 L12.279,16.529 L12.691,16.355 L13.111,16.142 L13.540,15.887 L13.976,15.585 L14.421,15.232 L14.535,15.286 L14.651,15.334 L14.770,15.378 L14.892,15.417 L15.020,15.452 L15.154,15.483 L15.294,15.511 L15.443,15.536 L15.601,15.558 L15.769,15.579 L15.947,15.598 L16.138,15.615 L16.289,15.626 L16.439,15.632 L16.588,15.633 L16.734,15.629 L16.878,15.621 L17.019,15.610 L17.157,15.595 L17.291,15.578 L17.421,15.558 L17.547,15.537 L17.668,15.514 L17.784,15.491 L17.945,15.444 L18.078,15.379 L18.182,15.300 L18.261,15.211 L18.315,15.115 L18.348,15.016 L18.360,14.918 L18.355,14.824 L18.332,14.738 L18.296,14.664 L18.247,14.604 L18.188,14.564 L17.719,14.349 L17.343,14.183 L17.050,14.060 L16.827,13.972 L16.663,13.912 L16.544,13.873 L16.461,13.848 L16.400,13.828 L16.351,13.808 L16.300,13.780 L16.237,13.736 L16.150,13.670 L16.424,13.337 L16.717,12.965 L17.020,12.553 L17.330,12.102 L17.640,11.613 L17.943,11.087 L18.235,10.524 L18.510,9.924 L18.762,9.288 L18.984,8.617 L19.171,7.912 L19.318,7.172 L19.331,7.086 L19.343,6.996 L19.356,6.902 L19.369,6.805 L19.380,6.708 L19.391,6.611 L19.401,6.515 L19.409,6.422 L19.416,6.332 L19.421,6.248 L19.423,6.169 L19.422,6.097 L19.422,6.058 L19.424,6.023 L19.429,5.992 L19.436,5.964 L19.447,5.940 L19.461,5.919 L19.480,5.901 L19.502,5.885 L19.530,5.873 L19.562,5.863 L19.601,5.855 L19.645,5.849 L19.775,5.833 L19.904,5.812 L20.032,5.788 L20.160,5.761 L20.286,5.729 L20.411,5.694 L20.536,5.654 L20.658,5.610 L20.780,5.562 L20.900,5.510 L21.019,5.453 L21.136,5.391 L21.456,5.198 L21.744,4.985 L22.002,4.754 L22.230,4.506 L22.430,4.242 L22.603,3.962 L22.750,3.667 L22.874,3.358 L22.975,3.035 L23.054,2.701 L23.114,2.354 L23.155,1.997 L23.159,1.942 L23.160,1.886 L23.159,1.832 L23.154,1.778 L23.144,1.725 L23.131,1.674 L23.112,1.626 L23.087,1.580 L23.055,1.537 L23.017,1.497 L22.971,1.462 L22.917,1.430 Z M11.175,14.474 L10.692,14.099 L10.251,13.767 L9.851,13.476 L9.488,13.224 L9.163,13.009 L8.872,12.829 L8.615,12.683 L8.390,12.568 L8.196,12.483 L8.030,12.426 L7.891,12.396 L7.778,12.390 L7.693,12.404 L7.625,12.433 L7.572,12.475 L7.533,12.528 L7.507,12.591 L7.492,12.661 L7.487,12.736 L7.490,12.815 L7.499,12.895 L7.514,12.975 L7.532,13.053 L7.552,13.126 L7.574,13.194 L7.598,13.258 L7.622,13.320 L7.648,13.380 L7.676,13.439 L7.704,13.496 L7.734,13.552 L7.766,13.608 L7.800,13.664 L7.835,13.721 L7.872,13.780 L7.910,13.840 L7.937,13.882 L7.961,13.926 L7.981,13.973 L7.996,14.022 L8.005,14.072 L8.007,14.123 L8.001,14.175 L7.984,14.226 L7.958,14.277 L7.919,14.327 L7.867,14.375 L7.801,14.422 L7.629,14.503 L7.444,14.551 L7.248,14.569 L7.050,14.564 L6.852,14.540 L6.662,14.501 L6.484,14.454 L6.324,14.403 L6.187,14.353 L6.079,14.309 L6.005,14.277 L5.970,14.260 L5.646,14.061 L5.332,13.852 L5.027,13.632 L4.733,13.399 L4.448,13.155 L4.175,12.898 L3.913,12.628 L3.663,12.345 L3.424,12.048 L3.198,11.737 L2.985,11.410 L2.785,11.069 L2.604,10.731 L2.437,10.389 L2.284,10.043 L2.143,9.692 L2.017,9.338 L1.905,8.980 L1.806,8.617 L1.722,8.251 L1.652,7.880 L1.597,7.505 L1.557,7.127 L1.532,6.744 L1.530,6.656 L1.533,6.577 L1.544,6.507 L1.560,6.446 L1.584,6.392 L1.616,6.345 L1.656,6.304 L1.704,6.269 L1.761,6.239 L1.828,6.213 L1.905,6.192 L1.992,6.173 L2.114,6.152 L2.237,6.134 L2.360,6.119 L2.483,6.108 L2.607,6.099 L2.730,6.094 L2.854,6.092 L2.977,6.094 L3.100,6.099 L3.223,6.108 L3.346,6.120 L3.468,6.136 L3.976,6.224 L4.471,6.337 L4.953,6.476 L5.424,6.640 L5.881,6.828 L6.327,7.041 L6.760,7.277 L7.181,7.538 L7.589,7.822 L7.986,8.130 L8.371,8.460 L8.744,8.813 L8.949,9.024 L9.147,9.240 L9.338,9.463 L9.522,9.690 L9.701,9.921 L9.876,10.156 L10.046,10.393 L10.214,10.633 L10.379,10.875 L10.543,11.117 L10.706,11.360 L10.869,11.602 L11.044,11.859 L11.221,12.112 L11.402,12.363 L11.587,12.610 L11.775,12.854 L11.969,13.093 L12.168,13.327 L12.373,13.557 L12.584,13.781 L12.803,13.999 L13.028,14.210 L13.262,14.415 L13.345,14.484 L13.425,14.550 L13.502,14.613 L13.577,14.674 L13.651,14.732 L13.722,14.788 L13.792,14.841 L13.860,14.891 L13.927,14.939 L13.993,14.984 L14.058,15.027 L14.123,15.068 L13.919,15.088 L13.697,15.103 L13.460,15.110 L13.211,15.108 L12.953,15.094 L12.690,15.066 L12.424,15.021 L12.160,14.958 L11.899,14.874 L11.646,14.767 L11.404,14.635 L11.175,14.475 L11.175,14.474 Z M12.141,8.260 L12.144,8.219 L12.152,8.181 L12.164,8.144 L12.181,8.110 L12.203,8.078 L12.228,8.050 L12.256,8.025 L12.288,8.004 L12.322,7.987 L12.359,7.974 L12.398,7.966 L12.439,7.963 L12.448,7.964 L12.457,7.964 L12.466,7.965 L12.475,7.966 L12.484,7.967 L12.493,7.969 L12.501,7.970 L12.509,7.972 L12.517,7.974 L12.525,7.977 L12.533,7.979 L12.541,7.982 L12.551,7.986 L12.561,7.990 L12.571,7.995 L12.581,8.000 L12.591,8.005 L12.600,8.011 L12.609,8.017 L12.618,8.023 L12.627,8.030 L12.635,8.037 L12.643,8.045 L12.650,8.053 L12.663,8.067 L12.675,8.081 L12.686,8.097 L12.696,8.113 L12.704,8.129 L12.712,8.147 L12.718,8.165 L12.724,8.183 L12.728,8.202 L12.731,8.221 L12.733,8.240 L12.733,8.260 L12.731,8.300 L12.723,8.339 L12.710,8.376 L12.693,8.410 L12.672,8.442 L12.647,8.470 L12.618,8.495 L12.587,8.516 L12.552,8.533 L12.515,8.546 L12.476,8.554 L12.435,8.556 L12.395,8.554 L12.356,8.546 L12.319,8.533 L12.285,8.516 L12.254,8.495 L12.226,8.470 L12.201,8.442 L12.180,8.410 L12.164,8.376 L12.151,8.339 L12.144,8.300 L12.141,8.260 Z M15.142,9.799 L15.093,9.818 L15.045,9.837 L14.997,9.855 L14.949,9.872 L14.901,9.888 L14.854,9.903 L14.806,9.916 L14.759,9.927 L14.712,9.937 L14.665,9.944 L14.618,9.950 L14.572,9.953 L14.499,9.954 L14.427,9.950 L14.354,9.941 L14.282,9.928 L14.211,9.911 L14.143,9.890 L14.076,9.866 L14.013,9.839 L13.953,9.809 L13.898,9.778 L13.847,9.744 L13.802,9.709 L13.737,9.655 L13.676,9.605 L13.618,9.555 L13.564,9.507 L13.513,9.457 L13.466,9.405 L13.423,9.349 L13.384,9.289 L13.349,9.223 L13.318,9.150 L13.292,9.068 L13.270,8.977 L13.262,8.934 L13.257,8.888 L13.253,8.839 L13.252,8.789 L13.252,8.738 L13.253,8.686 L13.256,8.635 L13.260,8.585 L13.265,8.537 L13.271,8.491 L13.277,8.449 L13.284,8.410 L13.299,8.333 L13.307,8.261 L13.309,8.193 L13.305,8.129 L13.295,8.068 L13.278,8.010 L13.256,7.954 L13.228,7.902 L13.194,7.851 L13.154,7.802 L13.107,7.754 L13.055,7.708 L13.008,7.673 L12.960,7.642 L12.910,7.615 L12.858,7.592 L12.804,7.572 L12.749,7.556 L12.693,7.543 L12.634,7.533 L12.575,7.525 L12.515,7.520 L12.453,7.517 L12.390,7.516 L12.367,7.516 L12.343,7.513 L12.321,7.509 L12.299,7.504 L12.277,7.498 L12.256,7.491 L12.236,7.484 L12.216,7.476 L12.197,7.467 L12.179,7.459 L12.161,7.450 L12.145,7.441 L12.119,7.427 L12.094,7.409 L12.071,7.388 L12.051,7.364 L12.033,7.338 L12.019,7.309 L12.009,7.279 L12.003,7.246 L12.002,7.211 L12.007,7.174 L12.018,7.136 L12.035,7.096 L12.044,7.081 L12.056,7.064 L12.071,7.045 L12.088,7.025 L12.107,7.004 L12.126,6.983 L12.146,6.963 L12.165,6.944 L12.182,6.927 L12.198,6.913 L12.211,6.901 L12.220,6.893 L12.307,6.850 L12.396,6.816 L12.486,6.793 L12.578,6.778 L12.671,6.771 L12.764,6.773 L12.858,6.781 L12.953,6.796 L13.047,6.817 L13.141,6.843 L13.234,6.874 L13.326,6.908 L13.409,6.946 L13.490,6.987 L13.568,7.034 L13.645,7.086 L13.722,7.142 L13.798,7.203 L13.875,7.268 L13.953,7.338 L14.033,7.412 L14.116,7.491 L14.202,7.575 L14.292,7.663 L14.380,7.765 L14.457,7.857 L14.524,7.939 L14.583,8.013 L14.636,8.081 L14.683,8.145 L14.727,8.207 L14.770,8.268 L14.812,8.331 L14.855,8.397 L14.902,8.468 L14.953,8.545 L14.995,8.609 L15.036,8.674 L15.077,8.739 L15.116,8.804 L15.155,8.871 L15.192,8.938 L15.228,9.006 L15.262,9.075 L15.295,9.145 L15.326,9.217 L15.356,9.290 L15.383,9.364 L15.396,9.410 L15.403,9.455 L15.404,9.498 L15.398,9.539 L15.387,9.579 L15.370,9.616 L15.347,9.652 L15.317,9.686 L15.282,9.718 L15.241,9.747 L15.194,9.774 L15.142,9.799 Z",
+		"M22.917,1.430 L22.858,1.407 L22.805,1.397 L22.756,1.398 L22.711,1.409 L22.670,1.429 L22.631,1.454 L22.595,1.485 L22.560,1.519 L22.526,1.554 L22.492,1.590 L22.457,1.624 L22.422,1.655 L22.410,1.665 L22.398,1.675 L22.387,1.685 L22.376,1.696 L22.364,1.707 L22.353,1.718 L22.343,1.729 L22.332,1.741 L22.322,1.752 L22.311,1.764 L22.301,1.775 L22.290,1.787 L22.199,1.880 L22.106,1.967 L22.009,2.047 L21.909,2.120 L21.806,2.186 L21.699,2.244 L21.588,2.293 L21.473,2.333 L21.353,2.363 L21.229,2.383 L21.100,2.393 L20.966,2.391 L20.768,2.386 L20.575,2.394 L20.387,2.414 L20.203,2.447 L20.024,2.494 L19.849,2.554 L19.678,2.628 L19.510,2.716 L19.347,2.817 L19.187,2.933 L19.031,3.064 L18.879,3.210 L18.840,3.027 L18.790,2.857 L18.728,2.699 L18.654,2.551 L18.568,2.415 L18.472,2.288 L18.365,2.171 L18.247,2.064 L18.118,1.965 L17.980,1.874 L17.832,1.791 L17.675,1.716 L17.590,1.678 L17.505,1.640 L17.421,1.600 L17.338,1.559 L17.256,1.515 L17.176,1.468 L17.098,1.418 L17.023,1.363 L16.950,1.303 L16.881,1.238 L16.815,1.167 L16.754,1.089 L16.715,1.030 L16.680,0.970 L16.649,0.910 L16.622,0.848 L16.597,0.786 L16.575,0.724 L16.555,0.661 L16.535,0.597 L16.517,0.533 L16.498,0.470 L16.479,0.406 L16.459,0.342 L16.446,0.303 L16.432,0.265 L16.417,0.228 L16.402,0.191 L16.384,0.157 L16.364,0.125 L16.342,0.095 L16.317,0.069 L16.288,0.046 L16.255,0.027 L16.218,0.013 L16.176,0.004 L16.130,0.000 L16.089,0.004 L16.052,0.014 L16.018,0.029 L15.988,0.050 L15.960,0.075 L15.935,0.103 L15.912,0.134 L15.891,0.167 L15.871,0.201 L15.852,0.236 L15.833,0.270 L15.761,0.409 L15.697,0.551 L15.640,0.694 L15.590,0.839 L15.547,0.986 L15.511,1.134 L15.482,1.284 L15.459,1.435 L15.441,1.586 L15.430,1.739 L15.425,1.892 L15.425,2.046 L15.443,2.387 L15.485,2.715 L15.550,3.032 L15.638,3.336 L15.750,3.629 L15.886,3.908 L16.045,4.176 L16.228,4.430 L16.435,4.672 L16.666,4.901 L16.920,5.117 L17.199,5.320 L17.230,5.343 L17.257,5.365 L17.280,5.388 L17.299,5.412 L17.315,5.436 L17.326,5.460 L17.335,5.486 L17.339,5.513 L17.340,5.540 L17.338,5.569 L17.332,5.600 L17.324,5.632 L17.303,5.699 L17.283,5.766 L17.262,5.833 L17.240,5.900 L17.219,5.967 L17.197,6.034 L17.175,6.100 L17.153,6.167 L17.131,6.234 L17.109,6.301 L17.088,6.368 L17.067,6.435 L17.053,6.476 L17.038,6.510 L17.021,6.540 L17.002,6.564 L16.982,6.582 L16.958,6.596 L16.932,6.604 L16.903,6.607 L16.870,6.605 L16.834,6.599 L16.794,6.587 L16.750,6.570 L16.592,6.501 L16.438,6.427 L16.288,6.347 L16.140,6.263 L15.996,6.174 L15.855,6.080 L15.718,5.982 L15.583,5.880 L15.452,5.774 L15.323,5.664 L15.197,5.550 L15.074,5.433 L14.869,5.231 L14.666,5.027 L14.465,4.822 L14.264,4.616 L14.063,4.410 L13.861,4.206 L13.656,4.003 L13.448,3.804 L13.237,3.610 L13.020,3.420 L12.797,3.236 L12.568,3.060 L12.513,3.020 L12.458,2.980 L12.404,2.941 L12.349,2.902 L12.294,2.864 L12.239,2.826 L12.183,2.788 L12.128,2.751 L12.072,2.714 L12.016,2.677 L11.960,2.641 L11.903,2.605 L11.706,2.378 L11.584,2.160 L11.526,1.951 L11.522,1.755 L11.564,1.573 L11.640,1.407 L11.742,1.257 L11.858,1.127 L11.980,1.018 L12.097,0.932 L12.199,0.869 L12.277,0.833 L12.333,0.805 L12.370,0.770 L12.388,0.728 L12.385,0.683 L12.361,0.637 L12.315,0.590 L12.246,0.545 L12.153,0.505 L12.035,0.470 L11.892,0.443 L11.722,0.426 L11.526,0.420 L11.317,0.427 L11.110,0.444 L10.904,0.472 L10.698,0.510 L10.491,0.556 L10.282,0.611 L10.070,0.674 L9.854,0.744 L9.634,0.820 L9.407,0.902 L9.174,0.989 L8.933,1.081 L8.897,1.095 L8.860,1.108 L8.824,1.121 L8.787,1.133 L8.750,1.144 L8.712,1.155 L8.675,1.166 L8.637,1.176 L8.599,1.186 L8.561,1.195 L8.522,1.204 L8.484,1.213 L8.260,1.173 L8.036,1.139 L7.809,1.111 L7.582,1.088 L7.352,1.071 L7.121,1.060 L6.889,1.054 L6.655,1.054 L6.419,1.061 L6.182,1.073 L5.943,1.091 L5.702,1.115 L5.255,1.179 L4.823,1.271 L4.407,1.390 L4.006,1.535 L3.620,1.707 L3.251,1.906 L2.896,2.131 L2.558,2.382 L2.235,2.659 L1.928,2.963 L1.637,3.291 L1.362,3.646 L1.062,4.092 L0.801,4.547 L0.579,5.012 L0.395,5.485 L0.247,5.966 L0.135,6.454 L0.057,6.949 L0.012,7.450 L0.000,7.957 L0.019,8.469 L0.068,8.986 L0.147,9.506 L0.259,10.050 L0.402,10.577 L0.574,11.088 L0.776,11.583 L1.006,12.062 L1.265,12.526 L1.552,12.972 L1.866,13.403 L2.208,13.817 L2.575,14.215 L2.969,14.597 L3.389,14.962 L3.843,15.316 L4.308,15.638 L4.784,15.928 L5.273,16.185 L5.772,16.410 L6.284,16.601 L6.807,16.758 L7.342,16.882 L7.889,16.971 L8.448,17.025 L9.019,17.043 L9.601,17.027 L9.962,17.003 L10.330,16.971 L10.705,16.925 L11.087,16.863 L11.477,16.778 L11.874,16.669 L12.279,16.529 L12.691,16.355 L13.111,16.142 L13.540,15.887 L13.976,15.585 L14.421,15.232 L14.535,15.286 L14.651,15.334 L14.770,15.378 L14.892,15.417 L15.020,15.452 L15.154,15.483 L15.294,15.511 L15.443,15.536 L15.601,15.558 L15.769,15.579 L15.947,15.598 L16.138,15.615 L16.289,15.626 L16.439,15.632 L16.588,15.633 L16.734,15.629 L16.878,15.621 L17.019,15.610 L17.157,15.595 L17.291,15.578 L17.421,15.558 L17.547,15.537 L17.668,15.514 L17.784,15.491 L17.945,15.444 L18.078,15.379 L18.182,15.300 L18.261,15.211 L18.315,15.115 L18.348,15.016 L18.360,14.918 L18.355,14.824 L18.332,14.738 L18.296,14.664 L18.247,14.604 L18.188,14.564 L17.719,14.349 L17.343,14.183 L17.050,14.060 L16.827,13.972 L16.663,13.912 L16.544,13.873 L16.461,13.848 L16.400,13.828 L16.351,13.808 L16.300,13.780 L16.237,13.736 L16.150,13.670 L16.424,13.337 L16.717,12.965 L17.020,12.553 L17.330,12.102 L17.640,11.613 L17.943,11.087 L18.235,10.524 L18.510,9.924 L18.762,9.288 L18.984,8.617 L19.171,7.912 L19.318,7.172 L19.331,7.086 L19.343,6.996 L19.356,6.902 L19.369,6.805 L19.380,6.708 L19.391,6.611 L19.401,6.515 L19.409,6.422 L19.416,6.332 L19.421,6.248 L19.423,6.169 L19.422,6.097 L19.422,6.058 L19.424,6.023 L19.429,5.992 L19.436,5.964 L19.447,5.940 L19.461,5.919 L19.480,5.901 L19.502,5.885 L19.530,5.873 L19.562,5.863 L19.601,5.855 L19.645,5.849 L19.775,5.833 L19.904,5.812 L20.032,5.788 L20.160,5.761 L20.286,5.729 L20.411,5.694 L20.536,5.654 L20.658,5.610 L20.780,5.562 L20.900,5.510 L21.019,5.453 L21.136,5.391 L21.456,5.198 L21.744,4.985 L22.002,4.754 L22.230,4.506 L22.430,4.242 L22.603,3.962 L22.750,3.667 L22.874,3.358 L22.975,3.035 L23.054,2.701 L23.114,2.354 L23.155,1.997 L23.159,1.942 L23.160,1.886 L23.159,1.832 L23.154,1.778 L23.144,1.725 L23.131,1.674 L23.112,1.626 L23.087,1.580 L23.055,1.537 L23.017,1.497 L22.971,1.462 L22.917,1.430 Z M11.175,14.474 L10.692,14.099 L10.251,13.767 L9.851,13.476 L9.488,13.224 L9.163,13.009 L8.872,12.829 L8.615,12.683 L8.390,12.568 L8.196,12.483 L8.030,12.426 L7.891,12.396 L7.778,12.390 L7.693,12.404 L7.625,12.433 L7.572,12.475 L7.533,12.528 L7.507,12.591 L7.492,12.661 L7.487,12.736 L7.490,12.815 L7.499,12.895 L7.514,12.975 L7.532,13.053 L7.552,13.126 L7.574,13.194 L7.598,13.258 L7.622,13.320 L7.648,13.380 L7.676,13.439 L7.704,13.496 L7.734,13.552 L7.766,13.608 L7.800,13.664 L7.835,13.721 L7.872,13.780 L7.910,13.840 L7.937,13.882 L7.961,13.926 L7.981,13.973 L7.996,14.022 L8.005,14.072 L8.007,14.123 L8.001,14.175 L7.984,14.226 L7.958,14.277 L7.919,14.327 L7.867,14.375 L7.801,14.422 L7.629,14.503 L7.444,14.551 L7.248,14.569 L7.050,14.564 L6.852,14.540 L6.662,14.501 L6.484,14.454 L6.324,14.403 L6.187,14.353 L6.079,14.309 L6.005,14.277 L5.970,14.260 L5.646,14.061 L5.332,13.852 L5.027,13.632 L4.733,13.399 L4.448,13.155 L4.175,12.898 L3.913,12.628 L3.663,12.345 L3.424,12.048 L3.198,11.737 L2.985,11.410 L2.785,11.069 L2.604,10.731 L2.437,10.389 L2.284,10.043 L2.143,9.692 L2.017,9.338 L1.905,8.980 L1.806,8.617 L1.722,8.251 L1.652,7.880 L1.597,7.505 L1.557,7.127 L1.532,6.744 L1.530,6.656 L1.533,6.577 L1.544,6.507 L1.560,6.446 L1.584,6.392 L1.616,6.345 L1.656,6.304 L1.704,6.269 L1.761,6.239 L1.828,6.213 L1.905,6.192 L1.992,6.173 L2.114,6.152 L2.237,6.134 L2.360,6.119 L2.483,6.108 L2.607,6.099 L2.730,6.094 L2.854,6.092 L2.977,6.094 L3.100,6.099 L3.223,6.108 L3.346,6.120 L3.468,6.136 L3.976,6.224 L4.471,6.337 L4.953,6.476 L5.424,6.640 L5.881,6.828 L6.327,7.041 L6.760,7.277 L7.181,7.538 L7.589,7.822 L7.986,8.130 L8.371,8.460 L8.744,8.813 L8.949,9.024 L9.147,9.240 L9.338,9.463 L9.522,9.690 L9.701,9.921 L9.876,10.156 L10.046,10.393 L10.214,10.633 L10.379,10.875 L10.543,11.117 L10.706,11.360 L10.869,11.602 L11.044,11.859 L11.221,12.112 L11.402,12.363 L11.587,12.610 L11.775,12.854 L11.969,13.093 L12.168,13.327 L12.373,13.557 L12.584,13.781 L12.803,13.999 L13.028,14.210 L13.262,14.415 L13.345,14.484 L13.425,14.550 L13.502,14.613 L13.577,14.674 L13.651,14.732 L13.722,14.788 L13.792,14.841 L13.860,14.891 L13.927,14.939 L13.993,14.984 L14.058,15.027 L14.123,15.068 L13.919,15.088 L13.697,15.103 L13.460,15.110 L13.211,15.108 L12.953,15.094 L12.690,15.066 L12.424,15.021 L12.160,14.958 L11.899,14.874 L11.646,14.767 L11.404,14.635 L11.175,14.475 L11.175,14.474 Z M12.141,8.260 L12.144,8.219 L12.152,8.181 L12.164,8.144 L12.181,8.110 L12.203,8.078 L12.228,8.050 L12.256,8.025 L12.288,8.004 L12.322,7.987 L12.359,7.974 L12.398,7.966 L12.439,7.963 L12.448,7.964 L12.457,7.964 L12.466,7.965 L12.475,7.966 L12.484,7.967 L12.493,7.969 L12.501,7.970 L12.509,7.972 L12.517,7.974 L12.525,7.977 L12.533,7.979 L12.541,7.982 L12.551,7.986 L12.561,7.990 L12.571,7.995 L12.581,8.000 L12.591,8.005 L12.600,8.011 L12.609,8.017 L12.618,8.023 L12.627,8.030 L12.635,8.037 L12.643,8.045 L12.650,8.053 L12.663,8.067 L12.675,8.081 L12.686,8.097 L12.696,8.113 L12.704,8.129 L12.712,8.147 L12.718,8.165 L12.724,8.183 L12.728,8.202 L12.731,8.221 L12.733,8.240 L12.733,8.260 L12.731,8.300 L12.723,8.339 L12.710,8.376 L12.693,8.410 L12.672,8.442 L12.647,8.470 L12.618,8.495 L12.587,8.516 L12.552,8.533 L12.515,8.546 L12.476,8.554 L12.435,8.556 L12.395,8.554 L12.356,8.546 L12.319,8.533 L12.285,8.516 L12.254,8.495 L12.226,8.470 L12.201,8.442 L12.180,8.410 L12.164,8.376 L12.151,8.339 L12.144,8.300 L12.141,8.260 Z M15.142,9.799 L15.093,9.818 L15.045,9.837 L14.997,9.855 L14.949,9.872 L14.901,9.888 L14.854,9.903 L14.806,9.916 L14.759,9.927 L14.712,9.937 L14.665,9.944 L14.618,9.950 L14.572,9.953 L14.499,9.954 L14.427,9.950 L14.354,9.941 L14.282,9.928 L14.211,9.911 L14.143,9.890 L14.076,9.866 L14.013,9.839 L13.953,9.809 L13.898,9.778 L13.847,9.744 L13.802,9.709 L13.737,9.655 L13.676,9.605 L13.618,9.555 L13.564,9.507 L13.513,9.457 L13.466,9.405 L13.423,9.349 L13.384,9.289 L13.349,9.223 L13.318,9.150 L13.292,9.068 L13.270,8.977 L13.262,8.934 L13.257,8.888 L13.253,8.839 L13.252,8.789 L13.252,8.738 L13.253,8.686 L13.256,8.635 L13.260,8.585 L13.265,8.537 L13.271,8.491 L13.277,8.449 L13.284,8.410 L13.299,8.333 L13.307,8.261 L13.309,8.193 L13.305,8.129 L13.295,8.068 L13.278,8.010 L13.256,7.954 L13.228,7.902 L13.194,7.851 L13.154,7.802 L13.107,7.754 L13.055,7.708 L13.008,7.673 L12.960,7.642 L12.910,7.615 L12.858,7.592 L12.804,7.572 L12.749,7.556 L12.693,7.543 L12.634,7.533 L12.575,7.525 L12.515,7.520 L12.453,7.517 L12.390,7.516 L12.367,7.516 L12.343,7.513 L12.321,7.509 L12.299,7.504 L12.277,7.498 L12.256,7.491 L12.236,7.484 L12.216,7.476 L12.197,7.467 L12.179,7.459 L12.161,7.450 L12.145,7.441 L12.119,7.427 L12.094,7.409 L12.071,7.388 L12.051,7.364 L12.033,7.338 L12.019,7.309 L12.009,7.279 L12.003,7.246 L12.002,7.211 L12.007,7.174 L12.018,7.136 L12.035,7.096 L12.044,7.081 L12.056,7.064 L12.071,7.045 L12.088,7.025 L12.107,7.004 L12.126,6.983 L12.146,6.963 L12.165,6.944 L12.182,6.927 L12.198,6.913 L12.211,6.901 L12.220,6.893 L12.307,6.850 L12.396,6.816 L12.486,6.793 L12.578,6.778 L12.671,6.771 L12.764,6.773 L12.858,6.781 L12.953,6.796 L13.047,6.817 L13.141,6.843 L13.234,6.874 L13.326,6.908 L13.409,6.946 L13.490,6.987 L13.568,7.034 L13.645,7.086 L13.722,7.142 L13.798,7.203 L13.875,7.268 L13.953,7.338 L14.033,7.412 L14.116,7.491 L14.202,7.575 L14.292,7.663 L14.380,7.765 L14.457,7.857 L14.524,7.939 L14.583,8.013 L14.636,8.081 L14.683,8.145 L14.727,8.207 L14.770,8.268 L14.812,8.331 L14.855,8.397 L14.902,8.468 L14.953,8.545 L14.995,8.609 L15.036,8.674 L15.077,8.739 L15.116,8.804 L15.155,8.871 L15.192,8.938 L15.228,9.006 L15.262,9.075 L15.295,9.145 L15.326,9.217 L15.356,9.290 L15.383,9.364 L15.396,9.410 L15.403,9.455 L15.404,9.498 L15.398,9.539 L15.387,9.579 L15.370,9.616 L15.347,9.652 L15.317,9.686 L15.282,9.718 L15.241,9.747 L15.194,9.774 L15.142,9.799 Z",
+		"M24.424,3.622 L24.377,3.580 L24.331,3.552 L24.285,3.535 L24.239,3.529 L24.194,3.532 L24.149,3.543 L24.104,3.558 L24.059,3.577 L24.014,3.598 L23.970,3.619 L23.926,3.639 L23.882,3.655 L23.867,3.660 L23.852,3.665 L23.838,3.671 L23.823,3.677 L23.809,3.683 L23.795,3.689 L23.781,3.696 L23.767,3.703 L23.753,3.710 L23.739,3.717 L23.725,3.724 L23.711,3.731 L23.593,3.785 L23.474,3.833 L23.355,3.873 L23.236,3.906 L23.116,3.930 L22.995,3.946 L22.874,3.952 L22.752,3.948 L22.630,3.933 L22.506,3.908 L22.383,3.870 L22.258,3.820 L22.075,3.745 L21.893,3.683 L21.710,3.634 L21.526,3.600 L21.342,3.579 L21.157,3.572 L20.971,3.580 L20.783,3.602 L20.594,3.638 L20.403,3.689 L20.211,3.756 L20.016,3.837 L20.046,3.653 L20.060,3.476 L20.058,3.305 L20.042,3.141 L20.011,2.983 L19.965,2.830 L19.898,2.677 L19.806,2.525 L19.687,2.371 L19.537,2.218 L19.357,2.066 L19.143,1.916 L19.020,1.840 L18.892,1.765 L18.762,1.691 L18.630,1.618 L18.497,1.545 L18.365,1.472 L18.235,1.398 L18.107,1.324 L17.984,1.247 L17.865,1.168 L17.753,1.086 L17.648,0.999 L17.582,0.936 L17.524,0.873 L17.474,0.810 L17.429,0.747 L17.390,0.683 L17.355,0.620 L17.323,0.556 L17.293,0.492 L17.265,0.428 L17.236,0.363 L17.205,0.299 L17.173,0.235 L17.151,0.197 L17.128,0.159 L17.103,0.121 L17.075,0.085 L17.043,0.051 L17.007,0.019 L16.966,-0.010 L16.918,-0.035 L16.864,-0.057 L16.801,-0.074 L16.731,-0.086 L16.651,-0.092 L16.565,-0.092 L16.487,-0.085 L16.418,-0.071 L16.357,-0.051 L16.301,-0.027 L16.252,0.002 L16.207,0.033 L16.166,0.067 L16.129,0.103 L16.094,0.140 L16.061,0.177 L16.029,0.214 L15.911,0.363 L15.811,0.513 L15.726,0.664 L15.655,0.815 L15.596,0.967 L15.548,1.119 L15.510,1.272 L15.481,1.425 L15.460,1.578 L15.446,1.731 L15.440,1.885 L15.439,2.039 L15.459,2.378 L15.506,2.703 L15.581,3.013 L15.686,3.306 L15.820,3.583 L15.985,3.842 L16.179,4.086 L16.398,4.320 L16.634,4.550 L16.883,4.780 L17.141,5.013 L17.409,5.248 L17.437,5.275 L17.461,5.301 L17.480,5.328 L17.494,5.354 L17.504,5.380 L17.510,5.407 L17.511,5.434 L17.509,5.462 L17.502,5.490 L17.492,5.519 L17.478,5.550 L17.460,5.581 L17.422,5.649 L17.384,5.716 L17.348,5.784 L17.313,5.852 L17.279,5.920 L17.246,5.988 L17.214,6.057 L17.183,6.126 L17.154,6.196 L17.126,6.266 L17.100,6.336 L17.074,6.407 L17.058,6.449 L17.041,6.485 L17.023,6.516 L17.004,6.541 L16.982,6.560 L16.958,6.574 L16.932,6.583 L16.903,6.586 L16.870,6.584 L16.834,6.576 L16.795,6.564 L16.751,6.547 L16.595,6.474 L16.442,6.398 L16.293,6.318 L16.146,6.235 L16.003,6.148 L15.861,6.059 L15.723,5.966 L15.587,5.870 L15.453,5.770 L15.323,5.663 L15.197,5.550 L15.074,5.433 L14.869,5.231 L14.666,5.027 L14.465,4.822 L14.264,4.616 L14.063,4.410 L13.861,4.206 L13.656,4.003 L13.448,3.804 L13.237,3.610 L13.020,3.420 L12.797,3.236 L12.568,3.060 L12.513,3.020 L12.458,2.980 L12.404,2.941 L12.349,2.902 L12.294,2.864 L12.239,2.826 L12.183,2.788 L12.128,2.751 L12.072,2.714 L12.016,2.677 L11.960,2.641 L11.903,2.605 L11.706,2.378 L11.584,2.160 L11.526,1.951 L11.522,1.755 L11.564,1.573 L11.640,1.407 L11.742,1.257 L11.858,1.127 L11.980,1.018 L12.097,0.932 L12.199,0.869 L12.277,0.833 L12.333,0.805 L12.370,0.770 L12.388,0.728 L12.385,0.683 L12.361,0.637 L12.315,0.590 L12.246,0.545 L12.153,0.505 L12.035,0.470 L11.892,0.443 L11.722,0.426 L11.526,0.420 L11.317,0.427 L11.110,0.444 L10.904,0.472 L10.698,0.510 L10.491,0.556 L10.282,0.611 L10.070,0.674 L9.854,0.744 L9.634,0.820 L9.407,0.902 L9.174,0.989 L8.933,1.081 L8.897,1.095 L8.860,1.108 L8.824,1.121 L8.787,1.133 L8.750,1.144 L8.712,1.155 L8.675,1.166 L8.637,1.176 L8.599,1.186 L8.561,1.195 L8.522,1.204 L8.484,1.213 L8.260,1.173 L8.036,1.139 L7.809,1.111 L7.582,1.088 L7.352,1.071 L7.121,1.060 L6.889,1.054 L6.655,1.054 L6.419,1.061 L6.182,1.073 L5.943,1.091 L5.702,1.115 L5.255,1.179 L4.823,1.271 L4.407,1.390 L4.006,1.535 L3.620,1.707 L3.251,1.906 L2.896,2.131 L2.558,2.382 L2.235,2.659 L1.928,2.963 L1.637,3.291 L1.362,3.646 L1.062,4.092 L0.801,4.547 L0.579,5.012 L0.395,5.485 L0.247,5.966 L0.135,6.454 L0.057,6.949 L0.012,7.450 L0.000,7.957 L0.019,8.469 L0.068,8.986 L0.147,9.506 L0.259,10.050 L0.402,10.577 L0.574,11.088 L0.776,11.583 L1.006,12.062 L1.265,12.526 L1.552,12.972 L1.866,13.403 L2.208,13.817 L2.575,14.215 L2.969,14.597 L3.389,14.962 L3.843,15.316 L4.308,15.638 L4.784,15.928 L5.273,16.185 L5.772,16.410 L6.284,16.601 L6.807,16.758 L7.342,16.882 L7.889,16.971 L8.448,17.025 L9.019,17.043 L9.601,17.027 L9.962,17.003 L10.330,16.971 L10.705,16.925 L11.087,16.863 L11.477,16.778 L11.874,16.669 L12.279,16.529 L12.691,16.355 L13.111,16.142 L13.540,15.887 L13.976,15.585 L14.421,15.232 L14.535,15.286 L14.651,15.334 L14.770,15.378 L14.892,15.417 L15.020,15.452 L15.154,15.483 L15.294,15.511 L15.443,15.536 L15.601,15.558 L15.769,15.579 L15.947,15.598 L16.138,15.615 L16.289,15.626 L16.439,15.632 L16.588,15.633 L16.734,15.629 L16.878,15.621 L17.019,15.610 L17.157,15.595 L17.291,15.578 L17.421,15.558 L17.547,15.537 L17.668,15.514 L17.784,15.491 L17.945,15.444 L18.078,15.379 L18.182,15.300 L18.261,15.211 L18.315,15.115 L18.348,15.016 L18.360,14.918 L18.355,14.824 L18.332,14.738 L18.296,14.664 L18.247,14.604 L18.188,14.564 L17.719,14.349 L17.343,14.183 L17.050,14.060 L16.827,13.972 L16.663,13.912 L16.544,13.873 L16.461,13.848 L16.400,13.828 L16.351,13.808 L16.300,13.780 L16.237,13.736 L16.150,13.670 L16.424,13.337 L16.717,12.965 L17.020,12.553 L17.330,12.102 L17.640,11.613 L17.943,11.087 L18.235,10.524 L18.510,9.924 L18.762,9.288 L18.984,8.617 L19.171,7.912 L19.316,7.178 L19.327,7.098 L19.338,7.016 L19.350,6.933 L19.362,6.851 L19.375,6.770 L19.388,6.691 L19.403,6.616 L19.417,6.544 L19.432,6.476 L19.446,6.413 L19.459,6.355 L19.470,6.303 L19.477,6.275 L19.485,6.250 L19.496,6.229 L19.509,6.210 L19.524,6.195 L19.543,6.182 L19.565,6.173 L19.591,6.166 L19.621,6.161 L19.656,6.160 L19.695,6.161 L19.740,6.164 L19.872,6.174 L20.004,6.183 L20.136,6.191 L20.268,6.197 L20.401,6.202 L20.533,6.206 L20.665,6.210 L20.796,6.213 L20.928,6.216 L21.060,6.218 L21.192,6.220 L21.324,6.222 L21.693,6.229 L22.041,6.230 L22.367,6.214 L22.674,6.166 L22.960,6.060 L23.223,5.873 L23.467,5.651 L23.693,5.407 L23.903,5.142 L24.097,4.858 L24.277,4.556 L24.443,4.237 L24.466,4.187 L24.487,4.136 L24.506,4.084 L24.520,4.032 L24.531,3.979 L24.536,3.927 L24.536,3.875 L24.529,3.823 L24.515,3.772 L24.493,3.721 L24.463,3.671 L24.424,3.622 Z M11.175,14.474 L10.692,14.099 L10.251,13.767 L9.851,13.476 L9.488,13.224 L9.163,13.009 L8.872,12.829 L8.615,12.683 L8.390,12.568 L8.196,12.483 L8.030,12.426 L7.891,12.396 L7.778,12.390 L7.693,12.404 L7.625,12.433 L7.572,12.475 L7.533,12.528 L7.507,12.591 L7.492,12.661 L7.487,12.736 L7.490,12.815 L7.499,12.895 L7.514,12.975 L7.532,13.053 L7.552,13.126 L7.574,13.194 L7.598,13.258 L7.622,13.320 L7.648,13.380 L7.676,13.439 L7.704,13.496 L7.734,13.552 L7.766,13.608 L7.800,13.664 L7.835,13.721 L7.872,13.780 L7.910,13.840 L7.937,13.882 L7.961,13.926 L7.981,13.973 L7.996,14.022 L8.005,14.072 L8.007,14.123 L8.001,14.175 L7.984,14.226 L7.958,14.277 L7.919,14.327 L7.867,14.375 L7.801,14.422 L7.629,14.503 L7.444,14.551 L7.248,14.569 L7.050,14.564 L6.852,14.540 L6.662,14.501 L6.484,14.454 L6.324,14.403 L6.187,14.353 L6.079,14.309 L6.005,14.277 L5.970,14.260 L5.646,14.061 L5.332,13.852 L5.027,13.632 L4.733,13.399 L4.448,13.155 L4.175,12.898 L3.913,12.628 L3.663,12.345 L3.424,12.048 L3.198,11.737 L2.985,11.410 L2.785,11.069 L2.604,10.731 L2.437,10.389 L2.284,10.043 L2.143,9.692 L2.017,9.338 L1.905,8.980 L1.806,8.617 L1.722,8.251 L1.652,7.880 L1.597,7.505 L1.557,7.127 L1.532,6.744 L1.530,6.656 L1.533,6.577 L1.544,6.507 L1.560,6.446 L1.584,6.392 L1.616,6.345 L1.656,6.304 L1.704,6.269 L1.761,6.239 L1.828,6.213 L1.905,6.192 L1.992,6.173 L2.114,6.152 L2.237,6.134 L2.360,6.119 L2.483,6.108 L2.607,6.099 L2.730,6.094 L2.854,6.092 L2.977,6.094 L3.100,6.099 L3.223,6.108 L3.346,6.120 L3.468,6.136 L3.976,6.224 L4.471,6.337 L4.953,6.476 L5.424,6.640 L5.881,6.828 L6.327,7.041 L6.760,7.277 L7.181,7.538 L7.589,7.822 L7.986,8.130 L8.371,8.460 L8.744,8.813 L8.949,9.024 L9.147,9.240 L9.338,9.463 L9.522,9.690 L9.701,9.921 L9.876,10.156 L10.046,10.393 L10.214,10.633 L10.379,10.875 L10.543,11.117 L10.706,11.360 L10.869,11.602 L11.044,11.859 L11.221,12.112 L11.402,12.363 L11.587,12.610 L11.775,12.854 L11.969,13.093 L12.168,13.327 L12.373,13.557 L12.584,13.781 L12.803,13.999 L13.028,14.210 L13.262,14.415 L13.345,14.484 L13.425,14.550 L13.502,14.613 L13.577,14.674 L13.651,14.732 L13.722,14.788 L13.792,14.841 L13.860,14.891 L13.927,14.939 L13.993,14.984 L14.058,15.027 L14.123,15.068 L13.919,15.088 L13.697,15.103 L13.460,15.110 L13.211,15.108 L12.953,15.094 L12.690,15.066 L12.424,15.021 L12.160,14.958 L11.899,14.874 L11.646,14.767 L11.404,14.635 L11.175,14.475 L11.175,14.474 Z M12.141,8.260 L12.144,8.219 L12.152,8.181 L12.164,8.144 L12.181,8.110 L12.203,8.078 L12.228,8.050 L12.256,8.025 L12.288,8.004 L12.322,7.987 L12.359,7.974 L12.398,7.966 L12.439,7.963 L12.448,7.964 L12.457,7.964 L12.466,7.965 L12.475,7.966 L12.484,7.967 L12.493,7.969 L12.501,7.970 L12.509,7.972 L12.517,7.974 L12.525,7.977 L12.533,7.979 L12.541,7.982 L12.551,7.986 L12.561,7.990 L12.571,7.995 L12.581,8.000 L12.591,8.005 L12.600,8.011 L12.609,8.017 L12.618,8.023 L12.627,8.030 L12.635,8.037 L12.643,8.045 L12.650,8.053 L12.663,8.067 L12.675,8.081 L12.686,8.097 L12.696,8.113 L12.704,8.129 L12.712,8.147 L12.718,8.165 L12.724,8.183 L12.728,8.202 L12.731,8.221 L12.733,8.240 L12.733,8.260 L12.731,8.300 L12.723,8.339 L12.710,8.376 L12.693,8.410 L12.672,8.442 L12.647,8.470 L12.618,8.495 L12.587,8.516 L12.552,8.533 L12.515,8.546 L12.476,8.554 L12.435,8.556 L12.395,8.554 L12.356,8.546 L12.319,8.533 L12.285,8.516 L12.254,8.495 L12.226,8.470 L12.201,8.442 L12.180,8.410 L12.164,8.376 L12.151,8.339 L12.144,8.300 L12.141,8.260 Z M15.142,9.799 L15.093,9.818 L15.045,9.837 L14.997,9.855 L14.949,9.872 L14.901,9.888 L14.854,9.903 L14.806,9.916 L14.759,9.927 L14.712,9.937 L14.665,9.944 L14.618,9.950 L14.572,9.953 L14.499,9.954 L14.427,9.950 L14.354,9.941 L14.282,9.928 L14.211,9.911 L14.143,9.890 L14.076,9.866 L14.013,9.839 L13.953,9.809 L13.898,9.778 L13.847,9.744 L13.802,9.709 L13.737,9.655 L13.676,9.605 L13.618,9.555 L13.564,9.507 L13.513,9.457 L13.466,9.405 L13.423,9.349 L13.384,9.289 L13.349,9.223 L13.318,9.150 L13.292,9.068 L13.270,8.977 L13.262,8.934 L13.257,8.888 L13.253,8.839 L13.252,8.789 L13.252,8.738 L13.253,8.686 L13.256,8.635 L13.260,8.585 L13.265,8.537 L13.271,8.491 L13.277,8.449 L13.284,8.410 L13.299,8.333 L13.307,8.261 L13.309,8.193 L13.305,8.129 L13.295,8.068 L13.278,8.010 L13.256,7.954 L13.228,7.902 L13.194,7.851 L13.154,7.802 L13.107,7.754 L13.055,7.708 L13.008,7.673 L12.960,7.642 L12.910,7.615 L12.858,7.592 L12.804,7.572 L12.749,7.556 L12.693,7.543 L12.634,7.533 L12.575,7.525 L12.515,7.520 L12.453,7.517 L12.390,7.516 L12.367,7.516 L12.343,7.513 L12.321,7.509 L12.299,7.504 L12.277,7.498 L12.256,7.491 L12.236,7.484 L12.216,7.476 L12.197,7.467 L12.179,7.459 L12.161,7.450 L12.145,7.441 L12.119,7.427 L12.094,7.409 L12.071,7.388 L12.051,7.364 L12.033,7.338 L12.019,7.309 L12.009,7.279 L12.003,7.246 L12.002,7.211 L12.007,7.174 L12.018,7.136 L12.035,7.096 L12.044,7.081 L12.056,7.064 L12.071,7.045 L12.088,7.025 L12.107,7.004 L12.126,6.983 L12.146,6.963 L12.165,6.944 L12.182,6.927 L12.198,6.913 L12.211,6.901 L12.220,6.893 L12.307,6.850 L12.396,6.816 L12.486,6.793 L12.578,6.778 L12.671,6.771 L12.764,6.773 L12.858,6.781 L12.953,6.796 L13.047,6.817 L13.141,6.843 L13.234,6.874 L13.326,6.908 L13.409,6.946 L13.490,6.987 L13.568,7.034 L13.645,7.086 L13.722,7.142 L13.798,7.203 L13.875,7.268 L13.953,7.338 L14.033,7.412 L14.116,7.491 L14.202,7.575 L14.292,7.663 L14.380,7.765 L14.457,7.857 L14.524,7.939 L14.583,8.013 L14.636,8.081 L14.683,8.145 L14.727,8.207 L14.770,8.268 L14.812,8.331 L14.855,8.397 L14.902,8.468 L14.953,8.545 L14.995,8.609 L15.036,8.674 L15.077,8.739 L15.116,8.804 L15.155,8.871 L15.192,8.938 L15.228,9.006 L15.262,9.075 L15.295,9.145 L15.326,9.217 L15.356,9.290 L15.383,9.364 L15.396,9.410 L15.403,9.455 L15.404,9.498 L15.398,9.539 L15.387,9.579 L15.370,9.616 L15.347,9.652 L15.317,9.686 L15.282,9.718 L15.241,9.747 L15.194,9.774 L15.142,9.799 Z",
+		"M21.182,0.147 L21.119,0.142 L21.065,0.148 L21.019,0.163 L20.980,0.187 L20.946,0.217 L20.916,0.253 L20.890,0.293 L20.867,0.336 L20.844,0.380 L20.822,0.424 L20.800,0.467 L20.775,0.507 L20.766,0.519 L20.758,0.532 L20.750,0.546 L20.742,0.559 L20.735,0.573 L20.728,0.587 L20.721,0.601 L20.714,0.615 L20.707,0.629 L20.700,0.643 L20.694,0.657 L20.687,0.671 L20.627,0.786 L20.563,0.897 L20.494,1.002 L20.420,1.101 L20.341,1.195 L20.255,1.281 L20.163,1.361 L20.065,1.432 L19.959,1.496 L19.847,1.552 L19.726,1.599 L19.597,1.636 L19.407,1.689 L19.225,1.753 L19.051,1.827 L18.885,1.913 L18.727,2.010 L18.577,2.119 L18.435,2.239 L18.300,2.372 L18.174,2.517 L18.055,2.675 L17.944,2.845 L17.841,3.029 L17.751,2.866 L17.653,2.718 L17.547,2.585 L17.433,2.465 L17.311,2.360 L17.183,2.267 L17.055,2.185 L16.929,2.113 L16.808,2.049 L16.692,1.990 L16.585,1.936 L16.485,1.883 L16.437,1.856 L16.391,1.825 L16.349,1.791 L16.308,1.754 L16.270,1.712 L16.233,1.666 L16.199,1.614 L16.165,1.557 L16.134,1.494 L16.104,1.425 L16.075,1.349 L16.047,1.265 L16.029,1.203 L16.013,1.140 L15.998,1.077 L15.984,1.012 L15.970,0.948 L15.958,0.883 L15.946,0.817 L15.935,0.751 L15.925,0.685 L15.914,0.619 L15.903,0.553 L15.893,0.486 L15.887,0.446 L15.880,0.406 L15.874,0.367 L15.867,0.328 L15.860,0.291 L15.853,0.256 L15.846,0.223 L15.838,0.193 L15.829,0.166 L15.820,0.142 L15.810,0.122 L15.797,0.106 L15.784,0.095 L15.771,0.092 L15.759,0.097 L15.748,0.107 L15.737,0.123 L15.727,0.144 L15.718,0.168 L15.709,0.196 L15.700,0.226 L15.692,0.257 L15.684,0.289 L15.675,0.320 L15.640,0.449 L15.605,0.583 L15.571,0.719 L15.538,0.859 L15.508,1.001 L15.481,1.147 L15.459,1.294 L15.440,1.443 L15.426,1.593 L15.417,1.745 L15.413,1.898 L15.414,2.052 L15.431,2.394 L15.468,2.725 L15.525,3.048 L15.601,3.361 L15.695,3.667 L15.808,3.965 L15.941,4.253 L16.098,4.529 L16.284,4.786 L16.503,5.019 L16.754,5.225 L17.040,5.403 L17.072,5.422 L17.102,5.441 L17.127,5.461 L17.150,5.481 L17.169,5.502 L17.186,5.524 L17.199,5.548 L17.209,5.572 L17.216,5.598 L17.220,5.626 L17.221,5.655 L17.219,5.686 L17.213,5.751 L17.205,5.816 L17.196,5.880 L17.185,5.945 L17.173,6.009 L17.160,6.073 L17.145,6.137 L17.130,6.201 L17.114,6.265 L17.097,6.329 L17.080,6.394 L17.062,6.459 L17.050,6.497 L17.036,6.531 L17.020,6.559 L17.002,6.582 L16.982,6.600 L16.958,6.613 L16.932,6.621 L16.903,6.625 L16.871,6.623 L16.834,6.616 L16.794,6.605 L16.750,6.590 L16.591,6.523 L16.436,6.450 L16.284,6.371 L16.136,6.286 L15.991,6.195 L15.851,6.098 L15.714,5.995 L15.581,5.888 L15.450,5.778 L15.323,5.665 L15.197,5.550 L15.074,5.433 L14.869,5.231 L14.666,5.027 L14.465,4.822 L14.264,4.616 L14.063,4.410 L13.861,4.206 L13.656,4.003 L13.448,3.804 L13.237,3.610 L13.020,3.420 L12.797,3.236 L12.568,3.060 L12.513,3.020 L12.458,2.980 L12.404,2.941 L12.349,2.902 L12.294,2.864 L12.239,2.826 L12.183,2.788 L12.128,2.751 L12.072,2.714 L12.016,2.677 L11.960,2.641 L11.903,2.605 L11.706,2.378 L11.584,2.160 L11.526,1.951 L11.522,1.755 L11.564,1.573 L11.640,1.407 L11.742,1.257 L11.858,1.127 L11.980,1.018 L12.097,0.932 L12.199,0.869 L12.277,0.833 L12.333,0.805 L12.370,0.770 L12.388,0.728 L12.385,0.683 L12.361,0.637 L12.315,0.590 L12.246,0.545 L12.153,0.505 L12.035,0.470 L11.892,0.443 L11.722,0.426 L11.526,0.420 L11.317,0.427 L11.110,0.444 L10.904,0.472 L10.698,0.510 L10.491,0.556 L10.282,0.611 L10.070,0.674 L9.854,0.744 L9.634,0.820 L9.407,0.902 L9.174,0.989 L8.933,1.081 L8.897,1.095 L8.860,1.108 L8.824,1.121 L8.787,1.133 L8.750,1.144 L8.712,1.155 L8.675,1.166 L8.637,1.176 L8.599,1.186 L8.561,1.195 L8.522,1.204 L8.484,1.213 L8.260,1.173 L8.036,1.139 L7.809,1.111 L7.582,1.088 L7.352,1.071 L7.121,1.060 L6.889,1.054 L6.655,1.054 L6.419,1.061 L6.182,1.073 L5.943,1.091 L5.702,1.115 L5.255,1.179 L4.823,1.271 L4.407,1.390 L4.006,1.535 L3.620,1.707 L3.251,1.906 L2.896,2.131 L2.558,2.382 L2.235,2.659 L1.928,2.963 L1.637,3.291 L1.362,3.646 L1.062,4.092 L0.801,4.547 L0.579,5.012 L0.395,5.485 L0.247,5.966 L0.135,6.454 L0.057,6.949 L0.012,7.450 L0.000,7.957 L0.019,8.469 L0.068,8.986 L0.147,9.506 L0.259,10.050 L0.402,10.577 L0.574,11.088 L0.776,11.583 L1.006,12.062 L1.265,12.526 L1.552,12.972 L1.866,13.403 L2.208,13.817 L2.575,14.215 L2.969,14.597 L3.389,14.962 L3.843,15.316 L4.308,15.638 L4.784,15.928 L5.273,16.185 L5.772,16.410 L6.284,16.601 L6.807,16.758 L7.342,16.882 L7.889,16.971 L8.448,17.025 L9.019,17.043 L9.601,17.027 L9.962,17.003 L10.330,16.971 L10.705,16.925 L11.087,16.863 L11.477,16.778 L11.874,16.669 L12.279,16.529 L12.691,16.355 L13.111,16.142 L13.540,15.887 L13.976,15.585 L14.421,15.232 L14.535,15.286 L14.651,15.334 L14.770,15.378 L14.892,15.417 L15.020,15.452 L15.154,15.483 L15.294,15.511 L15.443,15.536 L15.601,15.558 L15.769,15.579 L15.947,15.598 L16.138,15.615 L16.289,15.626 L16.439,15.632 L16.588,15.633 L16.734,15.629 L16.878,15.621 L17.019,15.610 L17.157,15.595 L17.291,15.578 L17.421,15.558 L17.547,15.537 L17.668,15.514 L17.784,15.491 L17.945,15.444 L18.078,15.379 L18.182,15.300 L18.261,15.211 L18.315,15.115 L18.348,15.016 L18.360,14.918 L18.355,14.824 L18.332,14.738 L18.296,14.664 L18.247,14.604 L18.188,14.564 L17.719,14.349 L17.343,14.183 L17.050,14.060 L16.827,13.972 L16.663,13.912 L16.544,13.873 L16.461,13.848 L16.400,13.828 L16.351,13.808 L16.300,13.780 L16.237,13.736 L16.150,13.670 L16.424,13.337 L16.717,12.965 L17.020,12.553 L17.330,12.102 L17.640,11.613 L17.943,11.087 L18.235,10.524 L18.510,9.924 L18.762,9.288 L18.984,8.617 L19.171,7.912 L19.320,7.168 L19.334,7.077 L19.348,6.979 L19.361,6.876 L19.373,6.768 L19.383,6.658 L19.391,6.546 L19.395,6.434 L19.396,6.324 L19.394,6.218 L19.388,6.116 L19.378,6.022 L19.365,5.936 L19.358,5.889 L19.353,5.846 L19.351,5.808 L19.352,5.774 L19.357,5.743 L19.367,5.716 L19.380,5.692 L19.399,5.671 L19.423,5.652 L19.453,5.636 L19.489,5.621 L19.531,5.608 L19.656,5.571 L19.778,5.528 L19.898,5.480 L20.016,5.426 L20.132,5.366 L20.244,5.301 L20.354,5.229 L20.460,5.150 L20.562,5.065 L20.660,4.973 L20.754,4.873 L20.843,4.766 L21.069,4.433 L21.244,4.077 L21.374,3.708 L21.469,3.339 L21.545,2.986 L21.622,2.660 L21.677,2.334 L21.705,2.003 L21.707,1.665 L21.685,1.322 L21.641,0.973 L21.576,0.620 L21.563,0.565 L21.548,0.512 L21.531,0.460 L21.510,0.410 L21.486,0.362 L21.458,0.318 L21.426,0.277 L21.388,0.240 L21.346,0.208 L21.298,0.182 L21.243,0.161 L21.182,0.147 Z M11.175,14.474 L10.692,14.099 L10.251,13.767 L9.851,13.476 L9.488,13.224 L9.163,13.009 L8.872,12.829 L8.615,12.683 L8.390,12.568 L8.196,12.483 L8.030,12.426 L7.891,12.396 L7.778,12.390 L7.693,12.404 L7.625,12.433 L7.572,12.475 L7.533,12.528 L7.507,12.591 L7.492,12.661 L7.487,12.736 L7.490,12.815 L7.499,12.895 L7.514,12.975 L7.532,13.053 L7.552,13.126 L7.574,13.194 L7.598,13.258 L7.622,13.320 L7.648,13.380 L7.676,13.439 L7.704,13.496 L7.734,13.552 L7.766,13.608 L7.800,13.664 L7.835,13.721 L7.872,13.780 L7.910,13.840 L7.937,13.882 L7.961,13.926 L7.981,13.973 L7.996,14.022 L8.005,14.072 L8.007,14.123 L8.001,14.175 L7.984,14.226 L7.958,14.277 L7.919,14.327 L7.867,14.375 L7.801,14.422 L7.629,14.503 L7.444,14.551 L7.248,14.569 L7.050,14.564 L6.852,14.540 L6.662,14.501 L6.484,14.454 L6.324,14.403 L6.187,14.353 L6.079,14.309 L6.005,14.277 L5.970,14.260 L5.646,14.061 L5.332,13.852 L5.027,13.632 L4.733,13.399 L4.448,13.155 L4.175,12.898 L3.913,12.628 L3.663,12.345 L3.424,12.048 L3.198,11.737 L2.985,11.410 L2.785,11.069 L2.604,10.731 L2.437,10.389 L2.284,10.043 L2.143,9.692 L2.017,9.338 L1.905,8.980 L1.806,8.617 L1.722,8.251 L1.652,7.880 L1.597,7.505 L1.557,7.127 L1.532,6.744 L1.530,6.656 L1.533,6.577 L1.544,6.507 L1.560,6.446 L1.584,6.392 L1.616,6.345 L1.656,6.304 L1.704,6.269 L1.761,6.239 L1.828,6.213 L1.905,6.192 L1.992,6.173 L2.114,6.152 L2.237,6.134 L2.360,6.119 L2.483,6.108 L2.607,6.099 L2.730,6.094 L2.854,6.092 L2.977,6.094 L3.100,6.099 L3.223,6.108 L3.346,6.120 L3.468,6.136 L3.976,6.224 L4.471,6.337 L4.953,6.476 L5.424,6.640 L5.881,6.828 L6.327,7.041 L6.760,7.277 L7.181,7.538 L7.589,7.822 L7.986,8.130 L8.371,8.460 L8.744,8.813 L8.949,9.024 L9.147,9.240 L9.338,9.463 L9.522,9.690 L9.701,9.921 L9.876,10.156 L10.046,10.393 L10.214,10.633 L10.379,10.875 L10.543,11.117 L10.706,11.360 L10.869,11.602 L11.044,11.859 L11.221,12.112 L11.402,12.363 L11.587,12.610 L11.775,12.854 L11.969,13.093 L12.168,13.327 L12.373,13.557 L12.584,13.781 L12.803,13.999 L13.028,14.210 L13.262,14.415 L13.345,14.484 L13.425,14.550 L13.502,14.613 L13.577,14.674 L13.651,14.732 L13.722,14.788 L13.792,14.841 L13.860,14.891 L13.927,14.939 L13.993,14.984 L14.058,15.027 L14.123,15.068 L13.919,15.088 L13.697,15.103 L13.460,15.110 L13.211,15.108 L12.953,15.094 L12.690,15.066 L12.424,15.021 L12.160,14.958 L11.899,14.874 L11.646,14.767 L11.404,14.635 L11.175,14.475 L11.175,14.474 Z M12.141,8.260 L12.144,8.219 L12.152,8.181 L12.164,8.144 L12.181,8.110 L12.203,8.078 L12.228,8.050 L12.256,8.025 L12.288,8.004 L12.322,7.987 L12.359,7.974 L12.398,7.966 L12.439,7.963 L12.448,7.964 L12.457,7.964 L12.466,7.965 L12.475,7.966 L12.484,7.967 L12.493,7.969 L12.501,7.970 L12.509,7.972 L12.517,7.974 L12.525,7.977 L12.533,7.979 L12.541,7.982 L12.551,7.986 L12.561,7.990 L12.571,7.995 L12.581,8.000 L12.591,8.005 L12.600,8.011 L12.609,8.017 L12.618,8.023 L12.627,8.030 L12.635,8.037 L12.643,8.045 L12.650,8.053 L12.663,8.067 L12.675,8.081 L12.686,8.097 L12.696,8.113 L12.704,8.129 L12.712,8.147 L12.718,8.165 L12.724,8.183 L12.728,8.202 L12.731,8.221 L12.733,8.240 L12.733,8.260 L12.731,8.300 L12.723,8.339 L12.710,8.376 L12.693,8.410 L12.672,8.442 L12.647,8.470 L12.618,8.495 L12.587,8.516 L12.552,8.533 L12.515,8.546 L12.476,8.554 L12.435,8.556 L12.395,8.554 L12.356,8.546 L12.319,8.533 L12.285,8.516 L12.254,8.495 L12.226,8.470 L12.201,8.442 L12.180,8.410 L12.164,8.376 L12.151,8.339 L12.144,8.300 L12.141,8.260 Z M15.142,9.799 L15.093,9.818 L15.045,9.837 L14.997,9.855 L14.949,9.872 L14.901,9.888 L14.854,9.903 L14.806,9.916 L14.759,9.927 L14.712,9.937 L14.665,9.944 L14.618,9.950 L14.572,9.953 L14.499,9.954 L14.427,9.950 L14.354,9.941 L14.282,9.928 L14.211,9.911 L14.143,9.890 L14.076,9.866 L14.013,9.839 L13.953,9.809 L13.898,9.778 L13.847,9.744 L13.802,9.709 L13.737,9.655 L13.676,9.605 L13.618,9.555 L13.564,9.507 L13.513,9.457 L13.466,9.405 L13.423,9.349 L13.384,9.289 L13.349,9.223 L13.318,9.150 L13.292,9.068 L13.270,8.977 L13.262,8.934 L13.257,8.888 L13.253,8.839 L13.252,8.789 L13.252,8.738 L13.253,8.686 L13.256,8.635 L13.260,8.585 L13.265,8.537 L13.271,8.491 L13.277,8.449 L13.284,8.410 L13.299,8.333 L13.307,8.261 L13.309,8.193 L13.305,8.129 L13.295,8.068 L13.278,8.010 L13.256,7.954 L13.228,7.902 L13.194,7.851 L13.154,7.802 L13.107,7.754 L13.055,7.708 L13.008,7.673 L12.960,7.642 L12.910,7.615 L12.858,7.592 L12.804,7.572 L12.749,7.556 L12.693,7.543 L12.634,7.533 L12.575,7.525 L12.515,7.520 L12.453,7.517 L12.390,7.516 L12.367,7.516 L12.343,7.513 L12.321,7.509 L12.299,7.504 L12.277,7.498 L12.256,7.491 L12.236,7.484 L12.216,7.476 L12.197,7.467 L12.179,7.459 L12.161,7.450 L12.145,7.441 L12.119,7.427 L12.094,7.409 L12.071,7.388 L12.051,7.364 L12.033,7.338 L12.019,7.309 L12.009,7.279 L12.003,7.246 L12.002,7.211 L12.007,7.174 L12.018,7.136 L12.035,7.096 L12.044,7.081 L12.056,7.064 L12.071,7.045 L12.088,7.025 L12.107,7.004 L12.126,6.983 L12.146,6.963 L12.165,6.944 L12.182,6.927 L12.198,6.913 L12.211,6.901 L12.220,6.893 L12.307,6.850 L12.396,6.816 L12.486,6.793 L12.578,6.778 L12.671,6.771 L12.764,6.773 L12.858,6.781 L12.953,6.796 L13.047,6.817 L13.141,6.843 L13.234,6.874 L13.326,6.908 L13.409,6.946 L13.490,6.987 L13.568,7.034 L13.645,7.086 L13.722,7.142 L13.798,7.203 L13.875,7.268 L13.953,7.338 L14.033,7.412 L14.116,7.491 L14.202,7.575 L14.292,7.663 L14.380,7.765 L14.457,7.857 L14.524,7.939 L14.583,8.013 L14.636,8.081 L14.683,8.145 L14.727,8.207 L14.770,8.268 L14.812,8.331 L14.855,8.397 L14.902,8.468 L14.953,8.545 L14.995,8.609 L15.036,8.674 L15.077,8.739 L15.116,8.804 L15.155,8.871 L15.192,8.938 L15.228,9.006 L15.262,9.075 L15.295,9.145 L15.326,9.217 L15.356,9.290 L15.383,9.364 L15.396,9.410 L15.403,9.455 L15.404,9.498 L15.398,9.539 L15.387,9.579 L15.370,9.616 L15.347,9.652 L15.317,9.686 L15.282,9.718 L15.241,9.747 L15.194,9.774 L15.142,9.799 Z",
+		"M24.371,3.507 L24.324,3.465 L24.277,3.437 L24.231,3.422 L24.185,3.417 L24.140,3.421 L24.094,3.431 L24.050,3.448 L24.005,3.468 L23.961,3.489 L23.917,3.511 L23.873,3.532 L23.829,3.549 L23.815,3.554 L23.800,3.559 L23.786,3.565 L23.771,3.571 L23.757,3.578 L23.743,3.584 L23.729,3.591 L23.715,3.599 L23.701,3.606 L23.688,3.613 L23.674,3.620 L23.660,3.627 L23.543,3.684 L23.425,3.733 L23.307,3.776 L23.188,3.810 L23.068,3.837 L22.948,3.855 L22.827,3.863 L22.705,3.861 L22.582,3.849 L22.459,3.825 L22.334,3.790 L22.209,3.742 L22.025,3.670 L21.841,3.611 L21.657,3.566 L21.473,3.534 L21.289,3.517 L21.104,3.513 L20.918,3.524 L20.730,3.549 L20.542,3.589 L20.352,3.644 L20.161,3.713 L19.968,3.798 L19.994,3.613 L20.005,3.436 L20.001,3.266 L19.981,3.102 L19.948,2.944 L19.899,2.792 L19.830,2.641 L19.736,2.490 L19.616,2.340 L19.467,2.190 L19.287,2.041 L19.075,1.897 L18.953,1.823 L18.827,1.751 L18.699,1.679 L18.569,1.608 L18.439,1.537 L18.309,1.465 L18.181,1.393 L18.055,1.320 L17.934,1.245 L17.818,1.167 L17.708,1.086 L17.605,1.000 L17.541,0.937 L17.484,0.875 L17.434,0.812 L17.391,0.749 L17.352,0.686 L17.318,0.622 L17.286,0.559 L17.257,0.495 L17.229,0.431 L17.200,0.366 L17.170,0.302 L17.139,0.238 L17.117,0.200 L17.094,0.162 L17.070,0.125 L17.043,0.089 L17.012,0.055 L16.977,0.023 L16.936,-0.006 L16.889,-0.032 L16.836,-0.053 L16.775,-0.070 L16.706,-0.082 L16.628,-0.089 L16.544,-0.088 L16.468,-0.081 L16.401,-0.067 L16.340,-0.048 L16.286,-0.023 L16.238,0.005 L16.194,0.036 L16.154,0.070 L16.117,0.106 L16.083,0.143 L16.051,0.180 L16.019,0.216 L15.904,0.365 L15.805,0.515 L15.722,0.665 L15.652,0.816 L15.594,0.968 L15.546,1.120 L15.509,1.272 L15.480,1.425 L15.459,1.578 L15.446,1.732 L15.439,1.885 L15.439,2.039 L15.459,2.378 L15.505,2.703 L15.580,3.014 L15.683,3.308 L15.817,3.585 L15.980,3.845 L16.173,4.090 L16.389,4.325 L16.624,4.555 L16.872,4.785 L17.130,5.017 L17.398,5.251 L17.427,5.277 L17.451,5.304 L17.470,5.330 L17.485,5.356 L17.495,5.382 L17.501,5.409 L17.503,5.436 L17.500,5.463 L17.494,5.492 L17.484,5.521 L17.470,5.552 L17.453,5.583 L17.416,5.651 L17.379,5.718 L17.344,5.786 L17.309,5.854 L17.276,5.922 L17.243,5.990 L17.212,6.059 L17.182,6.128 L17.153,6.198 L17.125,6.268 L17.099,6.338 L17.074,6.408 L17.058,6.450 L17.041,6.487 L17.023,6.517 L17.004,6.542 L16.982,6.561 L16.958,6.575 L16.932,6.584 L16.903,6.587 L16.870,6.585 L16.834,6.577 L16.795,6.565 L16.751,6.548 L16.595,6.476 L16.442,6.399 L16.292,6.319 L16.146,6.236 L16.002,6.150 L15.861,6.060 L15.722,5.967 L15.586,5.871 L15.453,5.770 L15.323,5.663 L15.197,5.550 L15.074,5.433 L14.869,5.231 L14.666,5.027 L14.465,4.822 L14.264,4.616 L14.063,4.410 L13.861,4.206 L13.656,4.003 L13.448,3.804 L13.237,3.610 L13.020,3.420 L12.797,3.236 L12.568,3.060 L12.513,3.020 L12.458,2.980 L12.404,2.941 L12.349,2.902 L12.294,2.864 L12.239,2.826 L12.183,2.788 L12.128,2.751 L12.072,2.714 L12.016,2.677 L11.960,2.641 L11.903,2.605 L11.706,2.378 L11.584,2.160 L11.526,1.951 L11.522,1.755 L11.564,1.573 L11.640,1.407 L11.742,1.257 L11.858,1.127 L11.980,1.018 L12.097,0.932 L12.199,0.869 L12.277,0.833 L12.333,0.805 L12.370,0.770 L12.388,0.728 L12.385,0.683 L12.361,0.637 L12.315,0.590 L12.246,0.545 L12.153,0.505 L12.035,0.470 L11.892,0.443 L11.722,0.426 L11.526,0.420 L11.317,0.427 L11.110,0.444 L10.904,0.472 L10.698,0.510 L10.491,0.556 L10.282,0.611 L10.070,0.674 L9.854,0.744 L9.634,0.820 L9.407,0.902 L9.174,0.989 L8.933,1.081 L8.897,1.095 L8.860,1.108 L8.824,1.121 L8.787,1.133 L8.750,1.144 L8.712,1.155 L8.675,1.166 L8.637,1.176 L8.599,1.186 L8.561,1.195 L8.522,1.204 L8.484,1.213 L8.260,1.173 L8.036,1.139 L7.809,1.111 L7.582,1.088 L7.352,1.071 L7.121,1.060 L6.889,1.054 L6.655,1.054 L6.419,1.061 L6.182,1.073 L5.943,1.091 L5.702,1.115 L5.255,1.179 L4.823,1.271 L4.407,1.390 L4.006,1.535 L3.620,1.707 L3.251,1.906 L2.896,2.131 L2.558,2.382 L2.235,2.659 L1.928,2.963 L1.637,3.291 L1.362,3.646 L1.062,4.092 L0.801,4.547 L0.579,5.012 L0.395,5.485 L0.247,5.966 L0.135,6.454 L0.057,6.949 L0.012,7.450 L0.000,7.957 L0.019,8.469 L0.068,8.986 L0.147,9.506 L0.259,10.050 L0.402,10.577 L0.574,11.088 L0.776,11.583 L1.006,12.062 L1.265,12.526 L1.552,12.972 L1.866,13.403 L2.208,13.817 L2.575,14.215 L2.969,14.597 L3.389,14.962 L3.843,15.316 L4.308,15.638 L4.784,15.928 L5.273,16.185 L5.772,16.410 L6.284,16.601 L6.807,16.758 L7.342,16.882 L7.889,16.971 L8.448,17.025 L9.019,17.043 L9.601,17.027 L9.962,17.003 L10.330,16.971 L10.705,16.925 L11.087,16.863 L11.477,16.778 L11.874,16.669 L12.279,16.529 L12.691,16.355 L13.111,16.142 L13.540,15.887 L13.976,15.585 L14.421,15.232 L14.535,15.286 L14.651,15.334 L14.770,15.378 L14.892,15.417 L15.020,15.452 L15.154,15.483 L15.294,15.511 L15.443,15.536 L15.601,15.558 L15.769,15.579 L15.947,15.598 L16.138,15.615 L16.289,15.626 L16.439,15.632 L16.588,15.633 L16.734,15.629 L16.878,15.621 L17.019,15.610 L17.157,15.595 L17.291,15.578 L17.421,15.558 L17.547,15.537 L17.668,15.514 L17.784,15.491 L17.945,15.444 L18.078,15.379 L18.182,15.300 L18.261,15.211 L18.315,15.115 L18.348,15.016 L18.360,14.918 L18.355,14.824 L18.332,14.738 L18.296,14.664 L18.247,14.604 L18.188,14.564 L17.719,14.349 L17.343,14.183 L17.050,14.060 L16.827,13.972 L16.663,13.912 L16.544,13.873 L16.461,13.848 L16.400,13.828 L16.351,13.808 L16.300,13.780 L16.237,13.736 L16.150,13.670 L16.424,13.337 L16.717,12.965 L17.020,12.553 L17.330,12.102 L17.640,11.613 L17.943,11.087 L18.235,10.524 L18.510,9.924 L18.762,9.288 L18.984,8.617 L19.171,7.912 L19.316,7.178 L19.327,7.097 L19.338,7.015 L19.350,6.932 L19.362,6.849 L19.375,6.767 L19.389,6.687 L19.403,6.611 L19.417,6.538 L19.432,6.469 L19.445,6.405 L19.458,6.346 L19.468,6.293 L19.475,6.265 L19.483,6.239 L19.493,6.217 L19.506,6.198 L19.521,6.182 L19.540,6.169 L19.562,6.159 L19.588,6.152 L19.618,6.147 L19.652,6.145 L19.692,6.146 L19.736,6.149 L19.869,6.158 L20.001,6.165 L20.133,6.171 L20.265,6.176 L20.397,6.179 L20.529,6.182 L20.661,6.183 L20.793,6.184 L20.924,6.184 L21.056,6.184 L21.188,6.183 L21.319,6.182 L21.688,6.178 L22.035,6.169 L22.360,6.143 L22.666,6.084 L22.950,5.970 L23.210,5.778 L23.450,5.551 L23.671,5.303 L23.877,5.035 L24.066,4.747 L24.240,4.442 L24.401,4.121 L24.423,4.070 L24.444,4.018 L24.461,3.966 L24.475,3.914 L24.484,3.862 L24.488,3.809 L24.487,3.757 L24.480,3.705 L24.465,3.654 L24.442,3.604 L24.411,3.555 L24.371,3.507 Z M11.175,14.474 L10.692,14.099 L10.251,13.767 L9.851,13.476 L9.488,13.224 L9.163,13.009 L8.872,12.829 L8.615,12.683 L8.390,12.568 L8.196,12.483 L8.030,12.426 L7.891,12.396 L7.778,12.390 L7.693,12.404 L7.625,12.433 L7.572,12.475 L7.533,12.528 L7.507,12.591 L7.492,12.661 L7.487,12.736 L7.490,12.815 L7.499,12.895 L7.514,12.975 L7.532,13.053 L7.552,13.126 L7.574,13.194 L7.598,13.258 L7.622,13.320 L7.648,13.380 L7.676,13.439 L7.704,13.496 L7.734,13.552 L7.766,13.608 L7.800,13.664 L7.835,13.721 L7.872,13.780 L7.910,13.840 L7.937,13.882 L7.961,13.926 L7.981,13.973 L7.996,14.022 L8.005,14.072 L8.007,14.123 L8.001,14.175 L7.984,14.226 L7.958,14.277 L7.919,14.327 L7.867,14.375 L7.801,14.422 L7.629,14.503 L7.444,14.551 L7.248,14.569 L7.050,14.564 L6.852,14.540 L6.662,14.501 L6.484,14.454 L6.324,14.403 L6.187,14.353 L6.079,14.309 L6.005,14.277 L5.970,14.260 L5.646,14.061 L5.332,13.852 L5.027,13.632 L4.733,13.399 L4.448,13.155 L4.175,12.898 L3.913,12.628 L3.663,12.345 L3.424,12.048 L3.198,11.737 L2.985,11.410 L2.785,11.069 L2.604,10.731 L2.437,10.389 L2.284,10.043 L2.143,9.692 L2.017,9.338 L1.905,8.980 L1.806,8.617 L1.722,8.251 L1.652,7.880 L1.597,7.505 L1.557,7.127 L1.532,6.744 L1.530,6.656 L1.533,6.577 L1.544,6.507 L1.560,6.446 L1.584,6.392 L1.616,6.345 L1.656,6.304 L1.704,6.269 L1.761,6.239 L1.828,6.213 L1.905,6.192 L1.992,6.173 L2.114,6.152 L2.237,6.134 L2.360,6.119 L2.483,6.108 L2.607,6.099 L2.730,6.094 L2.854,6.092 L2.977,6.094 L3.100,6.099 L3.223,6.108 L3.346,6.120 L3.468,6.136 L3.976,6.224 L4.471,6.337 L4.953,6.476 L5.424,6.640 L5.881,6.828 L6.327,7.041 L6.760,7.277 L7.181,7.538 L7.589,7.822 L7.986,8.130 L8.371,8.460 L8.744,8.813 L8.949,9.024 L9.147,9.240 L9.338,9.463 L9.522,9.690 L9.701,9.921 L9.876,10.156 L10.046,10.393 L10.214,10.633 L10.379,10.875 L10.543,11.117 L10.706,11.360 L10.869,11.602 L11.044,11.859 L11.221,12.112 L11.402,12.363 L11.587,12.610 L11.775,12.854 L11.969,13.093 L12.168,13.327 L12.373,13.557 L12.584,13.781 L12.803,13.999 L13.028,14.210 L13.262,14.415 L13.345,14.484 L13.425,14.550 L13.502,14.613 L13.577,14.674 L13.651,14.732 L13.722,14.788 L13.792,14.841 L13.860,14.891 L13.927,14.939 L13.993,14.984 L14.058,15.027 L14.123,15.068 L13.919,15.088 L13.697,15.103 L13.460,15.110 L13.211,15.108 L12.953,15.094 L12.690,15.066 L12.424,15.021 L12.160,14.958 L11.899,14.874 L11.646,14.767 L11.404,14.635 L11.175,14.475 L11.175,14.474 Z M12.141,8.260 L12.144,8.219 L12.152,8.181 L12.164,8.144 L12.181,8.110 L12.203,8.078 L12.228,8.050 L12.256,8.025 L12.288,8.004 L12.322,7.987 L12.359,7.974 L12.398,7.966 L12.439,7.963 L12.448,7.964 L12.457,7.964 L12.466,7.965 L12.475,7.966 L12.484,7.967 L12.493,7.969 L12.501,7.970 L12.509,7.972 L12.517,7.974 L12.525,7.977 L12.533,7.979 L12.541,7.982 L12.551,7.986 L12.561,7.990 L12.571,7.995 L12.581,8.000 L12.591,8.005 L12.600,8.011 L12.609,8.017 L12.618,8.023 L12.627,8.030 L12.635,8.037 L12.643,8.045 L12.650,8.053 L12.663,8.067 L12.675,8.081 L12.686,8.097 L12.696,8.113 L12.704,8.129 L12.712,8.147 L12.718,8.165 L12.724,8.183 L12.728,8.202 L12.731,8.221 L12.733,8.240 L12.733,8.260 L12.731,8.300 L12.723,8.339 L12.710,8.376 L12.693,8.410 L12.672,8.442 L12.647,8.470 L12.618,8.495 L12.587,8.516 L12.552,8.533 L12.515,8.546 L12.476,8.554 L12.435,8.556 L12.395,8.554 L12.356,8.546 L12.319,8.533 L12.285,8.516 L12.254,8.495 L12.226,8.470 L12.201,8.442 L12.180,8.410 L12.164,8.376 L12.151,8.339 L12.144,8.300 L12.141,8.260 Z M15.142,9.799 L15.093,9.818 L15.045,9.837 L14.997,9.855 L14.949,9.872 L14.901,9.888 L14.854,9.903 L14.806,9.916 L14.759,9.927 L14.712,9.937 L14.665,9.944 L14.618,9.950 L14.572,9.953 L14.499,9.954 L14.427,9.950 L14.354,9.941 L14.282,9.928 L14.211,9.911 L14.143,9.890 L14.076,9.866 L14.013,9.839 L13.953,9.809 L13.898,9.778 L13.847,9.744 L13.802,9.709 L13.737,9.655 L13.676,9.605 L13.618,9.555 L13.564,9.507 L13.513,9.457 L13.466,9.405 L13.423,9.349 L13.384,9.289 L13.349,9.223 L13.318,9.150 L13.292,9.068 L13.270,8.977 L13.262,8.934 L13.257,8.888 L13.253,8.839 L13.252,8.789 L13.252,8.738 L13.253,8.686 L13.256,8.635 L13.260,8.585 L13.265,8.537 L13.271,8.491 L13.277,8.449 L13.284,8.410 L13.299,8.333 L13.307,8.261 L13.309,8.193 L13.305,8.129 L13.295,8.068 L13.278,8.010 L13.256,7.954 L13.228,7.902 L13.194,7.851 L13.154,7.802 L13.107,7.754 L13.055,7.708 L13.008,7.673 L12.960,7.642 L12.910,7.615 L12.858,7.592 L12.804,7.572 L12.749,7.556 L12.693,7.543 L12.634,7.533 L12.575,7.525 L12.515,7.520 L12.453,7.517 L12.390,7.516 L12.367,7.516 L12.343,7.513 L12.321,7.509 L12.299,7.504 L12.277,7.498 L12.256,7.491 L12.236,7.484 L12.216,7.476 L12.197,7.467 L12.179,7.459 L12.161,7.450 L12.145,7.441 L12.119,7.427 L12.094,7.409 L12.071,7.388 L12.051,7.364 L12.033,7.338 L12.019,7.309 L12.009,7.279 L12.003,7.246 L12.002,7.211 L12.007,7.174 L12.018,7.136 L12.035,7.096 L12.044,7.081 L12.056,7.064 L12.071,7.045 L12.088,7.025 L12.107,7.004 L12.126,6.983 L12.146,6.963 L12.165,6.944 L12.182,6.927 L12.198,6.913 L12.211,6.901 L12.220,6.893 L12.307,6.850 L12.396,6.816 L12.486,6.793 L12.578,6.778 L12.671,6.771 L12.764,6.773 L12.858,6.781 L12.953,6.796 L13.047,6.817 L13.141,6.843 L13.234,6.874 L13.326,6.908 L13.409,6.946 L13.490,6.987 L13.568,7.034 L13.645,7.086 L13.722,7.142 L13.798,7.203 L13.875,7.268 L13.953,7.338 L14.033,7.412 L14.116,7.491 L14.202,7.575 L14.292,7.663 L14.380,7.765 L14.457,7.857 L14.524,7.939 L14.583,8.013 L14.636,8.081 L14.683,8.145 L14.727,8.207 L14.770,8.268 L14.812,8.331 L14.855,8.397 L14.902,8.468 L14.953,8.545 L14.995,8.609 L15.036,8.674 L15.077,8.739 L15.116,8.804 L15.155,8.871 L15.192,8.938 L15.228,9.006 L15.262,9.075 L15.295,9.145 L15.326,9.217 L15.356,9.290 L15.383,9.364 L15.396,9.410 L15.403,9.455 L15.404,9.498 L15.398,9.539 L15.387,9.579 L15.370,9.616 L15.347,9.652 L15.317,9.686 L15.282,9.718 L15.241,9.747 L15.194,9.774 L15.142,9.799 Z",
+		"M21.837,0.540 L21.775,0.529 L21.721,0.529 L21.673,0.540 L21.631,0.559 L21.594,0.586 L21.561,0.618 L21.531,0.655 L21.503,0.695 L21.477,0.737 L21.450,0.778 L21.423,0.818 L21.395,0.856 L21.385,0.867 L21.375,0.879 L21.366,0.892 L21.356,0.904 L21.348,0.917 L21.339,0.930 L21.331,0.944 L21.322,0.957 L21.314,0.970 L21.306,0.983 L21.298,0.997 L21.290,1.010 L21.219,1.118 L21.143,1.222 L21.064,1.319 L20.980,1.410 L20.891,1.494 L20.797,1.571 L20.697,1.641 L20.592,1.702 L20.480,1.755 L20.362,1.798 L20.237,1.832 L20.105,1.856 L19.910,1.889 L19.722,1.933 L19.542,1.989 L19.368,2.057 L19.200,2.137 L19.040,2.229 L18.886,2.334 L18.739,2.452 L18.598,2.583 L18.463,2.728 L18.335,2.886 L18.213,3.058 L18.140,2.886 L18.058,2.728 L17.967,2.585 L17.866,2.454 L17.756,2.336 L17.638,2.231 L17.516,2.136 L17.392,2.052 L17.267,1.977 L17.143,1.909 L17.020,1.848 L16.900,1.791 L16.839,1.762 L16.779,1.731 L16.722,1.697 L16.667,1.661 L16.613,1.620 L16.562,1.576 L16.512,1.527 L16.464,1.472 L16.418,1.412 L16.375,1.346 L16.333,1.273 L16.294,1.193 L16.269,1.132 L16.246,1.071 L16.225,1.009 L16.207,0.946 L16.190,0.883 L16.174,0.819 L16.159,0.755 L16.145,0.690 L16.132,0.625 L16.118,0.560 L16.105,0.495 L16.091,0.429 L16.082,0.390 L16.073,0.351 L16.064,0.312 L16.054,0.275 L16.044,0.239 L16.032,0.205 L16.020,0.174 L16.006,0.145 L15.990,0.120 L15.973,0.098 L15.953,0.081 L15.930,0.067 L15.906,0.060 L15.883,0.059 L15.862,0.066 L15.843,0.078 L15.825,0.096 L15.809,0.119 L15.794,0.145 L15.781,0.174 L15.767,0.204 L15.755,0.237 L15.743,0.270 L15.731,0.302 L15.683,0.435 L15.637,0.571 L15.595,0.710 L15.556,0.852 L15.522,0.996 L15.492,1.142 L15.467,1.290 L15.447,1.440 L15.432,1.591 L15.422,1.743 L15.417,1.896 L15.418,2.050 L15.435,2.391 L15.474,2.722 L15.534,3.042 L15.614,3.352 L15.715,3.653 L15.835,3.944 L15.977,4.226 L16.143,4.493 L16.336,4.744 L16.559,4.975 L16.812,5.185 L17.095,5.371 L17.127,5.392 L17.155,5.412 L17.180,5.433 L17.202,5.454 L17.220,5.477 L17.234,5.500 L17.246,5.524 L17.254,5.549 L17.259,5.576 L17.261,5.604 L17.260,5.634 L17.255,5.666 L17.244,5.732 L17.232,5.798 L17.219,5.863 L17.204,5.929 L17.189,5.994 L17.173,6.059 L17.156,6.124 L17.138,6.189 L17.120,6.254 L17.101,6.319 L17.083,6.385 L17.064,6.450 L17.051,6.490 L17.037,6.524 L17.020,6.552 L17.002,6.576 L16.981,6.594 L16.958,6.607 L16.932,6.615 L16.903,6.618 L16.870,6.617 L16.834,6.610 L16.794,6.599 L16.750,6.583 L16.591,6.515 L16.436,6.442 L16.285,6.363 L16.137,6.278 L15.993,6.187 L15.852,6.092 L15.715,5.991 L15.582,5.886 L15.451,5.776 L15.323,5.664 L15.197,5.550 L15.074,5.433 L14.869,5.231 L14.666,5.027 L14.465,4.822 L14.264,4.616 L14.063,4.410 L13.861,4.206 L13.656,4.003 L13.448,3.804 L13.237,3.610 L13.020,3.420 L12.797,3.236 L12.568,3.060 L12.513,3.020 L12.458,2.980 L12.404,2.941 L12.349,2.902 L12.294,2.864 L12.239,2.826 L12.183,2.788 L12.128,2.751 L12.072,2.714 L12.016,2.677 L11.960,2.641 L11.903,2.605 L11.706,2.378 L11.584,2.160 L11.526,1.951 L11.522,1.755 L11.564,1.573 L11.640,1.407 L11.742,1.257 L11.858,1.127 L11.980,1.018 L12.097,0.932 L12.199,0.869 L12.277,0.833 L12.333,0.805 L12.370,0.770 L12.388,0.728 L12.385,0.683 L12.361,0.637 L12.315,0.590 L12.246,0.545 L12.153,0.505 L12.035,0.470 L11.892,0.443 L11.722,0.426 L11.526,0.420 L11.317,0.427 L11.110,0.444 L10.904,0.472 L10.698,0.510 L10.491,0.556 L10.282,0.611 L10.070,0.674 L9.854,0.744 L9.634,0.820 L9.407,0.902 L9.174,0.989 L8.933,1.081 L8.897,1.095 L8.860,1.108 L8.824,1.121 L8.787,1.133 L8.750,1.144 L8.712,1.155 L8.675,1.166 L8.637,1.176 L8.599,1.186 L8.561,1.195 L8.522,1.204 L8.484,1.213 L8.260,1.173 L8.036,1.139 L7.809,1.111 L7.582,1.088 L7.352,1.071 L7.121,1.060 L6.889,1.054 L6.655,1.054 L6.419,1.061 L6.182,1.073 L5.943,1.091 L5.702,1.115 L5.255,1.179 L4.823,1.271 L4.407,1.390 L4.006,1.535 L3.620,1.707 L3.251,1.906 L2.896,2.131 L2.558,2.382 L2.235,2.659 L1.928,2.963 L1.637,3.291 L1.362,3.646 L1.062,4.092 L0.801,4.547 L0.579,5.012 L0.395,5.485 L0.247,5.966 L0.135,6.454 L0.057,6.949 L0.012,7.450 L0.000,7.957 L0.019,8.469 L0.068,8.986 L0.147,9.506 L0.259,10.050 L0.402,10.577 L0.574,11.088 L0.776,11.583 L1.006,12.062 L1.265,12.526 L1.552,12.972 L1.866,13.403 L2.208,13.817 L2.575,14.215 L2.969,14.597 L3.389,14.962 L3.843,15.316 L4.308,15.638 L4.784,15.928 L5.273,16.185 L5.772,16.410 L6.284,16.601 L6.807,16.758 L7.342,16.882 L7.889,16.971 L8.448,17.025 L9.019,17.043 L9.601,17.027 L9.962,17.003 L10.330,16.971 L10.705,16.925 L11.087,16.863 L11.477,16.778 L11.874,16.669 L12.279,16.529 L12.691,16.355 L13.111,16.142 L13.540,15.887 L13.976,15.585 L14.421,15.232 L14.535,15.286 L14.651,15.334 L14.770,15.378 L14.892,15.417 L15.020,15.452 L15.154,15.483 L15.294,15.511 L15.443,15.536 L15.601,15.558 L15.769,15.579 L15.947,15.598 L16.138,15.615 L16.289,15.626 L16.439,15.632 L16.588,15.633 L16.734,15.629 L16.878,15.621 L17.019,15.610 L17.157,15.595 L17.291,15.578 L17.421,15.558 L17.547,15.537 L17.668,15.514 L17.784,15.491 L17.945,15.444 L18.078,15.379 L18.182,15.300 L18.261,15.211 L18.315,15.115 L18.348,15.016 L18.360,14.918 L18.355,14.824 L18.332,14.738 L18.296,14.664 L18.247,14.604 L18.188,14.564 L17.719,14.349 L17.343,14.183 L17.050,14.060 L16.827,13.972 L16.663,13.912 L16.544,13.873 L16.461,13.848 L16.400,13.828 L16.351,13.808 L16.300,13.780 L16.237,13.736 L16.150,13.670 L16.424,13.337 L16.717,12.965 L17.020,12.553 L17.330,12.102 L17.640,11.613 L17.943,11.087 L18.235,10.524 L18.510,9.924 L18.762,9.288 L18.984,8.617 L19.171,7.912 L19.319,7.169 L19.333,7.080 L19.346,6.985 L19.359,6.885 L19.372,6.781 L19.382,6.676 L19.391,6.569 L19.398,6.463 L19.402,6.359 L19.403,6.258 L19.401,6.162 L19.395,6.073 L19.387,5.992 L19.383,5.948 L19.380,5.908 L19.381,5.872 L19.384,5.840 L19.392,5.811 L19.403,5.786 L19.418,5.764 L19.439,5.745 L19.464,5.728 L19.495,5.714 L19.532,5.702 L19.575,5.692 L19.702,5.661 L19.827,5.626 L19.950,5.586 L20.072,5.542 L20.192,5.492 L20.310,5.437 L20.426,5.376 L20.538,5.309 L20.649,5.236 L20.756,5.157 L20.860,5.072 L20.960,4.980 L21.224,4.693 L21.445,4.383 L21.627,4.058 L21.775,3.726 L21.899,3.399 L22.012,3.085 L22.100,2.767 L22.163,2.440 L22.200,2.105 L22.215,1.761 L22.207,1.410 L22.179,1.051 L22.172,0.996 L22.163,0.942 L22.151,0.888 L22.136,0.836 L22.117,0.786 L22.094,0.739 L22.066,0.695 L22.032,0.655 L21.993,0.618 L21.948,0.587 L21.896,0.561 L21.837,0.540 Z M11.175,14.474 L10.692,14.099 L10.251,13.767 L9.851,13.476 L9.488,13.224 L9.163,13.009 L8.872,12.829 L8.615,12.683 L8.390,12.568 L8.196,12.483 L8.030,12.426 L7.891,12.396 L7.778,12.390 L7.693,12.404 L7.625,12.433 L7.572,12.475 L7.533,12.528 L7.507,12.591 L7.492,12.661 L7.487,12.736 L7.490,12.815 L7.499,12.895 L7.514,12.975 L7.532,13.053 L7.552,13.126 L7.574,13.194 L7.598,13.258 L7.622,13.320 L7.648,13.380 L7.676,13.439 L7.704,13.496 L7.734,13.552 L7.766,13.608 L7.800,13.664 L7.835,13.721 L7.872,13.780 L7.910,13.840 L7.937,13.882 L7.961,13.926 L7.981,13.973 L7.996,14.022 L8.005,14.072 L8.007,14.123 L8.001,14.175 L7.984,14.226 L7.958,14.277 L7.919,14.327 L7.867,14.375 L7.801,14.422 L7.629,14.503 L7.444,14.551 L7.248,14.569 L7.050,14.564 L6.852,14.540 L6.662,14.501 L6.484,14.454 L6.324,14.403 L6.187,14.353 L6.079,14.309 L6.005,14.277 L5.970,14.260 L5.646,14.061 L5.332,13.852 L5.027,13.632 L4.733,13.399 L4.448,13.155 L4.175,12.898 L3.913,12.628 L3.663,12.345 L3.424,12.048 L3.198,11.737 L2.985,11.410 L2.785,11.069 L2.604,10.731 L2.437,10.389 L2.284,10.043 L2.143,9.692 L2.017,9.338 L1.905,8.980 L1.806,8.617 L1.722,8.251 L1.652,7.880 L1.597,7.505 L1.557,7.127 L1.532,6.744 L1.530,6.656 L1.533,6.577 L1.544,6.507 L1.560,6.446 L1.584,6.392 L1.616,6.345 L1.656,6.304 L1.704,6.269 L1.761,6.239 L1.828,6.213 L1.905,6.192 L1.992,6.173 L2.114,6.152 L2.237,6.134 L2.360,6.119 L2.483,6.108 L2.607,6.099 L2.730,6.094 L2.854,6.092 L2.977,6.094 L3.100,6.099 L3.223,6.108 L3.346,6.120 L3.468,6.136 L3.976,6.224 L4.471,6.337 L4.953,6.476 L5.424,6.640 L5.881,6.828 L6.327,7.041 L6.760,7.277 L7.181,7.538 L7.589,7.822 L7.986,8.130 L8.371,8.460 L8.744,8.813 L8.949,9.024 L9.147,9.240 L9.338,9.463 L9.522,9.690 L9.701,9.921 L9.876,10.156 L10.046,10.393 L10.214,10.633 L10.379,10.875 L10.543,11.117 L10.706,11.360 L10.869,11.602 L11.044,11.859 L11.221,12.112 L11.402,12.363 L11.587,12.610 L11.775,12.854 L11.969,13.093 L12.168,13.327 L12.373,13.557 L12.584,13.781 L12.803,13.999 L13.028,14.210 L13.262,14.415 L13.345,14.484 L13.425,14.550 L13.502,14.613 L13.577,14.674 L13.651,14.732 L13.722,14.788 L13.792,14.841 L13.860,14.891 L13.927,14.939 L13.993,14.984 L14.058,15.027 L14.123,15.068 L13.919,15.088 L13.697,15.103 L13.460,15.110 L13.211,15.108 L12.953,15.094 L12.690,15.066 L12.424,15.021 L12.160,14.958 L11.899,14.874 L11.646,14.767 L11.404,14.635 L11.175,14.475 L11.175,14.474 Z M12.141,8.260 L12.144,8.219 L12.152,8.181 L12.164,8.144 L12.181,8.110 L12.203,8.078 L12.228,8.050 L12.256,8.025 L12.288,8.004 L12.322,7.987 L12.359,7.974 L12.398,7.966 L12.439,7.963 L12.448,7.964 L12.457,7.964 L12.466,7.965 L12.475,7.966 L12.484,7.967 L12.493,7.969 L12.501,7.970 L12.509,7.972 L12.517,7.974 L12.525,7.977 L12.533,7.979 L12.541,7.982 L12.551,7.986 L12.561,7.990 L12.571,7.995 L12.581,8.000 L12.591,8.005 L12.600,8.011 L12.609,8.017 L12.618,8.023 L12.627,8.030 L12.635,8.037 L12.643,8.045 L12.650,8.053 L12.663,8.067 L12.675,8.081 L12.686,8.097 L12.696,8.113 L12.704,8.129 L12.712,8.147 L12.718,8.165 L12.724,8.183 L12.728,8.202 L12.731,8.221 L12.733,8.240 L12.733,8.260 L12.731,8.300 L12.723,8.339 L12.710,8.376 L12.693,8.410 L12.672,8.442 L12.647,8.470 L12.618,8.495 L12.587,8.516 L12.552,8.533 L12.515,8.546 L12.476,8.554 L12.435,8.556 L12.395,8.554 L12.356,8.546 L12.319,8.533 L12.285,8.516 L12.254,8.495 L12.226,8.470 L12.201,8.442 L12.180,8.410 L12.164,8.376 L12.151,8.339 L12.144,8.300 L12.141,8.260 Z M15.142,9.799 L15.093,9.818 L15.045,9.837 L14.997,9.855 L14.949,9.872 L14.901,9.888 L14.854,9.903 L14.806,9.916 L14.759,9.927 L14.712,9.937 L14.665,9.944 L14.618,9.950 L14.572,9.953 L14.499,9.954 L14.427,9.950 L14.354,9.941 L14.282,9.928 L14.211,9.911 L14.143,9.890 L14.076,9.866 L14.013,9.839 L13.953,9.809 L13.898,9.778 L13.847,9.744 L13.802,9.709 L13.737,9.655 L13.676,9.605 L13.618,9.555 L13.564,9.507 L13.513,9.457 L13.466,9.405 L13.423,9.349 L13.384,9.289 L13.349,9.223 L13.318,9.150 L13.292,9.068 L13.270,8.977 L13.262,8.934 L13.257,8.888 L13.253,8.839 L13.252,8.789 L13.252,8.738 L13.253,8.686 L13.256,8.635 L13.260,8.585 L13.265,8.537 L13.271,8.491 L13.277,8.449 L13.284,8.410 L13.299,8.333 L13.307,8.261 L13.309,8.193 L13.305,8.129 L13.295,8.068 L13.278,8.010 L13.256,7.954 L13.228,7.902 L13.194,7.851 L13.154,7.802 L13.107,7.754 L13.055,7.708 L13.008,7.673 L12.960,7.642 L12.910,7.615 L12.858,7.592 L12.804,7.572 L12.749,7.556 L12.693,7.543 L12.634,7.533 L12.575,7.525 L12.515,7.520 L12.453,7.517 L12.390,7.516 L12.367,7.516 L12.343,7.513 L12.321,7.509 L12.299,7.504 L12.277,7.498 L12.256,7.491 L12.236,7.484 L12.216,7.476 L12.197,7.467 L12.179,7.459 L12.161,7.450 L12.145,7.441 L12.119,7.427 L12.094,7.409 L12.071,7.388 L12.051,7.364 L12.033,7.338 L12.019,7.309 L12.009,7.279 L12.003,7.246 L12.002,7.211 L12.007,7.174 L12.018,7.136 L12.035,7.096 L12.044,7.081 L12.056,7.064 L12.071,7.045 L12.088,7.025 L12.107,7.004 L12.126,6.983 L12.146,6.963 L12.165,6.944 L12.182,6.927 L12.198,6.913 L12.211,6.901 L12.220,6.893 L12.307,6.850 L12.396,6.816 L12.486,6.793 L12.578,6.778 L12.671,6.771 L12.764,6.773 L12.858,6.781 L12.953,6.796 L13.047,6.817 L13.141,6.843 L13.234,6.874 L13.326,6.908 L13.409,6.946 L13.490,6.987 L13.568,7.034 L13.645,7.086 L13.722,7.142 L13.798,7.203 L13.875,7.268 L13.953,7.338 L14.033,7.412 L14.116,7.491 L14.202,7.575 L14.292,7.663 L14.380,7.765 L14.457,7.857 L14.524,7.939 L14.583,8.013 L14.636,8.081 L14.683,8.145 L14.727,8.207 L14.770,8.268 L14.812,8.331 L14.855,8.397 L14.902,8.468 L14.953,8.545 L14.995,8.609 L15.036,8.674 L15.077,8.739 L15.116,8.804 L15.155,8.871 L15.192,8.938 L15.228,9.006 L15.262,9.075 L15.295,9.145 L15.326,9.217 L15.356,9.290 L15.383,9.364 L15.396,9.410 L15.403,9.455 L15.404,9.498 L15.398,9.539 L15.387,9.579 L15.370,9.616 L15.347,9.652 L15.317,9.686 L15.282,9.718 L15.241,9.747 L15.194,9.774 L15.142,9.799 Z",
+		"M23.428,1.998 L23.372,1.969 L23.320,1.953 L23.272,1.950 L23.226,1.956 L23.183,1.970 L23.142,1.992 L23.102,2.019 L23.064,2.049 L23.026,2.080 L22.989,2.112 L22.951,2.143 L22.913,2.170 L22.900,2.178 L22.887,2.187 L22.874,2.196 L22.862,2.206 L22.850,2.215 L22.838,2.225 L22.826,2.236 L22.814,2.246 L22.802,2.256 L22.791,2.267 L22.779,2.277 L22.768,2.287 L22.668,2.370 L22.565,2.447 L22.461,2.516 L22.354,2.579 L22.244,2.634 L22.132,2.680 L22.016,2.717 L21.897,2.745 L21.775,2.762 L21.650,2.770 L21.520,2.765 L21.387,2.750 L21.191,2.724 L20.999,2.711 L20.809,2.712 L20.623,2.726 L20.440,2.754 L20.259,2.795 L20.081,2.850 L19.906,2.920 L19.733,3.004 L19.562,3.103 L19.393,3.217 L19.226,3.346 L19.207,3.160 L19.175,2.986 L19.129,2.822 L19.071,2.667 L19.000,2.522 L18.917,2.386 L18.820,2.258 L18.708,2.138 L18.580,2.024 L18.436,1.918 L18.276,1.819 L18.099,1.727 L18.002,1.681 L17.904,1.636 L17.806,1.589 L17.708,1.542 L17.611,1.493 L17.515,1.441 L17.422,1.387 L17.331,1.329 L17.244,1.267 L17.161,1.200 L17.082,1.127 L17.008,1.048 L16.961,0.989 L16.920,0.930 L16.883,0.869 L16.851,0.808 L16.822,0.746 L16.797,0.684 L16.773,0.621 L16.751,0.557 L16.729,0.494 L16.707,0.430 L16.685,0.367 L16.662,0.303 L16.646,0.265 L16.630,0.227 L16.612,0.190 L16.593,0.154 L16.571,0.120 L16.547,0.088 L16.519,0.059 L16.488,0.033 L16.451,0.011 L16.410,-0.006 L16.364,-0.019 L16.311,-0.027 L16.254,-0.029 L16.202,-0.024 L16.156,-0.012 L16.115,0.005 L16.077,0.027 L16.043,0.053 L16.013,0.082 L15.985,0.114 L15.959,0.148 L15.934,0.183 L15.911,0.218 L15.888,0.253 L15.804,0.396 L15.729,0.540 L15.664,0.685 L15.609,0.832 L15.561,0.980 L15.522,1.130 L15.490,1.280 L15.465,1.432 L15.447,1.584 L15.435,1.737 L15.429,1.890 L15.429,2.044 L15.448,2.384 L15.491,2.712 L15.559,3.026 L15.652,3.328 L15.770,3.615 L15.914,3.889 L16.083,4.149 L16.276,4.398 L16.491,4.635 L16.726,4.864 L16.982,5.084 L17.258,5.296 L17.288,5.320 L17.314,5.344 L17.336,5.368 L17.354,5.392 L17.368,5.417 L17.378,5.442 L17.384,5.468 L17.387,5.495 L17.386,5.523 L17.381,5.553 L17.373,5.583 L17.362,5.616 L17.337,5.683 L17.311,5.751 L17.286,5.818 L17.260,5.886 L17.235,5.953 L17.210,6.020 L17.186,6.088 L17.161,6.155 L17.137,6.223 L17.114,6.291 L17.091,6.359 L17.069,6.427 L17.055,6.468 L17.039,6.503 L17.022,6.533 L17.003,6.557 L16.982,6.576 L16.958,6.590 L16.932,6.598 L16.903,6.601 L16.870,6.599 L16.834,6.592 L16.794,6.580 L16.750,6.564 L16.593,6.493 L16.439,6.418 L16.289,6.339 L16.142,6.255 L15.998,6.167 L15.857,6.074 L15.719,5.978 L15.584,5.877 L15.452,5.773 L15.323,5.664 L15.197,5.550 L15.074,5.433 L14.869,5.231 L14.666,5.027 L14.465,4.822 L14.264,4.616 L14.063,4.410 L13.861,4.206 L13.656,4.003 L13.448,3.804 L13.237,3.610 L13.020,3.420 L12.797,3.236 L12.568,3.060 L12.513,3.020 L12.458,2.980 L12.404,2.941 L12.349,2.902 L12.294,2.864 L12.239,2.826 L12.183,2.788 L12.128,2.751 L12.072,2.714 L12.016,2.677 L11.960,2.641 L11.903,2.605 L11.706,2.378 L11.584,2.160 L11.526,1.951 L11.522,1.755 L11.564,1.573 L11.640,1.407 L11.742,1.257 L11.858,1.127 L11.980,1.018 L12.097,0.932 L12.199,0.869 L12.277,0.833 L12.333,0.805 L12.370,0.770 L12.388,0.728 L12.385,0.683 L12.361,0.637 L12.315,0.590 L12.246,0.545 L12.153,0.505 L12.035,0.470 L11.892,0.443 L11.722,0.426 L11.526,0.420 L11.317,0.427 L11.110,0.444 L10.904,0.472 L10.698,0.510 L10.491,0.556 L10.282,0.611 L10.070,0.674 L9.854,0.744 L9.634,0.820 L9.407,0.902 L9.174,0.989 L8.933,1.081 L8.897,1.095 L8.860,1.108 L8.824,1.121 L8.787,1.133 L8.750,1.144 L8.712,1.155 L8.675,1.166 L8.637,1.176 L8.599,1.186 L8.561,1.195 L8.522,1.204 L8.484,1.213 L8.260,1.173 L8.036,1.139 L7.809,1.111 L7.582,1.088 L7.352,1.071 L7.121,1.060 L6.889,1.054 L6.655,1.054 L6.419,1.061 L6.182,1.073 L5.943,1.091 L5.702,1.115 L5.255,1.179 L4.823,1.271 L4.407,1.390 L4.006,1.535 L3.620,1.707 L3.251,1.906 L2.896,2.131 L2.558,2.382 L2.235,2.659 L1.928,2.963 L1.637,3.291 L1.362,3.646 L1.062,4.092 L0.801,4.547 L0.579,5.012 L0.395,5.485 L0.247,5.966 L0.135,6.454 L0.057,6.949 L0.012,7.450 L0.000,7.957 L0.019,8.469 L0.068,8.986 L0.147,9.506 L0.259,10.050 L0.402,10.577 L0.574,11.088 L0.776,11.583 L1.006,12.062 L1.265,12.526 L1.552,12.972 L1.866,13.403 L2.208,13.817 L2.575,14.215 L2.969,14.597 L3.389,14.962 L3.843,15.316 L4.308,15.638 L4.784,15.928 L5.273,16.185 L5.772,16.410 L6.284,16.601 L6.807,16.758 L7.342,16.882 L7.889,16.971 L8.448,17.025 L9.019,17.043 L9.601,17.027 L9.962,17.003 L10.330,16.971 L10.705,16.925 L11.087,16.863 L11.477,16.778 L11.874,16.669 L12.279,16.529 L12.691,16.355 L13.111,16.142 L13.540,15.887 L13.976,15.585 L14.421,15.232 L14.535,15.286 L14.651,15.334 L14.770,15.378 L14.892,15.417 L15.020,15.452 L15.154,15.483 L15.294,15.511 L15.443,15.536 L15.601,15.558 L15.769,15.579 L15.947,15.598 L16.138,15.615 L16.289,15.626 L16.439,15.632 L16.588,15.633 L16.734,15.629 L16.878,15.621 L17.019,15.610 L17.157,15.595 L17.291,15.578 L17.421,15.558 L17.547,15.537 L17.668,15.514 L17.784,15.491 L17.945,15.444 L18.078,15.379 L18.182,15.300 L18.261,15.211 L18.315,15.115 L18.348,15.016 L18.360,14.918 L18.355,14.824 L18.332,14.738 L18.296,14.664 L18.247,14.604 L18.188,14.564 L17.719,14.349 L17.343,14.183 L17.050,14.060 L16.827,13.972 L16.663,13.912 L16.544,13.873 L16.461,13.848 L16.400,13.828 L16.351,13.808 L16.300,13.780 L16.237,13.736 L16.150,13.670 L16.424,13.337 L16.717,12.965 L17.020,12.553 L17.330,12.102 L17.640,11.613 L17.943,11.087 L18.235,10.524 L18.510,9.924 L18.762,9.288 L18.984,8.617 L19.171,7.912 L19.318,7.174 L19.330,7.090 L19.342,7.001 L19.354,6.911 L19.367,6.818 L19.379,6.726 L19.391,6.634 L19.402,6.544 L19.413,6.457 L19.422,6.373 L19.430,6.295 L19.435,6.222 L19.438,6.156 L19.441,6.119 L19.445,6.087 L19.451,6.058 L19.461,6.033 L19.473,6.011 L19.489,5.993 L19.508,5.977 L19.532,5.964 L19.561,5.954 L19.594,5.946 L19.633,5.941 L19.677,5.938 L19.808,5.929 L19.939,5.916 L20.069,5.901 L20.199,5.883 L20.328,5.862 L20.456,5.838 L20.583,5.810 L20.710,5.779 L20.836,5.746 L20.962,5.708 L21.086,5.668 L21.210,5.624 L21.552,5.485 L21.867,5.331 L22.155,5.158 L22.415,4.963 L22.648,4.740 L22.851,4.483 L23.029,4.205 L23.184,3.910 L23.318,3.600 L23.432,3.276 L23.528,2.938 L23.606,2.587 L23.615,2.532 L23.622,2.477 L23.627,2.422 L23.627,2.368 L23.624,2.315 L23.615,2.263 L23.601,2.213 L23.581,2.164 L23.555,2.118 L23.521,2.075 L23.479,2.035 L23.428,1.998 Z M11.175,14.474 L10.692,14.099 L10.251,13.767 L9.851,13.476 L9.488,13.224 L9.163,13.009 L8.872,12.829 L8.615,12.683 L8.390,12.568 L8.196,12.483 L8.030,12.426 L7.891,12.396 L7.778,12.390 L7.693,12.404 L7.625,12.433 L7.572,12.475 L7.533,12.528 L7.507,12.591 L7.492,12.661 L7.487,12.736 L7.490,12.815 L7.499,12.895 L7.514,12.975 L7.532,13.053 L7.552,13.126 L7.574,13.194 L7.598,13.258 L7.622,13.320 L7.648,13.380 L7.676,13.439 L7.704,13.496 L7.734,13.552 L7.766,13.608 L7.800,13.664 L7.835,13.721 L7.872,13.780 L7.910,13.840 L7.937,13.882 L7.961,13.926 L7.981,13.973 L7.996,14.022 L8.005,14.072 L8.007,14.123 L8.001,14.175 L7.984,14.226 L7.958,14.277 L7.919,14.327 L7.867,14.375 L7.801,14.422 L7.629,14.503 L7.444,14.551 L7.248,14.569 L7.050,14.564 L6.852,14.540 L6.662,14.501 L6.484,14.454 L6.324,14.403 L6.187,14.353 L6.079,14.309 L6.005,14.277 L5.970,14.260 L5.646,14.061 L5.332,13.852 L5.027,13.632 L4.733,13.399 L4.448,13.155 L4.175,12.898 L3.913,12.628 L3.663,12.345 L3.424,12.048 L3.198,11.737 L2.985,11.410 L2.785,11.069 L2.604,10.731 L2.437,10.389 L2.284,10.043 L2.143,9.692 L2.017,9.338 L1.905,8.980 L1.806,8.617 L1.722,8.251 L1.652,7.880 L1.597,7.505 L1.557,7.127 L1.532,6.744 L1.530,6.656 L1.533,6.577 L1.544,6.507 L1.560,6.446 L1.584,6.392 L1.616,6.345 L1.656,6.304 L1.704,6.269 L1.761,6.239 L1.828,6.213 L1.905,6.192 L1.992,6.173 L2.114,6.152 L2.237,6.134 L2.360,6.119 L2.483,6.108 L2.607,6.099 L2.730,6.094 L2.854,6.092 L2.977,6.094 L3.100,6.099 L3.223,6.108 L3.346,6.120 L3.468,6.136 L3.976,6.224 L4.471,6.337 L4.953,6.476 L5.424,6.640 L5.881,6.828 L6.327,7.041 L6.760,7.277 L7.181,7.538 L7.589,7.822 L7.986,8.130 L8.371,8.460 L8.744,8.813 L8.949,9.024 L9.147,9.240 L9.338,9.463 L9.522,9.690 L9.701,9.921 L9.876,10.156 L10.046,10.393 L10.214,10.633 L10.379,10.875 L10.543,11.117 L10.706,11.360 L10.869,11.602 L11.044,11.859 L11.221,12.112 L11.402,12.363 L11.587,12.610 L11.775,12.854 L11.969,13.093 L12.168,13.327 L12.373,13.557 L12.584,13.781 L12.803,13.999 L13.028,14.210 L13.262,14.415 L13.345,14.484 L13.425,14.550 L13.502,14.613 L13.577,14.674 L13.651,14.732 L13.722,14.788 L13.792,14.841 L13.860,14.891 L13.927,14.939 L13.993,14.984 L14.058,15.027 L14.123,15.068 L13.919,15.088 L13.697,15.103 L13.460,15.110 L13.211,15.108 L12.953,15.094 L12.690,15.066 L12.424,15.021 L12.160,14.958 L11.899,14.874 L11.646,14.767 L11.404,14.635 L11.175,14.475 L11.175,14.474 Z M12.141,8.260 L12.144,8.219 L12.152,8.181 L12.164,8.144 L12.181,8.110 L12.203,8.078 L12.228,8.050 L12.256,8.025 L12.288,8.004 L12.322,7.987 L12.359,7.974 L12.398,7.966 L12.439,7.963 L12.448,7.964 L12.457,7.964 L12.466,7.965 L12.475,7.966 L12.484,7.967 L12.493,7.969 L12.501,7.970 L12.509,7.972 L12.517,7.974 L12.525,7.977 L12.533,7.979 L12.541,7.982 L12.551,7.986 L12.561,7.990 L12.571,7.995 L12.581,8.000 L12.591,8.005 L12.600,8.011 L12.609,8.017 L12.618,8.023 L12.627,8.030 L12.635,8.037 L12.643,8.045 L12.650,8.053 L12.663,8.067 L12.675,8.081 L12.686,8.097 L12.696,8.113 L12.704,8.129 L12.712,8.147 L12.718,8.165 L12.724,8.183 L12.728,8.202 L12.731,8.221 L12.733,8.240 L12.733,8.260 L12.731,8.300 L12.723,8.339 L12.710,8.376 L12.693,8.410 L12.672,8.442 L12.647,8.470 L12.618,8.495 L12.587,8.516 L12.552,8.533 L12.515,8.546 L12.476,8.554 L12.435,8.556 L12.395,8.554 L12.356,8.546 L12.319,8.533 L12.285,8.516 L12.254,8.495 L12.226,8.470 L12.201,8.442 L12.180,8.410 L12.164,8.376 L12.151,8.339 L12.144,8.300 L12.141,8.260 Z M15.142,9.799 L15.093,9.818 L15.045,9.837 L14.997,9.855 L14.949,9.872 L14.901,9.888 L14.854,9.903 L14.806,9.916 L14.759,9.927 L14.712,9.937 L14.665,9.944 L14.618,9.950 L14.572,9.953 L14.499,9.954 L14.427,9.950 L14.354,9.941 L14.282,9.928 L14.211,9.911 L14.143,9.890 L14.076,9.866 L14.013,9.839 L13.953,9.809 L13.898,9.778 L13.847,9.744 L13.802,9.709 L13.737,9.655 L13.676,9.605 L13.618,9.555 L13.564,9.507 L13.513,9.457 L13.466,9.405 L13.423,9.349 L13.384,9.289 L13.349,9.223 L13.318,9.150 L13.292,9.068 L13.270,8.977 L13.262,8.934 L13.257,8.888 L13.253,8.839 L13.252,8.789 L13.252,8.738 L13.253,8.686 L13.256,8.635 L13.260,8.585 L13.265,8.537 L13.271,8.491 L13.277,8.449 L13.284,8.410 L13.299,8.333 L13.307,8.261 L13.309,8.193 L13.305,8.129 L13.295,8.068 L13.278,8.010 L13.256,7.954 L13.228,7.902 L13.194,7.851 L13.154,7.802 L13.107,7.754 L13.055,7.708 L13.008,7.673 L12.960,7.642 L12.910,7.615 L12.858,7.592 L12.804,7.572 L12.749,7.556 L12.693,7.543 L12.634,7.533 L12.575,7.525 L12.515,7.520 L12.453,7.517 L12.390,7.516 L12.367,7.516 L12.343,7.513 L12.321,7.509 L12.299,7.504 L12.277,7.498 L12.256,7.491 L12.236,7.484 L12.216,7.476 L12.197,7.467 L12.179,7.459 L12.161,7.450 L12.145,7.441 L12.119,7.427 L12.094,7.409 L12.071,7.388 L12.051,7.364 L12.033,7.338 L12.019,7.309 L12.009,7.279 L12.003,7.246 L12.002,7.211 L12.007,7.174 L12.018,7.136 L12.035,7.096 L12.044,7.081 L12.056,7.064 L12.071,7.045 L12.088,7.025 L12.107,7.004 L12.126,6.983 L12.146,6.963 L12.165,6.944 L12.182,6.927 L12.198,6.913 L12.211,6.901 L12.220,6.893 L12.307,6.850 L12.396,6.816 L12.486,6.793 L12.578,6.778 L12.671,6.771 L12.764,6.773 L12.858,6.781 L12.953,6.796 L13.047,6.817 L13.141,6.843 L13.234,6.874 L13.326,6.908 L13.409,6.946 L13.490,6.987 L13.568,7.034 L13.645,7.086 L13.722,7.142 L13.798,7.203 L13.875,7.268 L13.953,7.338 L14.033,7.412 L14.116,7.491 L14.202,7.575 L14.292,7.663 L14.380,7.765 L14.457,7.857 L14.524,7.939 L14.583,8.013 L14.636,8.081 L14.683,8.145 L14.727,8.207 L14.770,8.268 L14.812,8.331 L14.855,8.397 L14.902,8.468 L14.953,8.545 L14.995,8.609 L15.036,8.674 L15.077,8.739 L15.116,8.804 L15.155,8.871 L15.192,8.938 L15.228,9.006 L15.262,9.075 L15.295,9.145 L15.326,9.217 L15.356,9.290 L15.383,9.364 L15.396,9.410 L15.403,9.455 L15.404,9.498 L15.398,9.539 L15.387,9.579 L15.370,9.616 L15.347,9.652 L15.317,9.686 L15.282,9.718 L15.241,9.747 L15.194,9.774 L15.142,9.799 Z",
+		"M22.917,1.430 L22.858,1.407 L22.805,1.397 L22.756,1.398 L22.711,1.409 L22.670,1.429 L22.631,1.454 L22.595,1.485 L22.560,1.519 L22.526,1.554 L22.492,1.590 L22.457,1.624 L22.422,1.655 L22.410,1.665 L22.398,1.675 L22.387,1.685 L22.376,1.696 L22.364,1.707 L22.353,1.718 L22.343,1.729 L22.332,1.741 L22.322,1.752 L22.311,1.764 L22.301,1.775 L22.290,1.787 L22.199,1.880 L22.106,1.967 L22.009,2.047 L21.909,2.120 L21.806,2.186 L21.699,2.244 L21.588,2.293 L21.473,2.333 L21.353,2.363 L21.229,2.383 L21.100,2.393 L20.966,2.391 L20.768,2.386 L20.575,2.394 L20.387,2.414 L20.203,2.447 L20.024,2.494 L19.849,2.554 L19.678,2.628 L19.510,2.716 L19.347,2.817 L19.187,2.933 L19.031,3.064 L18.879,3.210 L18.840,3.027 L18.790,2.857 L18.728,2.699 L18.654,2.551 L18.568,2.415 L18.472,2.288 L18.365,2.171 L18.247,2.064 L18.118,1.965 L17.980,1.874 L17.832,1.791 L17.675,1.716 L17.590,1.678 L17.505,1.640 L17.421,1.600 L17.338,1.559 L17.256,1.515 L17.176,1.468 L17.098,1.418 L17.023,1.363 L16.950,1.303 L16.881,1.238 L16.815,1.167 L16.754,1.089 L16.715,1.030 L16.680,0.970 L16.649,0.910 L16.622,0.848 L16.597,0.786 L16.575,0.724 L16.555,0.661 L16.535,0.597 L16.517,0.533 L16.498,0.470 L16.479,0.406 L16.459,0.342 L16.446,0.303 L16.432,0.265 L16.417,0.228 L16.402,0.191 L16.384,0.157 L16.364,0.125 L16.342,0.095 L16.317,0.069 L16.288,0.046 L16.255,0.027 L16.218,0.013 L16.176,0.004 L16.130,0.000 L16.089,0.004 L16.052,0.014 L16.018,0.029 L15.988,0.050 L15.960,0.075 L15.935,0.103 L15.912,0.134 L15.891,0.167 L15.871,0.201 L15.852,0.236 L15.833,0.270 L15.761,0.409 L15.697,0.551 L15.640,0.694 L15.590,0.839 L15.547,0.986 L15.511,1.134 L15.482,1.284 L15.459,1.435 L15.441,1.586 L15.430,1.739 L15.425,1.892 L15.425,2.046 L15.443,2.387 L15.485,2.715 L15.550,3.032 L15.638,3.336 L15.750,3.629 L15.886,3.908 L16.045,4.176 L16.228,4.430 L16.435,4.672 L16.666,4.901 L16.920,5.117 L17.199,5.320 L17.230,5.343 L17.257,5.365 L17.280,5.388 L17.299,5.412 L17.315,5.436 L17.326,5.460 L17.335,5.486 L17.339,5.513 L17.340,5.540 L17.338,5.569 L17.332,5.600 L17.324,5.632 L17.303,5.699 L17.283,5.766 L17.262,5.833 L17.240,5.900 L17.219,5.967 L17.197,6.034 L17.175,6.100 L17.153,6.167 L17.131,6.234 L17.109,6.301 L17.088,6.368 L17.067,6.435 L17.053,6.476 L17.038,6.510 L17.021,6.540 L17.002,6.564 L16.982,6.582 L16.958,6.596 L16.932,6.604 L16.903,6.607 L16.870,6.605 L16.834,6.599 L16.794,6.587 L16.750,6.570 L16.592,6.501 L16.438,6.427 L16.288,6.347 L16.140,6.263 L15.996,6.174 L15.855,6.080 L15.718,5.982 L15.583,5.880 L15.452,5.774 L15.323,5.664 L15.197,5.550 L15.074,5.433 L14.869,5.231 L14.666,5.027 L14.465,4.822 L14.264,4.616 L14.063,4.410 L13.861,4.206 L13.656,4.003 L13.448,3.804 L13.237,3.610 L13.020,3.420 L12.797,3.236 L12.568,3.060 L12.513,3.020 L12.458,2.980 L12.404,2.941 L12.349,2.902 L12.294,2.864 L12.239,2.826 L12.183,2.788 L12.128,2.751 L12.072,2.714 L12.016,2.677 L11.960,2.641 L11.903,2.605 L11.706,2.378 L11.584,2.160 L11.526,1.951 L11.522,1.755 L11.564,1.573 L11.640,1.407 L11.742,1.257 L11.858,1.127 L11.980,1.018 L12.097,0.932 L12.199,0.869 L12.277,0.833 L12.333,0.805 L12.370,0.770 L12.388,0.728 L12.385,0.683 L12.361,0.637 L12.315,0.590 L12.246,0.545 L12.153,0.505 L12.035,0.470 L11.892,0.443 L11.722,0.426 L11.526,0.420 L11.317,0.427 L11.110,0.444 L10.904,0.472 L10.698,0.510 L10.491,0.556 L10.282,0.611 L10.070,0.674 L9.854,0.744 L9.634,0.820 L9.407,0.902 L9.174,0.989 L8.933,1.081 L8.897,1.095 L8.860,1.108 L8.824,1.121 L8.787,1.133 L8.750,1.144 L8.712,1.155 L8.675,1.166 L8.637,1.176 L8.599,1.186 L8.561,1.195 L8.522,1.204 L8.484,1.213 L8.260,1.173 L8.036,1.139 L7.809,1.111 L7.582,1.088 L7.352,1.071 L7.121,1.060 L6.889,1.054 L6.655,1.054 L6.419,1.061 L6.182,1.073 L5.943,1.091 L5.702,1.115 L5.255,1.179 L4.823,1.271 L4.407,1.390 L4.006,1.535 L3.620,1.707 L3.251,1.906 L2.896,2.131 L2.558,2.382 L2.235,2.659 L1.928,2.963 L1.637,3.291 L1.362,3.646 L1.062,4.092 L0.801,4.547 L0.579,5.012 L0.395,5.485 L0.247,5.966 L0.135,6.454 L0.057,6.949 L0.012,7.450 L0.000,7.957 L0.019,8.469 L0.068,8.986 L0.147,9.506 L0.259,10.050 L0.402,10.577 L0.574,11.088 L0.776,11.583 L1.006,12.062 L1.265,12.526 L1.552,12.972 L1.866,13.403 L2.208,13.817 L2.575,14.215 L2.969,14.597 L3.389,14.962 L3.843,15.316 L4.308,15.638 L4.784,15.928 L5.273,16.185 L5.772,16.410 L6.284,16.601 L6.807,16.758 L7.342,16.882 L7.889,16.971 L8.448,17.025 L9.019,17.043 L9.601,17.027 L9.962,17.003 L10.330,16.971 L10.705,16.925 L11.087,16.863 L11.477,16.778 L11.874,16.669 L12.279,16.529 L12.691,16.355 L13.111,16.142 L13.540,15.887 L13.976,15.585 L14.421,15.232 L14.535,15.286 L14.651,15.334 L14.770,15.378 L14.892,15.417 L15.020,15.452 L15.154,15.483 L15.294,15.511 L15.443,15.536 L15.601,15.558 L15.769,15.579 L15.947,15.598 L16.138,15.615 L16.289,15.626 L16.439,15.632 L16.588,15.633 L16.734,15.629 L16.878,15.621 L17.019,15.610 L17.157,15.595 L17.291,15.578 L17.421,15.558 L17.547,15.537 L17.668,15.514 L17.784,15.491 L17.945,15.444 L18.078,15.379 L18.182,15.300 L18.261,15.211 L18.315,15.115 L18.348,15.016 L18.360,14.918 L18.355,14.824 L18.332,14.738 L18.296,14.664 L18.247,14.604 L18.188,14.564 L17.719,14.349 L17.343,14.183 L17.050,14.060 L16.827,13.972 L16.663,13.912 L16.544,13.873 L16.461,13.848 L16.400,13.828 L16.351,13.808 L16.300,13.780 L16.237,13.736 L16.150,13.670 L16.424,13.337 L16.717,12.965 L17.020,12.553 L17.330,12.102 L17.640,11.613 L17.943,11.087 L18.235,10.524 L18.510,9.924 L18.762,9.288 L18.984,8.617 L19.171,7.912 L19.318,7.172 L19.331,7.086 L19.343,6.996 L19.356,6.902 L19.369,6.805 L19.380,6.708 L19.391,6.611 L19.401,6.515 L19.409,6.422 L19.416,6.332 L19.421,6.248 L19.423,6.169 L19.422,6.097 L19.422,6.058 L19.424,6.023 L19.429,5.992 L19.436,5.964 L19.447,5.940 L19.461,5.919 L19.480,5.901 L19.502,5.885 L19.530,5.873 L19.562,5.863 L19.601,5.855 L19.645,5.849 L19.775,5.833 L19.904,5.812 L20.032,5.788 L20.160,5.761 L20.286,5.729 L20.411,5.694 L20.536,5.654 L20.658,5.610 L20.780,5.562 L20.900,5.510 L21.019,5.453 L21.136,5.391 L21.456,5.198 L21.744,4.985 L22.002,4.754 L22.230,4.506 L22.430,4.242 L22.603,3.962 L22.750,3.667 L22.874,3.358 L22.975,3.035 L23.054,2.701 L23.114,2.354 L23.155,1.997 L23.159,1.942 L23.160,1.886 L23.159,1.832 L23.154,1.778 L23.144,1.725 L23.131,1.674 L23.112,1.626 L23.087,1.580 L23.055,1.537 L23.017,1.497 L22.971,1.462 L22.917,1.430 Z M11.175,14.474 L10.692,14.099 L10.251,13.767 L9.851,13.476 L9.488,13.224 L9.163,13.009 L8.872,12.829 L8.615,12.683 L8.390,12.568 L8.196,12.483 L8.030,12.426 L7.891,12.396 L7.778,12.390 L7.693,12.404 L7.625,12.433 L7.572,12.475 L7.533,12.528 L7.507,12.591 L7.492,12.661 L7.487,12.736 L7.490,12.815 L7.499,12.895 L7.514,12.975 L7.532,13.053 L7.552,13.126 L7.574,13.194 L7.598,13.258 L7.622,13.320 L7.648,13.380 L7.676,13.439 L7.704,13.496 L7.734,13.552 L7.766,13.608 L7.800,13.664 L7.835,13.721 L7.872,13.780 L7.910,13.840 L7.937,13.882 L7.961,13.926 L7.981,13.973 L7.996,14.022 L8.005,14.072 L8.007,14.123 L8.001,14.175 L7.984,14.226 L7.958,14.277 L7.919,14.327 L7.867,14.375 L7.801,14.422 L7.629,14.503 L7.444,14.551 L7.248,14.569 L7.050,14.564 L6.852,14.540 L6.662,14.501 L6.484,14.454 L6.324,14.403 L6.187,14.353 L6.079,14.309 L6.005,14.277 L5.970,14.260 L5.646,14.061 L5.332,13.852 L5.027,13.632 L4.733,13.399 L4.448,13.155 L4.175,12.898 L3.913,12.628 L3.663,12.345 L3.424,12.048 L3.198,11.737 L2.985,11.410 L2.785,11.069 L2.604,10.731 L2.437,10.389 L2.284,10.043 L2.143,9.692 L2.017,9.338 L1.905,8.980 L1.806,8.617 L1.722,8.251 L1.652,7.880 L1.597,7.505 L1.557,7.127 L1.532,6.744 L1.530,6.656 L1.533,6.577 L1.544,6.507 L1.560,6.446 L1.584,6.392 L1.616,6.345 L1.656,6.304 L1.704,6.269 L1.761,6.239 L1.828,6.213 L1.905,6.192 L1.992,6.173 L2.114,6.152 L2.237,6.134 L2.360,6.119 L2.483,6.108 L2.607,6.099 L2.730,6.094 L2.854,6.092 L2.977,6.094 L3.100,6.099 L3.223,6.108 L3.346,6.120 L3.468,6.136 L3.976,6.224 L4.471,6.337 L4.953,6.476 L5.424,6.640 L5.881,6.828 L6.327,7.041 L6.760,7.277 L7.181,7.538 L7.589,7.822 L7.986,8.130 L8.371,8.460 L8.744,8.813 L8.949,9.024 L9.147,9.240 L9.338,9.463 L9.522,9.690 L9.701,9.921 L9.876,10.156 L10.046,10.393 L10.214,10.633 L10.379,10.875 L10.543,11.117 L10.706,11.360 L10.869,11.602 L11.044,11.859 L11.221,12.112 L11.402,12.363 L11.587,12.610 L11.775,12.854 L11.969,13.093 L12.168,13.327 L12.373,13.557 L12.584,13.781 L12.803,13.999 L13.028,14.210 L13.262,14.415 L13.345,14.484 L13.425,14.550 L13.502,14.613 L13.577,14.674 L13.651,14.732 L13.722,14.788 L13.792,14.841 L13.860,14.891 L13.927,14.939 L13.993,14.984 L14.058,15.027 L14.123,15.068 L13.919,15.088 L13.697,15.103 L13.460,15.110 L13.211,15.108 L12.953,15.094 L12.690,15.066 L12.424,15.021 L12.160,14.958 L11.899,14.874 L11.646,14.767 L11.404,14.635 L11.175,14.475 L11.175,14.474 Z M12.141,8.260 L12.144,8.219 L12.152,8.181 L12.164,8.144 L12.181,8.110 L12.203,8.078 L12.228,8.050 L12.256,8.025 L12.288,8.004 L12.322,7.987 L12.359,7.974 L12.398,7.966 L12.439,7.963 L12.448,7.964 L12.457,7.964 L12.466,7.965 L12.475,7.966 L12.484,7.967 L12.493,7.969 L12.501,7.970 L12.509,7.972 L12.517,7.974 L12.525,7.977 L12.533,7.979 L12.541,7.982 L12.551,7.986 L12.561,7.990 L12.571,7.995 L12.581,8.000 L12.591,8.005 L12.600,8.011 L12.609,8.017 L12.618,8.023 L12.627,8.030 L12.635,8.037 L12.643,8.045 L12.650,8.053 L12.663,8.067 L12.675,8.081 L12.686,8.097 L12.696,8.113 L12.704,8.129 L12.712,8.147 L12.718,8.165 L12.724,8.183 L12.728,8.202 L12.731,8.221 L12.733,8.240 L12.733,8.260 L12.731,8.300 L12.723,8.339 L12.710,8.376 L12.693,8.410 L12.672,8.442 L12.647,8.470 L12.618,8.495 L12.587,8.516 L12.552,8.533 L12.515,8.546 L12.476,8.554 L12.435,8.556 L12.395,8.554 L12.356,8.546 L12.319,8.533 L12.285,8.516 L12.254,8.495 L12.226,8.470 L12.201,8.442 L12.180,8.410 L12.164,8.376 L12.151,8.339 L12.144,8.300 L12.141,8.260 Z M15.142,9.799 L15.093,9.818 L15.045,9.837 L14.997,9.855 L14.949,9.872 L14.901,9.888 L14.854,9.903 L14.806,9.916 L14.759,9.927 L14.712,9.937 L14.665,9.944 L14.618,9.950 L14.572,9.953 L14.499,9.954 L14.427,9.950 L14.354,9.941 L14.282,9.928 L14.211,9.911 L14.143,9.890 L14.076,9.866 L14.013,9.839 L13.953,9.809 L13.898,9.778 L13.847,9.744 L13.802,9.709 L13.737,9.655 L13.676,9.605 L13.618,9.555 L13.564,9.507 L13.513,9.457 L13.466,9.405 L13.423,9.349 L13.384,9.289 L13.349,9.223 L13.318,9.150 L13.292,9.068 L13.270,8.977 L13.262,8.934 L13.257,8.888 L13.253,8.839 L13.252,8.789 L13.252,8.738 L13.253,8.686 L13.256,8.635 L13.260,8.585 L13.265,8.537 L13.271,8.491 L13.277,8.449 L13.284,8.410 L13.299,8.333 L13.307,8.261 L13.309,8.193 L13.305,8.129 L13.295,8.068 L13.278,8.010 L13.256,7.954 L13.228,7.902 L13.194,7.851 L13.154,7.802 L13.107,7.754 L13.055,7.708 L13.008,7.673 L12.960,7.642 L12.910,7.615 L12.858,7.592 L12.804,7.572 L12.749,7.556 L12.693,7.543 L12.634,7.533 L12.575,7.525 L12.515,7.520 L12.453,7.517 L12.390,7.516 L12.367,7.516 L12.343,7.513 L12.321,7.509 L12.299,7.504 L12.277,7.498 L12.256,7.491 L12.236,7.484 L12.216,7.476 L12.197,7.467 L12.179,7.459 L12.161,7.450 L12.145,7.441 L12.119,7.427 L12.094,7.409 L12.071,7.388 L12.051,7.364 L12.033,7.338 L12.019,7.309 L12.009,7.279 L12.003,7.246 L12.002,7.211 L12.007,7.174 L12.018,7.136 L12.035,7.096 L12.044,7.081 L12.056,7.064 L12.071,7.045 L12.088,7.025 L12.107,7.004 L12.126,6.983 L12.146,6.963 L12.165,6.944 L12.182,6.927 L12.198,6.913 L12.211,6.901 L12.220,6.893 L12.307,6.850 L12.396,6.816 L12.486,6.793 L12.578,6.778 L12.671,6.771 L12.764,6.773 L12.858,6.781 L12.953,6.796 L13.047,6.817 L13.141,6.843 L13.234,6.874 L13.326,6.908 L13.409,6.946 L13.490,6.987 L13.568,7.034 L13.645,7.086 L13.722,7.142 L13.798,7.203 L13.875,7.268 L13.953,7.338 L14.033,7.412 L14.116,7.491 L14.202,7.575 L14.292,7.663 L14.380,7.765 L14.457,7.857 L14.524,7.939 L14.583,8.013 L14.636,8.081 L14.683,8.145 L14.727,8.207 L14.770,8.268 L14.812,8.331 L14.855,8.397 L14.902,8.468 L14.953,8.545 L14.995,8.609 L15.036,8.674 L15.077,8.739 L15.116,8.804 L15.155,8.871 L15.192,8.938 L15.228,9.006 L15.262,9.075 L15.295,9.145 L15.326,9.217 L15.356,9.290 L15.383,9.364 L15.396,9.410 L15.403,9.455 L15.404,9.498 L15.398,9.539 L15.387,9.579 L15.370,9.616 L15.347,9.652 L15.317,9.686 L15.282,9.718 L15.241,9.747 L15.194,9.774 L15.142,9.799 Z",
+		"M22.917,1.430 L22.858,1.407 L22.805,1.397 L22.756,1.398 L22.711,1.409 L22.670,1.429 L22.631,1.454 L22.595,1.485 L22.560,1.519 L22.526,1.554 L22.492,1.590 L22.457,1.624 L22.422,1.655 L22.410,1.665 L22.398,1.675 L22.387,1.685 L22.376,1.696 L22.364,1.707 L22.353,1.718 L22.343,1.729 L22.332,1.741 L22.322,1.752 L22.311,1.764 L22.301,1.775 L22.290,1.787 L22.199,1.880 L22.106,1.967 L22.009,2.047 L21.909,2.120 L21.806,2.186 L21.699,2.244 L21.588,2.293 L21.473,2.333 L21.353,2.363 L21.229,2.383 L21.100,2.393 L20.966,2.391 L20.768,2.386 L20.575,2.394 L20.387,2.414 L20.203,2.447 L20.024,2.494 L19.849,2.554 L19.678,2.628 L19.510,2.716 L19.347,2.817 L19.187,2.933 L19.031,3.064 L18.879,3.210 L18.840,3.027 L18.790,2.857 L18.728,2.699 L18.654,2.551 L18.568,2.415 L18.472,2.288 L18.365,2.171 L18.247,2.064 L18.118,1.965 L17.980,1.874 L17.832,1.791 L17.675,1.716 L17.590,1.678 L17.505,1.640 L17.421,1.600 L17.338,1.559 L17.256,1.515 L17.176,1.468 L17.098,1.418 L17.023,1.363 L16.950,1.303 L16.881,1.238 L16.815,1.167 L16.754,1.089 L16.715,1.030 L16.680,0.970 L16.649,0.910 L16.622,0.848 L16.597,0.786 L16.575,0.724 L16.555,0.661 L16.535,0.597 L16.517,0.533 L16.498,0.470 L16.479,0.406 L16.459,0.342 L16.446,0.303 L16.432,0.265 L16.417,0.228 L16.402,0.191 L16.384,0.157 L16.364,0.125 L16.342,0.095 L16.317,0.069 L16.288,0.046 L16.255,0.027 L16.218,0.013 L16.176,0.004 L16.130,0.000 L16.089,0.004 L16.052,0.014 L16.018,0.029 L15.988,0.050 L15.960,0.075 L15.935,0.103 L15.912,0.134 L15.891,0.167 L15.871,0.201 L15.852,0.236 L15.833,0.270 L15.761,0.409 L15.697,0.551 L15.640,0.694 L15.590,0.839 L15.547,0.986 L15.511,1.134 L15.482,1.284 L15.459,1.435 L15.441,1.586 L15.430,1.739 L15.425,1.892 L15.425,2.046 L15.443,2.387 L15.485,2.715 L15.550,3.032 L15.638,3.336 L15.750,3.629 L15.886,3.908 L16.045,4.176 L16.228,4.430 L16.435,4.672 L16.666,4.901 L16.920,5.117 L17.199,5.320 L17.230,5.343 L17.257,5.365 L17.280,5.388 L17.299,5.412 L17.315,5.436 L17.326,5.460 L17.335,5.486 L17.339,5.513 L17.340,5.540 L17.338,5.569 L17.332,5.600 L17.324,5.632 L17.303,5.699 L17.283,5.766 L17.262,5.833 L17.240,5.900 L17.219,5.967 L17.197,6.034 L17.175,6.100 L17.153,6.167 L17.131,6.234 L17.109,6.301 L17.088,6.368 L17.067,6.435 L17.053,6.476 L17.038,6.510 L17.021,6.540 L17.002,6.564 L16.982,6.582 L16.958,6.596 L16.932,6.604 L16.903,6.607 L16.870,6.605 L16.834,6.599 L16.794,6.587 L16.750,6.570 L16.592,6.501 L16.438,6.427 L16.288,6.347 L16.140,6.263 L15.996,6.174 L15.855,6.080 L15.718,5.982 L15.583,5.880 L15.452,5.774 L15.323,5.664 L15.197,5.550 L15.074,5.433 L14.869,5.231 L14.666,5.027 L14.465,4.822 L14.264,4.616 L14.063,4.410 L13.861,4.206 L13.656,4.003 L13.448,3.804 L13.237,3.610 L13.020,3.420 L12.797,3.236 L12.568,3.060 L12.513,3.020 L12.458,2.980 L12.404,2.941 L12.349,2.902 L12.294,2.864 L12.239,2.826 L12.183,2.788 L12.128,2.751 L12.072,2.714 L12.016,2.677 L11.960,2.641 L11.903,2.605 L11.706,2.378 L11.584,2.160 L11.526,1.951 L11.522,1.755 L11.564,1.573 L11.640,1.407 L11.742,1.257 L11.858,1.127 L11.980,1.018 L12.097,0.932 L12.199,0.869 L12.277,0.833 L12.333,0.805 L12.370,0.770 L12.388,0.728 L12.385,0.683 L12.361,0.637 L12.315,0.590 L12.246,0.545 L12.153,0.505 L12.035,0.470 L11.892,0.443 L11.722,0.426 L11.526,0.420 L11.317,0.427 L11.110,0.444 L10.904,0.472 L10.698,0.510 L10.491,0.556 L10.282,0.611 L10.070,0.674 L9.854,0.744 L9.634,0.820 L9.407,0.902 L9.174,0.989 L8.933,1.081 L8.897,1.095 L8.860,1.108 L8.824,1.121 L8.787,1.133 L8.750,1.144 L8.712,1.155 L8.675,1.166 L8.637,1.176 L8.599,1.186 L8.561,1.195 L8.522,1.204 L8.484,1.213 L8.260,1.173 L8.036,1.139 L7.809,1.111 L7.582,1.088 L7.352,1.071 L7.121,1.060 L6.889,1.054 L6.655,1.054 L6.419,1.061 L6.182,1.073 L5.943,1.091 L5.702,1.115 L5.255,1.179 L4.823,1.271 L4.407,1.390 L4.006,1.535 L3.620,1.707 L3.251,1.906 L2.896,2.131 L2.558,2.382 L2.235,2.659 L1.928,2.963 L1.637,3.291 L1.362,3.646 L1.062,4.092 L0.801,4.547 L0.579,5.012 L0.395,5.485 L0.247,5.966 L0.135,6.454 L0.057,6.949 L0.012,7.450 L0.000,7.957 L0.019,8.469 L0.068,8.986 L0.147,9.506 L0.259,10.050 L0.402,10.577 L0.574,11.088 L0.776,11.583 L1.006,12.062 L1.265,12.526 L1.552,12.972 L1.866,13.403 L2.208,13.817 L2.575,14.215 L2.969,14.597 L3.389,14.962 L3.843,15.316 L4.308,15.638 L4.784,15.928 L5.273,16.185 L5.772,16.410 L6.284,16.601 L6.807,16.758 L7.342,16.882 L7.889,16.971 L8.448,17.025 L9.019,17.043 L9.601,17.027 L9.962,17.003 L10.330,16.971 L10.705,16.925 L11.087,16.863 L11.477,16.778 L11.874,16.669 L12.279,16.529 L12.691,16.355 L13.111,16.142 L13.540,15.887 L13.976,15.585 L14.421,15.232 L14.535,15.286 L14.651,15.334 L14.770,15.378 L14.892,15.417 L15.020,15.452 L15.154,15.483 L15.294,15.511 L15.443,15.536 L15.601,15.558 L15.769,15.579 L15.947,15.598 L16.138,15.615 L16.289,15.626 L16.439,15.632 L16.588,15.633 L16.734,15.629 L16.878,15.621 L17.019,15.610 L17.157,15.595 L17.291,15.578 L17.421,15.558 L17.547,15.537 L17.668,15.514 L17.784,15.491 L17.945,15.444 L18.078,15.379 L18.182,15.300 L18.261,15.211 L18.315,15.115 L18.348,15.016 L18.360,14.918 L18.355,14.824 L18.332,14.738 L18.296,14.664 L18.247,14.604 L18.188,14.564 L17.719,14.349 L17.343,14.183 L17.050,14.060 L16.827,13.972 L16.663,13.912 L16.544,13.873 L16.461,13.848 L16.400,13.828 L16.351,13.808 L16.300,13.780 L16.237,13.736 L16.150,13.670 L16.424,13.337 L16.717,12.965 L17.020,12.553 L17.330,12.102 L17.640,11.613 L17.943,11.087 L18.235,10.524 L18.510,9.924 L18.762,9.288 L18.984,8.617 L19.171,7.912 L19.318,7.172 L19.331,7.086 L19.343,6.996 L19.356,6.902 L19.369,6.805 L19.380,6.708 L19.391,6.611 L19.401,6.515 L19.409,6.422 L19.416,6.332 L19.421,6.248 L19.423,6.169 L19.422,6.097 L19.422,6.058 L19.424,6.023 L19.429,5.992 L19.436,5.964 L19.447,5.940 L19.461,5.919 L19.480,5.901 L19.502,5.885 L19.530,5.873 L19.562,5.863 L19.601,5.855 L19.645,5.849 L19.775,5.833 L19.904,5.812 L20.032,5.788 L20.160,5.761 L20.286,5.729 L20.411,5.694 L20.536,5.654 L20.658,5.610 L20.780,5.562 L20.900,5.510 L21.019,5.453 L21.136,5.391 L21.456,5.198 L21.744,4.985 L22.002,4.754 L22.230,4.506 L22.430,4.242 L22.603,3.962 L22.750,3.667 L22.874,3.358 L22.975,3.035 L23.054,2.701 L23.114,2.354 L23.155,1.997 L23.159,1.942 L23.160,1.886 L23.159,1.832 L23.154,1.778 L23.144,1.725 L23.131,1.674 L23.112,1.626 L23.087,1.580 L23.055,1.537 L23.017,1.497 L22.971,1.462 L22.917,1.430 Z M11.175,14.474 L10.692,14.099 L10.251,13.767 L9.851,13.476 L9.488,13.224 L9.163,13.009 L8.872,12.829 L8.615,12.683 L8.390,12.568 L8.196,12.483 L8.030,12.426 L7.891,12.396 L7.778,12.390 L7.693,12.404 L7.625,12.433 L7.572,12.475 L7.533,12.528 L7.507,12.591 L7.492,12.661 L7.487,12.736 L7.490,12.815 L7.499,12.895 L7.514,12.975 L7.532,13.053 L7.552,13.126 L7.574,13.194 L7.598,13.258 L7.622,13.320 L7.648,13.380 L7.676,13.439 L7.704,13.496 L7.734,13.552 L7.766,13.608 L7.800,13.664 L7.835,13.721 L7.872,13.780 L7.910,13.840 L7.937,13.882 L7.961,13.926 L7.981,13.973 L7.996,14.022 L8.005,14.072 L8.007,14.123 L8.001,14.175 L7.984,14.226 L7.958,14.277 L7.919,14.327 L7.867,14.375 L7.801,14.422 L7.629,14.503 L7.444,14.551 L7.248,14.569 L7.050,14.564 L6.852,14.540 L6.662,14.501 L6.484,14.454 L6.324,14.403 L6.187,14.353 L6.079,14.309 L6.005,14.277 L5.970,14.260 L5.646,14.061 L5.332,13.852 L5.027,13.632 L4.733,13.399 L4.448,13.155 L4.175,12.898 L3.913,12.628 L3.663,12.345 L3.424,12.048 L3.198,11.737 L2.985,11.410 L2.785,11.069 L2.604,10.731 L2.437,10.389 L2.284,10.043 L2.143,9.692 L2.017,9.338 L1.905,8.980 L1.806,8.617 L1.722,8.251 L1.652,7.880 L1.597,7.505 L1.557,7.127 L1.532,6.744 L1.530,6.656 L1.533,6.577 L1.544,6.507 L1.560,6.446 L1.584,6.392 L1.616,6.345 L1.656,6.304 L1.704,6.269 L1.761,6.239 L1.828,6.213 L1.905,6.192 L1.992,6.173 L2.114,6.152 L2.237,6.134 L2.360,6.119 L2.483,6.108 L2.607,6.099 L2.730,6.094 L2.854,6.092 L2.977,6.094 L3.100,6.099 L3.223,6.108 L3.346,6.120 L3.468,6.136 L3.976,6.224 L4.471,6.337 L4.953,6.476 L5.424,6.640 L5.881,6.828 L6.327,7.041 L6.760,7.277 L7.181,7.538 L7.589,7.822 L7.986,8.130 L8.371,8.460 L8.744,8.813 L8.949,9.024 L9.147,9.240 L9.338,9.463 L9.522,9.690 L9.701,9.921 L9.876,10.156 L10.046,10.393 L10.214,10.633 L10.379,10.875 L10.543,11.117 L10.706,11.360 L10.869,11.602 L11.044,11.859 L11.221,12.112 L11.402,12.363 L11.587,12.610 L11.775,12.854 L11.969,13.093 L12.168,13.327 L12.373,13.557 L12.584,13.781 L12.803,13.999 L13.028,14.210 L13.262,14.415 L13.345,14.484 L13.425,14.550 L13.502,14.613 L13.577,14.674 L13.651,14.732 L13.722,14.788 L13.792,14.841 L13.860,14.891 L13.927,14.939 L13.993,14.984 L14.058,15.027 L14.123,15.068 L13.919,15.088 L13.697,15.103 L13.460,15.110 L13.211,15.108 L12.953,15.094 L12.690,15.066 L12.424,15.021 L12.160,14.958 L11.899,14.874 L11.646,14.767 L11.404,14.635 L11.175,14.475 L11.175,14.474 Z M12.141,8.260 L12.144,8.219 L12.152,8.181 L12.164,8.144 L12.181,8.110 L12.203,8.078 L12.228,8.050 L12.256,8.025 L12.288,8.004 L12.322,7.987 L12.359,7.974 L12.398,7.966 L12.439,7.963 L12.448,7.964 L12.457,7.964 L12.466,7.965 L12.475,7.966 L12.484,7.967 L12.493,7.969 L12.501,7.970 L12.509,7.972 L12.517,7.974 L12.525,7.977 L12.533,7.979 L12.541,7.982 L12.551,7.986 L12.561,7.990 L12.571,7.995 L12.581,8.000 L12.591,8.005 L12.600,8.011 L12.609,8.017 L12.618,8.023 L12.627,8.030 L12.635,8.037 L12.643,8.045 L12.650,8.053 L12.663,8.067 L12.675,8.081 L12.686,8.097 L12.696,8.113 L12.704,8.129 L12.712,8.147 L12.718,8.165 L12.724,8.183 L12.728,8.202 L12.731,8.221 L12.733,8.240 L12.733,8.260 L12.731,8.300 L12.723,8.339 L12.710,8.376 L12.693,8.410 L12.672,8.442 L12.647,8.470 L12.618,8.495 L12.587,8.516 L12.552,8.533 L12.515,8.546 L12.476,8.554 L12.435,8.556 L12.395,8.554 L12.356,8.546 L12.319,8.533 L12.285,8.516 L12.254,8.495 L12.226,8.470 L12.201,8.442 L12.180,8.410 L12.164,8.376 L12.151,8.339 L12.144,8.300 L12.141,8.260 Z M15.142,9.799 L15.093,9.818 L15.045,9.837 L14.997,9.855 L14.949,9.872 L14.901,9.888 L14.854,9.903 L14.806,9.916 L14.759,9.927 L14.712,9.937 L14.665,9.944 L14.618,9.950 L14.572,9.953 L14.499,9.954 L14.427,9.950 L14.354,9.941 L14.282,9.928 L14.211,9.911 L14.143,9.890 L14.076,9.866 L14.013,9.839 L13.953,9.809 L13.898,9.778 L13.847,9.744 L13.802,9.709 L13.737,9.655 L13.676,9.605 L13.618,9.555 L13.564,9.507 L13.513,9.457 L13.466,9.405 L13.423,9.349 L13.384,9.289 L13.349,9.223 L13.318,9.150 L13.292,9.068 L13.270,8.977 L13.262,8.934 L13.257,8.888 L13.253,8.839 L13.252,8.789 L13.252,8.738 L13.253,8.686 L13.256,8.635 L13.260,8.585 L13.265,8.537 L13.271,8.491 L13.277,8.449 L13.284,8.410 L13.299,8.333 L13.307,8.261 L13.309,8.193 L13.305,8.129 L13.295,8.068 L13.278,8.010 L13.256,7.954 L13.228,7.902 L13.194,7.851 L13.154,7.802 L13.107,7.754 L13.055,7.708 L13.008,7.673 L12.960,7.642 L12.910,7.615 L12.858,7.592 L12.804,7.572 L12.749,7.556 L12.693,7.543 L12.634,7.533 L12.575,7.525 L12.515,7.520 L12.453,7.517 L12.390,7.516 L12.367,7.516 L12.343,7.513 L12.321,7.509 L12.299,7.504 L12.277,7.498 L12.256,7.491 L12.236,7.484 L12.216,7.476 L12.197,7.467 L12.179,7.459 L12.161,7.450 L12.145,7.441 L12.119,7.427 L12.094,7.409 L12.071,7.388 L12.051,7.364 L12.033,7.338 L12.019,7.309 L12.009,7.279 L12.003,7.246 L12.002,7.211 L12.007,7.174 L12.018,7.136 L12.035,7.096 L12.044,7.081 L12.056,7.064 L12.071,7.045 L12.088,7.025 L12.107,7.004 L12.126,6.983 L12.146,6.963 L12.165,6.944 L12.182,6.927 L12.198,6.913 L12.211,6.901 L12.220,6.893 L12.307,6.850 L12.396,6.816 L12.486,6.793 L12.578,6.778 L12.671,6.771 L12.764,6.773 L12.858,6.781 L12.953,6.796 L13.047,6.817 L13.141,6.843 L13.234,6.874 L13.326,6.908 L13.409,6.946 L13.490,6.987 L13.568,7.034 L13.645,7.086 L13.722,7.142 L13.798,7.203 L13.875,7.268 L13.953,7.338 L14.033,7.412 L14.116,7.491 L14.202,7.575 L14.292,7.663 L14.380,7.765 L14.457,7.857 L14.524,7.939 L14.583,8.013 L14.636,8.081 L14.683,8.145 L14.727,8.207 L14.770,8.268 L14.812,8.331 L14.855,8.397 L14.902,8.468 L14.953,8.545 L14.995,8.609 L15.036,8.674 L15.077,8.739 L15.116,8.804 L15.155,8.871 L15.192,8.938 L15.228,9.006 L15.262,9.075 L15.295,9.145 L15.326,9.217 L15.356,9.290 L15.383,9.364 L15.396,9.410 L15.403,9.455 L15.404,9.498 L15.398,9.539 L15.387,9.579 L15.370,9.616 L15.347,9.652 L15.317,9.686 L15.282,9.718 L15.241,9.747 L15.194,9.774 L15.142,9.799 Z"
+	];
+
+// src/features/whale-motion/playback.ts
+/** Pause the component's looping SVG without resetting its timeline. */
+	function attachLoopPlayback(svg, doc, motion) {
+		const sync = () => {
+			if (doc.hidden || motion?.matches) svg.pauseAnimations();
+			else svg.unpauseAnimations();
+		};
+		doc.addEventListener("visibilitychange", sync);
+		motion?.addEventListener("change", sync);
+		sync();
+		return () => {
+			doc.removeEventListener("visibilitychange", sync);
+			motion?.removeEventListener("change", sync);
+			svg.pauseAnimations();
+		};
+	}
+
+// src/features/whale-motion/client.ts
+	const SHAPES = TAIL_SHAPES.join(";");
+	const TAIL_TIMES = "0;.076923;.144231;.215385;.288462;.365385;.442308;.548077;1";
+	const TAIL_SPLINES = Array(8).fill(".333333 0 .666667 1").join(";");
+	const STYLES = `
+.power-dsh-whale-motion { display:inline-block; position:relative; flex-shrink:0; vertical-align:middle; pointer-events:none; }
+.power-dsh-whale-motion .power-dsh-whale-clip { position:absolute; overflow:hidden; pointer-events:none; }
+.power-dsh-whale-motion svg { display:block; position:absolute; overflow:visible; }
+.power-dsh-whale-motion .power-dsh-whale-still { display:none; }
+@media (prefers-reduced-motion:reduce) {
+  .power-dsh-whale-motion .power-dsh-whale-animated { display:none; }
+  .power-dsh-whale-motion .power-dsh-whale-still { display:inline; }
+}
+`;
+	function createClientFeature(runtime, env) {
+		const { React, h, observable, useSnapshot } = runtime;
+		const { ctx, source, t } = env;
+		let fault = null;
+		const status = observable(() => fault);
+		const setting = {
+			field: "whaleMotionEnabled",
+			description: "whaleMotionDescription"
+		};
+		function setFault(failed) {
+			if (Boolean(fault) === failed) return;
+			fault = failed ? { observedAt: (/* @__PURE__ */ new Date()).toISOString() } : null;
+			status.notify();
+		}
+		function AnimatedWhale({ size = 24 }) {
+			const box = React.useRef(null);
+			React.useEffect(() => {
+				const svg = box.current?.querySelector?.("svg");
+				if (!svg || typeof svg.pauseAnimations !== "function") return;
+				const motion = typeof window.matchMedia === "function" ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+				return attachLoopPlayback(svg, document, motion);
+			}, []);
+			const height = size * 17.04 / 23.16;
+			const pad = size / 6;
+			return h("span", {
+				className: "power-dsh-whale-motion",
+				ref: box,
+				"aria-hidden": true,
+				style: {
+					width: size,
+					height
+				}
+			}, h("style", null, STYLES), h("span", {
+				className: "power-dsh-whale-clip",
+				style: { inset: -pad }
+			}, h("svg", {
+				width: size,
+				height,
+				viewBox: "0 0 23.16 17.04",
+				fill: "none",
+				focusable: false,
+				style: {
+					left: pad,
+					top: pad
+				}
+			}, h("path", {
+				className: "power-dsh-whale-still",
+				fill: "currentColor",
+				d: FISH_PATH
+			}), h("path", {
+				className: "power-dsh-whale-animated",
+				fill: "currentColor",
+				fillRule: "evenodd",
+				d: TAIL_SHAPES[0]
+			}, h("animate", {
+				attributeName: "d",
+				values: SHAPES,
+				keyTimes: TAIL_TIMES,
+				calcMode: "spline",
+				keySplines: TAIL_SPLINES,
+				dur: "5.2s",
+				repeatCount: "indefinite"
+			})))));
+		}
+		ctx.slots.inject("sidebar.brand.mark", () => {
+			let release = null;
+			let attempted = false;
+			const sync = () => {
+				const snapshot = source.getSnapshot();
+				if (!(snapshot.status === "ready" && snapshot.value?.whaleMotionEnabled === true)) {
+					release?.();
+					release = null;
+					attempted = false;
+					setFault(false);
+				} else if (!release && !attempted) {
+					attempted = true;
+					try {
+						release = ctx.slots.register({
+							name: "sidebar.brand.mark",
+							priority: -1
+						}, AnimatedWhale);
+						setFault(false);
+					} catch {
+						setFault(true);
+					}
+				}
+			};
+			sync();
+			const unsubscribe = source.subscribe(sync);
+			return () => {
+				unsubscribe();
+				release?.();
+				setFault(false);
+			};
+		});
+		return {
+			settings: [setting],
+			useSettings() {
+				const failure = useSnapshot(status);
+				return [!failure ? setting : {
+					...setting,
+					failure: {
+						message: t("whaleMotionUnavailable"),
+						code: "PD-WHALE-SLOT",
+						operation: "whale-motion.register",
+						observedAt: failure.observedAt
+					}
+				}];
+			}
+		};
+	}
+
+// src/features/whale-motion/definition.ts
+	const definition = Object.freeze({
+		id: "whale-motion",
+		category: "interface",
+		order: 5.5,
+		keys: Object.freeze(["whaleMotionEnabled"]),
+		spec: "src/features/whale-motion/spec.md"
+	});
+
+// src/features/whale-motion/locales.ts
+	const locales$1 = {
+		en: {
+			whaleMotionEnabled: "Whale animation",
+			whaleMotionDescription: "Let the upper-left whale wave its tail in a loop",
+			whaleMotionUnavailable: "Could not display the whale animation. Turn it off and on to retry."
+		},
+		zh: {
+			whaleMotionEnabled: "鲸鱼动效",
+			whaleMotionDescription: "让左上角的小鲸鱼轻轻循环摆尾",
+			whaleMotionUnavailable: "鲸鱼动效未能显示，请关闭后重新开启。"
+		}
+	};
+
 // src/app/client-features.ts
 	const clientFeatures = [
 		{
-			definition: definition$2,
-			create: createClientFeature$2,
-			locales: locales$3,
+			definition,
+			create: createClientFeature,
+			locales: locales$1,
 			rpc: []
 		},
 		{
-			definition: definition$15,
-			create: createClientFeature$15,
-			locales: locales$16,
+			definition: definition$4,
+			create: createClientFeature$4,
+			locales: locales$5,
 			rpc: []
 		},
 		{
-			definition: definition$10,
-			create: createClientFeature$10,
-			locales: locales$11,
+			definition: definition$17,
+			create: createClientFeature$17,
+			locales: locales$18,
 			rpc: []
-		},
-		{
-			definition: definition$9,
-			create: createClientFeature$9,
-			locales: locales$10,
-			rpc: rpc$6
 		},
 		{
 			definition: definition$12,
 			create: createClientFeature$12,
 			locales: locales$13,
-			rpc: rpc$8
+			rpc: []
 		},
 		{
 			definition: definition$11,
 			create: createClientFeature$11,
 			locales: locales$12,
-			rpc: rpc$7
+			rpc: rpc$8
 		},
 		{
-			definition: definition$7,
-			create: createClientFeature$7,
-			locales: locales$8,
-			rpc: rpc$4
+			definition: definition$14,
+			create: createClientFeature$14,
+			locales: locales$15,
+			rpc: rpc$10
 		},
 		{
 			definition: definition$13,
@@ -5085,16 +6726,40 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			rpc: rpc$9
 		},
 		{
-			definition: definition$16,
-			create: createClientFeature$16,
-			locales: locales$17,
-			rpc: rpc$10
+			definition: definition$9,
+			create: createClientFeature$9,
+			locales: locales$10,
+			rpc: rpc$6
+		},
+		{
+			definition: definition$15,
+			create: createClientFeature$15,
+			locales: locales$16,
+			rpc: rpc$11
+		},
+		{
+			definition: definition$18,
+			create: createClientFeature$18,
+			locales: locales$19,
+			rpc: rpc$12
+		},
+		{
+			definition: definition$10,
+			create: createClientFeature$10,
+			locales: locales$11,
+			rpc: rpc$7
 		},
 		{
 			definition: definition$8,
 			create: createClientFeature$8,
 			locales: locales$9,
 			rpc: rpc$5
+		},
+		{
+			definition: definition$7,
+			create: createClientFeature$7,
+			locales: locales$8,
+			rpc: rpc$4
 		},
 		{
 			definition: definition$6,
@@ -5109,34 +6774,28 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			rpc: rpc$2
 		},
 		{
-			definition: definition$4,
-			create: createClientFeature$4,
-			locales: locales$5,
-			rpc: rpc$1
+			definition: definition$16,
+			create: createClientFeature$16,
+			locales: locales$17,
+			rpc: []
 		},
 		{
 			definition: definition$3,
 			create: createClientFeature$3,
 			locales: locales$4,
-			rpc
+			rpc: []
 		},
 		{
-			definition: definition$14,
-			create: createClientFeature$14,
-			locales: locales$15,
-			rpc: []
+			definition: definition$2,
+			create: createClientFeature$2,
+			locales: locales$3,
+			rpc: rpc$1
 		},
 		{
 			definition: definition$1,
 			create: createClientFeature$1,
 			locales: locales$2,
-			rpc: []
-		},
-		{
-			definition,
-			create: createClientFeature,
-			locales: locales$1,
-			rpc: []
+			rpc
 		}
 	];
 
@@ -5146,8 +6805,9 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			"title": "PowerDSH",
 			"generalTab": "General",
 			"interfaceTab": "Interface",
-			"enhancementsTab": "Enhancements",
+			"enhancementsTab": "Management",
 			"simplifyTab": "Simplify",
+			"otherTab": "Other",
 			"skillPreinstalledGroup": "Built-in",
 			"skillPersonalGroup": "User",
 			"retry": "Retry",
@@ -5172,8 +6832,9 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			"title": "PowerDSH",
 			"generalTab": "通用",
 			"interfaceTab": "界面",
-			"enhancementsTab": "增强",
+			"enhancementsTab": "管理",
 			"simplifyTab": "精简",
+			"otherTab": "其他",
 			"skillPreinstalledGroup": "内置",
 			"skillPersonalGroup": "用户",
 			"retry": "重试",
@@ -5244,7 +6905,13 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		LIST_SKILLS_RPC,
 		SET_SKILL_ENABLED_RPC,
 		LIST_MCP_SERVERS_RPC,
-		SET_MCP_SERVER_ENABLED_RPC
+		SET_MCP_SERVER_ENABLED_RPC,
+		LIST_ARCHIVED_SESSIONS_RPC,
+		RESTORE_ARCHIVED_SESSION_RPC,
+		DELETE_ARCHIVED_SESSION_RPC,
+		READ_WALLPAPER_RPC,
+		SAVE_WALLPAPER_RPC,
+		CLEAR_WALLPAPER_RPC
 	]);
 
 // src/app/client.ts

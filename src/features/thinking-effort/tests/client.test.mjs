@@ -153,7 +153,7 @@ test('the arc style renders a gauge with a needle that follows the stored prefer
   app.set({ thinkingEffortGlyph: 'arc' });
   view = app.renderEffort();
   assert.equal(bars(view).length, 0, 'The arc style replaces the signal bars.');
-  assert.equal(arcTicks(view).length, 3, 'Light graduations inside the ring.');
+  assert.equal(arcTicks(view).length, 5, 'Graduations span the arc from end to end.');
   assert.ok(needle(view), 'The gauge has a needle.');
   assert.equal(graphicOnly(view), true);
   assert.match(hint(view), /effortDefault/);

@@ -9,6 +9,8 @@ import type * as SkillsFeature from '../features/skills/host.ts';
 import type * as McpFeature from '../features/mcp/host.ts';
 import type * as NotificationsFeature from '../features/notifications/host.ts';
 import type * as RestartFeature from '../features/restart-button/host.ts';
+import type * as ArchiveFeature from '../features/archive/host.ts';
+import type * as BackgroundFeature from '../features/flowing-background/host.ts';
 import { NativeRemoteService, type NativeContext } from '../shared/host/native.ts';
 import type { HostFeature } from '../shared/host/feature.ts';
 import type { LivePreferences } from '../shared/types/preferences.ts';
@@ -31,7 +33,9 @@ type ComposedService =
   & typeof SkillsFeature.methods & ReturnType<typeof SkillsFeature.createHost>
   & typeof McpFeature.methods & ReturnType<typeof McpFeature.createHost>
   & typeof NotificationsFeature.methods & ReturnType<typeof NotificationsFeature.createHost>
-  & typeof RestartFeature.methods & ReturnType<typeof RestartFeature.createHost>;
+  & typeof RestartFeature.methods & ReturnType<typeof RestartFeature.createHost>
+  & typeof ArchiveFeature.methods & ReturnType<typeof ArchiveFeature.createHost>
+  & typeof BackgroundFeature.methods & ReturnType<typeof BackgroundFeature.createHost>;
 interface ModService extends ComposedService {}
 class ModService extends NativeRemoteService {
   queue: OperationQueue;

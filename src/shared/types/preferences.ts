@@ -11,6 +11,7 @@ export interface DisabledSkillPreference {
 
 export interface Preferences {
   showVersion: boolean;
+  whaleMotionEnabled: boolean;
   showThemeSwitcher: boolean;
   showRefreshButton: boolean;
   showRestartButton: boolean;
@@ -31,6 +32,10 @@ export interface Preferences {
   showThinkingEffortSwitcher: boolean;
   thinkingEffortGlyph: string;
   flowingBackgroundEnabled: boolean;
+  flowingBackgroundKind: string;
+  flowingBackgroundOpacity: number;
+  flowingBackgroundBlur: number;
+  archiveManagerEnabled: boolean;
 }
 export type PreferenceKey = keyof Preferences;
 export type PowerDshPreferences = Preferences;

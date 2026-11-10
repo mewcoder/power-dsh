@@ -35,6 +35,29 @@ export interface NativePresets {
   acquireScope(id: string): Promise<NativeLease>;
 }
 export interface NativeAgent { ctx: NativeContext }
+export interface NativeWorkspaceView {
+  workspaceId: string; title: string; path: string; sessionIds: readonly string[];
+}
+export interface NativeWorkspaceBaseline {
+  items: readonly NativeWorkspaceView[]; archivedSessionIds: readonly string[]; pinnedSessionIds: readonly string[];
+}
+export interface NativeWorkspaceController {
+  follow(signal: AbortSignal): AsyncIterable<{ type: string; value?: NativeWorkspaceBaseline }>;
+  unarchiveSession(request: { sessionId: string }): Promise<{ archivedSessionIds: readonly string[] }>;
+}
+export type NativeSessionTitleObservation =
+  | { sessionId: string; status: 'fulfilled'; value: { session: { createdAt: number }; title?: { title: string; updatedAt: number } } }
+  | { sessionId: string; status: 'rejected'; reason: unknown };
+export interface NativeSessionQuery {
+  readTitleSnapshots(sessionIds: readonly string[], signal?: AbortSignal): Promise<readonly NativeSessionTitleObservation[]>;
+  listSessions(signal?: AbortSignal): Promise<readonly { header: { id: string }; live: boolean }[]>;
+}
+export interface NativeSessionPersistence {
+  stat(sessionId: string, options?: { signal?: AbortSignal }): Promise<{
+    header: { id: string; cwd?: string };
+    location?: { kind: string; path: string };
+  } | undefined>;
+}
 export interface NativeSkill {
   name: string; description: string; source: string; provider: string; path?: string; origin?: string;
   resourceBase?: { kind: string; path?: string };
@@ -117,6 +140,9 @@ export interface NativeContext {
   typert: { register(descriptor: unknown): Release };
   sessionProjections: { register(projection: unknown): Promise<unknown> };
   workspaceRegistry: { list(): { path: string; title: string }[] };
+  workspaceController?: NativeWorkspaceController;
+  sessionQuery?: NativeSessionQuery;
+  sessionPersistence?: NativeSessionPersistence;
   workingDirectory: { defaultDirectory: string };
   loader: {
     import(name: '@deepseek-ai/dsh-scope'): Promise<{

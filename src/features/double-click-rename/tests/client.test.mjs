@@ -7,7 +7,7 @@ test('double-click blocking persists through the switch and only intercepts sess
   const element = (tagName, attributes = {}, extra = {}) => ({ tagName, getAttribute: name => attributes[name] ?? null, ...extra });
   const title = element('SPAN');
   const row = element('DIV', { role: 'treeitem', 'data-row-key': 'session:one' });
-  const control = () => descendants(app.selectSettingsTab('simplify')).find(node => node.props.id === 'settings-test-blockDoubleClickRename');
+  const control = () => descendants(app.selectSettingsTab('other')).find(node => node.props.id === 'settings-test-blockDoubleClickRename');
   assert.equal(control().props['aria-checked'], false);
   assert.equal(app.doubleClickListeners.size, 0);
   assert.equal(app.doubleClick([title, row]), false);
@@ -40,7 +40,7 @@ test('double-click blocking persists through the switch and only intercepts sess
 
 test('failed double-click preference saves leave the gesture enabled', async () => {
   const app = await mount({ formReply: () => false });
-  const control = () => descendants(app.selectSettingsTab('simplify')).find(node => node.props.id === 'settings-test-blockDoubleClickRename');
+  const control = () => descendants(app.selectSettingsTab('other')).find(node => node.props.id === 'settings-test-blockDoubleClickRename');
   await control().props.onClick();
   assert.equal(control().props['aria-checked'], false);
   assert.equal(app.doubleClickListeners.size, 0);

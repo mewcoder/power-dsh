@@ -72,7 +72,7 @@ for (const definition of definitions) {
   const client = clientFeatures.find(feature => feature.definition.id === definition.id);
   assert.deepEqual(client.rpc.map(rpc => rpc.id).sort(), (host.rpc ?? []).map(rpc => rpc.id).sort(),
     `Host/Client RPC ownership differs: ${definition.id}`);
-  assert.ok(['general', 'interface', 'enhance', 'simplify'].includes(definition.category));
+  assert.ok(['general', 'interface', 'enhance', 'simplify', 'other'].includes(definition.category));
   assert.equal(definition.spec, `src/features/${definition.id}/spec.md`);
   assert.ok(await isFile(definition.spec), `Missing primary Spec: ${definition.id}`);
   assert.ok(index.includes(`../${definition.spec}`), `Spec is missing from the documentation index: ${definition.id}`);

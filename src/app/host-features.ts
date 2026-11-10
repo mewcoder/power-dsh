@@ -56,8 +56,18 @@ import { definition as effortDefinition } from '../features/thinking-effort/defi
 import * as effortConfig from '../features/thinking-effort/config.ts';
 import { definition as backgroundDefinition } from '../features/flowing-background/definition.ts';
 import * as backgroundConfig from '../features/flowing-background/config.ts';
+import * as backgroundHost from '../features/flowing-background/host.ts';
+import { rpc as backgroundRpc } from '../features/flowing-background/rpc.ts';
+import { definition as archiveDefinition } from '../features/archive/definition.ts';
+import * as archiveConfig from '../features/archive/config.ts';
+import * as archiveHost from '../features/archive/host.ts';
+import { rpc as archiveRpc } from '../features/archive/rpc.ts';
+
+import { definition as whaleDefinition } from '../features/whale-motion/definition.ts';
+import * as whaleConfig from '../features/whale-motion/config.ts';
 
 export const HOST_FEATURES = Object.freeze([
+  { definition: whaleDefinition, ...whaleConfig },
   { definition: versionDefinition, ...versionConfig },
   { definition: appearanceDefinition, ...appearanceConfig },
   { definition: refreshDefinition, ...refreshConfig },
@@ -74,7 +84,8 @@ export const HOST_FEATURES = Object.freeze([
   { definition: goalDefinition, ...goalConfig, ...goalHost, rpc: goalRpc },
   { definition: renameDefinition, ...renameConfig },
   { definition: effortDefinition, ...effortConfig },
-  { definition: backgroundDefinition, ...backgroundConfig },
+  { definition: backgroundDefinition, ...backgroundConfig, ...backgroundHost, rpc: backgroundRpc },
+  { definition: archiveDefinition, ...archiveConfig, ...archiveHost, rpc: archiveRpc },
 ] satisfies HostFeature[]);
 
 export const hostFeatures = HOST_FEATURES;

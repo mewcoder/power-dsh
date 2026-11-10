@@ -84,7 +84,7 @@ test('the compact pure-graphic glyph scales any ladder into 20px', () => {
 
 test('the gauge mirrors the host icon with a light ring and a needle that follows the level', () => {
   const empty = arcGeometry(4, 0);
-  assert.equal(empty.ticks.length, 3, 'A few light graduations inside the ring.');
+  assert.equal(empty.ticks.length, 5, 'Five graduations span the arc from end to end.');
   assert.ok(empty.needle);
   assert.match(empty.track, /^M3\.4041/);
   assert.equal(empty.auto, true, 'No chosen level is the automatic state.');

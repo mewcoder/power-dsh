@@ -36,11 +36,12 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     });
   });
 
-  function renderGraphic(glyph: Glyph, count: number, active: number, rotation: number) {
+  function renderGraphic(glyph: Glyph, count: number, active: number, rotation: number, isMax: boolean) {
     if (glyph === 'arc') {
       const geometry = arcGeometry(count, active);
+      const stateClass = geometry.auto ? ' power-dsh-effort-arc-auto' : isMax ? ' power-dsh-effort-arc-max' : '';
       return h('svg', {
-        className: 'power-dsh-effort-bars', width: 20, height: 20, viewBox: '0 0 16 16',
+        className: 'power-dsh-effort-bars', width: 24, height: 24, viewBox: '0 0 16 16',
         'aria-hidden': true, focusable: false,
       },
         h('path', { className: 'power-dsh-effort-arc-track', d: geometry.track, fill: 'none', strokeLinecap: 'round' }),
@@ -49,12 +50,12 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
           x1: tick.x1, y1: tick.y1, x2: tick.x2, y2: tick.y2, strokeLinecap: 'round',
         })),
         geometry.needle && h('line', {
-          className: `power-dsh-effort-arc-needle${geometry.auto ? ' power-dsh-effort-arc-auto' : ''}`,
+          className: `power-dsh-effort-arc-needle${stateClass}`,
           x1: geometry.needle.x1, y1: geometry.needle.y1, x2: geometry.needle.x2, y2: geometry.needle.y2,
           strokeLinecap: 'round', style: { transform: `rotate(${rotation}deg)` },
         }),
         h('circle', {
-          className: `power-dsh-effort-arc-hub${geometry.auto ? ' power-dsh-effort-arc-auto' : ''}`,
+          className: `power-dsh-effort-arc-hub${stateClass}`,
           cx: geometry.hub.cx, cy: geometry.hub.cy, r: geometry.hub.r,
         }));
     }
@@ -103,7 +104,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       rotation += delta;
       setNeedleMotion({ target, rotation });
     }
-    const graphic = renderGraphic(glyph, count, active, rotation);
+    const graphic = renderGraphic(glyph, count, active, rotation, selected.id === 'max');
     const button = h('button', {
       type: 'button', className: 'power-dsh-effort-button',
       'aria-label': hint, 'aria-busy': busy ? true : undefined, disabled: busy,

@@ -62,8 +62,18 @@ import { locales as thinkingEffortLocales } from '../features/thinking-effort/lo
 import { createClientFeature as flowingBackground } from '../features/flowing-background/client.ts';
 import { definition as flowingBackgroundDefinition } from '../features/flowing-background/definition.ts';
 import { locales as flowingBackgroundLocales } from '../features/flowing-background/locales.ts';
+import { rpc as flowingBackgroundRpc } from '../features/flowing-background/rpc.ts';
+import { createClientFeature as archive } from '../features/archive/client.ts';
+import { definition as archiveDefinition } from '../features/archive/definition.ts';
+import { locales as archiveLocales } from '../features/archive/locales.ts';
+import { rpc as archiveRpc } from '../features/archive/rpc.ts';
+
+import { createClientFeature as whaleMotion } from '../features/whale-motion/client.ts';
+import { definition as whaleMotionDefinition } from '../features/whale-motion/definition.ts';
+import { locales as whaleMotionLocales } from '../features/whale-motion/locales.ts';
 
 export const clientFeatures: ClientFeatureSelection[] = [
+  { definition: whaleMotionDefinition, create: whaleMotion, locales: whaleMotionLocales, rpc: [] },
   { definition: versionDisplayDefinition, create: versionDisplay, locales: versionDisplayLocales, rpc: [] },
   { definition: appearanceShortcutDefinition, create: appearanceShortcut, locales: appearanceShortcutLocales, rpc: [] },
   { definition: refreshButtonDefinition, create: refreshButton, locales: refreshButtonLocales, rpc: [] },
@@ -80,5 +90,6 @@ export const clientFeatures: ClientFeatureSelection[] = [
   { definition: goalBlockingDefinition, create: goalBlocking, locales: goalBlockingLocales, rpc: goalBlockingRpc },
   { definition: doubleClickRenameDefinition, create: doubleClickRename, locales: doubleClickRenameLocales, rpc: [] },
   { definition: thinkingEffortDefinition, create: thinkingEffort, locales: thinkingEffortLocales, rpc: [] },
-  { definition: flowingBackgroundDefinition, create: flowingBackground, locales: flowingBackgroundLocales, rpc: [] },
+  { definition: flowingBackgroundDefinition, create: flowingBackground, locales: flowingBackgroundLocales, rpc: flowingBackgroundRpc },
+  { definition: archiveDefinition, create: archive, locales: archiveLocales, rpc: archiveRpc },
 ];

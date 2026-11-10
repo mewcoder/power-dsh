@@ -94,12 +94,13 @@ export function barGeometry(count: number, active: number, viewWidth = VIEW_WIDT
 const ARC_CENTER_X = 8;
 const ARC_CENTER_Y = 8.5;
 const ARC_TRACK = 'M3.4041 13.096C2.49514 12.187 1.87614 11.0288 1.62537 9.76798C1.37459 8.50716 1.50331 7.20028 1.99525 6.01261C2.48719 4.82494 3.32025 3.80981 4.3891 3.09557C5.45795 2.38134 6.71458 2.00008 8.0001 2C9.28563 2.00008 10.5423 2.38134 11.6111 3.09557C12.68 3.80981 13.513 4.82494 14.005 6.01261C14.4969 7.20028 14.6256 8.50716 14.3748 9.76798C14.1241 11.0288 13.5051 12.187 12.5961 13.096';
-const ARC_TICK_INNER = 5.2;
-const ARC_TICK_OUTER = 6.2;
+const ARC_TICK_INNER = 5;
+const ARC_TICK_OUTER = 6.25;
 const ARC_NEEDLE_LENGTH = 5.1;
 const ARC_START_DEG = 225;
 const ARC_SWEEP_DEG = 270;
-const ARC_TICK_FRACTIONS = [0.25, 0.5, 0.75] as const;
+// Graduations run the full 270° arc, including both ends, dividing it into four equal segments.
+const ARC_TICK_FRACTIONS = [0, 0.25, 0.5, 0.75, 1] as const;
 const ARC_HUB_RADIUS = 1;
 
 /** A fixed host-style gauge: light arc and ticks, plus one accent needle that turns from low to high. */

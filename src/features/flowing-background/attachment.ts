@@ -73,11 +73,49 @@ function change(element: HTMLElement, property: string, value: string, priority 
 }
 
 /** User-requested global preview: one canvas underneath the verified app frame. */
+export interface BackgroundAppearance {
+  opacity: number;
+  blur: number;
+  /** A user wallpaper replaces the animated pattern when present. */
+  wallpaper?: { dataUrl: string; name: string } | null;
+}
+
+/** Apply opacity and frosted blur to an owned layer without re-attaching it. */
+export function applyAppearance(layer: HTMLElement, appearance: Pick<BackgroundAppearance, 'opacity' | 'blur'>) {
+  const alpha = Math.min(100, Math.max(0, Number.isFinite(appearance.opacity) ? appearance.opacity : 100)) / 100;
+  const opacity = alpha < 1 ? String(alpha) : '';
+  if (layer.style.getPropertyValue('opacity') !== opacity) {
+    if (opacity) layer.style.setProperty('opacity', opacity);
+    else layer.style.removeProperty('opacity');
+  }
+  const blur = Math.min(40, Math.max(0, Number.isFinite(appearance.blur) ? appearance.blur : 0));
+  const artwork = layer.querySelector<HTMLElement>('.power-dsh-artwork');
+  if (!artwork) return;
+  // Blur changes sharpness only. Expanding a cover image's box also zooms and
+  // crops the image, so keep its original geometry and clear legacy overscan.
+  const declarations = {
+    filter: blur > 0 ? `blur(${blur}px)` : '',
+    position: '',
+    inset: '',
+    width: '',
+    height: '',
+  };
+  for (const [property, value] of Object.entries(declarations)) {
+    if (artwork.style.getPropertyValue(property) === value) continue;
+    if (value) artwork.style.setProperty(property, value);
+    else artwork.style.removeProperty(property);
+  }
+}
+
 export function watchBackground(
   report: (status: AttachmentStatus) => void,
   doc: Document = document,
   win: Window & typeof globalThis = window,
   animate = startAnimation,
+  appearance: BackgroundAppearance = { opacity: 100, blur: 0 },
+  /** Re-read on every sync so live sliders restyle the owned layer in place. */
+  readAppearance?: () => BackgroundAppearance,
+  subscribeAppearance?: (listener: () => void) => () => void,
 ): () => void {
   let current: { target: HTMLElement; layer: HTMLDivElement; refresh(classes: NativeClasses): void; dispose(): void } | null = null;
   let disposed = false;
@@ -128,6 +166,7 @@ export function watchBackground(
     const surfaces = new Map<HTMLElement, () => void>();
     const fades = new Map<HTMLElement, () => void>();
     const refresh = (names: NativeClasses) => {
+      if (readAppearance) applyAppearance(layer, readAppearance());
       // Scope Windows chrome overrides to the verified frame owning this layer.
       const css = `${styles}
 html[data-windows-titlebar] .${names.frame}:has(> .power-dsh-flowing-background)::before { background: transparent !important; }
@@ -178,12 +217,28 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
     };
     const layer = doc.createElement('div');
     layer.className = 'power-dsh-flowing-background';
+    const initial = readAppearance ? readAppearance() : appearance;
+    const wallpaper = initial.wallpaper ?? null;
+    layer.setAttribute('data-kind', wallpaper ? 'wallpaper' : 'pattern');
     layer.setAttribute('aria-hidden', 'true');
     const sheet = doc.createElement('style');
     sheet.textContent = styles;
-    const canvas = doc.createElement('canvas');
-    layer.append(sheet, canvas);
     let stop = () => {};
+    let canvas: HTMLCanvasElement | null = null;
+    if (wallpaper) {
+      // The wallpaper is a plain cover image; no GPU context or frame chain is created.
+      const image = doc.createElement('img');
+      image.className = 'power-dsh-wallpaper power-dsh-artwork';
+      image.setAttribute('alt', '');
+      image.setAttribute('draggable', 'false');
+      image.src = wallpaper.dataUrl;
+      layer.append(sheet, image);
+    } else {
+      canvas = doc.createElement('canvas');
+      canvas.className = 'power-dsh-artwork';
+      layer.append(sheet, canvas);
+    }
+    applyAppearance(layer, initial);
     const dispose = () => {
       stop(); layer.remove();
       for (const restore of surfaces.values()) restore();
@@ -197,7 +252,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
       restores.push(change(target, 'background-color', 'var(--dsw-alias-bg-base)'));
       refresh(classes);
       target.appendChild(layer);
-      stop = animate(canvas, win, doc, target);
+      if (canvas) stop = animate(canvas, win, doc, target);
       current = { target, layer, refresh, dispose };
       report({ state: 'attached' });
     } catch {
@@ -216,9 +271,13 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
   observer.observe(doc.body, { childList: true, subtree: true, attributes: true,
     attributeFilter: ['data-phase', 'data-shell-overlay', 'data-shell-bottom', 'data-rightbar-col', 'data-sidebar-drawer', 'hidden', 'class', 'style'] });
   sync();
+  const offAppearance = subscribeAppearance?.(() => {
+    if (!disposed && current && readAppearance) applyAppearance(current.layer, readAppearance());
+  });
   return () => {
     if (disposed) return;
     disposed = true;
+    offAppearance?.();
     observer.disconnect();
     clear();
   };

@@ -1,8 +1,8 @@
 import { TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import z from "@deepseek-ai/schemastery";
 import { spawn } from "node:child_process";
-import { access, lstat, mkdir, readFile, readdir, realpath, rename, unlink, writeFile } from "node:fs/promises";
-import path, { dirname, isAbsolute, join, resolve, win32 } from "node:path";
+import { access, lstat, mkdir, readFile, readdir, realpath, rename, rm, unlink, writeFile } from "node:fs/promises";
+import path, { basename, dirname, isAbsolute, join, resolve, win32 } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { defineTool } from "@deepseek-ai/dsh-tools";
 
@@ -57,7 +57,7 @@ var OperationQueue = class {
 };
 
 // src/features/version-display/definition.ts
-const definition$16 = Object.freeze({
+const definition$18 = Object.freeze({
 	id: "version-display",
 	category: "interface",
 	order: 6,
@@ -66,11 +66,11 @@ const definition$16 = Object.freeze({
 });
 
 // src/features/version-display/config.ts
-var config_exports$16 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$16,
+var config_exports$18 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$18,
 	settingsTool: () => settingsTool$10
 });
-const configFields$16 = { showVersion: z.boolean().default(false).volatile() };
+const configFields$18 = { showVersion: z.boolean().default(false).volatile() };
 const settingsTool$10 = {
 	parameters: { showVersion: {
 		type: "boolean",
@@ -104,7 +104,7 @@ const settingsTool$10 = {
 };
 
 // src/features/appearance-shortcut/definition.ts
-const definition$15 = Object.freeze({
+const definition$17 = Object.freeze({
 	id: "appearance-shortcut",
 	category: "interface",
 	order: 4,
@@ -113,11 +113,11 @@ const definition$15 = Object.freeze({
 });
 
 // src/features/appearance-shortcut/config.ts
-var config_exports$15 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$15,
+var config_exports$17 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$17,
 	settingsTool: () => settingsTool$9
 });
-const configFields$15 = { showThemeSwitcher: z.boolean().default(false).volatile() };
+const configFields$17 = { showThemeSwitcher: z.boolean().default(false).volatile() };
 const settingsTool$9 = {
 	parameters: { showThemeSwitcher: {
 		type: "boolean",
@@ -140,20 +140,20 @@ const settingsTool$9 = {
 };
 
 // src/features/refresh-button/definition.ts
-const definition$14 = Object.freeze({
+const definition$16 = Object.freeze({
 	id: "refresh-button",
-	category: "general",
+	category: "other",
 	order: 1,
 	keys: Object.freeze(["showRefreshButton"]),
 	spec: "src/features/refresh-button/spec.md"
 });
 
 // src/features/refresh-button/config.ts
-var config_exports$14 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$14,
+var config_exports$16 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$16,
 	settingsTool: () => settingsTool$8
 });
-const configFields$14 = { showRefreshButton: z.boolean().default(false).volatile() };
+const configFields$16 = { showRefreshButton: z.boolean().default(false).volatile() };
 const settingsTool$8 = {
 	parameters: { showRefreshButton: {
 		type: "boolean",
@@ -176,20 +176,20 @@ const settingsTool$8 = {
 };
 
 // src/features/restart-button/definition.ts
-const definition$13 = Object.freeze({
+const definition$15 = Object.freeze({
 	id: "restart-button",
-	category: "general",
+	category: "other",
 	order: 2,
 	keys: Object.freeze(["showRestartButton"]),
 	spec: "src/features/restart-button/spec.md"
 });
 
 // src/features/restart-button/config.ts
-var config_exports$13 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$13,
+var config_exports$15 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$15,
 	settingsTool: () => settingsTool$7
 });
-const configFields$13 = { showRestartButton: z.boolean().default(false).volatile() };
+const configFields$15 = { showRestartButton: z.boolean().default(false).volatile() };
 const settingsTool$7 = {
 	parameters: { showRestartButton: {
 		type: "boolean",
@@ -337,14 +337,14 @@ var DesktopRestart = class {
 };
 
 // src/features/restart-button/host.ts
-var host_exports$10 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$10,
-	methods: () => methods$10
+var host_exports$12 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$12,
+	methods: () => methods$12
 });
-function createHost$10(ctx, config) {
+function createHost$12(ctx, config) {
 	return { restart: new DesktopRestart(ctx, config) };
 }
-const methods$10 = {
+const methods$12 = {
 	restartStatus() {
 		return this.run(() => this.restart.status());
 	},
@@ -411,10 +411,10 @@ const RESTART_APP_RPC = {
 		} })
 	}
 };
-const rpc$10 = [RESTART_STATUS_RPC, RESTART_APP_RPC];
+const rpc$12 = [RESTART_STATUS_RPC, RESTART_APP_RPC];
 
 // src/features/notifications/definition.ts
-const definition$12 = Object.freeze({
+const definition$14 = Object.freeze({
 	id: "notifications",
 	category: "general",
 	order: 0,
@@ -427,8 +427,8 @@ const definition$12 = Object.freeze({
 });
 
 // src/features/notifications/config.ts
-var config_exports$12 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$12 });
-const configFields$12 = {
+var config_exports$14 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$14 });
+const configFields$14 = {
 	notificationsEnabled: z.boolean().default(false).volatile(),
 	notificationSoundEnabled: z.boolean().default(true).volatile(),
 	notificationSound: z.string().default("default").volatile()
@@ -632,17 +632,17 @@ var SystemSounds = class {
 };
 
 // src/features/notifications/host.ts
-var host_exports$9 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$9,
-	methods: () => methods$9
+var host_exports$11 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$11,
+	methods: () => methods$11
 });
-function createHost$9(ctx, config) {
+function createHost$11(ctx, config) {
 	ctx.inject(["sessionProjections"], async (child) => {
 		await child.sessionProjections.register(notificationProjection());
 	});
 	return { sounds: new SystemSounds(ctx, config) };
 }
-const methods$9 = {
+const methods$11 = {
 	listSystemSounds() {
 		return this.run(() => this.sounds.list());
 	},
@@ -748,10 +748,10 @@ const PLAY_SYSTEM_SOUND_RPC = {
 		} })
 	}
 };
-const rpc$9 = [LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC];
+const rpc$11 = [LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC];
 
 // src/features/personalization/definition.ts
-const definition$11 = Object.freeze({
+const definition$13 = Object.freeze({
 	id: "personalization",
 	category: "enhance",
 	order: 9,
@@ -760,8 +760,8 @@ const definition$11 = Object.freeze({
 });
 
 // src/features/personalization/config.ts
-var config_exports$11 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$11 });
-const configFields$11 = { personalizationEnabled: z.boolean().default(false).volatile() };
+var config_exports$13 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$13 });
+const configFields$13 = { personalizationEnabled: z.boolean().default(false).volatile() };
 
 // src/features/personalization/personalization.ts
 const MAX_PROMPT_LENGTH = 2e4;
@@ -830,14 +830,14 @@ var PersonalizationFile = class {
 };
 
 // src/features/personalization/host.ts
-var host_exports$8 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$8,
-	methods: () => methods$8
+var host_exports$10 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$10,
+	methods: () => methods$10
 });
-function createHost$8(_ctx, _config, { owner, ensureActive }) {
+function createHost$10(_ctx, _config, { owner, ensureActive }) {
 	return { instructions: new PersonalizationFile(owner.profileContext.home, ensureActive) };
 }
-const methods$8 = {
+const methods$10 = {
 	readPersonalization() {
 		return this.run(() => this.instructions.read());
 	},
@@ -877,10 +877,10 @@ function fileRpc(method, fields) {
 }
 const READ_PERSONALIZATION_RPC = fileRpc("readPersonalization", []);
 const SAVE_PERSONALIZATION_RPC = fileRpc("savePersonalization", ["text", "revision"]);
-const rpc$8 = [READ_PERSONALIZATION_RPC, SAVE_PERSONALIZATION_RPC];
+const rpc$10 = [READ_PERSONALIZATION_RPC, SAVE_PERSONALIZATION_RPC];
 
 // src/features/skills/definition.ts
-const definition$10 = Object.freeze({
+const definition$12 = Object.freeze({
 	id: "skills",
 	category: "enhance",
 	order: 7,
@@ -889,8 +889,8 @@ const definition$10 = Object.freeze({
 });
 
 // src/features/skills/config.ts
-var config_exports$10 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$10 });
-const configFields$10 = {
+var config_exports$12 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$12 });
+const configFields$12 = {
 	skillManagerEnabled: z.boolean().default(false).volatile(),
 	disabledSkills: z.array(z.object({
 		name: z.string().required(),
@@ -1375,11 +1375,11 @@ var SkillPolicy = class {
 };
 
 // src/features/skills/host.ts
-var host_exports$7 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$7,
-	methods: () => methods$7
+var host_exports$9 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$9,
+	methods: () => methods$9
 });
-function createHost$7(ctx, config, { owner, ensureActive }) {
+function createHost$9(ctx, config, { owner, ensureActive }) {
 	const skills = { current: null };
 	ctx.inject([
 		"skills",
@@ -1403,7 +1403,7 @@ function createHost$7(ctx, config, { owner, ensureActive }) {
 	});
 	return { skills };
 }
-const methods$7 = {
+const methods$9 = {
 	listSkills(cwd, scope) {
 		return this.run(() => {
 			if (!this.skills.current) throw new Error("DSH skill management is unavailable.");
@@ -1486,10 +1486,10 @@ const SET_SKILL_ENABLED_RPC = skillRpc("setSkillEnabled", [
 	"name",
 	"enabled"
 ]);
-const rpc$7 = [LIST_SKILLS_RPC, SET_SKILL_ENABLED_RPC];
+const rpc$9 = [LIST_SKILLS_RPC, SET_SKILL_ENABLED_RPC];
 
 // src/features/mcp/definition.ts
-const definition$9 = Object.freeze({
+const definition$11 = Object.freeze({
 	id: "mcp",
 	category: "enhance",
 	order: 8,
@@ -1498,8 +1498,8 @@ const definition$9 = Object.freeze({
 });
 
 // src/features/mcp/config.ts
-var config_exports$9 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$9 });
-const configFields$9 = { mcpManagerEnabled: z.boolean().default(false).volatile() };
+var config_exports$11 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$11 });
+const configFields$11 = { mcpManagerEnabled: z.boolean().default(false).volatile() };
 
 // src/features/mcp/mcp-policy.ts
 const MCP_CLIENT$1 = "@deepseek-ai/dsh-mcp-client";
@@ -2048,11 +2048,11 @@ var McpProviders = class {
 };
 
 // src/features/mcp/host.ts
-var host_exports$6 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$6,
-	methods: () => methods$6
+var host_exports$8 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$8,
+	methods: () => methods$8
 });
-function createHost$6(ctx, _config, { owner, ensureActive }) {
+function createHost$8(ctx, _config, { owner, ensureActive }) {
 	const options = { ensureActive };
 	const mcp = new McpPolicy(owner, options);
 	ctx.inject(["agentPresets"], (child) => {
@@ -2076,7 +2076,7 @@ function createHost$6(ctx, _config, { owner, ensureActive }) {
 	});
 	return { mcp };
 }
-const methods$6 = {
+const methods$8 = {
 	listMcpServers() {
 		return this.run(() => this.mcp.list());
 	},
@@ -2155,10 +2155,10 @@ function mcpRpc(method, fields) {
 }
 const LIST_MCP_SERVERS_RPC = mcpRpc("listMcpServers", []);
 const SET_MCP_SERVER_ENABLED_RPC = mcpRpc("setMcpServerEnabled", ["id", "enabled"]);
-const rpc$6 = [LIST_MCP_SERVERS_RPC, SET_MCP_SERVER_ENABLED_RPC];
+const rpc$8 = [LIST_MCP_SERVERS_RPC, SET_MCP_SERVER_ENABLED_RPC];
 
 // src/features/account-blocking/definition.ts
-const definition$8 = Object.freeze({
+const definition$10 = Object.freeze({
 	id: "account-blocking",
 	category: "simplify",
 	order: 8,
@@ -2167,11 +2167,11 @@ const definition$8 = Object.freeze({
 });
 
 // src/features/account-blocking/config.ts
-var config_exports$8 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$8,
+var config_exports$10 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$10,
 	settingsTool: () => settingsTool$6
 });
-const configFields$8 = { blockOfficialAccount: z.boolean().default(false).volatile() };
+const configFields$10 = { blockOfficialAccount: z.boolean().default(false).volatile() };
 const settingsTool$6 = {
 	parameters: { blockOfficialAccount: {
 		type: "boolean",
@@ -2273,23 +2273,23 @@ var AccountPolicy = class extends PluginPolicy {
 };
 
 // src/features/account-blocking/host.ts
-var host_exports$5 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$5,
-	methods: () => methods$5
+var host_exports$7 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$7,
+	methods: () => methods$7
 });
-function createHost$5(_ctx, _config, { owner, ensureActive }) {
+function createHost$7(_ctx, _config, { owner, ensureActive }) {
 	return { policy: new AccountPolicy(owner, { ensureActive }) };
 }
-const methods$5 = { async setAccountBlocked(blocked) {
+const methods$7 = { async setAccountBlocked(blocked) {
 	return this.run(() => this.policy.setBlocked(blocked));
 } };
 
 // src/features/account-blocking/rpc.ts
 const ACCOUNT_RPC = policyRpc("setAccountBlocked", "AccountPolicyResult");
-const rpc$5 = [ACCOUNT_RPC];
+const rpc$7 = [ACCOUNT_RPC];
 
 // src/features/search-blocking/definition.ts
-const definition$7 = Object.freeze({
+const definition$9 = Object.freeze({
 	id: "search-blocking",
 	category: "simplify",
 	order: 9,
@@ -2298,11 +2298,11 @@ const definition$7 = Object.freeze({
 });
 
 // src/features/search-blocking/config.ts
-var config_exports$7 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$7,
+var config_exports$9 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$9,
 	settingsTool: () => settingsTool$5
 });
-const configFields$7 = { blockOfficialSearch: z.boolean().default(false).volatile() };
+const configFields$9 = { blockOfficialSearch: z.boolean().default(false).volatile() };
 const settingsTool$5 = {
 	parameters: { blockOfficialSearch: {
 		type: "boolean",
@@ -2469,25 +2469,25 @@ var SearchPolicy = class {
 };
 
 // src/features/search-blocking/host.ts
-var host_exports$4 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$4,
-	methods: () => methods$4
+var host_exports$6 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$6,
+	methods: () => methods$6
 });
-function createHost$4(ctx, config, { owner, ensureActive }) {
+function createHost$6(ctx, config, { owner, ensureActive }) {
 	const search = new SearchPolicy(owner, config, { ensureActive });
 	ctx.inject(["agents", "agentPresets"], (child) => search.bind(child));
 	return { search };
 }
-const methods$4 = { async setSearchBlocked(blocked) {
+const methods$6 = { async setSearchBlocked(blocked) {
 	return this.run(() => this.search.setBlocked(blocked));
 } };
 
 // src/features/search-blocking/rpc.ts
 const SEARCH_RPC = policyRpc("setSearchBlocked", "SearchPolicyResult");
-const rpc$4 = [SEARCH_RPC];
+const rpc$6 = [SEARCH_RPC];
 
 // src/features/telemetry-blocking/definition.ts
-const definition$6 = Object.freeze({
+const definition$8 = Object.freeze({
 	id: "telemetry-blocking",
 	category: "simplify",
 	order: 10,
@@ -2496,11 +2496,11 @@ const definition$6 = Object.freeze({
 });
 
 // src/features/telemetry-blocking/config.ts
-var config_exports$6 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$6,
+var config_exports$8 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$8,
 	settingsTool: () => settingsTool$4
 });
-const configFields$6 = { blockOfficialTelemetry: z.boolean().default(false).volatile() };
+const configFields$8 = { blockOfficialTelemetry: z.boolean().default(false).volatile() };
 const settingsTool$4 = {
 	parameters: { blockOfficialTelemetry: {
 		type: "boolean",
@@ -2611,23 +2611,23 @@ var TelemetryPolicy = class extends PluginPolicy {
 };
 
 // src/features/telemetry-blocking/host.ts
-var host_exports$3 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$3,
-	methods: () => methods$3
+var host_exports$5 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$5,
+	methods: () => methods$5
 });
-function createHost$3(_ctx, _config, { owner, ensureActive }) {
+function createHost$5(_ctx, _config, { owner, ensureActive }) {
 	return { telemetry: new TelemetryPolicy(owner, { ensureActive }) };
 }
-const methods$3 = { async setTelemetryBlocked(blocked) {
+const methods$5 = { async setTelemetryBlocked(blocked) {
 	return this.run(() => this.telemetry.setBlocked(blocked));
 } };
 
 // src/features/telemetry-blocking/rpc.ts
 const TELEMETRY_RPC = policyRpc("setTelemetryBlocked", "TelemetryPolicyResult");
-const rpc$3 = [TELEMETRY_RPC];
+const rpc$5 = [TELEMETRY_RPC];
 
 // src/features/todo-blocking/definition.ts
-const definition$5 = Object.freeze({
+const definition$7 = Object.freeze({
 	id: "todo-blocking",
 	category: "simplify",
 	order: 11,
@@ -2636,11 +2636,11 @@ const definition$5 = Object.freeze({
 });
 
 // src/features/todo-blocking/config.ts
-var config_exports$5 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$5,
+var config_exports$7 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$7,
 	settingsTool: () => settingsTool$3
 });
-const configFields$5 = { blockTodo: z.boolean().default(false).volatile() };
+const configFields$7 = { blockTodo: z.boolean().default(false).volatile() };
 const settingsTool$3 = {
 	parameters: { blockTodo: {
 		type: "boolean",
@@ -2749,25 +2749,25 @@ var TodoPolicy = class {
 };
 
 // src/features/todo-blocking/host.ts
-var host_exports$2 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$2,
-	methods: () => methods$2
+var host_exports$4 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$4,
+	methods: () => methods$4
 });
-function createHost$2(ctx, config, { owner, ensureActive }) {
+function createHost$4(ctx, config, { owner, ensureActive }) {
 	const todo = new TodoPolicy(owner, config, { ensureActive });
 	ctx.inject(["agentPresets"], (child) => todo.bind(child));
 	return { todo };
 }
-const methods$2 = { async setTodoBlocked(blocked) {
+const methods$4 = { async setTodoBlocked(blocked) {
 	return this.run(() => this.todo.setBlocked(blocked));
 } };
 
 // src/features/todo-blocking/rpc.ts
 const TODO_RPC = policyRpc("setTodoBlocked", "TodoPolicyResult");
-const rpc$2 = [TODO_RPC];
+const rpc$4 = [TODO_RPC];
 
 // src/features/plan-blocking/definition.ts
-const definition$4 = Object.freeze({
+const definition$6 = Object.freeze({
 	id: "plan-blocking",
 	category: "simplify",
 	order: 11.5,
@@ -2776,11 +2776,11 @@ const definition$4 = Object.freeze({
 });
 
 // src/features/plan-blocking/config.ts
-var config_exports$4 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$4,
+var config_exports$6 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$6,
 	settingsTool: () => settingsTool$2
 });
-const configFields$4 = { blockPlan: z.boolean().default(false).volatile() };
+const configFields$6 = { blockPlan: z.boolean().default(false).volatile() };
 const settingsTool$2 = {
 	parameters: { blockPlan: {
 		type: "boolean",
@@ -2885,25 +2885,25 @@ var PlanPolicy = class {
 };
 
 // src/features/plan-blocking/host.ts
-var host_exports$1 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$1,
-	methods: () => methods$1
+var host_exports$3 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$3,
+	methods: () => methods$3
 });
-function createHost$1(ctx, config, { owner, ensureActive }) {
+function createHost$3(ctx, config, { owner, ensureActive }) {
 	const plan = new PlanPolicy(owner, config, { ensureActive });
 	ctx.inject(["agentPresets"], (child) => plan.bind(child));
 	return { plan };
 }
-const methods$1 = { async setPlanBlocked(blocked) {
+const methods$3 = { async setPlanBlocked(blocked) {
 	return this.run(() => this.plan.setBlocked(blocked));
 } };
 
 // src/features/plan-blocking/rpc.ts
 const PLAN_RPC = policyRpc("setPlanBlocked", "PlanPolicyResult");
-const rpc$1 = [PLAN_RPC];
+const rpc$3 = [PLAN_RPC];
 
 // src/features/goal-blocking/definition.ts
-const definition$3 = Object.freeze({
+const definition$5 = Object.freeze({
 	id: "goal-blocking",
 	category: "simplify",
 	order: 11.75,
@@ -2912,11 +2912,11 @@ const definition$3 = Object.freeze({
 });
 
 // src/features/goal-blocking/config.ts
-var config_exports$3 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$3,
+var config_exports$5 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$5,
 	settingsTool: () => settingsTool$1
 });
-const configFields$3 = { blockGoal: z.boolean().default(false).volatile() };
+const configFields$5 = { blockGoal: z.boolean().default(false).volatile() };
 const settingsTool$1 = {
 	parameters: { blockGoal: {
 		type: "boolean",
@@ -3027,38 +3027,38 @@ var GoalPolicy = class {
 };
 
 // src/features/goal-blocking/host.ts
-var host_exports = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost,
-	methods: () => methods
+var host_exports$2 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$2,
+	methods: () => methods$2
 });
-function createHost(ctx, config, { owner, ensureActive }) {
+function createHost$2(ctx, config, { owner, ensureActive }) {
 	const goal = new GoalPolicy(owner, config, { ensureActive });
 	ctx.inject(["agentPresets"], (child) => goal.bind(child));
 	return { goal };
 }
-const methods = { async setGoalBlocked(blocked) {
+const methods$2 = { async setGoalBlocked(blocked) {
 	return this.run(() => this.goal.setBlocked(blocked));
 } };
 
 // src/features/goal-blocking/rpc.ts
 const GOAL_RPC = policyRpc("setGoalBlocked", "GoalPolicyResult");
-const rpc = [GOAL_RPC];
+const rpc$2 = [GOAL_RPC];
 
 // src/features/double-click-rename/definition.ts
-const definition$2 = Object.freeze({
+const definition$4 = Object.freeze({
 	id: "double-click-rename",
-	category: "simplify",
-	order: 12,
+	category: "other",
+	order: 3,
 	keys: Object.freeze(["blockDoubleClickRename"]),
 	spec: "src/features/double-click-rename/spec.md"
 });
 
 // src/features/double-click-rename/config.ts
-var config_exports$2 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$2,
+var config_exports$4 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$4,
 	settingsTool: () => settingsTool
 });
-const configFields$2 = { blockDoubleClickRename: z.boolean().default(false).volatile() };
+const configFields$4 = { blockDoubleClickRename: z.boolean().default(false).volatile() };
 const settingsTool = {
 	parameters: { blockDoubleClickRename: {
 		type: "boolean",
@@ -3081,7 +3081,7 @@ const settingsTool = {
 };
 
 // src/features/thinking-effort/definition.ts
-const definition$1 = Object.freeze({
+const definition$3 = Object.freeze({
 	id: "thinking-effort",
 	category: "interface",
 	order: 3,
@@ -3090,38 +3090,544 @@ const definition$1 = Object.freeze({
 });
 
 // src/features/thinking-effort/config.ts
-var config_exports$1 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$1 });
-const configFields$1 = {
+var config_exports$3 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$3 });
+const configFields$3 = {
 	showThinkingEffortSwitcher: z.boolean().default(false).volatile(),
 	thinkingEffortGlyph: z.string().default("arc").volatile()
 };
 
 // src/features/flowing-background/definition.ts
-const definition = Object.freeze({
+const definition$2 = Object.freeze({
 	id: "flowing-background",
 	category: "interface",
 	order: 5,
-	keys: Object.freeze(["flowingBackgroundEnabled"]),
+	keys: Object.freeze([
+		"flowingBackgroundEnabled",
+		"flowingBackgroundKind",
+		"flowingBackgroundOpacity",
+		"flowingBackgroundBlur"
+	]),
 	spec: "src/features/flowing-background/spec.md"
 });
 
 // src/features/flowing-background/config.ts
+var config_exports$2 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$2 });
+const configFields$2 = {
+	flowingBackgroundEnabled: z.boolean().default(false).volatile(),
+	flowingBackgroundKind: z.string().default("pattern").volatile(),
+	flowingBackgroundOpacity: z.number().default(100).volatile(),
+	flowingBackgroundBlur: z.number().default(0).volatile()
+};
+
+// src/features/flowing-background/wallpaper.ts
+/** Bounded so a single profile never carries an unbounded binary asset. */
+const MAX_WALLPAPER_BYTES = 26214400;
+const MIME_EXTENSIONS = {
+	"image/png": "png",
+	"image/jpeg": "jpg",
+	"image/webp": "webp"
+};
+const DATA_URL = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/;
+function cleanName(value) {
+	if (typeof value !== "string") throw new TypeError("Wallpaper name must be a string.");
+	const name = value.split(/[\\/]/).pop()?.trim() ?? "";
+	if (!name || name.length > 200) throw new TypeError("Wallpaper name must be 1-200 characters.");
+	return name;
+}
+/** One user wallpaper stored inside the plugin's own profile directory. */
+var WallpaperStore = class {
+	home;
+	directory;
+	binary;
+	metadata;
+	ensureActive;
+	constructor(home, ensureActive = () => {}) {
+		if (!isAbsolute(home)) throw new TypeError("DSH home must be absolute");
+		this.home = resolve(home);
+		this.directory = join(this.home, "power-dsh");
+		this.binary = join(this.directory, "wallpaper.bin");
+		this.metadata = join(this.directory, "wallpaper.json");
+		this.ensureActive = ensureActive;
+	}
+	async read() {
+		this.ensureActive();
+		let bytes;
+		try {
+			const info = await lstat(this.binary);
+			if (!info.isFile()) throw new Error("Wallpaper must be a regular file.");
+			if (info.size > 26214400) throw new Error("Wallpaper exceeds the 25 MiB limit.");
+			bytes = await readFile(this.binary);
+		} catch (error) {
+			if (errorCode(error) === "ENOENT") return null;
+			throw error;
+		}
+		let meta;
+		try {
+			const raw = JSON.parse(await readFile(this.metadata, "utf8"));
+			if (typeof raw !== "object" || raw === null) throw new Error("Invalid wallpaper metadata.");
+			const record = raw;
+			if (typeof record.name !== "string" || typeof record.mime !== "string" || !Object.hasOwn(MIME_EXTENSIONS, record.mime)) throw new Error("Invalid wallpaper metadata.");
+			meta = {
+				name: record.name,
+				mime: record.mime
+			};
+		} catch (error) {
+			if (errorCode(error) === "ENOENT") return null;
+			throw error;
+		}
+		this.ensureActive();
+		return {
+			name: meta.name,
+			mime: meta.mime,
+			bytes: bytes.byteLength,
+			dataUrl: `data:${meta.mime};base64,${bytes.toString("base64")}`
+		};
+	}
+	async save(dataUrl, rawName) {
+		if (typeof dataUrl !== "string") throw new TypeError("Wallpaper must be a data URL.");
+		const match = DATA_URL.exec(dataUrl);
+		if (!match) throw new TypeError("Wallpaper must be a PNG, JPEG or WebP data URL.");
+		const [, mime] = match;
+		const name = cleanName(rawName);
+		const bytes = Buffer.from(match[2], "base64");
+		if (bytes.byteLength === 0) throw new TypeError("Wallpaper image is empty.");
+		if (bytes.byteLength > 26214400) throw new TypeError("Wallpaper exceeds the 25 MiB limit.");
+		await mkdir(this.directory, { recursive: true });
+		const binTmp = join(this.directory, `.wallpaper.${randomUUID()}.bin.tmp`);
+		const metaTmp = join(this.directory, `.wallpaper.${randomUUID()}.json.tmp`);
+		try {
+			await writeFile(binTmp, bytes, {
+				flag: "wx",
+				mode: 384
+			});
+			await writeFile(metaTmp, JSON.stringify({
+				name,
+				mime
+			}), {
+				encoding: "utf8",
+				flag: "wx",
+				mode: 384
+			});
+			this.ensureActive();
+			await rename(binTmp, this.binary);
+			await rename(metaTmp, this.metadata);
+		} finally {
+			await unlink(binTmp).catch((error) => {
+				if (errorCode(error) !== "ENOENT") throw error;
+			});
+			await unlink(metaTmp).catch((error) => {
+				if (errorCode(error) !== "ENOENT") throw error;
+			});
+		}
+		const saved = await this.read();
+		if (!saved) throw new Error("Wallpaper was not stored.");
+		return saved;
+	}
+	async clear() {
+		this.ensureActive();
+		await unlink(this.binary).catch((error) => {
+			if (errorCode(error) !== "ENOENT") throw error;
+		});
+		await unlink(this.metadata).catch((error) => {
+			if (errorCode(error) !== "ENOENT") throw error;
+		});
+		this.ensureActive();
+		return { cleared: true };
+	}
+};
+
+// src/features/flowing-background/host.ts
+var host_exports$1 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$1,
+	methods: () => methods$1
+});
+function createHost$1(_ctx, _config, { owner, ensureActive }) {
+	return { wallpaper: new WallpaperStore(owner.profileContext.home, ensureActive) };
+}
+const methods$1 = {
+	readWallpaper() {
+		return this.run(() => this.wallpaper.read());
+	},
+	saveWallpaper(dataUrl, name) {
+		return this.run(() => this.wallpaper.save(dataUrl, name));
+	},
+	clearWallpaper() {
+		return this.run(() => this.wallpaper.clear());
+	}
+};
+
+// src/features/flowing-background/rpc.ts
+const wallpaperCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#WallpaperAsset",
+	create: () => ({ parse(value) {
+		if (!isRecord(value) || typeof value.name !== "string" || typeof value.mime !== "string" || typeof value.bytes !== "number" || typeof value.dataUrl !== "string" || !value.dataUrl.startsWith("data:image/")) throw new TypeError("Invalid wallpaper asset");
+		return {
+			name: value.name,
+			mime: value.mime,
+			bytes: value.bytes,
+			dataUrl: value.dataUrl
+		};
+	} })
+};
+const nullableWallpaperCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#WallpaperAsset?",
+	create: () => ({ parse(value) {
+		return value === null ? null : wallpaperCodec.create().parse(value);
+	} })
+};
+const clearedCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#WallpaperCleared",
+	create: () => ({ parse(value) {
+		if (!isRecord(value) || value.cleared !== true) throw new TypeError("Invalid wallpaper clear result");
+		return { cleared: true };
+	} })
+};
+function descriptor(method, fields, result) {
+	return {
+		id: `power-dsh#powerDsh/${method}`,
+		service: "powerDsh",
+		namespace: "powerDsh",
+		method,
+		invocation: { kind: "direct" },
+		parameters: fields.map((name) => ({
+			name,
+			wire: name,
+			source: "json",
+			codec: stringCodec
+		})),
+		result
+	};
+}
+const READ_WALLPAPER_RPC = descriptor("readWallpaper", [], nullableWallpaperCodec);
+const SAVE_WALLPAPER_RPC = descriptor("saveWallpaper", ["dataUrl", "name"], wallpaperCodec);
+const CLEAR_WALLPAPER_RPC = descriptor("clearWallpaper", [], clearedCodec);
+const rpc$1 = [
+	READ_WALLPAPER_RPC,
+	SAVE_WALLPAPER_RPC,
+	CLEAR_WALLPAPER_RPC
+];
+
+// src/features/archive/definition.ts
+const definition$1 = Object.freeze({
+	id: "archive",
+	category: "enhance",
+	order: 10,
+	keys: Object.freeze(["archiveManagerEnabled"]),
+	spec: "src/features/archive/spec.md"
+});
+
+// src/features/archive/config.ts
+var config_exports$1 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$1 });
+const configFields$1 = { archiveManagerEnabled: z.boolean().default(false).volatile() };
+
+// src/features/archive/archive-catalog.ts
+/**
+* Fold the native Workspace baseline and the archived-session titles into a
+* plain projection. Ordering is deterministic so identical inputs render alike.
+*/
+function buildArchiveCatalog(baseline, titles) {
+	const workspaces = baseline.items.map((item) => ({
+		workspaceId: item.workspaceId,
+		title: item.title
+	}));
+	const owner = /* @__PURE__ */ new Map();
+	for (const item of baseline.items) for (const sessionId of item.sessionIds) if (!owner.has(sessionId)) owner.set(sessionId, {
+		workspaceId: item.workspaceId,
+		title: item.title
+	});
+	const seen = /* @__PURE__ */ new Set();
+	const sessions = [];
+	for (const sessionId of baseline.archivedSessionIds) {
+		if (seen.has(sessionId)) continue;
+		seen.add(sessionId);
+		const workspace = owner.get(sessionId);
+		const meta = titles.get(sessionId);
+		sessions.push({
+			sessionId,
+			title: meta?.title ?? "",
+			workspaceId: workspace?.workspaceId ?? "",
+			workspaceTitle: workspace?.title ?? "",
+			updatedAt: meta?.updatedAt ?? 0,
+			createdAt: meta?.createdAt ?? 0
+		});
+	}
+	return {
+		complete: true,
+		workspaces,
+		sessions
+	};
+}
+
+// src/features/archive/archive-service.ts
+/**
+* Reads the archived set from the native Workspace stream, restores single
+* sessions through the native unarchive operation, and permanently removes a
+* known archived session's transcript artifact. Holds no preferences.
+*/
+var ArchiveService = class {
+	workspaceController = null;
+	sessionQuery = null;
+	sessionPersistence = null;
+	async list() {
+		const controller = this.workspaceController;
+		if (!controller || !this.sessionQuery) throw new Error("archiveUnavailable");
+		const abort = new AbortController();
+		try {
+			const baseline = await readBaseline(controller, abort.signal);
+			const titles = await this.titlesFor(baseline.archivedSessionIds, abort.signal);
+			return buildArchiveCatalog(baseline, titles);
+		} finally {
+			abort.abort();
+		}
+	}
+	async restore(sessionId) {
+		const controller = this.workspaceController;
+		if (!controller) throw new Error("archiveUnavailable");
+		if (!validSessionId(sessionId)) throw new Error("archiveInvalidSession");
+		await controller.unarchiveSession({ sessionId });
+		return this.list();
+	}
+	/**
+	* Permanently delete one archived session. Clears the archive marker first so
+	* the list reflects the intent, then removes the resolved transcript
+	* artifact. Refuses non-archived ids and sessions whose artifact path cannot
+	* be resolved.
+	*/
+	async delete(sessionId) {
+		const controller = this.workspaceController;
+		const persistence = this.sessionPersistence;
+		if (!controller || !this.sessionQuery) throw new Error("archiveUnavailable");
+		if (!persistence) throw new Error("archiveDeleteUnavailable");
+		if (!validSessionId(sessionId)) throw new Error("archiveInvalidSession");
+		const abort = new AbortController();
+		try {
+			let baseline;
+			try {
+				baseline = await readBaseline(controller, abort.signal);
+			} catch {
+				throw new Error("archiveDeleteCheckFailed");
+			}
+			if (!baseline.archivedSessionIds.includes(sessionId)) throw new Error("archiveNotArchived");
+			let snapshot;
+			try {
+				snapshot = await persistence.stat(sessionId, { signal: abort.signal });
+			} catch {
+				throw new Error("archiveDeleteStatFailed");
+			}
+			const remaining = baseline.archivedSessionIds.filter((id) => id !== sessionId);
+			if (!snapshot) {
+				await controller.unarchiveSession({ sessionId }).catch(() => void 0);
+				const titles = await this.titlesFor(remaining, abort.signal).catch(() => /* @__PURE__ */ new Map());
+				return buildArchiveCatalog({
+					items: baseline.items,
+					archivedSessionIds: remaining
+				}, titles);
+			}
+			const artifact = snapshot.location?.path;
+			if (typeof artifact !== "string" || artifact.length === 0) throw new Error("archiveDeleteUnsupported");
+			try {
+				await controller.unarchiveSession({ sessionId });
+			} catch {
+				throw new Error("archiveDeleteUnarchiveFailed");
+			}
+			try {
+				await removeArtifact(artifact, sessionId);
+			} catch (error) {
+				throw error instanceof Error && error.message === "archiveDeleteUnsafe" ? error : /* @__PURE__ */ new Error("archiveDeleteRemoveFailed");
+			}
+			const titles = await this.titlesFor(remaining, abort.signal).catch(() => /* @__PURE__ */ new Map());
+			return buildArchiveCatalog({
+				items: baseline.items,
+				archivedSessionIds: remaining
+			}, titles);
+		} finally {
+			abort.abort();
+		}
+	}
+	async titlesFor(ids, signal) {
+		const titles = /* @__PURE__ */ new Map();
+		const query = this.sessionQuery;
+		const unique = [...new Set(ids)];
+		if (!query || unique.length === 0) return titles;
+		const results = await query.readTitleSnapshots(unique, signal);
+		for (const result of results) if (result.status === "fulfilled") titles.set(result.sessionId, {
+			title: result.value.title?.title ?? "",
+			updatedAt: result.value.title?.updatedAt ?? 0,
+			createdAt: result.value.session.createdAt
+		});
+		return titles;
+	}
+};
+function validSessionId(sessionId) {
+	return typeof sessionId === "string" && sessionId.length > 0 && sessionId.length <= 1024;
+}
+/** Resolve the first complete Workspace baseline and stop the stream. */
+async function readBaseline(controller, signal) {
+	for await (const frame of controller.follow(signal)) if ((frame.type === "baseline" || frame.type === "replace") && frame.value) return frame.value;
+	throw new Error("archiveUnavailable");
+}
+/**
+* Delete the session's own transcript directory when its path segment equals the
+* session id; otherwise delete only the resolved artifact file. Never follows a
+* symbolic link and never removes a shared parent directory.
+*/
+async function removeArtifact(artifactPath, sessionId) {
+	const directory = dirname(artifactPath);
+	if (basename(directory) === sessionId) {
+		const info = await lstat(directory).catch(() => null);
+		if (info?.isSymbolicLink()) throw new Error("archiveDeleteUnsafe");
+		if (info?.isDirectory()) {
+			await rm(directory, {
+				recursive: true,
+				force: true
+			});
+			return;
+		}
+	}
+	await rm(artifactPath, { force: true });
+}
+
+// src/features/archive/host.ts
+var host_exports = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost,
+	methods: () => methods
+});
+function createHost(ctx, _config, _options) {
+	const archive = new ArchiveService();
+	ctx.inject(["workspaceController", "sessionQuery"], (child) => {
+		archive.workspaceController = child.workspaceController ?? null;
+		archive.sessionQuery = child.sessionQuery ?? null;
+		child.effect(() => () => {
+			archive.workspaceController = null;
+			archive.sessionQuery = null;
+		});
+	});
+	ctx.inject(["sessionPersistence"], (child) => {
+		archive.sessionPersistence = child.sessionPersistence ?? null;
+		child.effect(() => () => {
+			archive.sessionPersistence = null;
+		});
+	});
+	return { archive };
+}
+const methods = {
+	listArchivedSessions() {
+		return this.run(() => this.archive.list());
+	},
+	restoreArchivedSession(sessionId) {
+		return this.run(() => this.archive.restore(sessionId));
+	},
+	deleteArchivedSession(sessionId) {
+		return this.run(() => this.archive.delete(sessionId));
+	}
+};
+
+// src/features/archive/rpc.ts
+const archiveCatalogCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#ArchiveCatalog",
+	create: () => ({ parse(value) {
+		if (!isRecord(value) || typeof value.complete !== "boolean" || !isArray(value.workspaces) || !isArray(value.sessions)) throw new TypeError("Invalid archive catalog");
+		const workspaces = value.workspaces.map((row) => {
+			if (!isRecord(row) || !hasStrings(row, ["workspaceId", "title"])) throw new TypeError("Invalid archive workspace");
+			return {
+				workspaceId: row.workspaceId,
+				title: row.title
+			};
+		});
+		const sessions = value.sessions.map((row) => {
+			if (!isRecord(row) || !hasStrings(row, [
+				"sessionId",
+				"title",
+				"workspaceId",
+				"workspaceTitle"
+			]) || typeof row.updatedAt !== "number" || !Number.isFinite(row.updatedAt) || typeof row.createdAt !== "number" || !Number.isFinite(row.createdAt)) throw new TypeError("Invalid archive session");
+			return {
+				sessionId: row.sessionId,
+				title: row.title,
+				workspaceId: row.workspaceId,
+				workspaceTitle: row.workspaceTitle,
+				updatedAt: row.updatedAt,
+				createdAt: row.createdAt
+			};
+		});
+		return {
+			complete: value.complete,
+			workspaces,
+			sessions
+		};
+	} })
+};
+function archiveRpc(method, fields) {
+	return {
+		id: `power-dsh#powerDsh/${method}`,
+		service: "powerDsh",
+		namespace: "powerDsh",
+		method,
+		invocation: { kind: "direct" },
+		parameters: fields.map((name) => ({
+			name,
+			wire: name,
+			source: "json",
+			codec: stringCodec
+		})),
+		result: archiveCatalogCodec
+	};
+}
+const LIST_ARCHIVED_SESSIONS_RPC = archiveRpc("listArchivedSessions", []);
+const RESTORE_ARCHIVED_SESSION_RPC = archiveRpc("restoreArchivedSession", ["sessionId"]);
+const DELETE_ARCHIVED_SESSION_RPC = archiveRpc("deleteArchivedSession", ["sessionId"]);
+const rpc = [
+	LIST_ARCHIVED_SESSIONS_RPC,
+	RESTORE_ARCHIVED_SESSION_RPC,
+	DELETE_ARCHIVED_SESSION_RPC
+];
+
+// src/features/whale-motion/definition.ts
+const definition = Object.freeze({
+	id: "whale-motion",
+	category: "interface",
+	order: 5.5,
+	keys: Object.freeze(["whaleMotionEnabled"]),
+	spec: "src/features/whale-motion/spec.md"
+});
+
+// src/features/whale-motion/config.ts
 var config_exports = /* @__PURE__ */ __exportAll({ configFields: () => configFields });
-const configFields = { flowingBackgroundEnabled: z.boolean().default(false).volatile() };
+const configFields = { whaleMotionEnabled: z.boolean().default(false).volatile() };
 
 // src/app/host-features.ts
 const HOST_FEATURES = Object.freeze([
+	{
+		definition,
+		...config_exports
+	},
+	{
+		definition: definition$18,
+		...config_exports$18
+	},
+	{
+		definition: definition$17,
+		...config_exports$17
+	},
 	{
 		definition: definition$16,
 		...config_exports$16
 	},
 	{
 		definition: definition$15,
-		...config_exports$15
+		...config_exports$15,
+		...host_exports$12,
+		rpc: rpc$12
 	},
 	{
 		definition: definition$14,
-		...config_exports$14
+		...config_exports$14,
+		...host_exports$11,
+		rpc: rpc$11
 	},
 	{
 		definition: definition$13,
@@ -3179,27 +3685,23 @@ const HOST_FEATURES = Object.freeze([
 	},
 	{
 		definition: definition$4,
-		...config_exports$4,
+		...config_exports$4
+	},
+	{
+		definition: definition$3,
+		...config_exports$3
+	},
+	{
+		definition: definition$2,
+		...config_exports$2,
 		...host_exports$1,
 		rpc: rpc$1
 	},
 	{
-		definition: definition$3,
-		...config_exports$3,
+		definition: definition$1,
+		...config_exports$1,
 		...host_exports,
 		rpc
-	},
-	{
-		definition: definition$2,
-		...config_exports$2
-	},
-	{
-		definition: definition$1,
-		...config_exports$1
-	},
-	{
-		definition,
-		...config_exports
 	}
 ]);
 
@@ -3231,7 +3733,13 @@ const MOD_RPC = composeRpc([
 	LIST_SKILLS_RPC,
 	SET_SKILL_ENABLED_RPC,
 	LIST_MCP_SERVERS_RPC,
-	SET_MCP_SERVER_ENABLED_RPC
+	SET_MCP_SERVER_ENABLED_RPC,
+	LIST_ARCHIVED_SESSIONS_RPC,
+	RESTORE_ARCHIVED_SESSION_RPC,
+	DELETE_ARCHIVED_SESSION_RPC,
+	READ_WALLPAPER_RPC,
+	SAVE_WALLPAPER_RPC,
+	CLEAR_WALLPAPER_RPC
 ]);
 
 // src/app/settings-tool.ts

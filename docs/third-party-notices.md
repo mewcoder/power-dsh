@@ -96,11 +96,17 @@ Mod 使用已核对的 DSH `0.2.2-rc.1` 原生会话、交互及 subprocess 通�
 
 本功能的信号格、循环序列与点击提交均为独立实现；接口依据为 DSH `0.2.2-rc.1` 安装包只读源码，未执行参考仓库脚本或安装其依赖、插件。行为边界见[推理等级选择器](../src/features/thinking-effort/spec.md)。
 
-## 官网流动背景参考
+## 自定义背景参考
 
-[官网流动背景](../src/features/flowing-background/spec.md)参考 [DeepSeek 首页](https://www.deepseek.com/)及市场中的 [Tim5613/dsh-homepage-glass](https://github.com/Tim5613/dsh-homepage-glass/tree/a9bb39e7a9ceb1a83b1467312076f786d6e30fa0)，确切提交 `a9bb39e7a9ceb1a83b1467312076f786d6e30fa0`、包版本 `1.3.1`。阅读其 README、LICENSE 与 `lib/client.js` 中的 FLOW_PARAMS、颜色混合、时间归一化和遮罩；核对蓝白三色、softness 100 的两级宽范围混色、八次旋涡、坐标缩放与慢速流动。该插件背景本身没有 CSS blur，其 `backdrop-filter:blur(14px)` 属于输入卡，未搬入 PowerDSH。官网当前使用有界周期相位，参数也已对照。PowerDSH 独立编写值噪声、旋涡、颜色合成及相位实现，不引入依赖或远程资源。参考插件自身声明 MIT，但同时声明官网 GLSL 为逐字提取；其外层 MIT 不作为官网源码的独立再分发许可，因此没有复制该 shader、皮肤全局 CSS 或宿主 DOM 接入代码。底部采用官网归零遮罩，没有采用参考插件保留 30% 蓝色的改版。WebGL 不可用或上下文丢失时显示自有 CSS 渐变。
+本轮按用户要求结合下列三个实现的职责划分：`dsh-ui-appearance@0.1.28`（提交 `fe6d9b930b9554e99b7fcdd44c8628afc2e1191a`）的媒体淡化／模糊与界面玻璃分离；`dsh-homepage-glass@1.3.1`（提交 `a9bb39e7a9ceb1a83b1467312076f786d6e30fa0`）的动效节流、减少动效和 GPU 回收；`dsh-mpkg-wallpaper`（提交 `ab8d50db9b4a29916be7ba8b45aed452ee80d538`）的零值语义、表面／媒体归属与避免滤镜影响 fixed 弹层定位。PowerDSH 使用「背景淡化」「背景模糊」描述已有功能，保留官方组件样式、Host 图片存储、自有图层范围和旧配置；仅作源码研究，未复制第三方样式、着色器或渲染器，也未安装或执行这些插件。各来源链接、许可与边界见下文。
 
-全局底层接入另外参考该提交中 `lib/client.js` 的挂载、负层级与结构背景透出思路（416–493 行的布局说明与 `.dhps_flow`，642 行的 `host.appendChild(canvas)`）。参考插件直接处理整页框架/内容列透明度、主题 token 与输入卡片；PowerDSH 没有复制其全局 CSS、卡片样式或宿主 DOM 接入代码。用户已授权独立编写范围受控的 AppFrame 底层适配。初版采用 npm `0.2.2-rc.1` 包中的类名，但直接读取已安装桌面包发现同版 `@deepseek-ai/dsh-client-ui-layout` 的样式及类映射（第 74、83–93 行）使用 `PIRFFq_frame`、`PIRFFq_sidebarCol`、`PIRFFq_centerCol`，`@deepseek-ai/dsh-client-ui-sidebar` 第 116–125 行使用 `kB3qhq_root`，与 npm 包的 `pI_x6G_*`、`hHd-Xa_root` 不同；构建差异导致固定选择器无法命中。当前必需框架映射只读自已加载的两个精确官方 `style[data-plugin-css]` 标签 `@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css`、`@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css`，要求标签及所需简单后缀类名唯一，再核对语义直接子元素和定位布局；不复制、重新注入这些官方样式，也不扫描任意样式表。只对主 Spec 列明的结构表面设置内联透明背景，不将全局主题 token 或任意后代改为透明；输入卡片、编辑器、文件卡片、菜单和弹窗保留原生表面。同一框架的映射或目标表面替换只刷新适配，框架替换或关闭时按原值、优先级与所有权恢复。授权范围、窄窗口抽屉保护、延迟样式恢复、失败保护和验收限制见[官网流动背景 Spec](../src/features/flowing-background/spec.md)。本次未适配操作系统原生标题栏，也未强制清空其他面板的独立不透明内容表面；浏览器未连接，本次映射修复后的全局实屏效果尚未验收。
+按用户指定，只读核对 [TQSY114514/dsh-ui-appearance](https://github.com/TQSY114514/dsh-ui-appearance/tree/fe6d9b930b9554e99b7fcdd44c8628afc2e1191a)，包 `0.1.28`、提交 `fe6d9b930b9554e99b7fcdd44c8628afc2e1191a`、MIT（Copyright (c) 2026 TQSY114514）。阅读 README、LICENSE、媒体存储与 `applier.ts`，参考媒体层不透明度／背景模糊分离、模糊画面留边、异步图片身份校验与释放的实现思路。最终保持画面原尺寸，只应用背景模糊滤镜，避免外扩 cover 容器引入额外放大裁切；保留既有 Host profile 图片存储和官方公共组件；未移植其样式表、全局主题覆写、视频／URL／配色功能或 IndexedDB 存储，也未执行其安装脚本、构建或安装该插件。
+
+调节面板的尺寸与排版适配自官方提交 `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` 的 [Modal.module.css](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/client/ui-primitives/src/Modal.module.css)，独立背景材质层参考同提交的 [MenuSurface.module.css](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/client/ui-primitives/src/MenuSurface.module.css)。Copyright (c) 2026 DeepSeek，适用本文开头完整保留的 MIT 许可证。使用本功能自有类名与更低底色不透明度，不运行时导入内部样式模块；关闭、更换与移除操作复用公开 `Button`。
+
+[自定义背景](../src/features/flowing-background/spec.md)参考 [DeepSeek 首页](https://www.deepseek.com/)及市场中的 [Tim5613/dsh-homepage-glass](https://github.com/Tim5613/dsh-homepage-glass/tree/a9bb39e7a9ceb1a83b1467312076f786d6e30fa0)，确切提交 `a9bb39e7a9ceb1a83b1467312076f786d6e30fa0`、包版本 `1.3.1`。阅读其 README、LICENSE 与 `lib/client.js` 中的 FLOW_PARAMS、颜色混合、时间归一化和遮罩；核对蓝白三色、softness 100 的两级宽范围混色、八次旋涡、坐标缩放与慢速流动。该插件背景本身没有 CSS blur，其 `backdrop-filter:blur(14px)` 属于输入卡，未搬入 PowerDSH。官网当前使用有界周期相位，参数也已对照。PowerDSH 独立编写值噪声、旋涡、颜色合成及相位实现，不引入依赖或远程资源。参考插件自身声明 MIT，但同时声明官网 GLSL 为逐字提取；其外层 MIT 不作为官网源码的独立再分发许可，因此没有复制该 shader、皮肤全局 CSS 或宿主 DOM 接入代码。底部采用官网归零遮罩，没有采用参考插件保留 30% 蓝色的改版。WebGL 不可用或上下文丢失时显示自有 CSS 渐变。
+
+全局底层接入另外参考该提交中 `lib/client.js` 的挂载、负层级与结构背景透出思路（416–493 行的布局说明与 `.dhps_flow`，642 行的 `host.appendChild(canvas)`）。参考插件直接处理整页框架/内容列透明度、主题 token 与输入卡片；PowerDSH 没有复制其全局 CSS、卡片样式或宿主 DOM 接入代码。用户已授权独立编写范围受控的 AppFrame 底层适配。初版采用 npm `0.2.2-rc.1` 包中的类名，但直接读取已安装桌面包发现同版 `@deepseek-ai/dsh-client-ui-layout` 的样式及类映射（第 74、83–93 行）使用 `PIRFFq_frame`、`PIRFFq_sidebarCol`、`PIRFFq_centerCol`，`@deepseek-ai/dsh-client-ui-sidebar` 第 116–125 行使用 `kB3qhq_root`，与 npm 包的 `pI_x6G_*`、`hHd-Xa_root` 不同；构建差异导致固定选择器无法命中。当前必需框架映射只读自已加载的两个精确官方 `style[data-plugin-css]` 标签 `@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css`、`@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css`，要求标签及所需简单后缀类名唯一，再核对语义直接子元素和定位布局；不复制、重新注入这些官方样式，也不扫描任意样式表。只对主 Spec 列明的结构表面设置内联透明背景，不将全局主题 token 或任意后代改为透明；输入卡片、编辑器、文件卡片、菜单和弹窗保留原生表面。同一框架的映射或目标表面替换只刷新适配，框架替换或关闭时按原值、优先级与所有权恢复。授权范围、窄窗口抽屉保护、延迟样式恢复、失败保护和验收限制见[自定义背景 Spec](../src/features/flowing-background/spec.md)。本次未适配操作系统原生标题栏，也未强制清空其他面板的独立不透明内容表面；浏览器未连接，本次映射修复后的全局实屏效果尚未验收。
 
 用户反馈底部 `_fade` 阴影后，另直接只读核对已安装 `0.2.2-rc.1` 官方工作区 Client 的 `WorkspaceBrowser.module.css` 标签、类名映射及分组/平铺/搜索结果渲染结构：原生底部 span.fade 为 24px 渐变，macOS 隐藏。PowerDSH 未复制或重新注入官方样式，仅增加精确模块元数据的可选读取和受控目标的 display 隐藏/恢复；动态哈希和授权范围见功能 Spec。
 
@@ -108,13 +114,26 @@ Mod 使用已核对的 DSH `0.2.2-rc.1` 原生会话、交互及 subprocess 通�
 
 开发前从 [dsh-market](https://dshmarket.com/browse/)检索并浅克隆 [XHR666/dsh-mpkg-wallpaper](https://github.com/XHR666/dsh-mpkg-wallpaper/tree/ab8d50db9b4a29916be7ba8b45aed452ee80d538)，提交 `ab8d50db9b4a29916be7ba8b45aed452ee80d538`，阅读 README、许可证与 Client 壁纸相关模块。仓库主体 MIT，渲染部分另有 GPL-3.0-or-later 声明；这里只对照动态装饰、暂停与背景接入的功能边界，没有复制或改编其代码，也未采用宿主 DOM/CSS 透明化及布局改写方式，未运行其脚本或安装其依赖。
 
+## 归档管理插件参考
+
+[归档管理](../src/features/archive/spec.md)开发前从 [dsh-market](https://dshmarket.com/browse/) 检索并浅克隆 [MichengAI/dsh-archive-manager](https://github.com/MichengAI/dsh-archive-manager/tree/c2146d58cfb23066a2df26221bf78de4b4b0cc78)，提交 `c2146d58cfb23066a2df26221bf78de4b4b0cc78`，Apache-2.0。参考「按工作区分组 + 搜索 + 排序/项目筛选 + 取消归档 + 二次确认删除」的信息结构。其删除依赖私有 `locate()` 及内部记账/投影清理，本项目没有复制其代码或样式，改用公开 `sessionPersistence.stat().location.path` 定位转录产物并由 Host 文件系统删除，未采用其自动归档与保留时长。PowerDSH 的归档读取由 Host 侧 `workspaceController.follow` 基线配合 `sessionQuery.readTitleSnapshots` 完成，恢复走原生 `unarchiveSession`。
+
+## 鲸鱼动效
+
+[鲸鱼动效](../src/features/whale-motion/spec.md)使用 DeepSeek Harness `0.2.2-rc.1` 的公开 `FishLogo` 几何（`FISH_LOGO_PATH` 与 `23.16 × 17.04` 画布），来自官方标签 `dsh-v0.2.2-rc.1`、提交 `66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db` 的 `packages/client/ui-primitives/src/FishLogo.tsx`，已与本机实际发行包核对。Copyright (c) 2026 DeepSeek，适用本文开头完整保留的 MIT 许可证。尾部形变与循环节奏独立实现，不复制官方动画或第三方动画资源。
+
+开发前检索 [dsh-market](https://dshmarket.com/browse/)，浅克隆并阅读 [qiweiii/dsh-brand-studio](https://github.com/qiweiii/dsh-brand-studio/tree/793a8c3999cd4ad2e5aef4c5acab019ffccd5143)（包 `0.0.4`）的 `src/client/index.tsx` 及包清单，参考品牌图形与字标独立 slot 的功能边界。该快照未见 LICENSE 或明确许可字段，因此没有复制代码、样式或图片，也未执行脚本、安装依赖或插件。运行接口依据来自已安装的官方 `ui-sidebar`、`ui-brand-official` 与 Web shell 的 single slot 优先级/释放实现，不以第三方声明代替兼容验证。
+
 ## Lucide Puzzle、Sparkles 与 Cable
 
-[Mod 图标](../assets/icon.svg)与 Mod 设置导航使用 Lucide Puzzle；[技能与 MCP 设置导航](../src/client.ts)分别使用 Lucide Sparkles 和 Cable。仅内联所需 SVG，不引入 Lucide 运行时依赖。图形使用约定见 [UI 规范](ui.md#logo-与图标)，独立 SVG 中也保留完整许可。
+[Mod 图标](../assets/icon.svg)与 Mod 设置导航使用 Lucide Puzzle；[技能与 MCP 设置导航](../src/client.ts)分别使用 Lucide Sparkles 和 Cable；[归档设置导航](../src/features/archive/client.ts)使用 Lucide Archive、Folder 与 Trash。仅内联所需 SVG，不引入 Lucide 运行时依赖。图形使用约定见 [UI 规范](ui.md#logo-与图标)，独立 SVG 中也保留完整许可。
 
 - [Puzzle 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/puzzle.svg)
 - [Sparkles 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/sparkles.svg)
 - [Cable 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/cable.svg)
+- [Archive 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/archive.svg)
+- [Folder 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/folder.svg)
+- [Trash 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/trash-2.svg)
 - [上游许可证](https://raw.githubusercontent.com/lucide-icons/lucide/main/LICENSE)
 - 获取日期：2026-11-07。
 
@@ -135,3 +154,7 @@ WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
+
+「透明度」「毛玻璃」两行设置的交互参考同目录 wallpaper 插件与 homepage-glass：wallpaper 以 0–100 的整屏磨砂与表面透明度滑块、homepage-glass 以卡片 `backdrop-filter: blur(14px) saturate(1.5)` 与固定半透明底色呈现毛玻璃，并在系统「减少透明」时退回不透明。PowerDSH 只借鉴其「磨砂 + 透明度」的思路，用自有图层 `opacity` 与 Canvas `filter: blur()` 实现，未复制其滑块组件、样式表或 DOM 接入代码。
+
+「自定义壁纸」的存储与上传交互参考同目录 wallpaper 插件的本地文件导入思路（本地读取、不自动上传、校验类型与体积）。PowerDSH 未复制其渲染器、壁纸库或界面代码，只实现单个壁纸文件的本地上传、校验与读取；图片保存在用户自己的 DSH profile 内，不上传任何远端。

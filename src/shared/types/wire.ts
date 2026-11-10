@@ -53,6 +53,16 @@ export interface PersonalizationFile {
   revision: string;
 }
 
+export interface WallpaperAsset {
+  name: string;
+  mime: string;
+  bytes: number;
+  dataUrl: string;
+}
+export interface WallpaperCleared {
+  cleared: true;
+}
+
 export interface SoundEntry {
   id: string;
   name: string;
@@ -70,3 +80,21 @@ export interface RestartStatus {
   error: '' | 'restartFailed';
 }
 export interface RestartAccepted { accepted: true }
+
+export interface ArchiveWorkspaceRow {
+  workspaceId: string;
+  title: string;
+}
+export interface ArchiveSessionRow {
+  sessionId: string;
+  title: string;
+  workspaceId: string;
+  workspaceTitle: string;
+  updatedAt: number;
+  createdAt: number;
+}
+export interface ArchiveCatalog {
+  complete: boolean;
+  workspaces: ArchiveWorkspaceRow[];
+  sessions: ArchiveSessionRow[];
+}

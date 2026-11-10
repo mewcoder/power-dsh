@@ -7,7 +7,7 @@ test('refresh preference reveals the shared horizontal menu and only selecting R
   let stopped = 0;
   const app = await mount({ themeAvailable: false, reload: () => { reloads++; } });
   assert.equal(app.renderHeader(), null);
-  const toggle = descendants(app.renderSettings()).find(node => node.props.id === 'settings-test-showRefreshButton');
+  const toggle = descendants(app.selectSettingsTab('other')).find(node => node.props.id === 'settings-test-showRefreshButton');
   await toggle.props.onClick();
   assert.equal(reloads, 0);
   assert.deepEqual(app.rpcCalls, []);
