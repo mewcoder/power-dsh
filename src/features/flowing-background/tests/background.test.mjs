@@ -525,3 +525,19 @@ test('settings snapshots keep a stable identity so the real store cannot re-rend
   }
   app.unmount();
 });
+
+test('wallpaper actions use the shipped sprite glyphs as icon-only controls', async () => {
+  const app = await mount({ wallpaper: { name: 'sky.png', mime: 'image/png', bytes: 4, dataUrl: PNG } });
+  app.set({ flowingBackgroundEnabled: true, flowingBackgroundKind: 'wallpaper' });
+  await openTune(app);
+  const icons = () => descendants(app.renderTunePanel()).filter(node => node.type === 'button'
+    && typeof node.props.className === 'string' && node.props.className.includes('power-dsh-wallpaper-icon'));
+  assert.equal(icons().length, 2, 'Replace and remove are the only row actions.');
+  assert.deepEqual(icons().map(node => node.props['aria-label']),
+    ['flowingBackgroundWallpaperReplace', 'flowingBackgroundWallpaperRemove']);
+  const glyphs = icons().map(node => descendants(node).find(child => child.props?.glyph)?.props.glyph);
+  assert.deepEqual(glyphs, ['edit-outline', 'trash-outline'], 'Both reuse the host icon sprite.');
+  assert.ok(icons().every(node => node.props.children.some(child => typeof child !== 'string')),
+    'Neither action renders a text label.');
+  app.unmount();
+});

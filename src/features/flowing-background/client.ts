@@ -42,7 +42,7 @@ function readImage(file: File): Promise<string> {
 }
 
 export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironment) {
-  const { React, h, Button, Tooltip, observable, useSnapshot, errorFeedback } = runtime;
+  const { React, h, Button, Tooltip, NativeIcon, observable, useSnapshot, errorFeedback } = runtime;
   const { ctx, t, source } = env;
   let fault: { issue: AttachmentFailure; observedAt: string } | null = null;
   const attachment = observable(() => fault);
@@ -385,24 +385,21 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
           h('span', { id: `${control}-description`, className: 'power-dsh-wallpaper-hint' },
             t('flowingBackgroundWallpaperDescription')))),
       h('div', { className: 'power-dsh-wallpaper-actions', role: 'group', 'aria-labelledby': `${control}-label` },
+        // Icon-only actions follow the native modal close button: a 28x28
+        // transparent control with a hover fill and the shipped sprite glyph.
         h(Tooltip, { label: t(asset.value ? 'flowingBackgroundWallpaperReplace' : 'flowingBackgroundWallpaperChoose'), side: 'top', portal: true },
-          h(Button, {
-            type: 'button', variant: 'ghost', size: 'sm', className: 'power-dsh-wallpaper-icon', disabled: disabled || busy,
+          h('button', {
+            type: 'button', className: 'power-dsh-wallpaper-icon', disabled: disabled || busy,
             'aria-label': t(asset.value ? 'flowingBackgroundWallpaperReplace' : 'flowingBackgroundWallpaperChoose'),
             'aria-describedby': `${control}-description${failure ? ` ${control}-error` : ''}`,
             'aria-busy': busy, onClick: choose,
-          }, h('svg', { width: 15, height: 15, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
-            strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, focusable: false },
-            h('path', { d: 'M2.5 11.5V13h1.5l7-7-1.5-1.5-7 7Z' }),
-            h('path', { d: 'M11.5 3.5 12 3a1.06 1.06 0 0 1 1.5 1.5l-.5.5-1.5-1.5Z' })))),
+          }, h(NativeIcon, { glyph: 'edit-outline' }))),
         asset.value && h(Tooltip, { label: t('flowingBackgroundWallpaperRemove'), side: 'top', portal: true },
-          h(Button, {
-            type: 'button', variant: 'ghost', size: 'sm', className: 'power-dsh-wallpaper-icon is-danger',
+          h('button', {
+            type: 'button', className: 'power-dsh-wallpaper-icon is-danger',
             'aria-label': t('flowingBackgroundWallpaperRemove'),
             disabled: disabled || busy, onClick: remove,
-          }, h('svg', { width: 15, height: 15, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
-            strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, focusable: false },
-            h('path', { d: 'M2.5 4h11M6 4V2.5h4V4M4 4l.6 9a1 1 0 0 0 1 1h4.8a1 1 0 0 0 1-1L12 4' })))),
+          }, h(NativeIcon, { glyph: 'trash-outline' }))),
         h('input', {
           ref: (element: HTMLInputElement | null) => { fileInput = element; },
           type: 'file', className: 'power-dsh-wallpaper-input', tabIndex: -1,

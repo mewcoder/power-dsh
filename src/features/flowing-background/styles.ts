@@ -36,7 +36,12 @@ export const settingsStyles = `
 .power-dsh-wallpaper-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-primary); font-size:13px; line-height:18px; }
 .power-dsh-wallpaper-hint { color:var(--dsw-alias-label-tertiary); font-size:11px; line-height:16px; }
 .power-dsh-wallpaper-actions { display:flex; flex:none; align-items:center; gap:2px; }
-.power-dsh-wallpaper-icon { flex:none; width:26px; height:26px; padding:0; color:var(--dsw-alias-label-tertiary); }
+/* Mirrors the native modal close control: 28x28, transparent, hover fill only. */
+.power-dsh-wallpaper-icon { flex:none; display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border:0; border-radius:var(--dsw-radius-sm); padding:0; background:transparent; color:var(--dsw-alias-label-secondary); cursor:pointer; }
+@media (hover:hover) { .power-dsh-wallpaper-icon:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover); } }
+.power-dsh-wallpaper-icon:active:not(:disabled) { background:var(--dsw-alias-interactive-bg-active); }
+.power-dsh-wallpaper-icon:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary)); outline-offset:2px; }
+.power-dsh-wallpaper-icon:disabled { opacity:.4; cursor:not-allowed; }
 .power-dsh-wallpaper-icon.is-danger:hover:not(:disabled) { color:var(--dsw-alias-state-error-primary); }
 :is(.power-dsh-page, .power-dsh-background-panel) .power-dsh-wallpaper-input { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
 `;
