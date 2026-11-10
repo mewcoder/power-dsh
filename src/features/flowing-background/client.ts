@@ -42,7 +42,7 @@ function readImage(file: File): Promise<string> {
 }
 
 export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironment) {
-  const { React, h, Button, Tooltip, observable, useSnapshot, errorFeedback } = runtime;
+  const { React, h, Menu, Button, Tooltip, observable, useSnapshot, errorFeedback } = runtime;
   const { ctx, t, source } = env;
   let fault: { issue: AttachmentFailure; observedAt: string } | null = null;
   const attachment = observable(() => fault);
@@ -145,6 +145,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     id: 'power-dsh-flowing-background', order: -100, locale: env.namespace,
   }, Background);
 
+  let kindMenuOpen = false;
+  const setKindMenu = (next: boolean) => { if (kindMenuOpen !== next) kindMenuOpen = next; };
   let panelState = { open: false, kind: 'pattern' as BackgroundKind, opacity: 100, blur: 0, saving: false, error: '' };
   const panelStore = observable(() => panelState);
   const publishPanel = (patch: Partial<typeof panelState>) => {
@@ -160,7 +162,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     leave();
     if (kind === 'wallpaper' && wallpaper.status === 'idle') void loadWallpaper();
   };
-  const finishPanel = () => publishPanel({ open: false, error: '' });
+  const finishPanel = () => { setKindMenu(false); publishPanel({ open: false, error: '' }); };
   const savePanel = async (): Promise<boolean> => {
     if (!active || !panelState.open || panelState.saving) return false;
     const snapshot = source.getSnapshot();
@@ -247,21 +249,40 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         operation: 'background.tune', retry: async () => { await commitPanel(); } })));
   }
 
-  /** Background type as a two-option segmented control inside the panel. */
+  /**
+   * Background type as the host Menu dropdown, matching every other selector in
+   * settings. Choosing a type only previews; the panel saves it on close.
+   */
   function kindChoice(current: BackgroundKind, disabled: boolean) {
+    const control = 'power-dsh-background-kind';
     return h('div', { className: 'power-dsh-background-panel-section' },
-      h('div', { className: 'power-dsh-background-panel-section-title' }, t('flowingBackgroundKind')),
-      h('div', { className: 'power-dsh-background-kind', role: 'radiogroup', 'aria-label': t('flowingBackgroundKind') },
-        ...KINDS.map(kind => h('button', {
-          key: kind, type: 'button', role: 'radio', 'aria-checked': current === kind,
-          className: 'power-dsh-background-kind-option', disabled,
-          onClick: () => {
-            if (disabled || !panelState.open || panelState.saving || panelState.kind === kind) return;
-            publishPanel({ kind });
-            // Loading the asset is a preview concern: switching types must not write.
-            if (kind === 'wallpaper' && wallpaper.status === 'idle') void loadWallpaper();
-          },
-        }, kindLabel(kind)))));
+      h('div', { className: 'power-dsh-background-panel-row' },
+        h('span', { id: `${control}-label`, className: 'power-dsh-background-panel-label' }, t('flowingBackgroundKind'))),
+      h(Menu, {
+        open: kindMenuOpen && !disabled,
+        align: 'end', portal: true, autoFocus: true, minWidthFromAnchor: true,
+        selectedId: current,
+        items: KINDS.map(kind => ({ id: kind, label: kindLabel(kind) })),
+        onClose: () => setKindMenu(false),
+        onSelect: next => {
+          setKindMenu(false);
+          if (next !== 'pattern' && next !== 'wallpaper') return;
+          if (!panelState.open || panelState.saving || panelState.kind === next) return;
+          publishPanel({ kind: next });
+          // Loading the asset is a preview concern: switching types must not write.
+          if (next === 'wallpaper' && wallpaper.status === 'idle') void loadWallpaper();
+        },
+        anchor: h(Button, {
+          type: 'button', variant: 'outline', size: 'md',
+          className: 'power-dsh-background-kind-select', id: control,
+          disabled, 'aria-labelledby': `${control}-label`,
+          'aria-haspopup': 'menu', 'aria-expanded': kindMenuOpen && !disabled,
+          onClick: () => { if (!disabled) setKindMenu(!kindMenuOpen); },
+        }, kindLabel(current), h('svg', {
+          width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', strokeWidth: 1.4,
+          strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, focusable: false,
+        }, h('path', { d: 'm4 6 4 4 4-4' }))),
+      }));
   }
 
   /**

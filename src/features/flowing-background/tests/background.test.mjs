@@ -5,6 +5,19 @@ import { mount, descendants } from '../../../../tests/helpers/client-fixture.mjs
 import { samplePatternMotion } from '../pattern.ts';
 
 const SLOT = 'shell.overlay:power-dsh-flowing-background';
+/** Choose one background type through the panel's native Menu dropdown. */
+async function chooseKind(app, kind) {
+  const nodes = () => descendants(app.renderTunePanel());
+  const trigger = nodes().find(node => node.props.className === 'power-dsh-background-kind-select');
+  assert.ok(trigger, 'The panel exposes a type dropdown.');
+  trigger.props.onClick();
+  const item = descendants(app.renderTunePanel())
+    .find(node => node.props.role === 'menuitem' && node.props['data-id'] === kind);
+  assert.ok(item, `The type menu offers ${kind}.`);
+  await item.props.onClick();
+  app.renderTunePanel();
+}
+
 async function openTune(app) {
   app.selectSettingsTab('interface');
   const trigger = descendants(app.renderSettings()).find(node => node.props.id === 'settings-test-flowingBackgroundTune');
@@ -376,14 +389,13 @@ test('the panel switches the background type and saves it on close', async () =>
   const app = await mount();
   app.set({ flowingBackgroundEnabled: true });
   await openTune(app);
-  const option = kind => descendants(app.renderTunePanel())
-    .find(node => node.props.role === 'radio' && [].concat(node.props.children).includes(kind));
-  assert.equal(option('flowingBackgroundKindPattern').props['aria-checked'], true, 'The pattern is the default type.');
-  assert.equal(option('flowingBackgroundKindWallpaper').props['aria-checked'], false);
+  const trigger = () => descendants(app.renderTunePanel())
+    .find(node => node.props.className === 'power-dsh-background-kind-select');
+  assert.ok([].concat(trigger().props.children).includes('flowingBackgroundKindPattern'), 'The pattern is the default type.');
   assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundKind, 'pattern',
-    'Switching the type previews without writing.');
-  option('flowingBackgroundKindWallpaper').props.onClick();
-  assert.equal(option('flowingBackgroundKindWallpaper').props['aria-checked'], true);
+    'Opening the panel never writes.');
+  await chooseKind(app, 'wallpaper');
+  assert.ok([].concat(trigger().props.children).includes('flowingBackgroundKindWallpaper'), 'The trigger shows the chosen type.');
   assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundKind, 'pattern',
     'Choosing a type alone does not write.');
   await descendants(app.renderTunePanel()).find(node => node.props.className === 'power-dsh-background-panel-close').props.onClick();
@@ -400,8 +412,7 @@ test('appearance is tunable for the built-in flow as well as a wallpaper', async
   assert.equal(slider().props.value, 40);
   assert.equal(descendants(app.renderTunePanel()).some(node => node.type === 'input' && node.props.type === 'file'), true,
     'A wallpaper offers its picker inside the panel.');
-  descendants(app.renderTunePanel()).find(node => node.props.role === 'radio'
-    && [].concat(node.props.children).includes('flowingBackgroundKindPattern')).props.onClick();
+  await chooseKind(app, 'pattern');
   assert.equal(descendants(app.renderTunePanel()).some(node => node.type === 'input' && node.props.type === 'file'), false,
     'Switching to the built-in flow hides the picker immediately.');
   await slider().props.onPointerUp();
@@ -419,19 +430,18 @@ test('the panel shows wallpaper controls only while the wallpaper type is select
   const nodes = () => descendants(app.renderTunePanel());
   const title = () => nodes().find(node => node.props.className === 'power-dsh-background-panel-title');
   const file = () => nodes().find(node => node.type === 'input' && node.props.type === 'file');
-  const choose = kind => nodes().find(node => node.props.role === 'radio' && [].concat(node.props.children).includes(kind));
   assert.ok([].concat(title().props.children).includes('flowingBackgroundTuneTitle'), 'One panel title covers both types.');
   assert.equal(nodes().filter(node => node.props.type === 'range').length, 2, 'Appearance is tunable for the built-in flow.');
   assert.equal(file(), undefined, 'Homepage flow has no wallpaper picker.');
   assert.equal(app.settingsProps().wallpaperSource.getSnapshot().status, 'idle', 'Opening homepage adjustment does not read the stored wallpaper.');
-  choose('flowingBackgroundKindWallpaper').props.onClick();
+  await chooseKind(app, 'wallpaper');
   await new Promise(setImmediate);
   assert.ok(file(), 'Selecting the wallpaper type reveals the picker.');
-  assert.ok(nodes().some(node => node.type === 'img' && node.props.src === PNG));
+  assert.ok(nodes().some(node => node.type === 'img' && node.props.src === PNG), 'The saved wallpaper previews.');
   const stalePicker = file();
   const staleRemove = nodes().find(node => node.type === 'button'
     && [].concat(node.props.children).includes('flowingBackgroundWallpaperRemove'));
-  choose('flowingBackgroundKindPattern').props.onClick();
+  await chooseKind(app, 'pattern');
   assert.equal(file(), undefined, 'Changing back hides even a cached wallpaper.');
   assert.equal(nodes().some(node => node.type === 'img'), false);
   await stalePicker.props.onChange({ currentTarget: { files: [{ name: 'other.png', type: 'image/png', size: 12, dataUrl: PNG }], value: 'x' } });

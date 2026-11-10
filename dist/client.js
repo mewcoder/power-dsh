@@ -4610,12 +4610,9 @@ void main() {
 .power-dsh-background-panel-section + .power-dsh-background-panel-section { padding-top: 16px; border-top: .5px solid var(--dsw-alias-border-l2); }
 .power-dsh-background-panel-section-title { font-size: 12px; line-height: 18px; font-weight: 500; color: var(--dsw-alias-label-secondary); }
 .power-dsh-background-panel-hint { margin: -4px 0 0; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); }
-/* Type choice as a segmented control: two options, one selected. */
-.power-dsh-background-kind { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; border-radius: var(--dsw-radius-md); background: var(--dsw-alias-bg-layer-1); }
-.power-dsh-background-kind-option { box-sizing: border-box; min-height: 30px; border: 0; border-radius: var(--dsw-radius-sm); padding: 0 10px; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 13px; cursor: pointer; }
-.power-dsh-background-kind-option[aria-checked="true"] { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); font-weight: 500; box-shadow: var(--dsw-elevation-raise); }
-.power-dsh-background-kind-option:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)); outline-offset: 2px; }
-.power-dsh-background-kind-option:disabled { opacity: .5; cursor: default; }
+/* Type choice as a full-width native menu trigger, matching the other selectors. */
+.power-dsh-background-panel .power-dsh-background-kind-select { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
+.power-dsh-background-panel .power-dsh-background-kind-select > svg { flex: none; color: var(--dsw-alias-label-tertiary); }
 .power-dsh-background-panel .power-dsh-setting-row { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding-top: 20px; border-top: .5px solid var(--dsw-alias-border-l2); }
 .power-dsh-background-panel .power-dsh-setting-label { font-size: 14px; line-height: 22px; }
 .power-dsh-background-panel .power-dsh-description { margin-top: 4px; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); }
@@ -5075,7 +5072,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		});
 	}
 	function createClientFeature$1(runtime, env) {
-		const { React, h, Button, Tooltip, observable, useSnapshot, errorFeedback } = runtime;
+		const { React, h, Menu, Button, Tooltip, observable, useSnapshot, errorFeedback } = runtime;
 		const { ctx, t, source } = env;
 		let fault = null;
 		const attachment = observable(() => fault);
@@ -5211,6 +5208,10 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			order: -100,
 			locale: env.namespace
 		}, Background);
+		let kindMenuOpen = false;
+		const setKindMenu = (next) => {
+			if (kindMenuOpen !== next) kindMenuOpen = next;
+		};
 		let panelState = {
 			open: false,
 			kind: "pattern",
@@ -5243,10 +5244,13 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			leave();
 			if (kind === "wallpaper" && wallpaper.status === "idle") loadWallpaper();
 		};
-		const finishPanel = () => publishPanel({
-			open: false,
-			error: ""
-		});
+		const finishPanel = () => {
+			setKindMenu(false);
+			publishPanel({
+				open: false,
+				error: ""
+			});
+		};
 		const savePanel = async () => {
 			if (!active || !panelState.open || panelState.saving) return false;
 			const snapshot = source.getSnapshot();
@@ -5352,25 +5356,60 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				}
 			})));
 		}
-		/** Background type as a two-option segmented control inside the panel. */
+		/**
+		* Background type as the host Menu dropdown, matching every other selector in
+		* settings. Choosing a type only previews; the panel saves it on close.
+		*/
 		function kindChoice(current, disabled) {
-			return h("div", { className: "power-dsh-background-panel-section" }, h("div", { className: "power-dsh-background-panel-section-title" }, t("flowingBackgroundKind")), h("div", {
-				className: "power-dsh-background-kind",
-				role: "radiogroup",
-				"aria-label": t("flowingBackgroundKind")
-			}, ...KINDS.map((kind) => h("button", {
-				key: kind,
-				type: "button",
-				role: "radio",
-				"aria-checked": current === kind,
-				className: "power-dsh-background-kind-option",
-				disabled,
-				onClick: () => {
-					if (disabled || !panelState.open || panelState.saving || panelState.kind === kind) return;
-					publishPanel({ kind });
-					if (kind === "wallpaper" && wallpaper.status === "idle") loadWallpaper();
-				}
-			}, kindLabel(kind)))));
+			const control = "power-dsh-background-kind";
+			return h("div", { className: "power-dsh-background-panel-section" }, h("div", { className: "power-dsh-background-panel-row" }, h("span", {
+				id: `${control}-label`,
+				className: "power-dsh-background-panel-label"
+			}, t("flowingBackgroundKind"))), h(Menu, {
+				open: kindMenuOpen && !disabled,
+				align: "end",
+				portal: true,
+				autoFocus: true,
+				minWidthFromAnchor: true,
+				selectedId: current,
+				items: KINDS.map((kind) => ({
+					id: kind,
+					label: kindLabel(kind)
+				})),
+				onClose: () => setKindMenu(false),
+				onSelect: (next) => {
+					setKindMenu(false);
+					if (next !== "pattern" && next !== "wallpaper") return;
+					if (!panelState.open || panelState.saving || panelState.kind === next) return;
+					publishPanel({ kind: next });
+					if (next === "wallpaper" && wallpaper.status === "idle") loadWallpaper();
+				},
+				anchor: h(Button, {
+					type: "button",
+					variant: "outline",
+					size: "md",
+					className: "power-dsh-background-kind-select",
+					id: control,
+					disabled,
+					"aria-labelledby": `${control}-label`,
+					"aria-haspopup": "menu",
+					"aria-expanded": kindMenuOpen && !disabled,
+					onClick: () => {
+						if (!disabled) setKindMenu(!kindMenuOpen);
+					}
+				}, kindLabel(current), h("svg", {
+					width: 16,
+					height: 16,
+					viewBox: "0 0 16 16",
+					fill: "none",
+					stroke: "currentColor",
+					strokeWidth: 1.4,
+					strokeLinecap: "round",
+					strokeLinejoin: "round",
+					"aria-hidden": true,
+					focusable: false
+				}, h("path", { d: "m4 6 4 4 4-4" })))
+			}));
 		}
 		/**
 		* One labelled slider. The control is a native `range`, so arrows, Home/End and

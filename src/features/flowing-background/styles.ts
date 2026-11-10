@@ -69,12 +69,9 @@ export const panelStyles = `
 .power-dsh-background-panel-section + .power-dsh-background-panel-section { padding-top: 16px; border-top: .5px solid var(--dsw-alias-border-l2); }
 .power-dsh-background-panel-section-title { font-size: 12px; line-height: 18px; font-weight: 500; color: var(--dsw-alias-label-secondary); }
 .power-dsh-background-panel-hint { margin: -4px 0 0; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); }
-/* Type choice as a segmented control: two options, one selected. */
-.power-dsh-background-kind { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; border-radius: var(--dsw-radius-md); background: var(--dsw-alias-bg-layer-1); }
-.power-dsh-background-kind-option { box-sizing: border-box; min-height: 30px; border: 0; border-radius: var(--dsw-radius-sm); padding: 0 10px; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 13px; cursor: pointer; }
-.power-dsh-background-kind-option[aria-checked="true"] { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); font-weight: 500; box-shadow: var(--dsw-elevation-raise); }
-.power-dsh-background-kind-option:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)); outline-offset: 2px; }
-.power-dsh-background-kind-option:disabled { opacity: .5; cursor: default; }
+/* Type choice as a full-width native menu trigger, matching the other selectors. */
+.power-dsh-background-panel .power-dsh-background-kind-select { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
+.power-dsh-background-panel .power-dsh-background-kind-select > svg { flex: none; color: var(--dsw-alias-label-tertiary); }
 .power-dsh-background-panel .power-dsh-setting-row { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding-top: 20px; border-top: .5px solid var(--dsw-alias-border-l2); }
 .power-dsh-background-panel .power-dsh-setting-label { font-size: 14px; line-height: 22px; }
 .power-dsh-background-panel .power-dsh-description { margin-top: 4px; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); }
