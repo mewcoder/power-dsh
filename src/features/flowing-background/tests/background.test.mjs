@@ -5,17 +5,14 @@ import { mount, descendants } from '../../../../tests/helpers/client-fixture.mjs
 import { samplePatternMotion } from '../pattern.ts';
 
 const SLOT = 'shell.overlay:power-dsh-flowing-background';
-/** Choose one background type through the panel's native Menu dropdown. */
+/** Choose one background type through the panel's radio group. */
 async function chooseKind(app, kind) {
-  const nodes = () => descendants(app.renderTunePanel());
-  const trigger = nodes().find(node => node.props.className === 'power-dsh-background-kind-select');
-  assert.ok(trigger, 'The panel exposes a type dropdown.');
-  trigger.props.onClick();
-  const item = descendants(app.renderTunePanel())
-    .find(node => node.props.role === 'menuitem' && node.props['data-id'] === kind);
-  assert.ok(item, `The type menu offers ${kind}.`);
-  await item.props.onClick();
+  const radio = descendants(app.renderTunePanel())
+    .find(node => node.type === 'input' && node.props.type === 'radio' && node.props.value === kind);
+  assert.ok(radio, `The panel offers the ${kind} radio.`);
+  radio.props.onChange();
   app.renderTunePanel();
+  await new Promise(setImmediate);
 }
 
 async function openTune(app) {
@@ -389,13 +386,15 @@ test('the panel switches the background type and saves it on close', async () =>
   const app = await mount();
   app.set({ flowingBackgroundEnabled: true });
   await openTune(app);
-  const trigger = () => descendants(app.renderTunePanel())
-    .find(node => node.props.className === 'power-dsh-background-kind-select');
-  assert.ok([].concat(trigger().props.children).includes('flowingBackgroundKindPattern'), 'The pattern is the default type.');
+  const radio = kind => descendants(app.renderTunePanel())
+    .find(node => node.type === 'input' && node.props.type === 'radio' && node.props.value === kind);
+  assert.equal(radio('pattern').props.checked, true, 'The pattern is the default type.');
+  assert.equal(radio('wallpaper').props.checked, false);
   assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundKind, 'pattern',
     'Opening the panel never writes.');
   await chooseKind(app, 'wallpaper');
-  assert.ok([].concat(trigger().props.children).includes('flowingBackgroundKindWallpaper'), 'The trigger shows the chosen type.');
+  assert.equal(radio('wallpaper').props.checked, true, 'The chosen radio is checked.');
+  assert.equal(radio('pattern').props.checked, false);
   assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundKind, 'pattern',
     'Choosing a type alone does not write.');
   await descendants(app.renderTunePanel()).find(node => node.props.className === 'power-dsh-background-panel-close').props.onClick();

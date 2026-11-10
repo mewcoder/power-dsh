@@ -4614,9 +4614,14 @@ void main() {
 .power-dsh-background-panel-section + .power-dsh-background-panel-section { padding-top: 16px; border-top: .5px solid var(--dsw-alias-border-l2); }
 .power-dsh-background-panel-section-title { font-size: 12px; line-height: 18px; font-weight: 500; color: var(--dsw-alias-label-secondary); }
 .power-dsh-background-panel-hint { margin: -4px 0 0; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); }
-/* Type choice as a full-width native menu trigger, matching the other selectors. */
-.power-dsh-background-panel .power-dsh-background-kind-select { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
-.power-dsh-background-panel .power-dsh-background-kind-select > svg { flex: none; color: var(--dsw-alias-label-tertiary); }
+/* Type choice as a plain radio group: two labelled options, no dropdown. */
+.power-dsh-background-kind { margin: 0; border: 0; padding: 0; }
+.power-dsh-background-kind > legend { padding: 0; }
+.power-dsh-background-radio { display: flex; align-items: center; gap: 8px; min-height: 26px; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 18px; cursor: pointer; }
+.power-dsh-background-radio input { flex: none; width: 14px; height: 14px; margin: 0; accent-color: var(--dsw-alias-brand-primary); cursor: pointer; }
+.power-dsh-background-radio input:disabled { cursor: default; }
+.power-dsh-background-radio input:disabled + .power-dsh-background-radio-label { opacity: .5; }
+.power-dsh-background-radio input:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)); outline-offset: 2px; }
 .power-dsh-background-panel .power-dsh-setting-row { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding-top: 20px; border-top: .5px solid var(--dsw-alias-border-l2); }
 .power-dsh-background-panel .power-dsh-setting-label { font-size: 14px; line-height: 22px; }
 .power-dsh-background-panel .power-dsh-description { margin-top: 4px; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); }
@@ -5074,7 +5079,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		});
 	}
 	function createClientFeature$1(runtime, env) {
-		const { React, h, Menu, Button, Tooltip, observable, useSnapshot, errorFeedback } = runtime;
+		const { React, h, Button, Tooltip, observable, useSnapshot, errorFeedback } = runtime;
 		const { ctx, t, source } = env;
 		let fault = null;
 		const attachment = observable(() => fault);
@@ -5210,10 +5215,6 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			order: -100,
 			locale: env.namespace
 		}, Background);
-		let kindMenuOpen = false;
-		const setKindMenu = (next) => {
-			if (kindMenuOpen !== next) kindMenuOpen = next;
-		};
 		let panelState = {
 			open: false,
 			kind: "pattern",
@@ -5246,13 +5247,10 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			leave();
 			if (kind === "wallpaper" && wallpaper.status === "idle") loadWallpaper();
 		};
-		const finishPanel = () => {
-			setKindMenu(false);
-			publishPanel({
-				open: false,
-				error: ""
-			});
-		};
+		const finishPanel = () => publishPanel({
+			open: false,
+			error: ""
+		});
 		const savePanel = async () => {
 			if (!active || !panelState.open || panelState.saving) return false;
 			const snapshot = source.getSnapshot();
@@ -5359,59 +5357,29 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			})));
 		}
 		/**
-		* Background type as the host Menu dropdown, matching every other selector in
-		* settings. Choosing a type only previews; the panel saves it on close.
+		* Background type as two radios in the panel. Choosing a type only previews;
+		* the panel saves it on close. Arrow keys move between the two options, which
+		* is what a native radio group does.
 		*/
 		function kindChoice(current, disabled) {
 			const control = "power-dsh-background-kind";
-			return h("div", { className: "power-dsh-background-panel-section" }, h("div", { className: "power-dsh-background-panel-row" }, h("span", {
-				id: `${control}-label`,
-				className: "power-dsh-background-panel-label"
-			}, t("flowingBackgroundKind"))), h(Menu, {
-				open: kindMenuOpen && !disabled,
-				align: "end",
-				portal: true,
-				autoFocus: true,
-				minWidthFromAnchor: true,
-				selectedId: current,
-				items: KINDS.map((kind) => ({
-					id: kind,
-					label: kindLabel(kind)
-				})),
-				onClose: () => setKindMenu(false),
-				onSelect: (next) => {
-					setKindMenu(false);
-					if (next !== "pattern" && next !== "wallpaper") return;
-					if (!panelState.open || panelState.saving || panelState.kind === next) return;
-					publishPanel({ kind: next });
-					if (next === "wallpaper" && wallpaper.status === "idle") loadWallpaper();
-				},
-				anchor: h(Button, {
-					type: "button",
-					variant: "outline",
-					size: "md",
-					className: "power-dsh-background-kind-select",
-					id: control,
-					disabled,
-					"aria-labelledby": `${control}-label`,
-					"aria-haspopup": "menu",
-					"aria-expanded": kindMenuOpen && !disabled,
-					onClick: () => {
-						if (!disabled) setKindMenu(!kindMenuOpen);
-					}
-				}, kindLabel(current), h("svg", {
-					width: 16,
-					height: 16,
-					viewBox: "0 0 16 16",
-					fill: "none",
-					stroke: "currentColor",
-					strokeWidth: 1.4,
-					strokeLinecap: "round",
-					strokeLinejoin: "round",
-					"aria-hidden": true,
-					focusable: false
-				}, h("path", { d: "m4 6 4 4 4-4" })))
-			}));
+			const choose = (next) => {
+				if (disabled || !panelState.open || panelState.saving || panelState.kind === next) return;
+				publishPanel({ kind: next });
+				if (next === "wallpaper" && wallpaper.status === "idle") loadWallpaper();
+			};
+			return h("fieldset", { className: "power-dsh-background-panel-section power-dsh-background-kind" }, h("legend", { className: "power-dsh-background-panel-section-title" }, t("flowingBackgroundKind")), ...KINDS.map((kind) => h("label", {
+				key: kind,
+				className: "power-dsh-background-radio"
+			}, h("input", {
+				type: "radio",
+				name: control,
+				value: kind,
+				id: `${control}-${kind}`,
+				checked: current === kind,
+				disabled,
+				onChange: () => choose(kind)
+			}), h("span", { className: "power-dsh-background-radio-label" }, kindLabel(kind)))));
 		}
 		/**
 		* One labelled slider. The control is a native `range`, so arrows, Home/End and

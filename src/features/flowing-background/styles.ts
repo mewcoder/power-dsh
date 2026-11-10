@@ -73,9 +73,14 @@ export const panelStyles = `
 .power-dsh-background-panel-section + .power-dsh-background-panel-section { padding-top: 16px; border-top: .5px solid var(--dsw-alias-border-l2); }
 .power-dsh-background-panel-section-title { font-size: 12px; line-height: 18px; font-weight: 500; color: var(--dsw-alias-label-secondary); }
 .power-dsh-background-panel-hint { margin: -4px 0 0; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); }
-/* Type choice as a full-width native menu trigger, matching the other selectors. */
-.power-dsh-background-panel .power-dsh-background-kind-select { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
-.power-dsh-background-panel .power-dsh-background-kind-select > svg { flex: none; color: var(--dsw-alias-label-tertiary); }
+/* Type choice as a plain radio group: two labelled options, no dropdown. */
+.power-dsh-background-kind { margin: 0; border: 0; padding: 0; }
+.power-dsh-background-kind > legend { padding: 0; }
+.power-dsh-background-radio { display: flex; align-items: center; gap: 8px; min-height: 26px; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 18px; cursor: pointer; }
+.power-dsh-background-radio input { flex: none; width: 14px; height: 14px; margin: 0; accent-color: var(--dsw-alias-brand-primary); cursor: pointer; }
+.power-dsh-background-radio input:disabled { cursor: default; }
+.power-dsh-background-radio input:disabled + .power-dsh-background-radio-label { opacity: .5; }
+.power-dsh-background-radio input:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)); outline-offset: 2px; }
 .power-dsh-background-panel .power-dsh-setting-row { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding-top: 20px; border-top: .5px solid var(--dsw-alias-border-l2); }
 .power-dsh-background-panel .power-dsh-setting-label { font-size: 14px; line-height: 22px; }
 .power-dsh-background-panel .power-dsh-description { margin-top: 4px; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); }
