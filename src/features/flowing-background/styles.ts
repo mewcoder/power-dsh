@@ -28,12 +28,16 @@ export const settingsStyles = `
 .power-dsh-page .power-dsh-slider { box-sizing:border-box; width:150px; margin:0; accent-color:var(--dsw-alias-state-business-primary); cursor:pointer; }
 .power-dsh-page .power-dsh-slider:disabled { opacity:.5; cursor:default; }
 .power-dsh-page .power-dsh-slider-value { min-width:44px; text-align:right; font-variant-numeric:tabular-nums; color:var(--dsw-alias-label-secondary); font-size:13px; }
-:is(.power-dsh-page, .power-dsh-background-panel) .power-dsh-wallpaper-field { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; }
-:is(.power-dsh-page, .power-dsh-background-panel) .power-dsh-wallpaper-details { display:flex; align-items:center; gap:12px; min-width:0; }
-:is(.power-dsh-page, .power-dsh-background-panel) .power-dsh-wallpaper-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; }
-:is(.power-dsh-page, .power-dsh-background-panel) .power-dsh-wallpaper-action { flex:none; white-space:nowrap; }
-:is(.power-dsh-page, .power-dsh-background-panel) .power-dsh-wallpaper-preview { display:block; width:56px; height:36px; border-radius:var(--dsw-radius-sm); object-fit:cover; border:.5px solid var(--dsw-alias-border-l4); }
-:is(.power-dsh-page, .power-dsh-background-panel) .power-dsh-wallpaper-name { max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-secondary); font-size:13px; }
+.power-dsh-wallpaper-row { display:flex; align-items:center; gap:10px; min-width:0; }
+.power-dsh-wallpaper-details { display:flex; flex:1 1 auto; align-items:center; gap:10px; min-width:0; }
+.power-dsh-wallpaper-thumb { flex:none; display:inline-flex; width:44px; height:30px; overflow:hidden; border-radius:var(--dsw-radius-sm); background:var(--dsw-alias-bg-layer-1); }
+.power-dsh-wallpaper-preview { display:block; width:100%; height:100%; object-fit:cover; }
+.power-dsh-wallpaper-copy { display:flex; flex-direction:column; gap:1px; min-width:0; }
+.power-dsh-wallpaper-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-primary); font-size:13px; line-height:18px; }
+.power-dsh-wallpaper-hint { color:var(--dsw-alias-label-tertiary); font-size:11px; line-height:16px; }
+.power-dsh-wallpaper-actions { display:flex; flex:none; align-items:center; gap:2px; }
+.power-dsh-wallpaper-icon { flex:none; width:26px; height:26px; padding:0; color:var(--dsw-alias-label-tertiary); }
+.power-dsh-wallpaper-icon.is-danger:hover:not(:disabled) { color:var(--dsw-alias-state-error-primary); }
 :is(.power-dsh-page, .power-dsh-background-panel) .power-dsh-wallpaper-input { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
 `;
 
@@ -75,9 +79,7 @@ export const panelStyles = `
 .power-dsh-background-panel .power-dsh-setting-row { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding-top: 20px; border-top: .5px solid var(--dsw-alias-border-l2); }
 .power-dsh-background-panel .power-dsh-setting-label { font-size: 14px; line-height: 22px; }
 .power-dsh-background-panel .power-dsh-description { margin-top: 4px; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); }
-.power-dsh-background-panel .power-dsh-wallpaper-name { flex: 1; min-width: 0; max-width: none; }
-.power-dsh-background-panel .power-dsh-wallpaper-preview { flex: none; width: 64px; height: 42px; }
 @media (max-width:360px) {
-  .power-dsh-background-panel .power-dsh-wallpaper-field { grid-template-columns:minmax(0,1fr); }
+  .power-dsh-background-panel .power-dsh-wallpaper-hint { display: none; }
 }
 `;

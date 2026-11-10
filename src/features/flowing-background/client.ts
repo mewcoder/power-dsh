@@ -382,36 +382,46 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       catch (failure) { setWallpaperError(errorMessage(failure) || t('flowingBackgroundWallpaperSaveFailed')); }
       finally { setPicking(false); }
     }
-    return h('div', { className: 'power-dsh-setting-row', key: 'flowingBackgroundWallpaper' },
-      h('div', { className: 'power-dsh-setting-copy' },
-        h('div', { id: `${control}-label`, className: 'power-dsh-setting-label' }, t('flowingBackgroundWallpaper')),
-        h('div', { id: `${control}-description`, className: 'power-dsh-description' }, t('flowingBackgroundWallpaperDescription')),
-        failure && errorFeedback({ t, id: `${control}-error`, message: failure,
-          code: 'PD-BACKGROUND-WALLPAPER', operation: 'saveWallpaper',
-          retry: asset.status === 'error' ? loadWallpaper : undefined })),
-      h('div', { className: 'power-dsh-wallpaper-field' },
-        h('div', { className: 'power-dsh-wallpaper-details' },
-        asset.value && h('img', {
-          className: 'power-dsh-wallpaper-preview', src: asset.value.dataUrl, alt: '',
-          'aria-hidden': true, draggable: false,
-        }),
-        h('span', { className: 'power-dsh-wallpaper-name', title: asset.value?.name },
-          asset.value ? asset.value.name : t('flowingBackgroundWallpaperEmpty'))),
-        h('div', { className: 'power-dsh-wallpaper-actions', role: 'group', 'aria-labelledby': `${control}-label` },
-        h(Button, {
-          type: 'button', variant: 'outline', size: 'sm', className: 'power-dsh-wallpaper-action', disabled: disabled || busy,
-          'aria-describedby': `${control}-description${failure ? ` ${control}-error` : ''}`,
-          'aria-busy': busy, onClick: choose,
-        }, t(asset.value ? 'flowingBackgroundWallpaperReplace' : 'flowingBackgroundWallpaperChoose')),
-        asset.value && h(Button, {
-          type: 'button', variant: 'outline', size: 'sm', className: 'power-dsh-wallpaper-action', disabled: disabled || busy,
-          onClick: remove,
-        }, t('flowingBackgroundWallpaperRemove'))),
+    // One row: thumbnail, name and a small caption on the left; compact icon
+    // actions on the right. The format hint is a caption, never a heading.
+    return h('div', { className: 'power-dsh-wallpaper-row', key: 'flowingBackgroundWallpaper' },
+      h('div', { className: 'power-dsh-wallpaper-details' },
+        h('span', { className: 'power-dsh-wallpaper-thumb', 'aria-hidden': true },
+          asset.value && h('img', {
+            className: 'power-dsh-wallpaper-preview', src: asset.value.dataUrl, alt: '', draggable: false,
+          })),
+        h('span', { className: 'power-dsh-wallpaper-copy' },
+          h('span', { id: `${control}-label`, className: 'power-dsh-wallpaper-name', title: asset.value?.name },
+            asset.value ? asset.value.name : t('flowingBackgroundWallpaperEmpty')),
+          h('span', { id: `${control}-description`, className: 'power-dsh-wallpaper-hint' },
+            t('flowingBackgroundWallpaperDescription')))),
+      h('div', { className: 'power-dsh-wallpaper-actions', role: 'group', 'aria-labelledby': `${control}-label` },
+        h(Tooltip, { label: t(asset.value ? 'flowingBackgroundWallpaperReplace' : 'flowingBackgroundWallpaperChoose'), side: 'top', portal: true },
+          h(Button, {
+            type: 'button', variant: 'ghost', size: 'sm', className: 'power-dsh-wallpaper-icon', disabled: disabled || busy,
+            'aria-label': t(asset.value ? 'flowingBackgroundWallpaperReplace' : 'flowingBackgroundWallpaperChoose'),
+            'aria-describedby': `${control}-description${failure ? ` ${control}-error` : ''}`,
+            'aria-busy': busy, onClick: choose,
+          }, h('svg', { width: 15, height: 15, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
+            strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, focusable: false },
+            h('path', { d: 'M2.5 11.5V13h1.5l7-7-1.5-1.5-7 7Z' }),
+            h('path', { d: 'M11.5 3.5 12 3a1.06 1.06 0 0 1 1.5 1.5l-.5.5-1.5-1.5Z' })))),
+        asset.value && h(Tooltip, { label: t('flowingBackgroundWallpaperRemove'), side: 'top', portal: true },
+          h(Button, {
+            type: 'button', variant: 'ghost', size: 'sm', className: 'power-dsh-wallpaper-icon is-danger',
+            'aria-label': t('flowingBackgroundWallpaperRemove'),
+            disabled: disabled || busy, onClick: remove,
+          }, h('svg', { width: 15, height: 15, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
+            strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, focusable: false },
+            h('path', { d: 'M2.5 4h11M6 4V2.5h4V4M4 4l.6 9a1 1 0 0 0 1 1h4.8a1 1 0 0 0 1-1L12 4' })))),
         h('input', {
           ref: (element: HTMLInputElement | null) => { fileInput = element; },
           type: 'file', className: 'power-dsh-wallpaper-input', tabIndex: -1,
           accept: ACCEPTED.join(','), 'aria-hidden': true, disabled: disabled || busy, onChange: picked,
-        })));
+        })),
+      failure && errorFeedback({ t, id: `${control}-error`, message: failure,
+        code: 'PD-BACKGROUND-WALLPAPER', operation: 'saveWallpaper',
+        retry: asset.status === 'error' ? loadWallpaper : undefined }));
   }
 
   function useSettings({ snapshot, disabled, saving, error, save, id, leaveSettings }: SettingsViewContext) {

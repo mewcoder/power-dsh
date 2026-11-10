@@ -440,7 +440,7 @@ test('the panel shows wallpaper controls only while the wallpaper type is select
   assert.ok(nodes().some(node => node.type === 'img' && node.props.src === PNG), 'The saved wallpaper previews.');
   const stalePicker = file();
   const staleRemove = nodes().find(node => node.type === 'button'
-    && [].concat(node.props.children).includes('flowingBackgroundWallpaperRemove'));
+    && typeof node.props.className === 'string' && node.props.className.includes('is-danger'));
   await chooseKind(app, 'pattern');
   assert.equal(file(), undefined, 'Changing back hides even a cached wallpaper.');
   assert.equal(nodes().some(node => node.type === 'img'), false);
@@ -486,8 +486,8 @@ test('removing the wallpaper clears it on the Host and returns to no image', asy
   app.selectSettingsTab('interface');
   app.set({ flowingBackgroundEnabled: true, flowingBackgroundKind: 'wallpaper' });
   await openTune(app);
-  const remove = () => descendants(app.renderTunePanel()).find(node => node.type === 'button' && node.props.className === 'power-dsh-wallpaper-action'
-    && node.props.children.includes('flowingBackgroundWallpaperRemove'));
+  const remove = () => descendants(app.renderTunePanel()).find(node => node.type === 'button'
+    && typeof node.props.className === 'string' && node.props.className.includes('power-dsh-wallpaper-icon is-danger'));
   assert.ok(remove());
   await remove().props.onClick();
   assert.deepEqual(app.wallpaperWrites, [{ cleared: true }]);
