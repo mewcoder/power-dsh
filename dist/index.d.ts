@@ -34,6 +34,7 @@ interface Preferences {
   flowingBackgroundKind: string;
   flowingBackgroundOpacity: number;
   flowingBackgroundBlur: number;
+  showBackgroundShortcut: boolean;
   archiveManagerEnabled: boolean;
 }
 type PreferenceKey = keyof Preferences;

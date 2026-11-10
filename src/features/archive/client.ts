@@ -37,17 +37,6 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       'aria-hidden': true, focusable: false,
     }, h('path', { d: 'M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2z' }));
   }
-  // Lucide Trash, ISC licensed; see docs/third-party-notices.md.
-  function TrashIcon({ size = 16 }: IconProps) {
-    return h('svg', {
-      width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
-      stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
-      'aria-hidden': true, focusable: false,
-    }, h('path', { d: 'M3 6h18' }),
-    h('path', { d: 'M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2' }),
-    h('path', { d: 'M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6' }),
-    h('path', { d: 'M10 11v6M14 11v6' }));
-  }
   const deleteErrorKeys = [
     'archiveDeleteUnavailable', 'archiveDeleteLive', 'archiveDeleteUnsupported', 'archiveDeleteUnsafe',
     'archiveNotArchived', 'archiveInvalidSession', 'archiveDeleteIncomplete', 'archiveDeleteCheckFailed',
@@ -150,25 +139,44 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const renderRow = (row: ArchiveSessionRow) => {
       const rowBusy = restoring === row.sessionId || deleting === row.sessionId;
       const time = row.updatedAt > 0 ? new Date(row.updatedAt).toLocaleString() : '';
+      const name = row.title || t('archiveUntitled');
       return h('li', { key: row.sessionId, className: 'power-dsh-archive-row', 'data-archive': row.sessionId },
         h('div', { className: 'power-dsh-archive-row-main' },
           h(Tooltip, { label: row.title || row.sessionId, side: 'top', portal: true, delayMs: 0, maxWidth: 480 },
-            h('span', { className: 'power-dsh-archive-row-title', tabIndex: 0 }, row.title || t('archiveUntitled'))),
+            h('span', { className: 'power-dsh-archive-row-title', tabIndex: 0 }, name)),
           time && h('span', { className: 'power-dsh-archive-row-time' }, time),
           error?.id === row.sessionId && errorFeedback({ t, id: `${row.sessionId}-error`, message: error.message,
             code: 'PD-ARCHIVE-ACTION', operation: 'archiveSession' })),
         h('div', { className: 'power-dsh-archive-row-actions' },
           h('button', {
-            type: 'button', className: 'power-dsh-archive-icon', 'data-danger': 'true',
-            'data-delete': row.sessionId, 'aria-label': t('archiveDelete'),
+            type: 'button', className: 'power-dsh-archive-action power-dsh-archive-action-danger',
+            'data-delete': row.sessionId, 'aria-label': `${t('archiveDelete')} ${name}`,
             disabled: disabled || rowBusy, 'aria-busy': deleting === row.sessionId,
             onClick: () => { if (mounted.current) setConfirming(row); },
-          }, h(TrashIcon)),
+          }, t(deleting === row.sessionId ? 'archiveDeleting' : 'archiveDelete')),
           h('button', {
-            type: 'button', className: 'power-dsh-prompt-action power-dsh-archive-restore',
-            'data-restore': row.sessionId, disabled: disabled || rowBusy, 'aria-busy': restoring === row.sessionId,
+            type: 'button', className: 'power-dsh-archive-action',
+            'data-restore': row.sessionId, 'aria-label': `${t('archiveRestore')} ${name}`,
+            disabled: disabled || rowBusy, 'aria-busy': restoring === row.sessionId,
             onClick: () => restore(row.sessionId),
-          }, t(rowBusy ? 'archiveRestoring' : 'archiveRestore'))));
+          }, t(restoring === row.sessionId ? 'archiveRestoring' : 'archiveRestore'))));
+    };
+    const renderGroup = (group: ArchiveGroup, index: number) => {
+      const titleId = `${id}-archive-group-${index}`;
+      const open = Boolean(query.trim()) || !closedGroups[group.key];
+      return h('section', { key: group.key, className: 'power-dsh-archive-group', 'aria-labelledby': titleId },
+        h('div', { className: 'power-dsh-archive-group-header' },
+          h('button', {
+            id: titleId, type: 'button', className: 'power-dsh-archive-group-toggle',
+            'aria-expanded': open, 'aria-controls': `${titleId}-body`,
+            onClick: () => {
+              if (query.trim()) return;
+              if (mounted.current) setClosedGroups(current => ({ ...current, [group.key]: !current[group.key] }));
+            },
+          }, h(SkillChevron), h('span', { className: 'power-dsh-archive-group-folder' }, h(FolderIcon)),
+          h('span', { className: 'power-dsh-archive-group-title' }, group.title)),
+          h('span', { className: 'power-dsh-archive-count' }, t('archiveCount').replace('{count}', () => String(group.sessions.length)))),
+        open && h('ul', { id: `${titleId}-body`, className: 'power-dsh-archive-rows' }, group.sessions.map(renderRow)));
     };
     return h('section', { className: 'power-dsh-page power-dsh-skills-page power-dsh-archive-page', 'aria-label': t('archiveTab') },
       h('style', null, styles),
@@ -189,14 +197,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             onChange: value => { if (mounted.current) setSortBy(value as ArchiveSort); } }),
           h(ArchiveSelect, { label: t('archiveProjectLabel'), value: projectValue, options: projectOptions, disabled: busy,
             onChange: value => { if (mounted.current) setProjectId(value === 'all' ? '' : value); } })),
-        catalog && snapshot.status === 'ready' && groups.map((group: ArchiveGroup) => h('section', {
-          key: group.key, className: 'power-dsh-archive-group', 'aria-label': group.title,
-        },
-          h('div', { className: 'power-dsh-archive-group-header' },
-            h('span', { className: 'power-dsh-archive-group-folder' }, h(FolderIcon)),
-            h('span', { className: 'power-dsh-archive-group-title' }, group.title),
-            h('span', { className: 'power-dsh-archive-count' }, t('archiveCount').replace('{count}', () => String(group.sessions.length)))),
-          h('ul', { className: 'power-dsh-archive-rows' }, group.sessions.map(renderRow)))),
+        catalog && snapshot.status === 'ready' && groups.map(renderGroup),
         catalog && snapshot.status === 'ready' && groups.length === 0
           && h('p', { className: 'power-dsh-skill-empty' }, t(query || projectId ? 'archiveNoMatches' : 'archiveEmpty'))),
       error && !(catalog?.sessions ?? []).some(row => row.sessionId === error.id)
@@ -208,7 +209,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         footer: h(React.Fragment, null,
           h(Button, { variant: 'outline', 'data-modal-autofocus': true, disabled: deleting !== null,
             onClick: () => { if (deleting === null) setConfirming(null); } }, t('cancel')),
-          h(Button, { variant: 'primary', disabled: deleting !== null,
+          h(Button, { variant: 'outline', className: 'power-dsh-archive-confirm-delete', disabled: deleting !== null,
             onClick: () => { void confirmDelete(confirming.sessionId); } }, t(deleting !== null ? 'archiveDeleting' : 'archiveDeleteConfirm'))),
       }));
   }

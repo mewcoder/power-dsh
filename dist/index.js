@@ -3105,7 +3105,8 @@ const definition$1 = Object.freeze({
 		"flowingBackgroundEnabled",
 		"flowingBackgroundKind",
 		"flowingBackgroundOpacity",
-		"flowingBackgroundBlur"
+		"flowingBackgroundBlur",
+		"showBackgroundShortcut"
 	]),
 	spec: "src/features/flowing-background/spec.md"
 });
@@ -3116,7 +3117,8 @@ const configFields$1 = {
 	flowingBackgroundEnabled: z.boolean().default(false).volatile(),
 	flowingBackgroundKind: z.string().default("pattern").volatile(),
 	flowingBackgroundOpacity: z.number().default(100).volatile(),
-	flowingBackgroundBlur: z.number().default(0).volatile()
+	flowingBackgroundBlur: z.number().default(0).volatile(),
+	showBackgroundShortcut: z.boolean().default(false).volatile()
 };
 
 // src/features/flowing-background/wallpaper.ts

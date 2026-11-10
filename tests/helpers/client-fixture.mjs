@@ -47,7 +47,19 @@ export function mcpCatalogFixture(overrides = {}) {
   return { complete: true, servers: [mcpFixture()], ...overrides };
 }
 
-export async function mount({ featureIds, localeLanguage, restartStatus = { supported: true, running: false, error: '' }, restartReply, desktop = false, themeAvailable = true, updates, rpcError, rpcReply, formReply, formLoad, fileText = '', fileReply, fileReadError, wallpaper, wallpaperReply, wallpaperReadError, wallpaperClearError, skillCatalog, skillList, skillReply, skillReadError, mcpCatalog, mcpList, mcpReply, mcpReadError, writable = true, reload = () => {}, windows = false, notificationPermission = 'granted', notificationRequest, notificationFailure = false, notificationServices = true, notificationsAvailable = true, localConnection = true, soundCatalog, soundReply, soundListError, modelDirectory, modelSelectReply, modelDirectoriesAvailable = true } = {}) {
+export function archiveSessionFixture(overrides = {}) {
+  return { sessionId: 's1', title: 'Archived session', workspaceId: 'w1', workspaceTitle: 'Project Alpha', updatedAt: 20, createdAt: 100, ...overrides };
+}
+
+export function archiveCatalogFixture(overrides = {}) {
+  return {
+    complete: true,
+    workspaces: [{ workspaceId: 'w1', title: 'Project Alpha' }, { workspaceId: 'w2', title: 'Project Beta' }],
+    sessions: [archiveSessionFixture()], ...overrides,
+  };
+}
+
+export async function mount({ featureIds, localeLanguage, restartStatus = { supported: true, running: false, error: '' }, restartReply, desktop = false, themeAvailable = true, updates, rpcError, rpcReply, formReply, formLoad, fileText = '', fileReply, fileReadError, wallpaper, wallpaperReply, wallpaperReadError, wallpaperClearError, skillCatalog, skillList, skillReply, skillReadError, mcpCatalog, mcpList, mcpReply, mcpReadError, archiveCatalog, archiveList, archiveReply, archiveReadError, writable = true, reload = () => {}, windows = false, notificationPermission = 'granted', notificationRequest, notificationFailure = false, notificationServices = true, notificationsAvailable = true, localConnection = true, soundCatalog, soundReply, soundListError, modelDirectory, modelSelectReply, modelDirectoriesAvailable = true } = {}) {
   let plugin;
   const nativeLauncher = { native: true };
   const entries = new Map([['settings.launcher:single', nativeLauncher]]);
@@ -145,6 +157,10 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   const mcpWrites = [];
   let mcpValue = mcpCatalog ?? mcpCatalogFixture();
   const mcpView = () => ({ ...mcpValue });
+  const archiveReads = [];
+  const archiveWrites = [];
+  let archiveValue = archiveCatalog ?? archiveCatalogFixture();
+  const archiveView = () => ({ ...archiveValue, sessions: [...archiveValue.sessions], workspaces: [...archiveValue.workspaces] });
   const effortSelects = [];
   const effortSessions = [];
   const effortListeners = new Set();
@@ -393,6 +409,22 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
             skillValue = { ...skillValue, skills: skillValue.skills.map(skill => skill.name === name ? { ...skill, enabled, modelInvocable: enabled, userInvocable: enabled } : skill) };
             return { ok: true, value: skillView(blocked, revision) };
           }
+          if (descriptor.method === 'listArchivedSessions') {
+            archiveReads.push({});
+            if (archiveList) return archiveList();
+            if (archiveReadError) return { ok: false, error: { message: archiveReadError } };
+            return { ok: true, value: archiveView() };
+          }
+          if (descriptor.method === 'restoreArchivedSession' || descriptor.method === 'deleteArchivedSession') {
+            archiveWrites.push({ method: descriptor.method, sessionId: blocked });
+            if (archiveReply) {
+              const result = await archiveReply(descriptor.method, blocked);
+              if (result.ok) archiveValue = result.value;
+              return result;
+            }
+            archiveValue = { ...archiveValue, sessions: archiveValue.sessions.filter(session => session.sessionId !== blocked) };
+            return { ok: true, value: archiveView() };
+          }
           if (descriptor.method === 'readWallpaper') return wallpaperReadError
             ? { ok: false, error: { message: wallpaperReadError } } : { ok: true, value: wallpaperValue };
           if (descriptor.method === 'saveWallpaper') {
@@ -477,7 +509,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     setConnectionState(state) { connectionState = state; connectionStateListeners.forEach(fn => fn()); },
     timers,
     connectionStateListeners,
-    entries, calls, dictionaries, nativeLauncher, rpcCalls, rpcDescriptors, fileWrites, skillReads, skillWrites, mcpReads, mcpWrites,
+    entries, calls, dictionaries, nativeLauncher, rpcCalls, rpcDescriptors, fileWrites, skillReads, skillWrites, mcpReads, mcpWrites, archiveReads, archiveWrites,
     soundPlays, soundLists: () => soundLists,
     notifications,
     permissionRequests: () => permissionRequests,
@@ -509,6 +541,16 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     },
     reloadSkills(cwd, scope) {
       return app.skillsProps().loadSkills(cwd, scope);
+    },
+    setArchive(value) { archiveValue = value; },
+    archiveProps() {
+      return entries.get('settings.section:power-dsh-archive').component({ t: key => key }).props;
+    },
+    renderArchive(language) {
+      return renderComponent(entries.get('settings.section:power-dsh-archive').component({ t: key => dictionaries.get(language)?.[key] ?? key }));
+    },
+    reloadArchive() {
+      return app.archiveProps().loadArchivedSessions();
     },
     focus() { focusListeners.forEach(fn => fn()); },
     focusSubscriptions: () => focusListeners.size,
@@ -711,6 +753,19 @@ export async function mcpPage(app, language) {
   const tools = name => includingHidden(row(name)).find(node => node.props.className === 'power-dsh-mcp-tools');
   const summary = name => descendants(row(name)).find(node => node.props.className === 'power-dsh-mcp-tools-summary');
   return { render, row, control, search, group, toggle, tools, summary };
+}
+
+export async function archivePage(app, language) {
+  app.set({ archiveManagerEnabled: true });
+  app.renderArchive(language);
+  await app.reloadArchive();
+  const render = () => descendants(app.renderArchive(language));
+  const group = title => render().find(node => node.type === 'button' && node.props.className === 'power-dsh-archive-group-toggle'
+    && descendants(node).some(child => [child.props.children].flat(Infinity).includes(title)));
+  const row = sessionId => render().find(node => node.type === 'li' && node.props['data-archive'] === sessionId);
+  const search = () => render().find(node => node.type === 'input' && node.props.type === 'search');
+  const action = (sessionId, name) => descendants(row(sessionId)).find(node => node.type === 'button' && node.props[`data-${name}`] === sessionId);
+  return { render, group, row, search, action };
 }
 
 export function restartControl(app) {

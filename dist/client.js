@@ -4568,6 +4568,13 @@ void main() {
 @media (hover:hover) { .power-dsh-page .power-dsh-background-style-select:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover); } }
 .power-dsh-page .power-dsh-background-tune-trigger { display:inline-flex; align-items:center; justify-content:center; flex:none; width:28px; height:28px; padding:0; }
 
+.power-dsh-background-seat { display:block; width:100%; height:0; }
+/* Matches the appearance shortcut beside it: fixed on the footer row, 32x32. */
+.power-dsh-background-shortcut { position:fixed; bottom:16px; z-index:5; display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; width:32px; height:32px; border:0; border-radius:var(--dsw-radius-md); padding:0; background:transparent; color:var(--dsw-alias-label-primary); font:inherit; cursor:pointer; pointer-events:auto; -webkit-app-region:no-drag; }
+@media (hover:hover) { .power-dsh-background-shortcut:hover { background:var(--dsw-alias-interactive-bg-hover); } }
+.power-dsh-background-shortcut:active { background:var(--dsw-alias-interactive-bg-active); }
+.power-dsh-background-shortcut:disabled { opacity:.5; cursor:default; }
+.power-dsh-background-shortcut:focus-visible { outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary)); outline-offset:2px; }
 .power-dsh-page .power-dsh-slider-field { display:inline-flex; align-items:center; gap:10px; min-width:190px; justify-content:flex-end; }
 .power-dsh-page .power-dsh-slider { box-sizing:border-box; width:150px; margin:0; accent-color:var(--dsw-alias-state-business-primary); cursor:pointer; }
 .power-dsh-page .power-dsh-slider:disabled { opacity:.5; cursor:default; }
@@ -4580,7 +4587,12 @@ void main() {
 .power-dsh-wallpaper-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-primary); font-size:13px; line-height:18px; }
 .power-dsh-wallpaper-hint { color:var(--dsw-alias-label-tertiary); font-size:11px; line-height:16px; }
 .power-dsh-wallpaper-actions { display:flex; flex:none; align-items:center; gap:2px; }
-.power-dsh-wallpaper-icon { flex:none; width:26px; height:26px; padding:0; color:var(--dsw-alias-label-tertiary); }
+/* Mirrors the native modal close control: 28x28, transparent, hover fill only. */
+.power-dsh-wallpaper-icon { flex:none; display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border:0; border-radius:var(--dsw-radius-sm); padding:0; background:transparent; color:var(--dsw-alias-label-secondary); cursor:pointer; }
+@media (hover:hover) { .power-dsh-wallpaper-icon:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover); } }
+.power-dsh-wallpaper-icon:active:not(:disabled) { background:var(--dsw-alias-interactive-bg-active); }
+.power-dsh-wallpaper-icon:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary)); outline-offset:2px; }
+.power-dsh-wallpaper-icon:disabled { opacity:.4; cursor:not-allowed; }
 .power-dsh-wallpaper-icon.is-danger:hover:not(:disabled) { color:var(--dsw-alias-state-error-primary); }
 :is(.power-dsh-page, .power-dsh-background-panel) .power-dsh-wallpaper-input { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
 `;
@@ -5081,7 +5093,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		});
 	}
 	function createClientFeature$1(runtime, env) {
-		const { React, h, Button, Tooltip, observable, useSnapshot, errorFeedback } = runtime;
+		const { React, h, Button, Tooltip, NativeIcon, observable, useSnapshot, errorFeedback } = runtime;
 		const { ctx, t, source } = env;
 		let fault = null;
 		const attachment = observable(() => fault);
@@ -5435,6 +5447,76 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				className: "power-dsh-background-panel-hint"
 			}, t(descriptionKey)));
 		}
+		function ShirtIcon({ size = 16 }) {
+			return h("svg", {
+				width: size,
+				height: size,
+				viewBox: "0 0 24 24",
+				fill: "none",
+				stroke: "currentColor",
+				strokeWidth: 2,
+				strokeLinecap: "round",
+				strokeLinejoin: "round",
+				"aria-hidden": true,
+				focusable: false
+			}, h("path", { d: "M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z" }));
+		}
+		/**
+		* Sidebar entry, shown when `showBackgroundShortcut` is on. It reuses the same
+		* panel as the settings row; `openPanel` still refuses when the form is not
+		* ready or writable, so the button reports why instead of opening an empty one.
+		*/
+		function BackgroundShortcut({ t }) {
+			const config = useSnapshot(source ?? EMPTY_SOURCE);
+			const state = useSnapshot(panelStore);
+			const seat = React.useRef(null);
+			const [left, setLeft] = React.useState(null);
+			const visible = config.status === "ready" && config.writable && config.value?.showBackgroundShortcut === true;
+			React.useLayoutEffect(() => {
+				if (!visible || !seat.current) return;
+				const element = seat.current;
+				const measure = () => {
+					const anchor = element.parentElement?.querySelector(".power-dsh-appearance-button") ?? element;
+					setLeft(Math.max(0, anchor.getBoundingClientRect().right - 72));
+				};
+				measure();
+				const observer = typeof ResizeObserver === "function" ? new ResizeObserver(measure) : null;
+				observer?.observe(element);
+				window.addEventListener("resize", measure);
+				window.visualViewport?.addEventListener("resize", measure);
+				return () => {
+					observer?.disconnect();
+					window.removeEventListener("resize", measure);
+					window.visualViewport?.removeEventListener("resize", measure);
+				};
+			}, [visible]);
+			if (!visible) return null;
+			const label = config.value?.flowingBackgroundEnabled === true ? t("flowingBackgroundTuneOpen") : t("flowingBackgroundEnabled");
+			return h(React.Fragment, null, h("style", null, settingsStyles + panelStyles), h("span", {
+				className: "power-dsh-background-seat",
+				ref: seat
+			}, h(Tooltip, {
+				label,
+				side: "top",
+				portal: true,
+				delayMs: 200,
+				maxWidth: 320
+			}, h("button", {
+				type: "button",
+				className: "power-dsh-background-shortcut",
+				style: left === null ? { visibility: "hidden" } : { left },
+				"aria-label": label,
+				"aria-haspopup": "dialog",
+				"aria-expanded": state.open,
+				onClick: () => {
+					if (state.open) {
+						closePanel();
+						return;
+					}
+					openPanel(() => {});
+				}
+			}, h(ShirtIcon)))));
+		}
 		ctx?.slots?.inject?.("shell.overlay", () => ctx.slots.register({
 			name: "shell.overlay",
 			id: "power-dsh-background-tune",
@@ -5476,6 +5558,11 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			field: "flowingBackgroundBlur",
 			description: "flowingBackgroundBlurDescription",
 			hidden: true
+		};
+		const shortcutSetting = {
+			field: "showBackgroundShortcut",
+			description: "showBackgroundShortcutDescription",
+			canSave: () => source.getSnapshot().value?.flowingBackgroundEnabled === true
 		};
 		const canEditWallpaper = () => {
 			const snapshot = source.getSnapshot();
@@ -5551,51 +5638,25 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				label: t(asset.value ? "flowingBackgroundWallpaperReplace" : "flowingBackgroundWallpaperChoose"),
 				side: "top",
 				portal: true
-			}, h(Button, {
+			}, h("button", {
 				type: "button",
-				variant: "ghost",
-				size: "sm",
 				className: "power-dsh-wallpaper-icon",
 				disabled: disabled || busy,
 				"aria-label": t(asset.value ? "flowingBackgroundWallpaperReplace" : "flowingBackgroundWallpaperChoose"),
 				"aria-describedby": `${control}-description${failure ? ` ${control}-error` : ""}`,
 				"aria-busy": busy,
 				onClick: choose
-			}, h("svg", {
-				width: 15,
-				height: 15,
-				viewBox: "0 0 16 16",
-				fill: "none",
-				stroke: "currentColor",
-				strokeWidth: 1.4,
-				strokeLinecap: "round",
-				strokeLinejoin: "round",
-				"aria-hidden": true,
-				focusable: false
-			}, h("path", { d: "M2.5 11.5V13h1.5l7-7-1.5-1.5-7 7Z" }), h("path", { d: "M11.5 3.5 12 3a1.06 1.06 0 0 1 1.5 1.5l-.5.5-1.5-1.5Z" })))), asset.value && h(Tooltip, {
+			}, h(NativeIcon, { glyph: "edit-outline" }))), asset.value && h(Tooltip, {
 				label: t("flowingBackgroundWallpaperRemove"),
 				side: "top",
 				portal: true
-			}, h(Button, {
+			}, h("button", {
 				type: "button",
-				variant: "ghost",
-				size: "sm",
 				className: "power-dsh-wallpaper-icon is-danger",
 				"aria-label": t("flowingBackgroundWallpaperRemove"),
 				disabled: disabled || busy,
 				onClick: remove
-			}, h("svg", {
-				width: 15,
-				height: 15,
-				viewBox: "0 0 16 16",
-				fill: "none",
-				stroke: "currentColor",
-				strokeWidth: 1.4,
-				strokeLinecap: "round",
-				strokeLinejoin: "round",
-				"aria-hidden": true,
-				focusable: false
-			}, h("path", { d: "M2.5 4h11M6 4V2.5h4V4M4 4l.6 9a1 1 0 0 0 1 1h4.8a1 1 0 0 0 1-1L12 4" })))), h("input", {
+			}, h(NativeIcon, { glyph: "trash-outline" }))), h("input", {
 				ref: (element) => {
 					fileInput = element;
 				},
@@ -5702,17 +5763,19 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			return [{
 				...main,
 				render: mainRow
-			}];
+			}, shortcutSetting];
 		}
 		return {
 			settings: [
 				mainSetting,
 				kindSetting,
 				opacitySetting,
-				blurSetting
+				blurSetting,
+				shortcutSetting
 			],
 			useSettings,
 			styles: settingsStyles + panelStyles,
+			sidebar: (props) => h(BackgroundShortcut, { ...props }),
 			api: {
 				wallpaperSource,
 				loadWallpaper,
@@ -5731,7 +5794,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			"flowingBackgroundEnabled",
 			"flowingBackgroundKind",
 			"flowingBackgroundOpacity",
-			"flowingBackgroundBlur"
+			"flowingBackgroundBlur",
+			"showBackgroundShortcut"
 		]),
 		spec: "src/features/flowing-background/spec.md"
 	});
@@ -5745,6 +5809,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			flowingBackgroundOpacityDescription: "0% hides the background; 100% shows it fully",
 			flowingBackgroundBlur: "Background blur",
 			flowingBackgroundBlurDescription: "0px keeps the background sharp; higher values add blur",
+			showBackgroundShortcut: "Quick background switch",
+			showBackgroundShortcutDescription: "Quickly adjust the background at the bottom of the sidebar",
 			flowingBackgroundKind: "Background type",
 			flowingBackgroundKindDescription: "Choose the built-in flow or your own wallpaper",
 			flowingBackgroundKindPattern: "Homepage flow",
@@ -5795,6 +5861,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			flowingBackgroundOpacityDescription: "0% 隐藏背景，100% 完全显示背景",
 			flowingBackgroundBlur: "背景模糊",
 			flowingBackgroundBlurDescription: "0px 保持清晰，数值越大背景越模糊",
+			showBackgroundShortcut: "快捷切换背景",
+			showBackgroundShortcutDescription: "在侧栏底部快捷调节背景",
 			flowingBackgroundKind: "背景类型",
 			flowingBackgroundKindDescription: "选择官网流动图案或自己的壁纸",
 			flowingBackgroundKindPattern: "官网流动",
@@ -5957,23 +6025,35 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 .power-dsh-archive-page .power-dsh-archive-select > svg { flex:none; color:var(--dsw-alias-label-tertiary); }
 .power-dsh-archive-page .power-dsh-archive-menu { min-width:0; max-width:100%; }
 .power-dsh-archive-page .power-dsh-archive-group { display:flex; flex-direction:column; gap:8px; }
+.power-dsh-archive-page .power-dsh-archive-group + .power-dsh-archive-group { border-top:.5px solid var(--dsw-alias-border-l2); padding-top:14px; }
 .power-dsh-archive-page .power-dsh-archive-group-header { display:flex; align-items:center; gap:8px; min-height:28px; }
+.power-dsh-archive-page .power-dsh-archive-group-toggle { display:flex; flex:1 1 auto; align-items:center; gap:8px; min-width:0; border:0; border-radius:var(--dsw-radius-sm); padding:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.power-dsh-archive-page .power-dsh-archive-group-toggle:hover { color:var(--dsw-alias-label-primary); }
+.power-dsh-archive-page .power-dsh-archive-group-toggle:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
+.power-dsh-archive-page .power-dsh-archive-group-toggle > .power-dsh-skill-chevron { flex:none; color:var(--dsw-alias-label-tertiary); transform:rotate(-90deg); }
+.power-dsh-archive-page .power-dsh-archive-group-toggle[aria-expanded="true"] > .power-dsh-skill-chevron { transform:none; }
 .power-dsh-archive-page .power-dsh-archive-group-folder { display:inline-flex; flex:none; color:var(--dsw-alias-label-tertiary); }
 .power-dsh-archive-page .power-dsh-archive-group-title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-primary); font-size:14px; line-height:22px; font-weight:500; }
-.power-dsh-archive-page .power-dsh-archive-count { flex:none; margin-left:auto; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
+.power-dsh-archive-page .power-dsh-archive-count { flex:none; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
 .power-dsh-archive-page .power-dsh-archive-rows { margin:0; padding:0; list-style:none; overflow:hidden; border:.5px solid var(--dsw-alias-settings-card-stroke); border-radius:var(--dsw-radius-xl); background:var(--dsw-alias-settings-card-fill); }
 .power-dsh-archive-page .power-dsh-archive-row { display:flex; align-items:center; gap:12px; padding:12px 14px; }
 .power-dsh-archive-page .power-dsh-archive-row + .power-dsh-archive-row { border-top:.5px solid var(--dsw-alias-border-l2); }
 .power-dsh-archive-page .power-dsh-archive-row-main { display:flex; flex:1 1 auto; flex-direction:column; gap:2px; min-width:0; }
 .power-dsh-archive-page .power-dsh-archive-row-title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-primary); font-size:14px; line-height:20px; }
 .power-dsh-archive-page .power-dsh-archive-row-time { color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
-.power-dsh-archive-page .power-dsh-archive-restore { flex:none; height:28px; padding:0 12px; font-size:12px; line-height:18px; }
-.power-dsh-archive-page .power-dsh-archive-row-actions { display:flex; flex:none; align-items:center; gap:8px; }
-.power-dsh-archive-page .power-dsh-archive-icon { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border:0; border-radius:var(--dsw-radius-md); padding:0; background:transparent; color:var(--dsw-alias-label-tertiary); cursor:pointer; }
-.power-dsh-archive-page .power-dsh-archive-icon:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover); }
-.power-dsh-archive-page .power-dsh-archive-icon[data-danger="true"]:hover:not(:disabled) { color:var(--dsw-alias-state-error-primary); }
-.power-dsh-archive-page .power-dsh-archive-icon:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
-.power-dsh-archive-page .power-dsh-archive-icon:disabled { opacity:.4; cursor:default; }
+.power-dsh-archive-page .power-dsh-archive-row-actions { display:flex; flex:none; align-items:center; gap:4px; }
+/* Row and dialog buttons follow the native Models settings buttons; see docs/third-party-notices.md. */
+.power-dsh-archive-page .power-dsh-archive-action { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; height:28px; border:.5px solid var(--dsw-alias-border-l3); border-radius:var(--dsw-radius-sm); padding:0 10px; background:transparent; color:var(--dsw-alias-label-primary); font:inherit; font-size:12px; line-height:18px; cursor:pointer; }
+.power-dsh-archive-page .power-dsh-archive-action-danger { border-color:transparent; color:var(--dsw-alias-state-error-primary); }
+@media (hover:hover) {
+  .power-dsh-archive-page .power-dsh-archive-action:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover-solid); }
+  .power-dsh-archive-page .power-dsh-archive-action-danger:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover-danger); }
+}
+.power-dsh-archive-page .power-dsh-archive-action:disabled { opacity:.4; cursor:default; }
+.power-dsh-archive-page .power-dsh-archive-action:focus-visible { outline:none; box-shadow:0 0 0 2px var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); }
+.power-dsh-archive-confirm-delete:not(:disabled) { --dsh-button-outline-color:var(--dsw-alias-state-error-primary); color:var(--dsw-alias-state-error-primary); }
+@media (hover:hover) { .power-dsh-archive-confirm-delete:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover-danger); } }
+@media (prefers-reduced-motion:no-preference) { .power-dsh-archive-page .power-dsh-archive-group-toggle > .power-dsh-skill-chevron { transition:transform 140ms var(--ds-ease-in-out); } }
 `;
 
 // src/features/archive/client.ts
@@ -6015,20 +6095,6 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				"aria-hidden": true,
 				focusable: false
 			}, h("path", { d: "M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2z" }));
-		}
-		function TrashIcon({ size = 16 }) {
-			return h("svg", {
-				width: size,
-				height: size,
-				viewBox: "0 0 24 24",
-				fill: "none",
-				stroke: "currentColor",
-				strokeWidth: 2,
-				strokeLinecap: "round",
-				strokeLinejoin: "round",
-				"aria-hidden": true,
-				focusable: false
-			}, h("path", { d: "M3 6h18" }), h("path", { d: "M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" }), h("path", { d: "M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" }), h("path", { d: "M10 11v6M14 11v6" }));
 		}
 		const deleteErrorKeys = [
 			"archiveDeleteUnavailable",
@@ -6098,7 +6164,9 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			const [restoring, setRestoring] = React.useState(null);
 			const [deleting, setDeleting] = React.useState(null);
 			const [confirming, setConfirming] = React.useState(null);
+			const [closedGroups, setClosedGroups] = React.useState({});
 			const [error, setError] = React.useState(null);
+			const id = React.useId();
 			const mounted = useMounted();
 			const pending = React.useRef(false);
 			const busy = snapshot.status === "loading" || restoring !== null || deleting !== null;
@@ -6171,6 +6239,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			const renderRow = (row) => {
 				const rowBusy = restoring === row.sessionId || deleting === row.sessionId;
 				const time = row.updatedAt > 0 ? new Date(row.updatedAt).toLocaleString() : "";
+				const name = row.title || t("archiveUntitled");
 				return h("li", {
 					key: row.sessionId,
 					className: "power-dsh-archive-row",
@@ -6184,7 +6253,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				}, h("span", {
 					className: "power-dsh-archive-row-title",
 					tabIndex: 0
-				}, row.title || t("archiveUntitled"))), time && h("span", { className: "power-dsh-archive-row-time" }, time), error?.id === row.sessionId && errorFeedback({
+				}, name)), time && h("span", { className: "power-dsh-archive-row-time" }, time), error?.id === row.sessionId && errorFeedback({
 					t,
 					id: `${row.sessionId}-error`,
 					message: error.message,
@@ -6192,23 +6261,48 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 					operation: "archiveSession"
 				})), h("div", { className: "power-dsh-archive-row-actions" }, h("button", {
 					type: "button",
-					className: "power-dsh-archive-icon",
-					"data-danger": "true",
+					className: "power-dsh-archive-action power-dsh-archive-action-danger",
 					"data-delete": row.sessionId,
-					"aria-label": t("archiveDelete"),
+					"aria-label": `${t("archiveDelete")} ${name}`,
 					disabled: disabled || rowBusy,
 					"aria-busy": deleting === row.sessionId,
 					onClick: () => {
 						if (mounted.current) setConfirming(row);
 					}
-				}, h(TrashIcon)), h("button", {
+				}, t(deleting === row.sessionId ? "archiveDeleting" : "archiveDelete")), h("button", {
 					type: "button",
-					className: "power-dsh-prompt-action power-dsh-archive-restore",
+					className: "power-dsh-archive-action",
 					"data-restore": row.sessionId,
+					"aria-label": `${t("archiveRestore")} ${name}`,
 					disabled: disabled || rowBusy,
 					"aria-busy": restoring === row.sessionId,
 					onClick: () => restore(row.sessionId)
-				}, t(rowBusy ? "archiveRestoring" : "archiveRestore"))));
+				}, t(restoring === row.sessionId ? "archiveRestoring" : "archiveRestore"))));
+			};
+			const renderGroup = (group, index) => {
+				const titleId = `${id}-archive-group-${index}`;
+				const open = Boolean(query.trim()) || !closedGroups[group.key];
+				return h("section", {
+					key: group.key,
+					className: "power-dsh-archive-group",
+					"aria-labelledby": titleId
+				}, h("div", { className: "power-dsh-archive-group-header" }, h("button", {
+					id: titleId,
+					type: "button",
+					className: "power-dsh-archive-group-toggle",
+					"aria-expanded": open,
+					"aria-controls": `${titleId}-body`,
+					onClick: () => {
+						if (query.trim()) return;
+						if (mounted.current) setClosedGroups((current) => ({
+							...current,
+							[group.key]: !current[group.key]
+						}));
+					}
+				}, h(SkillChevron), h("span", { className: "power-dsh-archive-group-folder" }, h(FolderIcon)), h("span", { className: "power-dsh-archive-group-title" }, group.title)), h("span", { className: "power-dsh-archive-count" }, t("archiveCount").replace("{count}", () => String(group.sessions.length)))), open && h("ul", {
+					id: `${titleId}-body`,
+					className: "power-dsh-archive-rows"
+				}, group.sessions.map(renderRow)));
 			};
 			return h("section", {
 				className: "power-dsh-page power-dsh-skills-page power-dsh-archive-page",
@@ -6249,11 +6343,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				onChange: (value) => {
 					if (mounted.current) setProjectId(value === "all" ? "" : value);
 				}
-			})), catalog && snapshot.status === "ready" && groups.map((group) => h("section", {
-				key: group.key,
-				className: "power-dsh-archive-group",
-				"aria-label": group.title
-			}, h("div", { className: "power-dsh-archive-group-header" }, h("span", { className: "power-dsh-archive-group-folder" }, h(FolderIcon)), h("span", { className: "power-dsh-archive-group-title" }, group.title), h("span", { className: "power-dsh-archive-count" }, t("archiveCount").replace("{count}", () => String(group.sessions.length)))), h("ul", { className: "power-dsh-archive-rows" }, group.sessions.map(renderRow)))), catalog && snapshot.status === "ready" && groups.length === 0 && h("p", { className: "power-dsh-skill-empty" }, t(query || projectId ? "archiveNoMatches" : "archiveEmpty"))), error && !(catalog?.sessions ?? []).some((row) => row.sessionId === error.id) && errorFeedback({
+			})), catalog && snapshot.status === "ready" && groups.map(renderGroup), catalog && snapshot.status === "ready" && groups.length === 0 && h("p", { className: "power-dsh-skill-empty" }, t(query || projectId ? "archiveNoMatches" : "archiveEmpty"))), error && !(catalog?.sessions ?? []).some((row) => row.sessionId === error.id) && errorFeedback({
 				t,
 				message: error.message,
 				code: "PD-ARCHIVE-ACTION",
@@ -6275,7 +6365,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 						if (deleting === null) setConfirming(null);
 					}
 				}, t("cancel")), h(Button, {
-					variant: "primary",
+					variant: "outline",
+					className: "power-dsh-archive-confirm-delete",
 					disabled: deleting !== null,
 					onClick: () => {
 						confirmDelete(confirming.sessionId);

@@ -33,7 +33,7 @@
 | [技能管理](../src/features/skills/spec.md) | 全局与项目来源、仅对 DSH 生效的启停与共享文件保护 |
 | [MCP 管理](../src/features/mcp/spec.md) | 全局服务器、原生启停、运行状态与工具列表 |
 | [全局指令](../src/features/personalization/spec.md) | 全局指令编辑、原生文件保存与入口关闭行为 |
-| [归档管理](../src/features/archive/spec.md) | 已归档会话的分组列表、搜索、排序、项目筛选、恢复与二次确认删除 |
+| [归档管理](../src/features/archive/spec.md) | 已归档会话的可折叠分组列表、搜索、排序、项目筛选、恢复与二次确认删除 |
 | [停用官方登录与模型接入](../src/features/account-blocking/spec.md) | 登录与模型目标、保留范围与启停行为 |
 | [停用官方搜索](../src/features/search-blocking/spec.md) | 独立搜索开关、抓取保留、旧会话限制与恢复 |
 | [停用官方反馈与遥测](../src/features/telemetry-blocking/spec.md) | 七个内置目标、开关行为与网络边界 |
