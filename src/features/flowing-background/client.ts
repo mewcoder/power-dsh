@@ -262,15 +262,16 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     };
     return h('fieldset', { className: 'power-dsh-background-panel-section power-dsh-background-kind' },
       h('legend', { className: 'power-dsh-background-panel-section-title' }, t('flowingBackgroundKind')),
-      ...KINDS.map(kind => h('label', {
-        key: kind, className: 'power-dsh-background-radio',
-      },
-        h('input', {
-          type: 'radio', name: control, value: kind, id: `${control}-${kind}`,
-          checked: current === kind, disabled,
-          onChange: () => choose(kind),
-        }),
-        h('span', { className: 'power-dsh-background-radio-label' }, kindLabel(kind)))));
+      h('div', { className: 'power-dsh-background-options' },
+        ...KINDS.map(kind => h('label', {
+          key: kind, className: 'power-dsh-background-radio',
+        },
+          h('input', {
+            type: 'radio', name: control, value: kind, id: `${control}-${kind}`,
+            checked: current === kind, disabled,
+            onChange: () => choose(kind),
+          }),
+          h('span', { className: 'power-dsh-background-radio-label' }, kindLabel(kind))))));
   }
 
   /**

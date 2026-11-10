@@ -76,7 +76,9 @@ export const panelStyles = `
 /* Type choice as a plain radio group: two labelled options, no dropdown. */
 .power-dsh-background-kind { margin: 0; border: 0; padding: 0; }
 .power-dsh-background-kind > legend { padding: 0; }
-.power-dsh-background-radio { display: flex; align-items: center; gap: 8px; min-height: 26px; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 18px; cursor: pointer; }
+/* The two options sit on one line, side by side. */
+.power-dsh-background-options { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; }
+.power-dsh-background-radio { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 18px; cursor: pointer; }
 .power-dsh-background-radio input { flex: none; width: 14px; height: 14px; margin: 0; accent-color: var(--dsw-alias-brand-primary); cursor: pointer; }
 .power-dsh-background-radio input:disabled { cursor: default; }
 .power-dsh-background-radio input:disabled + .power-dsh-background-radio-label { opacity: .5; }

@@ -18,7 +18,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   const { React, h, Menu, Modal, Button, Tooltip, observable, useSnapshot, useMounted, errorFeedback } = runtime;
   const { ctx, t, savePreference, preferenceSlot, namespace } = env;
   const styles = shellStyles + catalogStyles + featureStyles;
-  const { SkillSearchIcon } = createCatalogUI(runtime);
+  const { SkillSearchIcon, SkillChevron } = createCatalogUI(runtime);
   // Lucide Archive, ISC licensed; see docs/third-party-notices.md.
   function ArchiveIcon({ size = 16 }: IconProps) {
     return h('svg', {
@@ -94,7 +94,9 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const [restoring, setRestoring] = React.useState<string | null>(null);
     const [deleting, setDeleting] = React.useState<string | null>(null);
     const [confirming, setConfirming] = React.useState<ArchiveSessionRow | null>(null);
+    const [closedGroups, setClosedGroups] = React.useState<Record<string, boolean>>({});
     const [error, setError] = React.useState<{ id: string; message: string } | null>(null);
+    const id = React.useId();
     const mounted = useMounted();
     const pending = React.useRef(false);
     const busy = snapshot.status === 'loading' || restoring !== null || deleting !== null;

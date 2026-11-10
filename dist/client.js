@@ -4617,7 +4617,9 @@ void main() {
 /* Type choice as a plain radio group: two labelled options, no dropdown. */
 .power-dsh-background-kind { margin: 0; border: 0; padding: 0; }
 .power-dsh-background-kind > legend { padding: 0; }
-.power-dsh-background-radio { display: flex; align-items: center; gap: 8px; min-height: 26px; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 18px; cursor: pointer; }
+/* The two options sit on one line, side by side. */
+.power-dsh-background-options { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; }
+.power-dsh-background-radio { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 18px; cursor: pointer; }
 .power-dsh-background-radio input { flex: none; width: 14px; height: 14px; margin: 0; accent-color: var(--dsw-alias-brand-primary); cursor: pointer; }
 .power-dsh-background-radio input:disabled { cursor: default; }
 .power-dsh-background-radio input:disabled + .power-dsh-background-radio-label { opacity: .5; }
@@ -5368,7 +5370,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				publishPanel({ kind: next });
 				if (next === "wallpaper" && wallpaper.status === "idle") loadWallpaper();
 			};
-			return h("fieldset", { className: "power-dsh-background-panel-section power-dsh-background-kind" }, h("legend", { className: "power-dsh-background-panel-section-title" }, t("flowingBackgroundKind")), ...KINDS.map((kind) => h("label", {
+			return h("fieldset", { className: "power-dsh-background-panel-section power-dsh-background-kind" }, h("legend", { className: "power-dsh-background-panel-section-title" }, t("flowingBackgroundKind")), h("div", { className: "power-dsh-background-options" }, ...KINDS.map((kind) => h("label", {
 				key: kind,
 				className: "power-dsh-background-radio"
 			}, h("input", {
@@ -5379,7 +5381,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				checked: current === kind,
 				disabled,
 				onChange: () => choose(kind)
-			}), h("span", { className: "power-dsh-background-radio-label" }, kindLabel(kind)))));
+			}), h("span", { className: "power-dsh-background-radio-label" }, kindLabel(kind))))));
 		}
 		/**
 		* One labelled slider. The control is a native `range`, so arrows, Home/End and
@@ -5979,7 +5981,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		const { React, h, Menu, Modal, Button, Tooltip, observable, useSnapshot, useMounted, errorFeedback } = runtime;
 		const { ctx, t, savePreference, preferenceSlot, namespace } = env;
 		const styles$13 = styles$11 + styles$8 + styles;
-		const { SkillSearchIcon } = createCatalogUI(runtime);
+		const { SkillSearchIcon, SkillChevron } = createCatalogUI(runtime);
 		function ArchiveIcon({ size = 16 }) {
 			return h("svg", {
 				width: size,
