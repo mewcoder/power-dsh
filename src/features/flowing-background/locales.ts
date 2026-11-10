@@ -1,7 +1,7 @@
 import type { Locales } from '../../shared/client/types.ts';
 export const locales = {
   en: {
-    flowingBackgroundEnabled: 'Custom background',
+    flowingBackgroundEnabled: 'Background settings',
     flowingBackgroundDescription: 'Choose a soft animated background for the interface',
     flowingBackgroundOpacity: 'Background opacity',
     flowingBackgroundOpacityDescription: '0% hides the background; 100% shows it fully',
@@ -19,8 +19,8 @@ export const locales = {
     flowingBackgroundWallpaperChoose: 'Choose image',
     flowingBackgroundWallpaperReplace: 'Replace',
     flowingBackgroundWallpaperRemove: 'Remove',
-    flowingBackgroundTuneOpen: 'Adjust background',
-    flowingBackgroundTuneTitle: 'Background',
+    flowingBackgroundTuneOpen: 'Background settings',
+    flowingBackgroundTuneTitle: 'Background settings',
     flowingBackgroundTuneAppearance: 'Appearance',
     flowingBackgroundTuneDone: 'Close',
     flowingBackgroundWallpaperReadFailed: 'The saved wallpaper could not be read.',
@@ -53,7 +53,7 @@ export const locales = {
     flowingBackgroundRecoveryRetry: 'Turn the background off and on to retry. If the problem persists, copy the error information for a bug report.',
   },
   zh: {
-    flowingBackgroundEnabled: '自定义背景',
+    flowingBackgroundEnabled: '背景设置',
     flowingBackgroundDescription: '为界面选择柔和的动态背景',
     flowingBackgroundOpacity: '背景不透明度',
     flowingBackgroundOpacityDescription: '0% 隐藏背景，100% 完全显示背景',
@@ -71,7 +71,7 @@ export const locales = {
     flowingBackgroundWallpaperChoose: '选择图片',
     flowingBackgroundWallpaperReplace: '更换',
     flowingBackgroundWallpaperRemove: '移除',
-    flowingBackgroundTuneOpen: '调节背景',
+    flowingBackgroundTuneOpen: '背景设置',
     flowingBackgroundTuneTitle: '背景设置',
     flowingBackgroundTuneAppearance: '外观',
     flowingBackgroundTuneDone: '关闭',

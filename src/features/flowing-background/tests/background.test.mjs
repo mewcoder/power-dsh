@@ -89,6 +89,24 @@ test('the main row opens a panel that previews and saves appearance values', asy
   app.unmount();
 });
 
+test('keyboard adjustment never puts the panel into a disabled state', async () => {
+  const app = await mount();
+  app.set({ flowingBackgroundEnabled: true });
+  await openTune(app);
+  const nodes = () => descendants(app.renderTunePanel());
+  const panel = () => nodes().find(node => node.props.className === 'power-dsh-background-panel');
+  const radios = () => nodes().filter(node => node.type === 'input' && node.props.type === 'radio');
+  const close = () => nodes().find(node => node.props.className === 'power-dsh-background-panel-close');
+  const slider = () => nodes().find(node => node.props.id === 'power-dsh-tune-flowingBackgroundOpacity');
+  assert.equal(panel().props['aria-busy'], undefined, 'The dialog is not busy on open.');
+  slider().props.onChange({ currentTarget: { value: '55' } });
+  await slider().props.onKeyUp({ key: 'ArrowRight', currentTarget: { value: '55' } });
+  assert.equal(panel().props['aria-busy'], undefined, 'A save in flight must not mark the whole dialog busy.');
+  assert.ok(radios().every(radio => radio.props.disabled === false), 'Type radios stay operable.');
+  assert.equal(close().props.disabled, false, 'Close stays operable.');
+  app.unmount();
+});
+
 test('the sliders stay enabled while saving and accept keyboard input', async () => {
   const app = await mount();
   app.set({ flowingBackgroundEnabled: true });

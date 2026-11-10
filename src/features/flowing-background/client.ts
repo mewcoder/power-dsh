@@ -219,7 +219,6 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     if (!state.open) return null;
     const wallpaper = state.kind === 'wallpaper';
     return h('div', { className: 'power-dsh-background-panel', role: 'dialog', 'aria-label': title,
-      'aria-busy': state.saving,
       onKeyDown: (event: import('react').KeyboardEvent<HTMLDivElement>) => {
         if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); void closePanel(); }
       } },
@@ -230,15 +229,15 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         h(Button, {
           type: 'button', variant: 'ghost', size: 'sm', className: 'power-dsh-background-panel-close',
           'aria-label': t('flowingBackgroundTuneDone'), title: t('flowingBackgroundTuneDone'),
-          disabled: state.saving || operation.picking, onClick: closePanel,
+          disabled: operation.picking, onClick: closePanel,
         }, h('svg', { width: 14, height: 14, viewBox: '0 0 14 14', fill: 'none', stroke: 'currentColor',
           strokeWidth: 1.4, strokeLinecap: 'round', 'aria-hidden': true, focusable: false },
           h('path', { d: 'm3 3 8 8M11 3l-8 8' })))),
       h('div', { className: 'power-dsh-background-panel-body' },
       // 1. Background type first: everything below depends on this choice.
-      kindChoice(state.kind, state.saving || operation.picking),
+      kindChoice(state.kind, operation.picking),
       // 2. Wallpaper picking lives here rather than in a separate settings row.
-      wallpaper && wallpaperRow(asset, operation, state.saving),
+      wallpaper && wallpaperRow(asset, operation, false),
       // 3. Appearance tuning, only meaningful once a background exists.
       h('div', { className: 'power-dsh-background-panel-section' },
         h('div', { className: 'power-dsh-background-panel-section-title' }, t('flowingBackgroundTuneAppearance')),
@@ -309,21 +308,20 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       h('p', { id: description, className: 'power-dsh-background-panel-hint' }, t(descriptionKey)));
   }
   /**
-   * Short-sleeved tee, drawn in the host's own icon dialect: a 16x16 viewBox with
-   * a 1px stroke and round joins, matching `edit-outline` and `trash-outline`.
-   * Lucide artwork is designed on 24x24 at 2px, so scaling it to 16px made the
-   * glyph read heavy and cramped beside the host icons.
+   * Short-sleeved tee from Tabler Icons (MIT), tightened to fill the frame. The
+   * artwork is drawn inside roughly x 2.5-21.5 and y 4-21 of its 24x24 canvas,
+   * so it read small beside the host icons, whose glyphs fill all 16 units. The
+   * viewBox is cropped to that box and the stroke set to 1.4, keeping the 1px
+   * optical weight a 16px render of the host icons has.
    */
   function ShirtIcon({ size = 16 }: IconProps) {
     return h('svg', {
-      width: size, height: size, viewBox: '0 0 16 16', fill: 'none',
-      stroke: 'currentColor', strokeWidth: 1, strokeLinecap: 'round', strokeLinejoin: 'round',
+      width: size, height: size, viewBox: '2.5 3.5 19 18', fill: 'none',
+      stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round',
       'aria-hidden': true, focusable: false,
-    },
-      // Body and both sleeves in one closed outline.
-      h('path', { d: 'M6.2 2.6 2.5 4.1l1.1 2.6 1.9-.8v7.5h5V5.9l1.9.8 1.1-2.6-3.7-1.5' }),
-      // Collar, closing the neckline between the two shoulders.
-      h('path', { d: 'M6.2 2.6a2.4 2.4 0 0 0 3.6 0' }));
+    }, h('path', {
+      d: 'M15 4l6 2v5h-3v8a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-8H3V6l6-2a3 3 0 0 0 6 0',
+    }));
   }
 
   /**

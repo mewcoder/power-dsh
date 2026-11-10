@@ -1,8 +1,8 @@
-# 自定义背景
+# 背景设置
 
 ## 标识、入口与范围
 
-功能 id 为 `flowing-background`，入口为 **设置 → PowerDSH → 界面 → 自定义背景**。背景有两种类型：内置的**官网流动**图案（参考 [DeepSeek 首页](https://www.deepseek.com/)蓝色渐变与流场图案的独立 WebGL 绘制，呈现同类氛围，不复制官网脚本、DOM 或资源，不宣称完全复刻），以及用户自己的**自定义壁纸**。
+功能 id 为 `flowing-background`，入口为 **设置 → PowerDSH → 界面 → 背景设置**。背景有两种类型：内置的**官网流动**图案（参考 [DeepSeek 首页](https://www.deepseek.com/)蓝色渐变与流场图案的独立 WebGL 绘制，呈现同类氛围，不复制官网脚本、DOM 或资源，不宣称完全复刻），以及用户自己的**自定义壁纸**。
 
 用户明确要求“搞个全局的时候 我看看”，范围是覆盖侧边栏与主内容区的全局背景；已有对话、任务运行、设置页及其他全局面板均不触发隐藏，不使用会话或面板状态门控。开关 `flowingBackgroundEnabled` 控制是否显示；开启后主行右侧出现调节图标，打开的面板先选背景类型（`flowingBackgroundKind`，`pattern` 或 `wallpaper`），再调背景不透明度与背景模糊。用户明确要求支持自定义壁纸，并选择由 Host 把图片存到 profile 文件、在同一个功能内切换类型；不引入第二个开关。
 
@@ -30,7 +30,7 @@
 
 界面术语以作用对象和实际效果为准：「背景不透明度」（Background opacity）0% 隐藏背景，100% 完全显示；「背景模糊」（Background blur）0px 保持清晰，越大越模糊。名称与数值方向一致，滑块显示值与持久化值相同，不再取反。二者均只作用自有背景，不控制原生聊天卡片、输入框或调节面板自身材质。按用户要求参考多个插件的实现而保持官方组件样式：dsh-ui-appearance 区分媒体滤镜与表面玻璃，dsh-homepage-glass 对照动效节流、减少动效与 GPU 清理，dsh-mpkg-wallpaper 对照零值不隐式附加模糊、表面与媒体归属及弹层定位边界。配置键与值语义保持不变：`flowingBackgroundOpacity` 一直是 CSS 不透明度，界面现在直接显示这个数值，因此名称改为「背景不透明度」。
 
-`flowingBackgroundEnabled` 为独立布尔配置，默认 `false`；`flowingBackgroundKind` 为字符串配置，默认 `pattern`，取值 `pattern`（官网流动）或 `wallpaper`（自定义壁纸），未知值回退 `pattern`；`flowingBackgroundOpacity` 为数值配置，默认 `100`（CSS 不透明度语义；界面直接以 0–100% 显示「背景不透明度」，0% 完全隐藏、100% 完整显示，不做取反）；`flowingBackgroundBlur` 为数值配置，默认 `0`（0–40 像素）；`showBackgroundShortcut` 为布尔配置，默认 `false`，控制侧栏快捷入口：开启后在「快捷切换外观」按钮**左侧紧邻**（无间距）显示一个 32×32 按钮，与外观按钮同为 `position:fixed; bottom:16px`、`--dsw-radius-md`、`interactive-bg-hover` 悬浮，图标为按宿主图标规格自绘的短袖（16×16 viewBox、1px 描边、圆角端点，与 `edit-outline`／`trash-outline` 同构）；设置行紧跟在「自定义背景」主开关之后，仅在主开关开启时可保存，文案与「快捷切换外观」同构：中文「快捷切换背景」／「在侧栏底部快捷调节背景」，英文 `Quick background switch`／`Quickly adjust the background at the bottom of the sidebar`。五者均由原生 `configForms` 持久化到 PowerDSH 配置。复用设置行的保存、读回、忙碌、失败回滚及错误提示，保留其他偏好。只在配置 ready 且 `flowingBackgroundEnabled` 严格为 true 时注册背景；关闭或配置不可用时立即撤销注册。只读时展示已保存效果，禁止写入。主开关标题中文“自定义背景”、英文“Custom background”，说明中文“为界面选择柔和的动态背景”、英文“Choose a soft animated background for the interface”。开启后不再有独立的「背景类型」设置行：主行本身保留开关，右侧增加一个 ghost/sm 的调节图标，提供「调节背景」悬浮提示和无障碍名称。背景类型改为在调节面板内用原生 radio 组选择（`fieldset` + `legend` + 两个 `input[type=radio]`，同名成组），位于面板最上方，两个选项在同一行横向排列（间距 18px，窄窗口自动换行），标签为「官网流动」「自定义壁纸」；方向键可在两项间切换，与原生单选组行为一致。类型、不透明度与模糊统一在面板内预览、在关闭或释放时保存；选择类型本身不写盘。官网流动同样可调不透明度与模糊，切换类型不再重置外观。类型与两个数值的保存共用设置行的忙碌及错误反馈；失败以 Host 实际读回值为准，可再次操作完成恢复，已保存壁纸文件保留。壁纸行仅在当前类型为「自定义壁纸」时显示于调节面板内：44×30 缩略图、文件名（13px）与格式说明（11px 辅助色）在左，右侧是两个 28×28 的图标按钮，复用宿主图标 sprite 的 `edit-outline` 与 `trash-outline`，样式对齐原生 Modal 关闭按钮（透明底、`--dsw-radius-sm`、悬浮填充 `interactive-bg-hover`、`:focus-visible` 焦点环、禁用 40% 透明度）；均带悬浮提示与无障碍名称，移除按钮悬浮时转为错误色；未设置时文件名显示「未设置壁纸」。选择图片只更新当前壁纸，不自动改动背景类型。格式说明使用 11px 辅助色小字，不占标题层级，窄窗口下隐藏；文件名省略时可通过原生 title 查看完整名称。操作使用图标按钮而非文字按钮，组内 2px 间距。
+`flowingBackgroundEnabled` 为独立布尔配置，默认 `false`；`flowingBackgroundKind` 为字符串配置，默认 `pattern`，取值 `pattern`（官网流动）或 `wallpaper`（自定义壁纸），未知值回退 `pattern`；`flowingBackgroundOpacity` 为数值配置，默认 `100`（CSS 不透明度语义；界面直接以 0–100% 显示「背景不透明度」，0% 完全隐藏、100% 完整显示，不做取反）；`flowingBackgroundBlur` 为数值配置，默认 `0`（0–40 像素）；`showBackgroundShortcut` 为布尔配置，默认 `false`，控制侧栏快捷入口：开启后在「快捷切换外观」按钮**左侧紧邻**（无间距）显示一个 32×32 按钮，与外观按钮同为 `position:fixed; bottom:16px`、`--dsw-radius-md`、`interactive-bg-hover` 悬浮，图标为按宿主图标规格自绘的短袖（16×16 viewBox、1px 描边、圆角端点，与 `edit-outline`／`trash-outline` 同构）；设置行紧跟在「背景设置」主开关之后，仅在主开关开启时可保存，文案与「快捷切换外观」同构：中文「快捷切换背景」／「在侧栏底部快捷调节背景」，英文 `Quick background switch`／`Quickly adjust the background at the bottom of the sidebar`。五者均由原生 `configForms` 持久化到 PowerDSH 配置。复用设置行的保存、读回、忙碌、失败回滚及错误提示，保留其他偏好。只在配置 ready 且 `flowingBackgroundEnabled` 严格为 true 时注册背景；关闭或配置不可用时立即撤销注册。只读时展示已保存效果，禁止写入。主开关标题中文“背景设置”、英文“Background settings”，说明中文“为界面选择柔和的动态背景”、英文“Choose a soft animated background for the interface”。开启后不再有独立的「背景类型」设置行：主行本身保留开关，右侧增加一个 ghost/sm 的调节图标，提供「调节背景」悬浮提示和无障碍名称。背景类型改为在调节面板内用原生 radio 组选择（`fieldset` + `legend` + 两个 `input[type=radio]`，同名成组），位于面板最上方，两个选项在同一行横向排列（间距 18px，窄窗口自动换行），标签为「官网流动」「自定义壁纸」；方向键可在两项间切换，与原生单选组行为一致。类型、不透明度与模糊统一在面板内预览、在关闭或释放时保存；选择类型本身不写盘。官网流动同样可调不透明度与模糊，切换类型不再重置外观。类型与两个数值的保存共用设置行的忙碌及错误反馈；失败以 Host 实际读回值为准，可再次操作完成恢复，已保存壁纸文件保留。壁纸行仅在当前类型为「自定义壁纸」时显示于调节面板内：44×30 缩略图、文件名（13px）与格式说明（11px 辅助色）在左，右侧是两个 28×28 的图标按钮，复用宿主图标 sprite 的 `edit-outline` 与 `trash-outline`，样式对齐原生 Modal 关闭按钮（透明底、`--dsw-radius-sm`、悬浮填充 `interactive-bg-hover`、`:focus-visible` 焦点环、禁用 40% 透明度）；均带悬浮提示与无障碍名称，移除按钮悬浮时转为错误色；未设置时文件名显示「未设置壁纸」。选择图片只更新当前壁纸，不自动改动背景类型。格式说明使用 11px 辅助色小字，不占标题层级，窄窗口下隐藏；文件名省略时可通过原生 title 查看完整名称。操作使用图标按钮而非文字按钮，组内 2px 间距。
 
 ## 主页调节面板
 
@@ -75,7 +75,7 @@ Client 通过 `preferenceSlot` 将控制组件注册和配置订阅绑定到 slo
 - 默认不注册控制组件；开启只注册一个独立项，重复配置通知不会产生重复项；关闭、配置不可用和卸载均撤销。
 - 保存失败回到已保存值，不启动新效果，其他功能偏好保留；运行故障使用背景专属错误码，实际保存失败优先且不混入运行失败的原因。
 - 「背景类型」及其旁边的调节图标仅在开启时展开；类型默认 `pattern`，可切到 `wallpaper`，未知值回退 `pattern`；保存中禁用，失败回滚并显示行内提示。
-- 点击调节先关闭原生设置窗口，在主页正中央显示带独立样式的半透明磨砂面板：最上方是背景类型单选，其次（仅壁纸类型）是图片选择、更换与移除，最后是「外观」分组里的两个滑块。关闭或 Escape 保存最后的值并留在主页，不打开设置；从不占用原生设置入口。拖动即时预览，指针释放、键盘方向键／Home／End／PageUp／PageDown 或失焦时以数值提交；**滑块保存中不禁用**，因此键盘焦点与连续调整不会被打断，只阻止新的并发写入。保存失败撤下预览并在面板显示可恢复的错误。主开关关闭、配置不可用或卸载时自动收起并留在主页。面板不持久化、不阻塞其他区域；不透明度 `100`、模糊 `0` 时移除内联覆盖，其余值分别写入图层 `opacity` 与画布/图片的 `filter: blur()`；外观订阅随背景释放，只更新同一图层，不重启帧链。
+- 点击调节先关闭原生设置窗口，在主页正中央显示带独立样式的半透明磨砂面板：最上方是背景类型单选，其次（仅壁纸类型）是图片选择、更换与移除，最后是「外观」分组里的两个滑块。关闭或 Escape 保存最后的值并留在主页，不打开设置；从不占用原生设置入口。拖动即时预览，指针释放、键盘方向键／Home／End／PageUp／PageDown 或失焦时以数值提交；**滑块保存中不禁用**，因此键盘焦点与连续调整不会被打断，只阻止新的并发写入；保存期间面板本身也不进入忙碌或禁用态——根节点不设 `aria-busy`，类型单选与关闭按钮保持可操作，避免一次键盘调节让整张表单看起来被禁用。保存失败撤下预览并在面板显示可恢复的错误。主开关关闭、配置不可用或卸载时自动收起并留在主页。面板不持久化、不阻塞其他区域；不透明度 `100`、模糊 `0` 时移除内联覆盖，其余值分别写入图层 `opacity` 与画布/图片的 `filter: blur()`；外观订阅随背景释放，只更新同一图层，不重启帧链。
 - 主行开关在背景关闭时仍显示（调节图标隐藏），因此用户始终能重新开启。
 - 在自定义壁纸类型的面板中可选择 PNG/JPEG/WebP 图片，保持当前类型，经 Host 写入 profile 的 `power-dsh/` 文件并读回显示；已保存时显示文件名与缩略图，可更换或移除；未设置或读取失败时回退官网流动图案，不显示破图，读取失败提供共享错误反馈与重试。
 - 非图片、超过 25 MiB 的图片在 Client 侧即被拒绝且不产生 Host 写入；Host 侧再次校验 MIME、大小与文件名，只保留 basename，拒绝目录穿越、空载荷与非 data URL；损坏元数据报错而不猜测类型；写入使用 0600 临时文件后原子重命名并清理临时文件；清除幂等；卸载后调用被拒绝。
@@ -85,7 +85,7 @@ Client 通过 `preferenceSlot` 将控制组件注册和配置订阅绑定到 slo
 - 仅两个必需的确切官方样式标签及其所需简单类名唯一、且真实 AppFrame 可见并通过语义直接子元素与定位核对时可挂载；缺失、歧义或不支持时不绘画、不回退前景，设置页提供共享错误反馈。
 - 同版本不同构建哈希均以当前已加载样式模块为准；正确样式延迟到达可恢复挂载，同一框架的哈希或结构表面替换不重启动画，观察器随关闭和卸载释放。
 - 一张 Canvas 连续覆盖框架、侧边栏和主内容区；背景只从已批准结构表面透出，输入卡片、编辑器、文件卡片、菜单和弹窗保留原生表面与交互。窄窗口 `data-sidebar-drawer` 模式保留侧栏抽屉原生底色，退出该模式后再恢复侧栏透明适配。
-- 已有对话的输入区外层不再用原生 bg-base 渐变覆盖自定义背景，浅深主题均能透出背景；输入卡片的底色、圆角、阴影、sticky 定位和层级保持原生。输入区外层的原始内联值与优先级随关闭、替换或卸载恢复；菜单本体、阴影与 macOS 模糊垫层保持原生，外围色块仍待实屏确认。
+- 已有对话的输入区外层不再用原生 bg-base 渐变覆盖背景设置，浅深主题均能透出背景；输入卡片的底色、圆角、阴影、sticky 定位和层级保持原生。输入区外层的原始内联值与优先级随关闭、替换或卸载恢复；菜单本体、阴影与 macOS 模糊垫层保持原生，外围色块仍待实屏确认。
 - 开启时在装饰类名可唯一识别的构建中隐藏侧栏设置按钮上方的原生底部滚动渐隐层，包括抽屉模式；缺失或歧义时不阻断背景；关闭、卸载、初始化失败或节点替换后按所有权恢复原始 display 值与优先级。动态替换只更新该装饰层，不重启动画，不影响其他位置的渐隐层。
 - 工作区列表的底部 fade 只依据精确官方模块的唯一 root/treeBody/fade 映射及 span 直接子结构隐藏，兼容不同构建哈希；模块缺失、错误来源、标签/类名歧义均不阻断背景，恢复元数据后可适配，列表替换及关闭按所有权恢复，其他位置同名类不受影响。
 - Windows 顶部操作栏的 AppFrame `::before` 底色在开启期间透明，规则绑定当前唯一核对框架及其自有直接子层；关闭或卸载移除规则，拖动和菜单交互保持原生。两套构建哈希均使用动态映射；右上角原生窗口按钮底色保留。
@@ -112,4 +112,4 @@ Windows 顶栏适配依据参考源码 AppFrame 的 `data-windows-titlebar` / `:
 
 工作区 fade 补全已重建产物，通过严格类型、构建新鲜度、358 项全仓测试、实际打包、独立生产安装与 diff 空白检查；真实 Windows 展示尚待用户更新后复测。
 
-本轮按用户要求把背景命名为「自定义背景」，保留单一 `flowingBackgroundEnabled` 开关与官网流动图案，并补充 `flowingBackgroundOpacity`（0–100%，默认 100）与 `flowingBackgroundBlur`（0–40px，默认 0）两行滑块，分别控制画布不透明度与磨砂模糊，参考 wallpaper 的整屏磨砂与 homepage-glass 的界面毛玻璃作为功能边界对照，但只作用于自有背景图层，不改宿主表面。曾尝试的内置「流体」预置已按用户要求删除，相关 shader、`flowingBackgroundStyle` 配置与测试一并移除。本轮按用户要求新增自定义壁纸：新增 `flowingBackgroundKind` 类型配置与「壁纸图片」行，Host 以 `WallpaperStore` 把图片存到 profile 的 `power-dsh/wallpaper.{bin,json}`，并提供 `readWallpaper`／`saveWallpaper`／`clearWallpaper` 三个 owner-only RPC；Client 侧校验 MIME 与 25 MiB、经 `FileReader` 读 data URL、失败回退图案并复用共享错误反馈。壁纸类型不启动 WebGL 帧链。行为覆盖见 [tests/background.test.mjs](tests/background.test.mjs)、[tests/wallpaper.test.mjs](tests/wallpaper.test.mjs)与 [tests/attachment.test.mjs](tests/attachment.test.mjs)。实际页面（含浅深主题、滑块观感与真实图片选择）仍需实屏验收。
+本轮按用户要求把背景命名为「背景设置」，保留单一 `flowingBackgroundEnabled` 开关与官网流动图案，并补充 `flowingBackgroundOpacity`（0–100%，默认 100）与 `flowingBackgroundBlur`（0–40px，默认 0）两行滑块，分别控制画布不透明度与磨砂模糊，参考 wallpaper 的整屏磨砂与 homepage-glass 的界面毛玻璃作为功能边界对照，但只作用于自有背景图层，不改宿主表面。曾尝试的内置「流体」预置已按用户要求删除，相关 shader、`flowingBackgroundStyle` 配置与测试一并移除。本轮按用户要求新增自定义壁纸：新增 `flowingBackgroundKind` 类型配置与「壁纸图片」行，Host 以 `WallpaperStore` 把图片存到 profile 的 `power-dsh/wallpaper.{bin,json}`，并提供 `readWallpaper`／`saveWallpaper`／`clearWallpaper` 三个 owner-only RPC；Client 侧校验 MIME 与 25 MiB、经 `FileReader` 读 data URL、失败回退图案并复用共享错误反馈。壁纸类型不启动 WebGL 帧链。行为覆盖见 [tests/background.test.mjs](tests/background.test.mjs)、[tests/wallpaper.test.mjs](tests/wallpaper.test.mjs)与 [tests/attachment.test.mjs](tests/attachment.test.mjs)。实际页面（含浅深主题、滑块观感与真实图片选择）仍需实屏验收。
