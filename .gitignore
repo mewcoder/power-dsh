@@ -14,3 +14,6 @@ coverage/
 # Local upstream and plugin sources for reference only
 /.references/
 /reference/
+
+# Local design previews, not shipped
+/assets/previews/

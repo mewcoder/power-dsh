@@ -177,7 +177,6 @@ test('all feature configuration defaults and settings tool output requirements s
     flowingBackgroundOpacity: 100,
     flowingBackgroundBlur: 0,
     archiveManagerEnabled: false,
-    whaleMotionEnabled: false,
   };
   assert.deepEqual(Object.keys(Config.dict).sort(), Object.keys(expected).sort());
   for (const [key, value] of Object.entries(expected)) assert.deepEqual(Config.dict[key].meta.default, value, key);

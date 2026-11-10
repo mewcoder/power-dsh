@@ -11,7 +11,6 @@ export interface DisabledSkillPreference {
 
 export interface Preferences {
   showVersion: boolean;
-  whaleMotionEnabled: boolean;
   showThemeSwitcher: boolean;
   showRefreshButton: boolean;
   showRestartButton: boolean;

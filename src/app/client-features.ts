@@ -68,12 +68,7 @@ import { definition as archiveDefinition } from '../features/archive/definition.
 import { locales as archiveLocales } from '../features/archive/locales.ts';
 import { rpc as archiveRpc } from '../features/archive/rpc.ts';
 
-import { createClientFeature as whaleMotion } from '../features/whale-motion/client.ts';
-import { definition as whaleMotionDefinition } from '../features/whale-motion/definition.ts';
-import { locales as whaleMotionLocales } from '../features/whale-motion/locales.ts';
-
 export const clientFeatures: ClientFeatureSelection[] = [
-  { definition: whaleMotionDefinition, create: whaleMotion, locales: whaleMotionLocales, rpc: [] },
   { definition: versionDisplayDefinition, create: versionDisplay, locales: versionDisplayLocales, rpc: [] },
   { definition: appearanceShortcutDefinition, create: appearanceShortcut, locales: appearanceShortcutLocales, rpc: [] },
   { definition: refreshButtonDefinition, create: refreshButton, locales: refreshButtonLocales, rpc: [] },

@@ -29,12 +29,11 @@
 | [快捷推理等级切换](../src/features/thinking-effort/spec.md) | 模型选择右侧的信号格／仪表盘切换、档位序列、读回与失败边界 |
 | [外观快捷切换](../src/features/appearance-shortcut/spec.md) | 原生主题同步、按钮定位与生命周期 |
 | [自定义背景](../src/features/flowing-background/spec.md) | 单一开关、官网流动图案与自定义壁纸、Host 侧壁纸存储与校验、背景淡化与模糊调节、全局连续画布、受控结构表面适配、样式恢复与 GPU 生命周期 |
-| [鲸鱼动效](../src/features/whale-motion/spec.md) | 左上角小鲸鱼自动循环摆尾，身体、眼睛与字标保持原位 |
 | [显示版本号](../src/features/version-display/spec.md) | 宿主版本展示、桌面更新入口与侧栏定位 |
 | [技能管理](../src/features/skills/spec.md) | 全局与项目来源、仅对 DSH 生效的启停与共享文件保护 |
 | [MCP 管理](../src/features/mcp/spec.md) | 全局服务器、原生启停、运行状态与工具列表 |
-| [个性化](../src/features/personalization/spec.md) | 全局指令编辑、原生文件保存与入口关闭行为 |
-| [归档管理](../src/features/archive/spec.md) | 已归档会话的分组列表、标题搜索与单条恢复 |
+| [全局指令](../src/features/personalization/spec.md) | 全局指令编辑、原生文件保存与入口关闭行为 |
+| [归档管理](../src/features/archive/spec.md) | 已归档会话的分组列表、搜索、排序、项目筛选、恢复与二次确认删除 |
 | [停用官方登录与模型接入](../src/features/account-blocking/spec.md) | 登录与模型目标、保留范围与启停行为 |
 | [停用官方搜索](../src/features/search-blocking/spec.md) | 独立搜索开关、抓取保留、旧会话限制与恢复 |
 | [停用官方反馈与遥测](../src/features/telemetry-blocking/spec.md) | 七个内置目标、开关行为与网络边界 |

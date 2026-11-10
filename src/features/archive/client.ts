@@ -50,8 +50,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   }
   const deleteErrorKeys = [
     'archiveDeleteUnavailable', 'archiveDeleteLive', 'archiveDeleteUnsupported', 'archiveDeleteUnsafe',
-    'archiveNotArchived', 'archiveDeleteIncomplete', 'archiveDeleteCheckFailed', 'archiveDeleteStatFailed',
-    'archiveDeleteUnarchiveFailed', 'archiveDeleteRemoveFailed',
+    'archiveNotArchived', 'archiveInvalidSession', 'archiveDeleteIncomplete', 'archiveDeleteCheckFailed',
+    'archiveDeleteStatFailed', 'archiveDeleteUnarchiveFailed', 'archiveDeleteRemoveFailed',
   ];
   const archiveErrorMessage = (message: string | undefined, fallback: 'archiveLoadFailed' | 'archiveRestoreFailed' | 'archiveDeleteFailed') => {
     if (message?.includes('archiveUnavailable')) return t('archiveUnavailable');

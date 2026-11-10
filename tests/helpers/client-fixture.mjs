@@ -560,7 +560,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     },
     focusedElementId: () => focusedElementId,
     renderPersonalization() {
-      const wrapped = entries.get('settings.section:power-dsh-personalization').component({ t: key => key === 'settingsLocation' ? '全局指令（{path}）' : key });
+      const wrapped = entries.get('settings.section:power-dsh-personalization').component({ t: key => key === 'settingsLocation' ? '{path}' : key });
       return renderComponent(wrapped);
     },
     subscriptions: () => listeners.size,

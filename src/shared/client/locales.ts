@@ -25,7 +25,7 @@ export const locales = {
     "readOnly": "These settings are read-only.",
     "saveFailed": "Could not save this setting. Please try again.",
     "versionUnavailable": "DSH version information is currently unavailable.",
-    "settingsOutdated": "The Host has not loaded personalization yet. Re-enable power-dsh in plugin management, then try again."
+    "settingsOutdated": "This feature has not loaded in the Host yet. Re-enable power-dsh in plugin management, then try again."
   },
   "zh": {
     "title": "PowerDSH",
@@ -52,6 +52,6 @@ export const locales = {
     "readOnly": "当前设置为只读。",
     "saveFailed": "无法保存此设置，请重试。",
     "versionUnavailable": "DSH 版本信息暂不可用。",
-    "settingsOutdated": "个性化功能尚未在后端加载，请在插件管理中重新启用 power-dsh 后重试。"
+    "settingsOutdated": "该功能尚未在后端加载，请在插件管理中重新启用 power-dsh 后重试。"
   }
 } satisfies Locales;

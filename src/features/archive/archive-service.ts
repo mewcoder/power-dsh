@@ -17,7 +17,6 @@ export interface SessionQueryLike {
     { sessionId: string; status: 'fulfilled'; value: { session: { createdAt: number }; title?: { title: string; updatedAt: number } } }
     | { sessionId: string; status: 'rejected'; reason: unknown }
   )[]>;
-  listSessions(signal?: AbortSignal): Promise<readonly { header: { id: string }; live: boolean }[]>;
 }
 /** Structural view of the native session persistence service used for permanent deletion. */
 export interface SessionPersistenceLike {

@@ -63,11 +63,7 @@ import * as archiveConfig from '../features/archive/config.ts';
 import * as archiveHost from '../features/archive/host.ts';
 import { rpc as archiveRpc } from '../features/archive/rpc.ts';
 
-import { definition as whaleDefinition } from '../features/whale-motion/definition.ts';
-import * as whaleConfig from '../features/whale-motion/config.ts';
-
 export const HOST_FEATURES = Object.freeze([
-  { definition: whaleDefinition, ...whaleConfig },
   { definition: versionDefinition, ...versionConfig },
   { definition: appearanceDefinition, ...appearanceConfig },
   { definition: refreshDefinition, ...refreshConfig },

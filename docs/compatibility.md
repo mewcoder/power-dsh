@@ -73,7 +73,7 @@ DSH `0.2.2-rc.1` 安装包已核对会话行事件标记，作为有限 DOM 例�
 | 归档管理 | [ArchiveService](../src/features/archive/archive-service.ts)的 `workspaceController.follow()` / `unarchiveSession()`、`sessionQuery.readTitleSnapshots()` / `listSessions()`、`sessionPersistence.stat()` | 基线帧 `items` / `archivedSessionIds` 形状、工作区归属、标题/`updatedAt`/`createdAt`、`live` 判定、`stat().location.path` 定位与只删本会话产物、服务缺席降级 |
 | 任务通知 | [通知投影](../src/features/notifications/notifications.ts)及 Host 注册、Client 的 `sessions.list` / `uiSession.sessionStatus` | 投影注册与释放、`turn/end` 原因、首次订阅基线、重连去重、提问与审批状态字段 |
 | 系统声音 | [SystemSounds](../src/features/notifications/system-sounds.ts)、`connection.isLoopback`、subprocess `resolveExecutable` / `spawn` 与托管句柄 | 本机识别、参数与取消语义、平台真实试听、远程界面不会在服务器播放 |
-| 个性化 | `profileContext.home`、文件 RPC、宿主全局指令发现 | 正文落在同一个原生全局文件、冲突时不覆盖、禁用入口不改变正文及读取行为 |
+| 全局指令 | `profileContext.home`、文件 RPC、宿主全局指令发现 | 正文落在同一个原生全局文件、冲突时不覆盖、禁用入口不改变正文及读取行为 |
 | 版本、外观与刷新 | `clientModules.graph().release`、boot release、theme service、桌面 updates bridge、侧栏 slot 与标题栏 | 显示的是宿主版本；桥协议、主题事件、slot props、窗口缩放和系统标题栏偏移 |
 
 ## 升级指南核对结果

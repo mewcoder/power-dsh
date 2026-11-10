@@ -57,7 +57,7 @@ var OperationQueue = class {
 };
 
 // src/features/version-display/definition.ts
-const definition$18 = Object.freeze({
+const definition$17 = Object.freeze({
 	id: "version-display",
 	category: "interface",
 	order: 6,
@@ -66,11 +66,11 @@ const definition$18 = Object.freeze({
 });
 
 // src/features/version-display/config.ts
-var config_exports$18 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$18,
+var config_exports$17 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$17,
 	settingsTool: () => settingsTool$10
 });
-const configFields$18 = { showVersion: z.boolean().default(false).volatile() };
+const configFields$17 = { showVersion: z.boolean().default(false).volatile() };
 const settingsTool$10 = {
 	parameters: { showVersion: {
 		type: "boolean",
@@ -104,7 +104,7 @@ const settingsTool$10 = {
 };
 
 // src/features/appearance-shortcut/definition.ts
-const definition$17 = Object.freeze({
+const definition$16 = Object.freeze({
 	id: "appearance-shortcut",
 	category: "interface",
 	order: 4,
@@ -113,11 +113,11 @@ const definition$17 = Object.freeze({
 });
 
 // src/features/appearance-shortcut/config.ts
-var config_exports$17 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$17,
+var config_exports$16 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$16,
 	settingsTool: () => settingsTool$9
 });
-const configFields$17 = { showThemeSwitcher: z.boolean().default(false).volatile() };
+const configFields$16 = { showThemeSwitcher: z.boolean().default(false).volatile() };
 const settingsTool$9 = {
 	parameters: { showThemeSwitcher: {
 		type: "boolean",
@@ -140,7 +140,7 @@ const settingsTool$9 = {
 };
 
 // src/features/refresh-button/definition.ts
-const definition$16 = Object.freeze({
+const definition$15 = Object.freeze({
 	id: "refresh-button",
 	category: "other",
 	order: 1,
@@ -149,11 +149,11 @@ const definition$16 = Object.freeze({
 });
 
 // src/features/refresh-button/config.ts
-var config_exports$16 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$16,
+var config_exports$15 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$15,
 	settingsTool: () => settingsTool$8
 });
-const configFields$16 = { showRefreshButton: z.boolean().default(false).volatile() };
+const configFields$15 = { showRefreshButton: z.boolean().default(false).volatile() };
 const settingsTool$8 = {
 	parameters: { showRefreshButton: {
 		type: "boolean",
@@ -176,7 +176,7 @@ const settingsTool$8 = {
 };
 
 // src/features/restart-button/definition.ts
-const definition$15 = Object.freeze({
+const definition$14 = Object.freeze({
 	id: "restart-button",
 	category: "other",
 	order: 2,
@@ -185,11 +185,11 @@ const definition$15 = Object.freeze({
 });
 
 // src/features/restart-button/config.ts
-var config_exports$15 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$15,
+var config_exports$14 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$14,
 	settingsTool: () => settingsTool$7
 });
-const configFields$15 = { showRestartButton: z.boolean().default(false).volatile() };
+const configFields$14 = { showRestartButton: z.boolean().default(false).volatile() };
 const settingsTool$7 = {
 	parameters: { showRestartButton: {
 		type: "boolean",
@@ -414,7 +414,7 @@ const RESTART_APP_RPC = {
 const rpc$12 = [RESTART_STATUS_RPC, RESTART_APP_RPC];
 
 // src/features/notifications/definition.ts
-const definition$14 = Object.freeze({
+const definition$13 = Object.freeze({
 	id: "notifications",
 	category: "general",
 	order: 0,
@@ -427,8 +427,8 @@ const definition$14 = Object.freeze({
 });
 
 // src/features/notifications/config.ts
-var config_exports$14 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$14 });
-const configFields$14 = {
+var config_exports$13 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$13 });
+const configFields$13 = {
 	notificationsEnabled: z.boolean().default(false).volatile(),
 	notificationSoundEnabled: z.boolean().default(true).volatile(),
 	notificationSound: z.string().default("default").volatile()
@@ -751,7 +751,7 @@ const PLAY_SYSTEM_SOUND_RPC = {
 const rpc$11 = [LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC];
 
 // src/features/personalization/definition.ts
-const definition$13 = Object.freeze({
+const definition$12 = Object.freeze({
 	id: "personalization",
 	category: "enhance",
 	order: 9,
@@ -760,8 +760,8 @@ const definition$13 = Object.freeze({
 });
 
 // src/features/personalization/config.ts
-var config_exports$13 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$13 });
-const configFields$13 = { personalizationEnabled: z.boolean().default(false).volatile() };
+var config_exports$12 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$12 });
+const configFields$12 = { personalizationEnabled: z.boolean().default(false).volatile() };
 
 // src/features/personalization/personalization.ts
 const MAX_PROMPT_LENGTH = 2e4;
@@ -880,7 +880,7 @@ const SAVE_PERSONALIZATION_RPC = fileRpc("savePersonalization", ["text", "revisi
 const rpc$10 = [READ_PERSONALIZATION_RPC, SAVE_PERSONALIZATION_RPC];
 
 // src/features/skills/definition.ts
-const definition$12 = Object.freeze({
+const definition$11 = Object.freeze({
 	id: "skills",
 	category: "enhance",
 	order: 7,
@@ -889,8 +889,8 @@ const definition$12 = Object.freeze({
 });
 
 // src/features/skills/config.ts
-var config_exports$12 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$12 });
-const configFields$12 = {
+var config_exports$11 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$11 });
+const configFields$11 = {
 	skillManagerEnabled: z.boolean().default(false).volatile(),
 	disabledSkills: z.array(z.object({
 		name: z.string().required(),
@@ -1489,7 +1489,7 @@ const SET_SKILL_ENABLED_RPC = skillRpc("setSkillEnabled", [
 const rpc$9 = [LIST_SKILLS_RPC, SET_SKILL_ENABLED_RPC];
 
 // src/features/mcp/definition.ts
-const definition$11 = Object.freeze({
+const definition$10 = Object.freeze({
 	id: "mcp",
 	category: "enhance",
 	order: 8,
@@ -1498,8 +1498,8 @@ const definition$11 = Object.freeze({
 });
 
 // src/features/mcp/config.ts
-var config_exports$11 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$11 });
-const configFields$11 = { mcpManagerEnabled: z.boolean().default(false).volatile() };
+var config_exports$10 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$10 });
+const configFields$10 = { mcpManagerEnabled: z.boolean().default(false).volatile() };
 
 // src/features/mcp/mcp-policy.ts
 const MCP_CLIENT$1 = "@deepseek-ai/dsh-mcp-client";
@@ -2158,7 +2158,7 @@ const SET_MCP_SERVER_ENABLED_RPC = mcpRpc("setMcpServerEnabled", ["id", "enabled
 const rpc$8 = [LIST_MCP_SERVERS_RPC, SET_MCP_SERVER_ENABLED_RPC];
 
 // src/features/account-blocking/definition.ts
-const definition$10 = Object.freeze({
+const definition$9 = Object.freeze({
 	id: "account-blocking",
 	category: "simplify",
 	order: 8,
@@ -2167,11 +2167,11 @@ const definition$10 = Object.freeze({
 });
 
 // src/features/account-blocking/config.ts
-var config_exports$10 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$10,
+var config_exports$9 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$9,
 	settingsTool: () => settingsTool$6
 });
-const configFields$10 = { blockOfficialAccount: z.boolean().default(false).volatile() };
+const configFields$9 = { blockOfficialAccount: z.boolean().default(false).volatile() };
 const settingsTool$6 = {
 	parameters: { blockOfficialAccount: {
 		type: "boolean",
@@ -2289,7 +2289,7 @@ const ACCOUNT_RPC = policyRpc("setAccountBlocked", "AccountPolicyResult");
 const rpc$7 = [ACCOUNT_RPC];
 
 // src/features/search-blocking/definition.ts
-const definition$9 = Object.freeze({
+const definition$8 = Object.freeze({
 	id: "search-blocking",
 	category: "simplify",
 	order: 9,
@@ -2298,11 +2298,11 @@ const definition$9 = Object.freeze({
 });
 
 // src/features/search-blocking/config.ts
-var config_exports$9 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$9,
+var config_exports$8 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$8,
 	settingsTool: () => settingsTool$5
 });
-const configFields$9 = { blockOfficialSearch: z.boolean().default(false).volatile() };
+const configFields$8 = { blockOfficialSearch: z.boolean().default(false).volatile() };
 const settingsTool$5 = {
 	parameters: { blockOfficialSearch: {
 		type: "boolean",
@@ -2487,7 +2487,7 @@ const SEARCH_RPC = policyRpc("setSearchBlocked", "SearchPolicyResult");
 const rpc$6 = [SEARCH_RPC];
 
 // src/features/telemetry-blocking/definition.ts
-const definition$8 = Object.freeze({
+const definition$7 = Object.freeze({
 	id: "telemetry-blocking",
 	category: "simplify",
 	order: 10,
@@ -2496,11 +2496,11 @@ const definition$8 = Object.freeze({
 });
 
 // src/features/telemetry-blocking/config.ts
-var config_exports$8 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$8,
+var config_exports$7 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$7,
 	settingsTool: () => settingsTool$4
 });
-const configFields$8 = { blockOfficialTelemetry: z.boolean().default(false).volatile() };
+const configFields$7 = { blockOfficialTelemetry: z.boolean().default(false).volatile() };
 const settingsTool$4 = {
 	parameters: { blockOfficialTelemetry: {
 		type: "boolean",
@@ -2627,7 +2627,7 @@ const TELEMETRY_RPC = policyRpc("setTelemetryBlocked", "TelemetryPolicyResult");
 const rpc$5 = [TELEMETRY_RPC];
 
 // src/features/todo-blocking/definition.ts
-const definition$7 = Object.freeze({
+const definition$6 = Object.freeze({
 	id: "todo-blocking",
 	category: "simplify",
 	order: 11,
@@ -2636,11 +2636,11 @@ const definition$7 = Object.freeze({
 });
 
 // src/features/todo-blocking/config.ts
-var config_exports$7 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$7,
+var config_exports$6 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$6,
 	settingsTool: () => settingsTool$3
 });
-const configFields$7 = { blockTodo: z.boolean().default(false).volatile() };
+const configFields$6 = { blockTodo: z.boolean().default(false).volatile() };
 const settingsTool$3 = {
 	parameters: { blockTodo: {
 		type: "boolean",
@@ -2767,7 +2767,7 @@ const TODO_RPC = policyRpc("setTodoBlocked", "TodoPolicyResult");
 const rpc$4 = [TODO_RPC];
 
 // src/features/plan-blocking/definition.ts
-const definition$6 = Object.freeze({
+const definition$5 = Object.freeze({
 	id: "plan-blocking",
 	category: "simplify",
 	order: 11.5,
@@ -2776,11 +2776,11 @@ const definition$6 = Object.freeze({
 });
 
 // src/features/plan-blocking/config.ts
-var config_exports$6 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$6,
+var config_exports$5 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$5,
 	settingsTool: () => settingsTool$2
 });
-const configFields$6 = { blockPlan: z.boolean().default(false).volatile() };
+const configFields$5 = { blockPlan: z.boolean().default(false).volatile() };
 const settingsTool$2 = {
 	parameters: { blockPlan: {
 		type: "boolean",
@@ -2903,7 +2903,7 @@ const PLAN_RPC = policyRpc("setPlanBlocked", "PlanPolicyResult");
 const rpc$3 = [PLAN_RPC];
 
 // src/features/goal-blocking/definition.ts
-const definition$5 = Object.freeze({
+const definition$4 = Object.freeze({
 	id: "goal-blocking",
 	category: "simplify",
 	order: 11.75,
@@ -2912,11 +2912,11 @@ const definition$5 = Object.freeze({
 });
 
 // src/features/goal-blocking/config.ts
-var config_exports$5 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$5,
+var config_exports$4 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$4,
 	settingsTool: () => settingsTool$1
 });
-const configFields$5 = { blockGoal: z.boolean().default(false).volatile() };
+const configFields$4 = { blockGoal: z.boolean().default(false).volatile() };
 const settingsTool$1 = {
 	parameters: { blockGoal: {
 		type: "boolean",
@@ -3045,7 +3045,7 @@ const GOAL_RPC = policyRpc("setGoalBlocked", "GoalPolicyResult");
 const rpc$2 = [GOAL_RPC];
 
 // src/features/double-click-rename/definition.ts
-const definition$4 = Object.freeze({
+const definition$3 = Object.freeze({
 	id: "double-click-rename",
 	category: "other",
 	order: 3,
@@ -3054,11 +3054,11 @@ const definition$4 = Object.freeze({
 });
 
 // src/features/double-click-rename/config.ts
-var config_exports$4 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$4,
+var config_exports$3 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$3,
 	settingsTool: () => settingsTool
 });
-const configFields$4 = { blockDoubleClickRename: z.boolean().default(false).volatile() };
+const configFields$3 = { blockDoubleClickRename: z.boolean().default(false).volatile() };
 const settingsTool = {
 	parameters: { blockDoubleClickRename: {
 		type: "boolean",
@@ -3081,7 +3081,7 @@ const settingsTool = {
 };
 
 // src/features/thinking-effort/definition.ts
-const definition$3 = Object.freeze({
+const definition$2 = Object.freeze({
 	id: "thinking-effort",
 	category: "interface",
 	order: 3,
@@ -3090,14 +3090,14 @@ const definition$3 = Object.freeze({
 });
 
 // src/features/thinking-effort/config.ts
-var config_exports$3 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$3 });
-const configFields$3 = {
+var config_exports$2 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$2 });
+const configFields$2 = {
 	showThinkingEffortSwitcher: z.boolean().default(false).volatile(),
 	thinkingEffortGlyph: z.string().default("arc").volatile()
 };
 
 // src/features/flowing-background/definition.ts
-const definition$2 = Object.freeze({
+const definition$1 = Object.freeze({
 	id: "flowing-background",
 	category: "interface",
 	order: 5,
@@ -3111,8 +3111,8 @@ const definition$2 = Object.freeze({
 });
 
 // src/features/flowing-background/config.ts
-var config_exports$2 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$2 });
-const configFields$2 = {
+var config_exports$1 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$1 });
+const configFields$1 = {
 	flowingBackgroundEnabled: z.boolean().default(false).volatile(),
 	flowingBackgroundKind: z.string().default("pattern").volatile(),
 	flowingBackgroundOpacity: z.number().default(100).volatile(),
@@ -3311,7 +3311,7 @@ const rpc$1 = [
 ];
 
 // src/features/archive/definition.ts
-const definition$1 = Object.freeze({
+const definition = Object.freeze({
 	id: "archive",
 	category: "enhance",
 	order: 10,
@@ -3320,8 +3320,8 @@ const definition$1 = Object.freeze({
 });
 
 // src/features/archive/config.ts
-var config_exports$1 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$1 });
-const configFields$1 = { archiveManagerEnabled: z.boolean().default(false).volatile() };
+var config_exports = /* @__PURE__ */ __exportAll({ configFields: () => configFields });
+const configFields = { archiveManagerEnabled: z.boolean().default(false).volatile() };
 
 // src/features/archive/archive-catalog.ts
 /**
@@ -3586,29 +3586,8 @@ const rpc = [
 	DELETE_ARCHIVED_SESSION_RPC
 ];
 
-// src/features/whale-motion/definition.ts
-const definition = Object.freeze({
-	id: "whale-motion",
-	category: "interface",
-	order: 5.5,
-	keys: Object.freeze(["whaleMotionEnabled"]),
-	spec: "src/features/whale-motion/spec.md"
-});
-
-// src/features/whale-motion/config.ts
-var config_exports = /* @__PURE__ */ __exportAll({ configFields: () => configFields });
-const configFields = { whaleMotionEnabled: z.boolean().default(false).volatile() };
-
 // src/app/host-features.ts
 const HOST_FEATURES = Object.freeze([
-	{
-		definition,
-		...config_exports
-	},
-	{
-		definition: definition$18,
-		...config_exports$18
-	},
 	{
 		definition: definition$17,
 		...config_exports$17
@@ -3619,73 +3598,73 @@ const HOST_FEATURES = Object.freeze([
 	},
 	{
 		definition: definition$15,
-		...config_exports$15,
-		...host_exports$12,
-		rpc: rpc$12
+		...config_exports$15
 	},
 	{
 		definition: definition$14,
 		...config_exports$14,
-		...host_exports$11,
-		rpc: rpc$11
+		...host_exports$12,
+		rpc: rpc$12
 	},
 	{
 		definition: definition$13,
 		...config_exports$13,
-		...host_exports$10,
-		rpc: rpc$10
+		...host_exports$11,
+		rpc: rpc$11
 	},
 	{
 		definition: definition$12,
 		...config_exports$12,
-		...host_exports$9,
-		rpc: rpc$9
+		...host_exports$10,
+		rpc: rpc$10
 	},
 	{
 		definition: definition$11,
 		...config_exports$11,
-		...host_exports$8,
-		rpc: rpc$8
+		...host_exports$9,
+		rpc: rpc$9
 	},
 	{
 		definition: definition$10,
 		...config_exports$10,
-		...host_exports$7,
-		rpc: rpc$7
+		...host_exports$8,
+		rpc: rpc$8
 	},
 	{
 		definition: definition$9,
 		...config_exports$9,
-		...host_exports$6,
-		rpc: rpc$6
+		...host_exports$7,
+		rpc: rpc$7
 	},
 	{
 		definition: definition$8,
 		...config_exports$8,
-		...host_exports$5,
-		rpc: rpc$5
+		...host_exports$6,
+		rpc: rpc$6
 	},
 	{
 		definition: definition$7,
 		...config_exports$7,
-		...host_exports$4,
-		rpc: rpc$4
+		...host_exports$5,
+		rpc: rpc$5
 	},
 	{
 		definition: definition$6,
 		...config_exports$6,
-		...host_exports$3,
-		rpc: rpc$3
+		...host_exports$4,
+		rpc: rpc$4
 	},
 	{
 		definition: definition$5,
 		...config_exports$5,
-		...host_exports$2,
-		rpc: rpc$2
+		...host_exports$3,
+		rpc: rpc$3
 	},
 	{
 		definition: definition$4,
-		...config_exports$4
+		...config_exports$4,
+		...host_exports$2,
+		rpc: rpc$2
 	},
 	{
 		definition: definition$3,
@@ -3693,13 +3672,17 @@ const HOST_FEATURES = Object.freeze([
 	},
 	{
 		definition: definition$2,
-		...config_exports$2,
-		...host_exports$1,
-		rpc: rpc$1
+		...config_exports$2
 	},
 	{
 		definition: definition$1,
 		...config_exports$1,
+		...host_exports$1,
+		rpc: rpc$1
+	},
+	{
+		definition,
+		...config_exports,
 		...host_exports,
 		rpc
 	}

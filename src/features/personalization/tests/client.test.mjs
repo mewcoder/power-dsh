@@ -44,7 +44,8 @@ test('personalization saves explicitly, cancels edits and preserves saved text w
   const header = page.render().find(node => node.type === 'header');
   assert.equal(header.props.children.length, 2);
   assert.ok(header.props.children[0].props.children.includes('personalizationTab'));
-  assert.ok(header.props.children[1].props.children.includes('全局指令（/test-dsh-home/AGENTS.md）'));
+  assert.ok(header.props.children[1].props.children.includes('/test-dsh-home/AGENTS.md'));
+  assert.ok(!header.props.children[1].props.children.includes('全局指令'));
   assert.ok(!page.render().some(node => node.props.id?.endsWith('-prompt-count')));
   const actions = page.render().find(node => node.props.className === 'power-dsh-prompt-actions');
   assert.deepEqual(actions.props.children.map(node => node.props.children[0]), ['cancel', 'save']);

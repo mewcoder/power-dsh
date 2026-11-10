@@ -11,7 +11,6 @@ interface DisabledSkillPreference {
 }
 interface Preferences {
   showVersion: boolean;
-  whaleMotionEnabled: boolean;
   showThemeSwitcher: boolean;
   showRefreshButton: boolean;
   showRestartButton: boolean;
@@ -56,7 +55,7 @@ type SettingsOutput = Pick<Preferences, SettingsParameter> & {
   version: string | null;
   telemetry: TelemetryStatus;
 };
-type FeatureId = 'version-display' | 'appearance-shortcut' | 'refresh-button' | 'restart-button' | 'notifications' | 'personalization' | 'skills' | 'mcp' | 'account-blocking' | 'search-blocking' | 'telemetry-blocking' | 'todo-blocking' | 'plan-blocking' | 'goal-blocking' | 'double-click-rename' | 'thinking-effort' | 'flowing-background' | 'archive' | 'whale-motion';
+type FeatureId = 'version-display' | 'appearance-shortcut' | 'refresh-button' | 'restart-button' | 'notifications' | 'personalization' | 'skills' | 'mcp' | 'account-blocking' | 'search-blocking' | 'telemetry-blocking' | 'todo-blocking' | 'plan-blocking' | 'goal-blocking' | 'double-click-rename' | 'thinking-effort' | 'flowing-background' | 'archive';
 type FeatureCategory = 'general' | 'interface' | 'enhance' | 'simplify' | 'other';
 interface FeatureDefinition {
   readonly id: FeatureId;

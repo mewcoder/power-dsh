@@ -118,12 +118,6 @@ Mod 使用已核对的 DSH `0.2.2-rc.1` 原生会话、交互及 subprocess 通�
 
 [归档管理](../src/features/archive/spec.md)开发前从 [dsh-market](https://dshmarket.com/browse/) 检索并浅克隆 [MichengAI/dsh-archive-manager](https://github.com/MichengAI/dsh-archive-manager/tree/c2146d58cfb23066a2df26221bf78de4b4b0cc78)，提交 `c2146d58cfb23066a2df26221bf78de4b4b0cc78`，Apache-2.0。参考「按工作区分组 + 搜索 + 排序/项目筛选 + 取消归档 + 二次确认删除」的信息结构。其删除依赖私有 `locate()` 及内部记账/投影清理，本项目没有复制其代码或样式，改用公开 `sessionPersistence.stat().location.path` 定位转录产物并由 Host 文件系统删除，未采用其自动归档与保留时长。PowerDSH 的归档读取由 Host 侧 `workspaceController.follow` 基线配合 `sessionQuery.readTitleSnapshots` 完成，恢复走原生 `unarchiveSession`。
 
-## 鲸鱼动效
-
-[鲸鱼动效](../src/features/whale-motion/spec.md)使用 DeepSeek Harness `0.2.2-rc.1` 的公开 `FishLogo` 几何（`FISH_LOGO_PATH` 与 `23.16 × 17.04` 画布），来自官方标签 `dsh-v0.2.2-rc.1`、提交 `66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db` 的 `packages/client/ui-primitives/src/FishLogo.tsx`，已与本机实际发行包核对。Copyright (c) 2026 DeepSeek，适用本文开头完整保留的 MIT 许可证。尾部形变与循环节奏独立实现，不复制官方动画或第三方动画资源。
-
-开发前检索 [dsh-market](https://dshmarket.com/browse/)，浅克隆并阅读 [qiweiii/dsh-brand-studio](https://github.com/qiweiii/dsh-brand-studio/tree/793a8c3999cd4ad2e5aef4c5acab019ffccd5143)（包 `0.0.4`）的 `src/client/index.tsx` 及包清单，参考品牌图形与字标独立 slot 的功能边界。该快照未见 LICENSE 或明确许可字段，因此没有复制代码、样式或图片，也未执行脚本、安装依赖或插件。运行接口依据来自已安装的官方 `ui-sidebar`、`ui-brand-official` 与 Web shell 的 single slot 优先级/释放实现，不以第三方声明代替兼容验证。
-
 ## Lucide Puzzle、Sparkles 与 Cable
 
 [Mod 图标](../assets/icon.svg)与 Mod 设置导航使用 Lucide Puzzle；[技能与 MCP 设置导航](../src/client.ts)分别使用 Lucide Sparkles 和 Cable；[归档设置导航](../src/features/archive/client.ts)使用 Lucide Archive、Folder 与 Trash。仅内联所需 SVG，不引入 Lucide 运行时依赖。图形使用约定见 [UI 规范](ui.md#logo-与图标)，独立 SVG 中也保留完整许可。
