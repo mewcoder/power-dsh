@@ -7,7 +7,9 @@ import { samplePatternMotion } from '../pattern.ts';
 const SLOT = 'shell.overlay:power-dsh-flowing-background';
 async function openTune(app) {
   app.selectSettingsTab('interface');
-  descendants(app.renderSettings()).find(node => node.props.id === 'settings-test-flowingBackgroundTune').props.onClick();
+  const trigger = descendants(app.renderSettings()).find(node => node.props.id === 'settings-test-flowingBackgroundTune');
+  assert.ok(trigger, 'The main background row exposes the adjustment icon.');
+  trigger.props.onClick();
   app.renderTunePanel();
   await new Promise(setImmediate);
 }
@@ -29,55 +31,44 @@ test('the persisted switch adds one decoration and removes it on disable and dis
   assert.equal(app.entries.has(SLOT), false);
 });
 
-test('the tune button opens a homepage panel that previews and saves both values', async () => {
+test('the main row opens a panel that previews and saves appearance values', async () => {
   const app = await mount();
   app.selectSettingsTab('interface');
   const tune = view => descendants(view).find(node => node.props.id === 'settings-test-flowingBackgroundTune');
   assert.equal(tune(app.renderSettings()), undefined, 'No tuning entry while the background is off.');
   app.set({ flowingBackgroundEnabled: true });
   const button = tune(app.renderSettings());
-  assert.ok(button, 'The type row exposes an adjustment icon.');
+  assert.ok(button, 'The main row exposes an adjustment icon.');
   const settingsNodes = descendants(app.renderSettings());
   const controls = settingsNodes.find(node => node.props.className === 'power-dsh-background-controls');
-  assert.ok(descendants(controls).some(node => node.props.id === button.props.id), 'The icon sits beside the type selector.');
+  assert.ok(descendants(controls).some(node => node.props.id === button.props.id), 'The icon sits on the main row.');
   assert.equal(button.props['data-native-button'], true);
   assert.equal(button.props.variant, 'ghost');
   assert.ok(button.props['aria-label']);
   assert.ok(descendants(button).some(node => node.type === 'svg' && node.props['aria-hidden']));
-  assert.equal(button.props.children.some(child => typeof child === 'string'), false, 'The trigger is icon-only.');
-  assert.equal(settingsNodes.some(node => node.props.children?.includes('flowingBackgroundTune')), false, 'There is no separate tuning explanation row.');
-  const menu = settingsNodes.find(node => node.type === 'native-menu-fixture'
-    && node.props.anchor?.props.className === 'power-dsh-background-style-select');
-  assert.ok(menu, 'The type menu is the host Menu.');
-  assert.equal(menu.props.anchor.props['data-native-button'], true, 'The dropdown trigger uses the host Button.');
-  assert.equal(menu.props.anchor.props.variant, 'ghost');
-  assert.equal(menu.props.anchor.props.size, 'md');
-  const controlNodes = descendants(controls);
-  assert.ok(controlNodes.findIndex(node => node.props.id === button.props.id)
-    < controlNodes.findIndex(node => node.props.className === 'power-dsh-background-style-select'),
-    'The adjustment icon precedes the dropdown in both visual and keyboard order.');
-  assert.equal(app.entries.has('shell.overlay:power-dsh-background-tune'), true, 'The homepage panel is registered.');
+  assert.equal(button.props.children.some(child => child !== null && typeof child === 'object' && typeof child.type === 'string'), true);
+  assert.equal(settingsNodes.some(node => node.props.className === 'power-dsh-background-style-select'), false,
+    'There is no separate background-type dropdown row.');
   button.props.onClick();
   const panel = () => descendants(app.renderTunePanel()).find(node => node.props.className === 'power-dsh-background-panel');
   assert.ok(panel(), 'Clicking the adjustment icon shows the panel.');
   assert.deepEqual(app.settingsVisibility(), { open: false, closes: 1, opens: 0 }, 'The native settings modal closes for preview.');
   assert.equal(app.renderSettings(), null, 'The settings page is absent during preview.');
-  assert.equal(app.entries.has('settings.launcher:power-dsh-background-return'), false, 'Preview never takes over the native settings entry.');
   assert.ok(descendants(app.renderTunePanel()).some(node => node.type === 'style'), 'The panel retains its styles when settings unmounts.');
   const sliders = () => descendants(app.renderTunePanel()).filter(node => node.type === 'input' && node.props.type === 'range');
   const opacity = () => sliders().find(node => node.props.id === 'power-dsh-tune-flowingBackgroundOpacity');
   const blur = () => sliders().find(node => node.props.id === 'power-dsh-tune-flowingBackgroundBlur');
   app.renderTunePanel();
-  assert.equal(opacity().props.value, 0);
+  assert.equal(opacity().props.value, 100, 'Opacity starts fully visible.');
   assert.equal(blur().props.value, 0);
   opacity().props.onChange({ currentTarget: { value: '40' } });
   assert.equal(opacity().props.value, 40, 'Dragging previews without waiting for the save.');
-  assert.equal(app.entries.has('settings.launcher:power-dsh-background-return'), false, 'Dragging never replaces the settings entry again.');
   assert.ok(app.settingsProps().source.getSnapshot().value.flowingBackgroundOpacity === undefined
     || app.settingsProps().source.getSnapshot().value.flowingBackgroundOpacity === 100,
     'Preview alone does not write a new preference.');
   await opacity().props.onPointerUp({ currentTarget: { value: '40' } });
-  assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundOpacity, 60);
+  assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundOpacity, 40,
+    'Opacity maps straight through, with no inversion.');
   blur().props.onChange({ currentTarget: { value: '12' } });
   await blur().props.onKeyUp({ key: 'ArrowRight', currentTarget: { value: '12' } });
   assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundBlur, 12);
@@ -85,26 +76,41 @@ test('the tune button opens a homepage panel that previews and saves both values
   assert.equal(panel(), undefined, 'Closing the panel leaves the homepage visible.');
   assert.deepEqual(app.settingsVisibility(), { open: false, closes: 1, opens: 0 });
   assert.equal(app.renderSettings(), null, 'Closing never reopens settings.');
-  assert.equal(app.entries.has('settings.launcher:power-dsh-background-return'), false, 'The original settings launcher is restored.');
   app.unmount();
 });
 
-test('transparency starts at zero and inversely maps saved opacity for both background types', async () => {
+test('the sliders stay enabled while saving and accept keyboard input', async () => {
+  const app = await mount();
+  app.set({ flowingBackgroundEnabled: true });
+  await openTune(app);
+  const opacity = () => descendants(app.renderTunePanel()).find(node => node.props.id === 'power-dsh-tune-flowingBackgroundOpacity');
+  assert.equal(opacity().props.disabled, undefined, 'A range input is never disabled while a save is in flight.');
+  assert.equal(opacity().props['aria-describedby'], 'power-dsh-tune-flowingBackgroundOpacity-description');
+  for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown']) {
+    opacity().props.onChange({ currentTarget: { value: '60' } });
+    await opacity().props.onKeyUp({ key, currentTarget: { value: '60' } });
+    assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundOpacity, 60, `${key} commits.`);
+  }
+  assert.equal(opacity().props.onKeyUp({ key: 'Shift' }), undefined, 'Non-navigation keys do not commit.');
+  app.unmount();
+});
+
+test('opacity maps directly for both background types and never rewrites on open', async () => {
   for (const kind of ['pattern', 'wallpaper']) {
     const app = await mount();
     app.set({ flowingBackgroundEnabled: true, flowingBackgroundKind: kind, flowingBackgroundOpacity: 35 });
     await openTune(app);
     const slider = () => descendants(app.renderTunePanel()).find(node => node.props.id === 'power-dsh-tune-flowingBackgroundOpacity');
-    assert.equal(slider().props.value, 65, 'Existing saved opacity displays as equivalent transparency.');
-    assert.equal(slider().props['aria-valuetext'], '65%');
+    assert.equal(slider().props.value, 35, 'The saved opacity is shown as-is.');
+    assert.equal(slider().props['aria-valuetext'], '35%');
     assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundOpacity, 35, 'Opening does not rewrite the saved appearance.');
-    for (const [transparency, opacity] of [[0, 100], [100, 0], [25, 75]]) {
-      slider().props.onChange({ currentTarget: { value: String(transparency) } });
-      assert.equal(slider().props.value, transparency);
-      assert.equal(slider().props['aria-valuetext'], `${transparency}%`);
+    for (const [shown, stored] of [[0, 0], [100, 100], [75, 75]]) {
+      slider().props.onChange({ currentTarget: { value: String(shown) } });
+      assert.equal(slider().props.value, shown);
+      assert.equal(slider().props['aria-valuetext'], `${shown}%`);
       await slider().props.onPointerUp();
-      assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundOpacity, opacity,
-        'The persisted value keeps its existing CSS opacity meaning.');
+      assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundOpacity, stored,
+        'The persisted value is the same number the slider shows.');
     }
     app.unmount();
   }
@@ -122,7 +128,7 @@ test('closing saves the final drag and a failed preview save remains recoverable
   slider().props.onChange({ currentTarget: { value: '55' } });
   await close().props.onClick();
   assert.equal(app.settingsVisibility().open, false, 'A failed save does not dismiss its error.');
-  assert.equal(slider().props.value, 0, 'The preview rolls back to the inverse of the Host opacity.');
+  assert.equal(slider().props.value, 100, 'The preview rolls back to the saved opacity.');
   assert.ok(nodes().some(node => node.props['data-error-code'] === 'PD-BACKGROUND-STYLE-SAVE'));
   rejectSave = false;
   slider().props.onChange({ currentTarget: { value: '65' } });
@@ -130,7 +136,7 @@ test('closing saves the final drag and a failed preview save remains recoverable
   const saving = slider().props.onBlur();
   const closing = close().props.onClick();
   await Promise.all([saving, closing]);
-  assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundOpacity, 35);
+  assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundOpacity, 65);
   assert.equal(app.settingsVisibility().open, false);
   assert.equal(close(), undefined);
   app.unmount();
@@ -154,9 +160,9 @@ test('failed saves keep the decoration disabled and preserve other preferences',
   const app = await mount({ formReply: () => false });
   app.set({ flowingBackgroundEnabled: false, showVersion: true });
   const control = () => descendants(app.selectSettingsTab('interface')).find(node => node.props.id === 'settings-test-flowingBackgroundEnabled');
-  await control().props.onClick();
   assert.equal(control().props['aria-checked'], false);
-  assert.equal(control().props['aria-invalid'], true);
+  await control().props.onClick();
+  assert.equal(control().props['aria-checked'], false, 'A failed save restores the saved value.');
   assert.equal(app.settingsProps().source.getSnapshot().value.showVersion, true);
   assert.equal(app.entries.has(SLOT), false);
   app.unmount();
@@ -366,89 +372,71 @@ test('drawing is throttled and backing-store size stays bounded', () => {
 
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
 
-test('the background type switches between the pattern and a saved wallpaper', async () => {
+test('the panel switches the background type and saves it on close', async () => {
   const app = await mount();
-  const trigger = view => descendants(view).find(node => node.props.className === 'power-dsh-background-style-select');
-  let view = app.selectSettingsTab('interface');
-  assert.equal(trigger(view), undefined, 'No type row while the background is off.');
   app.set({ flowingBackgroundEnabled: true });
-  view = app.renderSettings();
-  assert.equal(trigger(view).props.children.includes('flowingBackgroundKindPattern'), true, 'The pattern is the default type.');
-  trigger(view).props.onClick();
-  const wallpaperItem = descendants(app.renderSettings()).find(node => node.props.role === 'menuitem' && node.props['data-id'] === 'wallpaper');
-  assert.ok(wallpaperItem, 'The type menu offers a custom wallpaper.');
-  await wallpaperItem.props.onClick();
-  assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundKind, 'wallpaper');
-  assert.equal(trigger(app.renderSettings()).props.children.includes('flowingBackgroundKindWallpaper'), true);
+  await openTune(app);
+  const option = kind => descendants(app.renderTunePanel())
+    .find(node => node.props.role === 'radio' && [].concat(node.props.children).includes(kind));
+  assert.equal(option('flowingBackgroundKindPattern').props['aria-checked'], true, 'The pattern is the default type.');
+  assert.equal(option('flowingBackgroundKindWallpaper').props['aria-checked'], false);
+  assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundKind, 'pattern',
+    'Switching the type previews without writing.');
+  option('flowingBackgroundKindWallpaper').props.onClick();
+  assert.equal(option('flowingBackgroundKindWallpaper').props['aria-checked'], true);
+  assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundKind, 'pattern',
+    'Choosing a type alone does not write.');
+  await descendants(app.renderTunePanel()).find(node => node.props.className === 'power-dsh-background-panel-close').props.onClick();
+  assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundKind, 'wallpaper',
+    'Closing saves the chosen type.');
   app.unmount();
 });
 
-test('selecting homepage flow restores zero transparency and zero blur', async () => {
+test('appearance is tunable for the built-in flow as well as a wallpaper', async () => {
   const app = await mount({ wallpaper: { name: 'sky.png', mime: 'image/png', bytes: 4, dataUrl: PNG } });
   app.set({ flowingBackgroundEnabled: true, flowingBackgroundKind: 'wallpaper', flowingBackgroundOpacity: 40, flowingBackgroundBlur: 16 });
-  const view = () => descendants(app.renderSettings());
-  app.selectSettingsTab('interface');
-  view().find(node => node.props.className === 'power-dsh-background-style-select').props.onClick();
-  await view().find(node => node.props.role === 'menuitem' && node.props['data-id'] === 'pattern').props.onClick();
+  await openTune(app);
+  const slider = () => descendants(app.renderTunePanel()).find(node => node.props.id === 'power-dsh-tune-flowingBackgroundOpacity');
+  assert.equal(slider().props.value, 40);
+  assert.equal(descendants(app.renderTunePanel()).some(node => node.type === 'input' && node.props.type === 'file'), true,
+    'A wallpaper offers its picker inside the panel.');
+  descendants(app.renderTunePanel()).find(node => node.props.role === 'radio'
+    && [].concat(node.props.children).includes('flowingBackgroundKindPattern')).props.onClick();
+  assert.equal(descendants(app.renderTunePanel()).some(node => node.type === 'input' && node.props.type === 'file'), false,
+    'Switching to the built-in flow hides the picker immediately.');
+  await slider().props.onPointerUp();
   const saved = app.settingsProps().source.getSnapshot().value;
   assert.equal(saved.flowingBackgroundKind, 'pattern');
-  assert.equal(saved.flowingBackgroundOpacity, 100);
-  assert.equal(saved.flowingBackgroundBlur, 0);
-  assert.deepEqual(app.wallpaperWrites, [], 'Selecting homepage flow never deletes the saved image.');
-  await openTune(app);
-  const panel = descendants(app.renderTunePanel());
-  assert.equal(panel.find(node => node.props.id === 'power-dsh-tune-flowingBackgroundOpacity').props.value, 0);
-  assert.equal(panel.find(node => node.props.id === 'power-dsh-tune-flowingBackgroundBlur').props.value, 0);
-  assert.equal(panel.some(node => node.props.type === 'file'), false);
+  assert.equal(saved.flowingBackgroundOpacity, 40, 'The built-in flow keeps its tunable opacity.');
+  assert.deepEqual(app.wallpaperWrites, [], 'Switching types never deletes the saved image.');
   app.unmount();
 });
 
-test('a rejected homepage default save shows an error and selecting it again completes the reset', async () => {
-  let rejectBlur = true;
-  const app = await mount({ formReply: async field => !(rejectBlur && field === 'flowingBackgroundBlur') });
-  app.set({ flowingBackgroundEnabled: true, flowingBackgroundKind: 'wallpaper', flowingBackgroundOpacity: 40, flowingBackgroundBlur: 16 });
-  app.selectSettingsTab('interface');
-  const view = () => descendants(app.renderSettings());
-  const selectHomepage = async () => {
-    view().find(node => node.props.className === 'power-dsh-background-style-select').props.onClick();
-    await view().find(node => node.props.role === 'menuitem' && node.props['data-id'] === 'pattern').props.onClick();
-  };
-  await selectHomepage();
-  assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundBlur, 16);
-  assert.ok(view().some(node => node.props['data-error-code'] === 'PD-BACKGROUND-KIND-SAVE'));
-  rejectBlur = false;
-  await selectHomepage();
-  assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundOpacity, 100);
-  assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundBlur, 0);
-  assert.equal(view().some(node => node.props['data-error-code'] === 'PD-BACKGROUND-KIND-SAVE'), false);
-  app.unmount();
-});
-
-test('the adjustment panel follows the selected type and never shows wallpaper controls for homepage flow', async () => {
+test('the panel shows wallpaper controls only while the wallpaper type is selected', async () => {
   const app = await mount({ wallpaper: { name: 'sky.png', mime: 'image/png', bytes: 4, dataUrl: PNG } });
   app.set({ flowingBackgroundEnabled: true, flowingBackgroundKind: 'pattern' });
   await openTune(app);
   const nodes = () => descendants(app.renderTunePanel());
   const title = () => nodes().find(node => node.props.className === 'power-dsh-background-panel-title');
   const file = () => nodes().find(node => node.type === 'input' && node.props.type === 'file');
-  assert.ok(title().props.children.includes('flowingBackgroundTunePatternTitle'));
-  assert.equal(nodes().filter(node => node.props.type === 'range').length, 2);
+  const choose = kind => nodes().find(node => node.props.role === 'radio' && [].concat(node.props.children).includes(kind));
+  assert.ok([].concat(title().props.children).includes('flowingBackgroundTuneTitle'), 'One panel title covers both types.');
+  assert.equal(nodes().filter(node => node.props.type === 'range').length, 2, 'Appearance is tunable for the built-in flow.');
   assert.equal(file(), undefined, 'Homepage flow has no wallpaper picker.');
   assert.equal(app.settingsProps().wallpaperSource.getSnapshot().status, 'idle', 'Opening homepage adjustment does not read the stored wallpaper.');
-  app.set({ flowingBackgroundKind: 'wallpaper' });
+  choose('flowingBackgroundKindWallpaper').props.onClick();
   await new Promise(setImmediate);
-  assert.ok(title().props.children.includes('flowingBackgroundTuneWallpaperTitle'));
-  assert.ok(file());
+  assert.ok(file(), 'Selecting the wallpaper type reveals the picker.');
   assert.ok(nodes().some(node => node.type === 'img' && node.props.src === PNG));
   const stalePicker = file();
-  const staleRemove = nodes().find(node => node.type === 'button' && node.props.children.includes('flowingBackgroundWallpaperRemove'));
-  app.set({ flowingBackgroundKind: 'pattern' });
-  assert.ok(title().props.children.includes('flowingBackgroundTunePatternTitle'));
+  const staleRemove = nodes().find(node => node.type === 'button'
+    && [].concat(node.props.children).includes('flowingBackgroundWallpaperRemove'));
+  choose('flowingBackgroundKindPattern').props.onClick();
   assert.equal(file(), undefined, 'Changing back hides even a cached wallpaper.');
   assert.equal(nodes().some(node => node.type === 'img'), false);
   await stalePicker.props.onChange({ currentTarget: { files: [{ name: 'other.png', type: 'image/png', size: 12, dataUrl: PNG }], value: 'x' } });
   await staleRemove.props.onClick();
-  assert.deepEqual(app.wallpaperWrites, [], 'Hidden wallpaper controls cannot write or switch the type back.');
+  assert.deepEqual(app.wallpaperWrites, [], 'Hidden wallpaper controls cannot write.');
   assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundKind, 'pattern');
   app.unmount();
 });

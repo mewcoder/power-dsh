@@ -4602,8 +4602,20 @@ void main() {
 .power-dsh-background-panel-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .power-dsh-background-panel-label { font-size: 14px; line-height: 22px; color: var(--dsw-alias-label-primary); }
 .power-dsh-background-panel-value { font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-secondary); }
-.power-dsh-background-panel .power-dsh-slider { box-sizing: border-box; width: 100%; margin: 0; accent-color: var(--dsw-alias-brand-primary); cursor: pointer; }
+.power-dsh-background-panel .power-dsh-slider { box-sizing: border-box; width: 100%; height: 20px; margin: 0; accent-color: var(--dsw-alias-brand-primary); cursor: pointer; }
+.power-dsh-background-panel .power-dsh-slider:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)); outline-offset: 4px; border-radius: var(--dsw-radius-xs); }
 .power-dsh-background-panel .power-dsh-slider:disabled { opacity: .4; cursor: not-allowed; }
+/* Grouping: each block states what it changes, so the panel reads top-down. */
+.power-dsh-background-panel-section { display: flex; flex-direction: column; gap: 12px; }
+.power-dsh-background-panel-section + .power-dsh-background-panel-section { padding-top: 16px; border-top: .5px solid var(--dsw-alias-border-l2); }
+.power-dsh-background-panel-section-title { font-size: 12px; line-height: 18px; font-weight: 500; color: var(--dsw-alias-label-secondary); }
+.power-dsh-background-panel-hint { margin: -4px 0 0; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); }
+/* Type choice as a segmented control: two options, one selected. */
+.power-dsh-background-kind { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; border-radius: var(--dsw-radius-md); background: var(--dsw-alias-bg-layer-1); }
+.power-dsh-background-kind-option { box-sizing: border-box; min-height: 30px; border: 0; border-radius: var(--dsw-radius-sm); padding: 0 10px; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 13px; cursor: pointer; }
+.power-dsh-background-kind-option[aria-checked="true"] { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); font-weight: 500; box-shadow: var(--dsw-elevation-raise); }
+.power-dsh-background-kind-option:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)); outline-offset: 2px; }
+.power-dsh-background-kind-option:disabled { opacity: .5; cursor: default; }
 .power-dsh-background-panel .power-dsh-setting-row { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding-top: 20px; border-top: .5px solid var(--dsw-alias-border-l2); }
 .power-dsh-background-panel .power-dsh-setting-label { font-size: 14px; line-height: 22px; }
 .power-dsh-background-panel .power-dsh-description { margin-top: 4px; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); }
@@ -5063,7 +5075,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		});
 	}
 	function createClientFeature$1(runtime, env) {
-		const { React, h, Menu, Button, Tooltip, observable, useSnapshot, errorFeedback } = runtime;
+		const { React, h, Button, Tooltip, observable, useSnapshot, errorFeedback } = runtime;
 		const { ctx, t, source } = env;
 		let fault = null;
 		const attachment = observable(() => fault);
@@ -5201,6 +5213,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		}, Background);
 		let panelState = {
 			open: false,
+			kind: "pattern",
 			opacity: 100,
 			blur: 0,
 			saving: false,
@@ -5221,6 +5234,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			const { kind, opacity, blur } = readStyle(snapshot);
 			publishPanel({
 				open: true,
+				kind,
 				opacity,
 				blur,
 				saving: false,
@@ -5237,21 +5251,27 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			if (!active || !panelState.open || panelState.saving) return false;
 			const snapshot = source.getSnapshot();
 			if (snapshot.status !== "ready" || !snapshot.writable) return false;
-			const { opacity, blur } = panelState;
+			const { kind, opacity, blur } = panelState;
 			publishPanel({
 				saving: true,
 				error: ""
 			});
 			try {
-				const saved = readStyle(source.getSnapshot());
-				if (opacity !== saved.opacity) await env.savePreference("flowingBackgroundOpacity", opacity, void 0, "number");
-				if (blur !== saved.blur) await env.savePreference("flowingBackgroundBlur", blur, void 0, "number");
+				if (kind !== readStyle(source.getSnapshot()).kind) await env.savePreference("flowingBackgroundKind", kind, void 0, "string");
+				const after = readStyle(source.getSnapshot());
+				if (opacity !== after.opacity) await env.savePreference("flowingBackgroundOpacity", opacity, void 0, "number");
+				if (blur !== after.blur) await env.savePreference("flowingBackgroundBlur", blur, void 0, "number");
 				return true;
 			} catch (failure) {
-				if (active) publishPanel({
-					...readStyle(source.getSnapshot()),
-					error: errorMessage(failure) || t("saveFailed")
-				});
+				if (active) {
+					const restored = readStyle(source.getSnapshot());
+					publishPanel({
+						kind: restored.kind,
+						opacity: restored.opacity,
+						blur: restored.blur,
+						error: errorMessage(failure) || t("saveFailed")
+					});
+				}
 				return false;
 			} finally {
 				if (active) publishPanel({ saving: false });
@@ -5285,10 +5305,9 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			const state = useSnapshot(panelStore);
 			const asset = useSnapshot(wallpaperSource);
 			const operation = useSnapshot(pickingStore);
-			const snapshot = useSnapshot(source);
-			const { kind } = readStyle(snapshot);
-			const title = t(kind === "wallpaper" ? "flowingBackgroundTuneWallpaperTitle" : "flowingBackgroundTunePatternTitle");
+			const title = t("flowingBackgroundTuneTitle");
 			if (!state.open) return null;
+			const wallpaper = state.kind === "wallpaper";
 			return h("div", {
 				className: "power-dsh-background-panel",
 				role: "dialog",
@@ -5323,7 +5342,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				strokeLinecap: "round",
 				"aria-hidden": true,
 				focusable: false
-			}, h("path", { d: "m3 3 8 8M11 3l-8 8" })))), h("div", { className: "power-dsh-background-panel-body" }, panelSlider("flowingBackgroundOpacity", "flowingBackgroundOpacity", 100 - state.opacity, 0, 100, 5, "%"), panelSlider("flowingBackgroundBlur", "flowingBackgroundBlur", state.blur, 0, 40, 4, "px"), kind === "wallpaper" && wallpaperRow(asset, operation, state.saving), state.error && errorFeedback({
+			}, h("path", { d: "m3 3 8 8M11 3l-8 8" })))), h("div", { className: "power-dsh-background-panel-body" }, kindChoice(state.kind, state.saving || operation.picking), wallpaper && wallpaperRow(asset, operation, state.saving), h("div", { className: "power-dsh-background-panel-section" }, h("div", { className: "power-dsh-background-panel-section-title" }, t("flowingBackgroundTuneAppearance")), panelSlider("flowingBackgroundOpacity", "flowingBackgroundOpacity", state.opacity, 0, 100, 5, "%", "flowingBackgroundOpacityDescription"), panelSlider("flowingBackgroundBlur", "flowingBackgroundBlur", state.blur, 0, 40, 1, "px", "flowingBackgroundBlurDescription")), state.error && errorFeedback({
 				t,
 				message: state.error,
 				code: "PD-BACKGROUND-STYLE-SAVE",
@@ -5333,16 +5352,44 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				}
 			})));
 		}
-		function panelSlider(field, labelKey, value, min, max, step, unit) {
+		/** Background type as a two-option segmented control inside the panel. */
+		function kindChoice(current, disabled) {
+			return h("div", { className: "power-dsh-background-panel-section" }, h("div", { className: "power-dsh-background-panel-section-title" }, t("flowingBackgroundKind")), h("div", {
+				className: "power-dsh-background-kind",
+				role: "radiogroup",
+				"aria-label": t("flowingBackgroundKind")
+			}, ...KINDS.map((kind) => h("button", {
+				key: kind,
+				type: "button",
+				role: "radio",
+				"aria-checked": current === kind,
+				className: "power-dsh-background-kind-option",
+				disabled,
+				onClick: () => {
+					if (disabled || !panelState.open || panelState.saving || panelState.kind === kind) return;
+					publishPanel({ kind });
+					if (kind === "wallpaper" && wallpaper.status === "idle") loadWallpaper();
+				}
+			}, kindLabel(kind)))));
+		}
+		/**
+		* One labelled slider. The control is a native `range`, so arrows, Home/End and
+		* Page Up/Down all work; it stays enabled while a save is in flight and only
+		* blocks new writes, so dragging never loses focus or the keyboard.
+		*/
+		function panelSlider(field, labelKey, value, min, max, step, unit, descriptionKey) {
 			const control = `power-dsh-tune-${field}`;
+			const description = `${control}-description`;
 			return h("div", {
 				className: "power-dsh-background-panel-slider",
 				key: field
 			}, h("div", { className: "power-dsh-background-panel-row" }, h("label", {
 				htmlFor: control,
 				className: "power-dsh-background-panel-label"
-			}, t(labelKey)), h("span", { className: "power-dsh-background-panel-value" }, `${value}${unit}`)), h("input", {
-				key: field,
+			}, t(labelKey)), h("span", {
+				className: "power-dsh-background-panel-value",
+				"aria-hidden": true
+			}, `${value}${unit}`)), h("input", {
 				id: control,
 				type: "range",
 				className: "power-dsh-slider",
@@ -5350,13 +5397,13 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				max,
 				step,
 				value,
-				disabled: panelState.saving,
 				"aria-label": t(labelKey),
+				"aria-describedby": description,
 				"aria-valuetext": `${value}${unit}`,
 				onChange: (event) => {
-					if (!panelState.open || panelState.saving) return;
+					if (!panelState.open) return;
 					const next = Math.min(max, Math.max(min, Number(event.currentTarget.value)));
-					if (Number.isFinite(next)) publishPanel(field === "flowingBackgroundOpacity" ? { opacity: 100 - next } : { blur: next });
+					if (Number.isFinite(next)) publishPanel(field === "flowingBackgroundOpacity" ? { opacity: next } : { blur: next });
 				},
 				onPointerUp: () => commitPanel(),
 				onKeyUp: (event) => {
@@ -5372,7 +5419,10 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 					].includes(event.key)) return commitPanel();
 				},
 				onBlur: () => commitPanel()
-			}));
+			}), h("p", {
+				id: description,
+				className: "power-dsh-background-panel-hint"
+			}, t(descriptionKey)));
 		}
 		ctx?.slots?.inject?.("shell.overlay", () => ctx.slots.register({
 			name: "shell.overlay",
@@ -5380,14 +5430,6 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			order: -99,
 			locale: env.namespace
 		}, TuningPanel));
-		let menuOpen = false;
-		const menuStore = observable(() => menuOpen);
-		const setMenu = (next) => {
-			if (menuOpen !== next) {
-				menuOpen = next;
-				menuStore.notify();
-			}
-		};
 		let pickingState = {
 			picking: false,
 			error: ""
@@ -5412,26 +5454,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		const kindSetting = {
 			field: "flowingBackgroundKind",
 			description: "flowingBackgroundKindDescription",
-			hidden: true,
-			save: async (next) => {
-				if (next !== "pattern" && next !== "wallpaper") throw new Error(t("saveFailed"));
-				try {
-					await env.savePreference("flowingBackgroundKind", next, void 0, "string");
-					if (next === "pattern") {
-						const saved = readStyle(source.getSnapshot());
-						if (saved.opacity !== 100) await env.savePreference("flowingBackgroundOpacity", 100, void 0, "number");
-						if (saved.blur !== 0) await env.savePreference("flowingBackgroundBlur", 0, void 0, "number");
-					}
-				} finally {
-					if (active && panelState.open) {
-						const { opacity, blur } = readStyle(source.getSnapshot());
-						publishPanel({
-							opacity,
-							blur
-						});
-					}
-				}
-			}
+			hidden: true
 		};
 		const opacitySetting = {
 			field: "flowingBackgroundOpacity",
@@ -5551,21 +5574,37 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		}
 		function useSettings({ snapshot, disabled, saving, error, save, id, leaveSettings }) {
 			const failed = useSnapshot(attachment);
-			const opened = useSnapshot(menuStore);
 			const openedTune = useSnapshot(panelStore).open;
 			const enabled = snapshot.value?.flowingBackgroundEnabled === true;
-			const { kind } = readStyle(snapshot);
 			const main = !failed || !enabled ? mainSetting : {
 				...mainSetting,
 				failure: presentFailure(failed.issue, failed.observedAt, t)
 			};
-			function kindRow() {
-				if (!enabled) return null;
-				const field = "flowingBackgroundKind";
-				const control = `${id}-${field}`;
-				const busy = saving?.field === field;
-				const fieldError = error?.field === field ? error.message : "";
-				const adjustment = h(Tooltip, {
+			const failure = "failure" in main ? main.failure : void 0;
+			/**
+			* The adjustment entry sits on the main row itself: there is no separate
+			* "background type" row any more, because the panel owns that choice.
+			*/
+			function mainRow() {
+				const control = `${id}-flowingBackgroundEnabled`;
+				return h("div", {
+					className: "power-dsh-setting-row",
+					key: "flowingBackgroundMain"
+				}, h("div", { className: "power-dsh-setting-copy" }, h("div", {
+					id: `${control}-label`,
+					className: "power-dsh-setting-label"
+				}, t("flowingBackgroundEnabled")), h("div", {
+					id: `${control}-description`,
+					className: "power-dsh-description"
+				}, t("flowingBackgroundDescription")), failure && errorFeedback({
+					t,
+					id: `${control}-error`,
+					message: failure.message,
+					code: failure.code,
+					operation: failure.operation,
+					context: failure.context,
+					observedAt: failure.observedAt
+				})), h("div", { className: "power-dsh-background-controls" }, enabled && h(Tooltip, {
 					label: t("flowingBackgroundTuneOpen"),
 					side: "top",
 					portal: true
@@ -5577,13 +5616,11 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 					id: `${id}-flowingBackgroundTune`,
 					disabled: disabled || !leaveSettings,
 					"aria-label": t("flowingBackgroundTuneOpen"),
+					"aria-describedby": `${control}-description`,
 					"aria-haspopup": "dialog",
 					"aria-expanded": openedTune,
 					onClick: () => {
-						if (!disabled) {
-							setMenu(false);
-							openPanel(leaveSettings);
-						}
+						if (!disabled) openPanel(leaveSettings);
 					}
 				}, h("svg", {
 					width: 16,
@@ -5603,72 +5640,25 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 					cx: 9,
 					cy: 12,
 					r: 2
+				})))), h("button", {
+					type: "button",
+					role: "switch",
+					className: "power-dsh-switch",
+					id: control,
+					"aria-checked": enabled,
+					"aria-labelledby": `${control}-label`,
+					"aria-describedby": `${control}-description`,
+					"aria-busy": saving?.field === "flowingBackgroundEnabled",
+					disabled: disabled || saving?.field === "flowingBackgroundEnabled",
+					onClick: () => save("flowingBackgroundEnabled", !enabled)
+				}, h("span", {
+					className: "power-dsh-switch-thumb",
+					"aria-hidden": true
 				}))));
-				const selector = h(Menu, {
-					open: opened && !disabled,
-					onClose: () => setMenu(false),
-					selectedId: kind,
-					align: "end",
-					portal: true,
-					autoFocus: true,
-					minWidthFromAnchor: true,
-					items: KINDS.map((item) => ({
-						id: item,
-						label: kindLabel(item)
-					})),
-					onSelect: (next) => {
-						setMenu(false);
-						return save(field, next);
-					},
-					anchor: h(Button, {
-						type: "button",
-						variant: "ghost",
-						size: "md",
-						className: "power-dsh-background-style-select",
-						disabled: disabled || busy,
-						"aria-label": t("flowingBackgroundKind"),
-						"aria-describedby": `${control}-description${fieldError ? ` ${control}-error` : ""}`,
-						"aria-invalid": Boolean(fieldError),
-						"aria-haspopup": "menu",
-						"aria-expanded": opened && !disabled,
-						"aria-busy": busy,
-						onClick: () => {
-							if (!disabled) setMenu(!opened);
-						}
-					}, kindLabel(kind), h("svg", {
-						width: 16,
-						height: 16,
-						viewBox: "0 0 16 16",
-						fill: "none",
-						stroke: "currentColor",
-						strokeWidth: 1.4,
-						strokeLinecap: "round",
-						strokeLinejoin: "round",
-						"aria-hidden": true,
-						focusable: false
-					}, h("path", { d: "m4 6 4 4 4-4" })))
-				});
-				return h("div", {
-					className: "power-dsh-setting-row",
-					key: field
-				}, h("div", { className: "power-dsh-setting-copy" }, h("div", {
-					id: `${control}-label`,
-					className: "power-dsh-setting-label"
-				}, t("flowingBackgroundKind")), h("div", {
-					id: `${control}-description`,
-					className: "power-dsh-description"
-				}, t("flowingBackgroundKindDescription")), fieldError && errorFeedback({
-					t,
-					id: `${control}-error`,
-					message: fieldError,
-					code: "PD-BACKGROUND-KIND-SAVE",
-					operation: `settings.${field}`
-				})), h("div", { className: "power-dsh-background-controls" }, adjustment, selector));
 			}
-			return [main, {
-				...kindSetting,
-				hidden: false,
-				render: kindRow
+			return [{
+				...main,
+				render: mainRow
 			}];
 		}
 		return {
@@ -5708,8 +5698,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		en: {
 			flowingBackgroundEnabled: "Custom background",
 			flowingBackgroundDescription: "Choose a soft animated background for the interface",
-			flowingBackgroundOpacity: "Background fade",
-			flowingBackgroundOpacityDescription: "0% preserves the original background; 100% fades it out",
+			flowingBackgroundOpacity: "Background opacity",
+			flowingBackgroundOpacityDescription: "0% hides the background; 100% shows it fully",
 			flowingBackgroundBlur: "Background blur",
 			flowingBackgroundBlurDescription: "0px keeps the background sharp; higher values add blur",
 			flowingBackgroundKind: "Background type",
@@ -5723,8 +5713,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			flowingBackgroundWallpaperReplace: "Replace",
 			flowingBackgroundWallpaperRemove: "Remove",
 			flowingBackgroundTuneOpen: "Adjust background",
-			flowingBackgroundTunePatternTitle: "Adjust homepage flow",
-			flowingBackgroundTuneWallpaperTitle: "Adjust wallpaper",
+			flowingBackgroundTuneTitle: "Background",
+			flowingBackgroundTuneAppearance: "Appearance",
 			flowingBackgroundTuneDone: "Close",
 			flowingBackgroundWallpaperReadFailed: "The saved wallpaper could not be read.",
 			flowingBackgroundWallpaperSaveFailed: "The wallpaper could not be saved.",
@@ -5758,8 +5748,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		zh: {
 			flowingBackgroundEnabled: "自定义背景",
 			flowingBackgroundDescription: "为界面选择柔和的动态背景",
-			flowingBackgroundOpacity: "背景淡化",
-			flowingBackgroundOpacityDescription: "0% 保持原始背景，100% 完全淡出背景",
+			flowingBackgroundOpacity: "背景不透明度",
+			flowingBackgroundOpacityDescription: "0% 隐藏背景，100% 完全显示背景",
 			flowingBackgroundBlur: "背景模糊",
 			flowingBackgroundBlurDescription: "0px 保持清晰，数值越大背景越模糊",
 			flowingBackgroundKind: "背景类型",
@@ -5773,8 +5763,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			flowingBackgroundWallpaperReplace: "更换",
 			flowingBackgroundWallpaperRemove: "移除",
 			flowingBackgroundTuneOpen: "调节背景",
-			flowingBackgroundTunePatternTitle: "官网流动调节",
-			flowingBackgroundTuneWallpaperTitle: "自定义壁纸调节",
+			flowingBackgroundTuneTitle: "背景设置",
+			flowingBackgroundTuneAppearance: "外观",
 			flowingBackgroundTuneDone: "关闭",
 			flowingBackgroundWallpaperReadFailed: "无法读取已保存的壁纸。",
 			flowingBackgroundWallpaperSaveFailed: "壁纸保存失败。",

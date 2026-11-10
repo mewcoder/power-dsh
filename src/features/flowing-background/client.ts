@@ -42,7 +42,7 @@ function readImage(file: File): Promise<string> {
 }
 
 export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironment) {
-  const { React, h, Menu, Button, Tooltip, observable, useSnapshot, errorFeedback } = runtime;
+  const { React, h, Button, Tooltip, observable, useSnapshot, errorFeedback } = runtime;
   const { ctx, t, source } = env;
   let fault: { issue: AttachmentFailure; observedAt: string } | null = null;
   const attachment = observable(() => fault);
@@ -145,7 +145,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     id: 'power-dsh-flowing-background', order: -100, locale: env.namespace,
   }, Background);
 
-  let panelState = { open: false, opacity: 100, blur: 0, saving: false, error: '' };
+  let panelState = { open: false, kind: 'pattern' as BackgroundKind, opacity: 100, blur: 0, saving: false, error: '' };
   const panelStore = observable(() => panelState);
   const publishPanel = (patch: Partial<typeof panelState>) => {
     if (Object.entries(patch).every(([key, value]) => panelState[key as keyof typeof panelState] === value)) return;
@@ -156,7 +156,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const snapshot = source.getSnapshot();
     if (!leave || panelState.open || snapshot.status !== 'ready' || !snapshot.writable) return;
     const { kind, opacity, blur } = readStyle(snapshot);
-    publishPanel({ open: true, opacity, blur, saving: false, error: '' });
+    publishPanel({ open: true, kind, opacity, blur, saving: false, error: '' });
     leave();
     if (kind === 'wallpaper' && wallpaper.status === 'idle') void loadWallpaper();
   };
@@ -165,16 +165,23 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     if (!active || !panelState.open || panelState.saving) return false;
     const snapshot = source.getSnapshot();
     if (snapshot.status !== 'ready' || !snapshot.writable) return false;
-    const { opacity, blur } = panelState;
+    const { kind, opacity, blur } = panelState;
     publishPanel({ saving: true, error: '' });
     try {
       const saved = readStyle(source.getSnapshot());
-      if (opacity !== saved.opacity) await env.savePreference('flowingBackgroundOpacity', opacity, undefined, 'number');
-      if (blur !== saved.blur) await env.savePreference('flowingBackgroundBlur', blur, undefined, 'number');
+      // Type first: the appearance below applies to whichever background is now
+      // selected, so the built-in flow is tunable too.
+      if (kind !== saved.kind) await env.savePreference('flowingBackgroundKind', kind, undefined, 'string');
+      const after = readStyle(source.getSnapshot());
+      if (opacity !== after.opacity) await env.savePreference('flowingBackgroundOpacity', opacity, undefined, 'number');
+      if (blur !== after.blur) await env.savePreference('flowingBackgroundBlur', blur, undefined, 'number');
       return true;
     } catch (failure) {
-      if (active) publishPanel({ ...readStyle(source.getSnapshot()),
-        error: errorMessage(failure) || t('saveFailed') });
+      if (active) {
+        const restored = readStyle(source.getSnapshot());
+        publishPanel({ kind: restored.kind, opacity: restored.opacity, blur: restored.blur,
+          error: errorMessage(failure) || t('saveFailed') });
+      }
       return false;
     } finally {
       if (active) publishPanel({ saving: false });
@@ -205,10 +212,9 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const state = useSnapshot(panelStore);
     const asset = useSnapshot(wallpaperSource);
     const operation = useSnapshot(pickingStore);
-    const snapshot = useSnapshot(source);
-    const { kind } = readStyle(snapshot);
-    const title = t(kind === 'wallpaper' ? 'flowingBackgroundTuneWallpaperTitle' : 'flowingBackgroundTunePatternTitle');
+    const title = t('flowingBackgroundTuneTitle');
     if (!state.open) return null;
+    const wallpaper = state.kind === 'wallpaper';
     return h('div', { className: 'power-dsh-background-panel', role: 'dialog', 'aria-label': title,
       'aria-busy': state.saving,
       onKeyDown: (event: import('react').KeyboardEvent<HTMLDivElement>) => {
@@ -226,45 +232,74 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
           strokeWidth: 1.4, strokeLinecap: 'round', 'aria-hidden': true, focusable: false },
           h('path', { d: 'm3 3 8 8M11 3l-8 8' })))),
       h('div', { className: 'power-dsh-background-panel-body' },
-      panelSlider('flowingBackgroundOpacity', 'flowingBackgroundOpacity', 100 - state.opacity, 0, 100, 5, '%'),
-      panelSlider('flowingBackgroundBlur', 'flowingBackgroundBlur', state.blur, 0, 40, 4, 'px'),
-      kind === 'wallpaper' && wallpaperRow(asset, operation, state.saving),
+      // 1. Background type first: everything below depends on this choice.
+      kindChoice(state.kind, state.saving || operation.picking),
+      // 2. Wallpaper picking lives here rather than in a separate settings row.
+      wallpaper && wallpaperRow(asset, operation, state.saving),
+      // 3. Appearance tuning, only meaningful once a background exists.
+      h('div', { className: 'power-dsh-background-panel-section' },
+        h('div', { className: 'power-dsh-background-panel-section-title' }, t('flowingBackgroundTuneAppearance')),
+        panelSlider('flowingBackgroundOpacity', 'flowingBackgroundOpacity', state.opacity, 0, 100, 5, '%',
+          'flowingBackgroundOpacityDescription'),
+        panelSlider('flowingBackgroundBlur', 'flowingBackgroundBlur', state.blur, 0, 40, 1, 'px',
+          'flowingBackgroundBlurDescription')),
       state.error && errorFeedback({ t, message: state.error, code: 'PD-BACKGROUND-STYLE-SAVE',
         operation: 'background.tune', retry: async () => { await commitPanel(); } })));
   }
+
+  /** Background type as a two-option segmented control inside the panel. */
+  function kindChoice(current: BackgroundKind, disabled: boolean) {
+    return h('div', { className: 'power-dsh-background-panel-section' },
+      h('div', { className: 'power-dsh-background-panel-section-title' }, t('flowingBackgroundKind')),
+      h('div', { className: 'power-dsh-background-kind', role: 'radiogroup', 'aria-label': t('flowingBackgroundKind') },
+        ...KINDS.map(kind => h('button', {
+          key: kind, type: 'button', role: 'radio', 'aria-checked': current === kind,
+          className: 'power-dsh-background-kind-option', disabled,
+          onClick: () => {
+            if (disabled || !panelState.open || panelState.saving || panelState.kind === kind) return;
+            publishPanel({ kind });
+            // Loading the asset is a preview concern: switching types must not write.
+            if (kind === 'wallpaper' && wallpaper.status === 'idle') void loadWallpaper();
+          },
+        }, kindLabel(kind)))));
+  }
+
+  /**
+   * One labelled slider. The control is a native `range`, so arrows, Home/End and
+   * Page Up/Down all work; it stays enabled while a save is in flight and only
+   * blocks new writes, so dragging never loses focus or the keyboard.
+   */
   function panelSlider(field: 'flowingBackgroundOpacity' | 'flowingBackgroundBlur', labelKey: string,
-    value: number, min: number, max: number, step: number, unit: string) {
+    value: number, min: number, max: number, step: number, unit: string, descriptionKey: string) {
     const control = `power-dsh-tune-${field}`;
+    const description = `${control}-description`;
     return h('div', { className: 'power-dsh-background-panel-slider', key: field },
       h('div', { className: 'power-dsh-background-panel-row' },
         h('label', { htmlFor: control, className: 'power-dsh-background-panel-label' }, t(labelKey)),
-        h('span', { className: 'power-dsh-background-panel-value' }, `${value}${unit}`)),
+        h('span', { className: 'power-dsh-background-panel-value', 'aria-hidden': true }, `${value}${unit}`)),
       h('input', {
-        key: field, id: control, type: 'range', className: 'power-dsh-slider',
-        min, max, step, value, disabled: panelState.saving,
-        'aria-label': t(labelKey), 'aria-valuetext': `${value}${unit}`,
+        id: control, type: 'range', className: 'power-dsh-slider',
+        min, max, step, value,
+        'aria-label': t(labelKey), 'aria-describedby': description, 'aria-valuetext': `${value}${unit}`,
         onChange: (event: import('react').ChangeEvent<HTMLInputElement>) => {
-          if (!panelState.open || panelState.saving) return;
+          if (!panelState.open) return;
           const next = Math.min(max, Math.max(min, Number(event.currentTarget.value)));
-          // Keep persisted CSS opacity compatible; expose its inverse as transparency.
-          if (Number.isFinite(next)) publishPanel(field === 'flowingBackgroundOpacity' ? { opacity: 100 - next } : { blur: next });
+          if (Number.isFinite(next)) publishPanel(field === 'flowingBackgroundOpacity' ? { opacity: next } : { blur: next });
         },
+        // Commit when the gesture ends or focus leaves, never on every key repeat.
         onPointerUp: () => commitPanel(),
         onKeyUp: (event: import('react').KeyboardEvent<HTMLInputElement>) => {
           if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) return commitPanel();
         },
         onBlur: () => commitPanel(),
-      }));
+      }),
+      h('p', { id: description, className: 'power-dsh-background-panel-hint' }, t(descriptionKey)));
   }
   // Frame-wide, click-through overlay; the panel itself opts back into pointer events.
   ctx?.slots?.inject?.('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay', id: 'power-dsh-background-tune', order: -99, locale: env.namespace,
   }, TuningPanel));
 
-  // Menu open state is feature-scoped so the row can be a plain render function.
-  let menuOpen = false;
-  const menuStore = observable(() => menuOpen);
-  const setMenu = (next: boolean) => { if (menuOpen !== next) { menuOpen = next; menuStore.notify(); } };
   // Wallpaper row state is feature-scoped for the same reason: the settings row
   // is authored as a plain render function, not a component with hooks.
   // The snapshot object is replaced, never rebuilt per call: useSyncExternalStore
@@ -283,25 +318,9 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     t(kind === 'wallpaper' ? 'flowingBackgroundKindWallpaper' : 'flowingBackgroundKindPattern');
 
   const mainSetting = { field: 'flowingBackgroundEnabled', description: 'flowingBackgroundDescription' } as const;
-  const kindSetting = {
-    field: 'flowingBackgroundKind', description: 'flowingBackgroundKindDescription', hidden: true,
-    save: async (next: unknown) => {
-      if (next !== 'pattern' && next !== 'wallpaper') throw new Error(t('saveFailed'));
-      try {
-        await env.savePreference('flowingBackgroundKind', next, undefined, 'string');
-        if (next === 'pattern') {
-          const saved = readStyle(source.getSnapshot());
-          if (saved.opacity !== 100) await env.savePreference('flowingBackgroundOpacity', 100, undefined, 'number');
-          if (saved.blur !== 0) await env.savePreference('flowingBackgroundBlur', 0, undefined, 'number');
-        }
-      } finally {
-        if (active && panelState.open) {
-          const { opacity, blur } = readStyle(source.getSnapshot());
-          publishPanel({ opacity, blur });
-        }
-      }
-    },
-  } as const;
+  // The panel owns the type, opacity and blur writes; these rows stay hidden so the
+  // feature still owns every key it persists.
+  const kindSetting = { field: 'flowingBackgroundKind', description: 'flowingBackgroundKindDescription', hidden: true } as const;
   const opacitySetting = { field: 'flowingBackgroundOpacity', description: 'flowingBackgroundOpacityDescription', hidden: true } as const;
   const blurSetting = { field: 'flowingBackgroundBlur', description: 'flowingBackgroundBlurDescription', hidden: true } as const;
 
@@ -376,61 +395,54 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
 
   function useSettings({ snapshot, disabled, saving, error, save, id, leaveSettings }: SettingsViewContext) {
     const failed = useSnapshot(attachment);
-    const opened = useSnapshot(menuStore);
     const tuneState = useSnapshot(panelStore);
     const openedTune = tuneState.open;
     const enabled = snapshot.value?.flowingBackgroundEnabled === true;
-    const { kind } = readStyle(snapshot);
     const main = !failed || !enabled ? mainSetting
       : { ...mainSetting, failure: presentFailure(failed.issue, failed.observedAt, t) };
+    const failure = 'failure' in main ? main.failure : undefined;
 
-    function kindRow() {
-      if (!enabled) return null;
-      const field = 'flowingBackgroundKind';
-      const control = `${id}-${field}`;
-      const busy = saving?.field === field;
-      const fieldError = error?.field === field ? error.message : '';
-      const adjustment = h(Tooltip, { label: t('flowingBackgroundTuneOpen'), side: 'top', portal: true },
-        h(Button, {
-          type: 'button', variant: 'ghost', size: 'sm', className: 'power-dsh-background-tune-trigger',
-          id: `${id}-flowingBackgroundTune`, disabled: disabled || !leaveSettings,
-          'aria-label': t('flowingBackgroundTuneOpen'),
-          'aria-haspopup': 'dialog', 'aria-expanded': openedTune,
-          onClick: () => { if (!disabled) { setMenu(false); openPanel(leaveSettings); } },
-        }, h('svg', {
-          width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
-          strokeWidth: 1.4, strokeLinecap: 'round', 'aria-hidden': true, focusable: false,
-        }, h('path', { d: 'M2 4h3m4 0h5M2 12h5m4 0h3' }),
-        h('circle', { cx: 7, cy: 4, r: 2 }), h('circle', { cx: 9, cy: 12, r: 2 }))));
-      const selector = h(Menu, {
-        open: opened && !disabled, onClose: () => setMenu(false), selectedId: kind,
-        align: 'end', portal: true, autoFocus: true, minWidthFromAnchor: true,
-        items: KINDS.map(item => ({ id: item, label: kindLabel(item) })),
-        onSelect: next => { setMenu(false); return save(field, next); },
-        anchor: h(Button, {
-          type: 'button', variant: 'ghost', size: 'md',
-          className: 'power-dsh-background-style-select', disabled: disabled || busy,
-          'aria-label': t('flowingBackgroundKind'), 'aria-describedby': `${control}-description${fieldError ? ` ${control}-error` : ''}`,
-          'aria-invalid': Boolean(fieldError),
-          'aria-haspopup': 'menu', 'aria-expanded': opened && !disabled, 'aria-busy': busy,
-          onClick: () => { if (!disabled) setMenu(!opened); },
-        }, kindLabel(kind), h('svg', {
-          width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', strokeWidth: 1.4,
-          strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, focusable: false,
-        }, h('path', { d: 'm4 6 4 4 4-4' }))),
-      });
-      return h('div', { className: 'power-dsh-setting-row', key: field },
+    /**
+     * The adjustment entry sits on the main row itself: there is no separate
+     * "background type" row any more, because the panel owns that choice.
+     */
+    function mainRow() {
+      const control = `${id}-flowingBackgroundEnabled`;
+      return h('div', { className: 'power-dsh-setting-row', key: 'flowingBackgroundMain' },
         h('div', { className: 'power-dsh-setting-copy' },
-          h('div', { id: `${control}-label`, className: 'power-dsh-setting-label' }, t('flowingBackgroundKind')),
-          h('div', { id: `${control}-description`, className: 'power-dsh-description' }, t('flowingBackgroundKindDescription')),
-          fieldError && errorFeedback({ t, id: `${control}-error`, message: fieldError,
-            code: 'PD-BACKGROUND-KIND-SAVE', operation: `settings.${field}` })),
-        h('div', { className: 'power-dsh-background-controls' }, adjustment, selector));
+          h('div', { id: `${control}-label`, className: 'power-dsh-setting-label' }, t('flowingBackgroundEnabled')),
+          h('div', { id: `${control}-description`, className: 'power-dsh-description' }, t('flowingBackgroundDescription')),
+          failure && errorFeedback({ t, id: `${control}-error`, message: failure.message,
+            code: failure.code, operation: failure.operation,
+            context: failure.context, observedAt: failure.observedAt })),
+        h('div', { className: 'power-dsh-background-controls' },
+          // The adjustment entry only exists once a background is chosen; the
+          // switch itself must always stay reachable.
+          enabled && h(Tooltip, { label: t('flowingBackgroundTuneOpen'), side: 'top', portal: true },
+            h(Button, {
+              type: 'button', variant: 'ghost', size: 'sm', className: 'power-dsh-background-tune-trigger',
+              id: `${id}-flowingBackgroundTune`, disabled: disabled || !leaveSettings,
+              'aria-label': t('flowingBackgroundTuneOpen'), 'aria-describedby': `${control}-description`,
+              'aria-haspopup': 'dialog', 'aria-expanded': openedTune,
+              onClick: () => { if (!disabled) openPanel(leaveSettings); },
+            }, h('svg', {
+              width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
+              strokeWidth: 1.4, strokeLinecap: 'round', 'aria-hidden': true, focusable: false,
+            }, h('path', { d: 'M2 4h3m4 0h5M2 12h5m4 0h3' }),
+            h('circle', { cx: 7, cy: 4, r: 2 }), h('circle', { cx: 9, cy: 12, r: 2 })))),
+          h('button', {
+            type: 'button', role: 'switch', className: 'power-dsh-switch', id: control,
+            'aria-checked': enabled, 'aria-labelledby': `${control}-label`,
+            'aria-describedby': `${control}-description`, 'aria-busy': saving?.field === 'flowingBackgroundEnabled',
+            disabled: disabled || saving?.field === 'flowingBackgroundEnabled',
+            onClick: () => save('flowingBackgroundEnabled', !enabled),
+          }, h('span', { className: 'power-dsh-switch-thumb', 'aria-hidden': true }))));
     }
 
+    // `hidden` short-circuits `render` in the settings shell, so the main row is
+    // replaced by a render contribution rather than hidden.
     return [
-      main,
-      { ...kindSetting, hidden: false, render: kindRow },
+      { ...main, render: mainRow },
     ];
   }
 

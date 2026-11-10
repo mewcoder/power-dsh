@@ -98,7 +98,7 @@ Mod 使用已核对的 DSH `0.2.2-rc.1` 原生会话、交互及 subprocess 通�
 
 ## 自定义背景参考
 
-本轮按用户要求结合下列三个实现的职责划分：`dsh-ui-appearance@0.1.28`（提交 `fe6d9b930b9554e99b7fcdd44c8628afc2e1191a`）的媒体淡化／模糊与界面玻璃分离；`dsh-homepage-glass@1.3.1`（提交 `a9bb39e7a9ceb1a83b1467312076f786d6e30fa0`）的动效节流、减少动效和 GPU 回收；`dsh-mpkg-wallpaper`（提交 `ab8d50db9b4a29916be7ba8b45aed452ee80d538`）的零值语义、表面／媒体归属与避免滤镜影响 fixed 弹层定位。PowerDSH 使用「背景淡化」「背景模糊」描述已有功能，保留官方组件样式、Host 图片存储、自有图层范围和旧配置；仅作源码研究，未复制第三方样式、着色器或渲染器，也未安装或执行这些插件。各来源链接、许可与边界见下文。
+本轮按用户要求结合下列三个实现的职责划分：`dsh-ui-appearance@0.1.28`（提交 `fe6d9b930b9554e99b7fcdd44c8628afc2e1191a`）的媒体淡化／模糊与界面玻璃分离；`dsh-homepage-glass@1.3.1`（提交 `a9bb39e7a9ceb1a83b1467312076f786d6e30fa0`）的动效节流、减少动效和 GPU 回收；`dsh-mpkg-wallpaper`（提交 `ab8d50db9b4a29916be7ba8b45aed452ee80d538`）的零值语义、表面／媒体归属与避免滤镜影响 fixed 弹层定位。PowerDSH 使用「背景不透明度」「背景模糊」描述已有功能，保留官方组件样式、Host 图片存储、自有图层范围和旧配置；仅作源码研究，未复制第三方样式、着色器或渲染器，也未安装或执行这些插件。各来源链接、许可与边界见下文。
 
 按用户指定，只读核对 [TQSY114514/dsh-ui-appearance](https://github.com/TQSY114514/dsh-ui-appearance/tree/fe6d9b930b9554e99b7fcdd44c8628afc2e1191a)，包 `0.1.28`、提交 `fe6d9b930b9554e99b7fcdd44c8628afc2e1191a`、MIT（Copyright (c) 2026 TQSY114514）。阅读 README、LICENSE、媒体存储与 `applier.ts`，参考媒体层不透明度／背景模糊分离、模糊画面留边、异步图片身份校验与释放的实现思路。最终保持画面原尺寸，只应用背景模糊滤镜，避免外扩 cover 容器引入额外放大裁切；保留既有 Host profile 图片存储和官方公共组件；未移植其样式表、全局主题覆写、视频／URL／配色功能或 IndexedDB 存储，也未执行其安装脚本、构建或安装该插件。
 
