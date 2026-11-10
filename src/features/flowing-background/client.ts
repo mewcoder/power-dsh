@@ -308,16 +308,16 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       h('p', { id: description, className: 'power-dsh-background-panel-hint' }, t(descriptionKey)));
   }
   /**
-   * Short-sleeved tee from Tabler Icons (MIT), tightened to fill the frame. The
-   * artwork is drawn inside roughly x 2.5-21.5 and y 4-21 of its 24x24 canvas,
-   * so it read small beside the host icons, whose glyphs fill all 16 units. The
-   * viewBox is cropped to that box and the stroke set to 1.4, keeping the 1px
-   * optical weight a 16px render of the host icons has.
+   * Short-sleeved tee from Tabler Icons (MIT), sized to the host icon metrics.
+   * Its glyph spans 18x17 of the 24-unit canvas, so a 22-unit viewBox renders it
+   * 13.1px wide - the host `trash-outline` glyph is 13.4px - with a 1.1 stroke
+   * landing on the host icons' 1px optical weight. Cropping tighter made the tee
+   * visibly larger than its neighbours.
    */
   function ShirtIcon({ size = 16 }: IconProps) {
     return h('svg', {
-      width: size, height: size, viewBox: '2.5 3.5 19 18', fill: 'none',
-      stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round',
+      width: size, height: size, viewBox: '1 1 22 22', fill: 'none',
+      stroke: 'currentColor', strokeWidth: 1.1, strokeLinecap: 'round', strokeLinejoin: 'round',
       'aria-hidden': true, focusable: false,
     }, h('path', {
       d: 'M15 4l6 2v5h-3v8a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-8H3V6l6-2a3 3 0 0 0 6 0',
