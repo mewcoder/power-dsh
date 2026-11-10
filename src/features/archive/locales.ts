@@ -3,7 +3,7 @@ export const locales = {
   "en": {
     "archiveManagerEnabled": "Archive management",
     "archiveManagerDescription": "Review and restore archived sessions",
-    "archiveTab": "Archive",
+    "archiveTab": "Archived",
     "archiveDescription": "Review and restore archived sessions in DSH",
     "archiveSearch": "Search archived sessions",
     "archiveEmpty": "No archived sessions",
@@ -21,6 +21,9 @@ export const locales = {
     "archiveDeleteTitle": "Delete session?",
     "archiveDeleteDescription": "This permanently deletes session “{name}” and its transcript. This cannot be undone.",
     "archiveDeleteConfirm": "Delete permanently",
+    "archiveDeleteAll": "Delete all",
+    "archiveDeleteAllTitle": "Delete all archived sessions?",
+    "archiveDeleteAllDescription": "This permanently deletes all {count} archived sessions and their transcripts. This cannot be undone.",
     "archiveDeleting": "Deleting…",
     "archiveDeleteFailed": "Could not delete this session. Please try again.",
     "archiveDeleteLive": "This session is still running. Stop it before deleting.",
@@ -43,7 +46,7 @@ export const locales = {
   "zh": {
     "archiveManagerEnabled": "归档管理",
     "archiveManagerDescription": "查看并恢复已归档会话",
-    "archiveTab": "归档",
+    "archiveTab": "已归档",
     "archiveDescription": "查看并恢复 DSH 中已归档的会话",
     "archiveSearch": "搜索已归档会话",
     "archiveEmpty": "暂无归档会话",
@@ -61,6 +64,9 @@ export const locales = {
     "archiveDeleteTitle": "删除会话？",
     "archiveDeleteDescription": "将永久删除会话“{name}”及其对话记录，此操作不可恢复。",
     "archiveDeleteConfirm": "永久删除",
+    "archiveDeleteAll": "全部删除",
+    "archiveDeleteAllTitle": "删除全部归档会话？",
+    "archiveDeleteAllDescription": "将永久删除全部 {count} 个归档会话及其对话记录，此操作不可恢复。",
     "archiveDeleting": "正在删除…",
     "archiveDeleteFailed": "无法删除此会话，请重试。",
     "archiveDeleteLive": "该会话仍在运行，请先停止后再删除。",
@@ -77,7 +83,7 @@ export const locales = {
     "archiveLoadFailed": "无法加载归档会话，请重试。",
     "archiveUnavailable": "归档管理暂不可用。",
     "archiveUntitled": "未命名会话",
-    "archiveUngrouped": "未归类",
+    "archiveUngrouped": "未分组",
     "archiveOutdated": "归档管理尚未在后端加载，请重新启用 power-dsh 后重试。"
   }
 } satisfies Locales;

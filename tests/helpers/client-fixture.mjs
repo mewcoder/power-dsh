@@ -48,18 +48,56 @@ export function mcpCatalogFixture(overrides = {}) {
 }
 
 export function archiveSessionFixture(overrides = {}) {
-  return { sessionId: 's1', title: 'Archived session', workspaceId: 'w1', workspaceTitle: 'Project Alpha', updatedAt: 20, createdAt: 100, ...overrides };
+  return { sessionId: 's1', title: 'Archived session', workspaceId: 'w1', workspaceTitle: 'Project Alpha', workspacePath: '/work/alpha', updatedAt: 20, createdAt: 100, ...overrides };
+}
+
+export function projectRowFixture(overrides = {}) {
+  return { workspaceId: 'w1', title: 'Project Alpha', path: '/work/alpha', sessionCount: 3, lastActiveAt: 20, ...overrides };
+}
+
+export function projectCatalogFixture(overrides = {}) {
+  return { complete: true, projects: [projectRowFixture()], ...overrides };
 }
 
 export function archiveCatalogFixture(overrides = {}) {
   return {
     complete: true,
-    workspaces: [{ workspaceId: 'w1', title: 'Project Alpha' }, { workspaceId: 'w2', title: 'Project Beta' }],
+    workspaces: [{ workspaceId: 'w1', title: 'Project Alpha', path: '/work/alpha' }, { workspaceId: 'w2', title: 'Project Beta', path: '/work/beta' }],
     sessions: [archiveSessionFixture()], ...overrides,
   };
 }
 
-export async function mount({ featureIds, localeLanguage, restartStatus = { supported: true, running: false, error: '' }, restartReply, desktop = false, themeAvailable = true, updates, rpcError, rpcReply, formReply, formLoad, fileText = '', fileReply, fileReadError, wallpaper, wallpaperReply, wallpaperReadError, wallpaperClearError, skillCatalog, skillList, skillReply, skillReadError, mcpCatalog, mcpList, mcpReply, mcpReadError, archiveCatalog, archiveList, archiveReply, archiveReadError, writable = true, reload = () => {}, windows = false, notificationPermission = 'granted', notificationRequest, notificationFailure = false, notificationServices = true, notificationsAvailable = true, localConnection = true, soundCatalog, soundReply, soundListError, modelDirectory, modelSelectReply, modelDirectoriesAvailable = true } = {}) {
+export function usageSnapshotFixture(overrides = {}) {
+  const days = overrides.days ?? [
+    { date: '2026-03-01', totalTokens: 100, turnCount: 2, toolCallCount: 1 },
+    { date: '2026-03-02', totalTokens: 0, turnCount: 0, toolCallCount: 0 },
+    { date: '2026-03-03', totalTokens: 400, turnCount: 3, toolCallCount: 5 },
+  ];
+  return {
+    complete: overrides.complete ?? true,
+    generatedAt: Date.parse('2026-03-03T12:00:00.000Z'),
+    timeZone: 'UTC',
+    firstDate: days[0]?.date ?? '',
+    lastDate: days.at(-1)?.date ?? '',
+    summary: {
+      totalTokens: 500, inputTokens: 400, outputTokens: 100, cacheReadTokens: 0, cacheWriteTokens: 0,
+      peakDayTokens: 400, longestSessionMs: 3_720_000, currentStreakDays: 1, longestStreakDays: 2,
+      activeDays: 2, sessionCount: 1, turnCount: 5, ...overrides.summary,
+    },
+    days,
+    dailyModels: overrides.dailyModels ?? [
+      { date: '2026-03-01', modelId: 'group/flash', provider: 'magpie', totalTokens: 100 },
+      { date: '2026-03-03', modelId: 'group/flash', provider: 'magpie', totalTokens: 300 },
+      { date: '2026-03-03', modelId: 'group/sol', provider: 'magpie', totalTokens: 100 },
+    ],
+    models: overrides.models ?? [
+      { modelId: 'group/flash', provider: 'magpie', totalTokens: 400, requestCount: 3 },
+      { modelId: 'group/sol', provider: 'magpie', totalTokens: 100, requestCount: 1 },
+    ],
+  };
+}
+
+export async function mount({ featureIds, localeLanguage, restartStatus = { supported: true, running: false, error: '' }, restartReply, desktop = false, themeAvailable = true, updates, rpcError, rpcReply, formReply, formLoad, fileText = '', fileReply, fileReadError, wallpaper, wallpaperReply, wallpaperReadError, wallpaperClearError, skillCatalog, skillList, skillReply, skillReadError, mcpCatalog, mcpList, mcpReply, mcpReadError, archiveCatalog, archiveList, archiveReply, archiveReadError, usageSnapshot, usageList, usageReply, usageReadError, projectCatalog, projectList, projectReply, projectReadError, writable = true, reload = () => {}, windows = false, notificationPermission = 'granted', notificationRequest, notificationFailure = false, notificationServices = true, notificationsAvailable = true, localConnection = true, soundCatalog, soundReply, soundListError, modelDirectory, modelSelectReply, modelDirectoriesAvailable = true } = {}) {
   let plugin;
   const nativeLauncher = { native: true };
   const entries = new Map([['settings.launcher:single', nativeLauncher]]);
@@ -161,6 +199,13 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   const archiveWrites = [];
   let archiveValue = archiveCatalog ?? archiveCatalogFixture();
   const archiveView = () => ({ ...archiveValue, sessions: [...archiveValue.sessions], workspaces: [...archiveValue.workspaces] });
+  const projectReads = [];
+  const projectWrites = [];
+  let projectValue = projectCatalog ?? projectCatalogFixture();
+  const projectView = () => ({ ...projectValue, projects: [...projectValue.projects] });
+  const usageReads = [];
+  let usageValue = usageSnapshot ?? usageSnapshotFixture();
+  const usageView = () => structuredClone(usageValue);
   const effortSelects = [];
   const effortSessions = [];
   const effortListeners = new Set();
@@ -425,6 +470,33 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
             archiveValue = { ...archiveValue, sessions: archiveValue.sessions.filter(session => session.sessionId !== blocked) };
             return { ok: true, value: archiveView() };
           }
+          if (descriptor.method === 'readUsageStats') {
+            usageReads.push({ timeZone: blocked });
+            if (usageList) return usageList(blocked);
+            if (usageReadError) return { ok: false, error: { message: usageReadError } };
+            if (usageReply) {
+              const result = await usageReply(blocked);
+              if (result.ok) usageValue = result.value;
+              return result;
+            }
+            return { ok: true, value: usageView() };
+          }
+          if (descriptor.method === 'listProjects') {
+            projectReads.push({});
+            if (projectList) return projectList();
+            if (projectReadError) return { ok: false, error: { message: projectReadError } };
+            return { ok: true, value: projectView() };
+          }
+          if (descriptor.method === 'removeProject') {
+            projectWrites.push({ method: descriptor.method, workspaceId: blocked });
+            if (projectReply) {
+              const result = await projectReply(descriptor.method, blocked);
+              if (result.ok) projectValue = result.value;
+              return result;
+            }
+            projectValue = { ...projectValue, projects: projectValue.projects.filter(project => project.workspaceId !== blocked) };
+            return { ok: true, value: projectView() };
+          }
           if (descriptor.method === 'readWallpaper') return wallpaperReadError
             ? { ok: false, error: { message: wallpaperReadError } } : { ok: true, value: wallpaperValue };
           if (descriptor.method === 'saveWallpaper') {
@@ -509,7 +581,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     setConnectionState(state) { connectionState = state; connectionStateListeners.forEach(fn => fn()); },
     timers,
     connectionStateListeners,
-    entries, calls, dictionaries, nativeLauncher, rpcCalls, rpcDescriptors, fileWrites, skillReads, skillWrites, mcpReads, mcpWrites, archiveReads, archiveWrites,
+    entries, calls, dictionaries, nativeLauncher, rpcCalls, rpcDescriptors, fileWrites, skillReads, skillWrites, mcpReads, mcpWrites, archiveReads, archiveWrites, projectReads, projectWrites, usageReads,
     soundPlays, soundLists: () => soundLists,
     notifications,
     permissionRequests: () => permissionRequests,
@@ -551,6 +623,26 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     },
     reloadArchive() {
       return app.archiveProps().loadArchivedSessions();
+    },
+    setProjects(value) { projectValue = value; },
+    projectsProps() {
+      return entries.get('settings.section:power-dsh-projects').component({ t: key => key }).props;
+    },
+    renderProjects(language) {
+      return renderComponent(entries.get('settings.section:power-dsh-projects').component({ t: key => dictionaries.get(language)?.[key] ?? key }));
+    },
+    reloadProjects() {
+      return app.projectsProps().loadProjects();
+    },
+    setUsage(value) { usageValue = value; },
+    usageProps() {
+      return entries.get('settings.section:power-dsh-usage').component({ t: key => key }).props;
+    },
+    renderUsage(language) {
+      return renderComponent(entries.get('settings.section:power-dsh-usage').component({ t: key => dictionaries.get(language)?.[key] ?? key }));
+    },
+    reloadUsage() {
+      return app.usageProps().loadUsageStats();
     },
     focus() { focusListeners.forEach(fn => fn()); },
     focusSubscriptions: () => focusListeners.size,
@@ -766,6 +858,17 @@ export async function archivePage(app, language) {
   const search = () => render().find(node => node.type === 'input' && node.props.type === 'search');
   const action = (sessionId, name) => descendants(row(sessionId)).find(node => node.type === 'button' && node.props[`data-${name}`] === sessionId);
   return { render, group, row, search, action };
+}
+
+export async function projectsPage(app, language) {
+  app.set({ projectManagerEnabled: true });
+  app.renderProjects(language);
+  await app.reloadProjects();
+  const render = () => descendants(app.renderProjects(language));
+  const row = workspaceId => render().find(node => node.type === 'li' && node.props['data-project'] === workspaceId);
+  const search = () => render().find(node => node.type === 'input' && node.props.type === 'search');
+  const action = workspaceId => descendants(row(workspaceId)).find(node => node.type === 'button' && node.props['data-remove'] === workspaceId);
+  return { render, row, search, action };
 }
 
 export function restartControl(app) {

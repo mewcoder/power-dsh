@@ -36,6 +36,8 @@ interface Preferences {
   flowingBackgroundBlur: number;
   showBackgroundShortcut: boolean;
   archiveManagerEnabled: boolean;
+  usageStatsEnabled: boolean;
+  projectManagerEnabled: boolean;
 }
 type PreferenceKey = keyof Preferences;
 interface LiveValue<T> {
@@ -56,7 +58,7 @@ type SettingsOutput = Pick<Preferences, SettingsParameter> & {
   version: string | null;
   telemetry: TelemetryStatus;
 };
-type FeatureId = 'version-display' | 'appearance-shortcut' | 'refresh-button' | 'restart-button' | 'notifications' | 'personalization' | 'skills' | 'mcp' | 'account-blocking' | 'search-blocking' | 'telemetry-blocking' | 'todo-blocking' | 'plan-blocking' | 'goal-blocking' | 'double-click-rename' | 'thinking-effort' | 'flowing-background' | 'archive';
+type FeatureId = 'version-display' | 'appearance-shortcut' | 'refresh-button' | 'restart-button' | 'notifications' | 'personalization' | 'skills' | 'mcp' | 'account-blocking' | 'search-blocking' | 'telemetry-blocking' | 'todo-blocking' | 'plan-blocking' | 'goal-blocking' | 'double-click-rename' | 'thinking-effort' | 'flowing-background' | 'archive' | 'usage-stats' | 'projects';
 type FeatureCategory = 'general' | 'interface' | 'enhance' | 'simplify' | 'other';
 interface FeatureDefinition {
   readonly id: FeatureId;
@@ -161,6 +163,72 @@ interface ArchiveCatalog {
   workspaces: ArchiveWorkspaceRow[];
   sessions: ArchiveSessionRow[];
 }
+/** One day of locally recorded token activity; dates are `YYYY-MM-DD` in the reporting zone. */
+interface UsageDayRow {
+  date: string;
+  totalTokens: number;
+  turnCount: number;
+  toolCallCount: number;
+}
+interface UsageModelRow {
+  modelId: string;
+  provider: string;
+  totalTokens: number;
+  requestCount: number;
+}
+/** One model's tokens on one day, for the per-model trend lines. */
+interface UsageDailyModelRow {
+  date: string;
+  modelId: string;
+  provider: string;
+  totalTokens: number;
+}
+interface UsageSummary {
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  peakDayTokens: number;
+  longestSessionMs: number;
+  currentStreakDays: number;
+  longestStreakDays: number;
+  activeDays: number;
+  sessionCount: number;
+  turnCount: number;
+}
+interface UsageSnapshot {
+  /** Whether every readable session log was folded; false when some were skipped. */
+  complete: boolean;
+  generatedAt: number;
+  /** IANA zone the day buckets use; always the calling browser's zone. */
+  timeZone: string;
+  /** Earliest and latest observed activity date, or empty when nothing was recorded. */
+  firstDate: string;
+  lastDate: string;
+  summary: UsageSummary;
+  /** Continuous daily series over the whole history, zero-filled for quiet days. */
+  days: UsageDayRow[];
+  /** Per-day totals for the models that appear in `models`, largest first. */
+  dailyModels: UsageDailyModelRow[];
+  /** Models ordered by total tokens, largest first. */
+  models: UsageModelRow[];
+}
+interface ProjectRow {
+  workspaceId: string;
+  title: string;
+  /** Native Workspace directory; empty when the baseline predates it. */
+  path: string;
+  /** Sessions currently accounted to this Workspace, archived ones included. */
+  sessionCount: number;
+  /** Latest activity among the Workspace's Sessions; 0 when none is dated. */
+  lastActiveAt: number;
+}
+interface ProjectCatalog {
+  complete: boolean;
+  /** Native registry order, so manual sorting mirrors the sidebar. */
+  projects: ProjectRow[];
+}
 /** Named Host operations, before the transport adds its result envelope. */
 interface PowerDshMethods {
   restartStatus(): Promise<RestartStatus>;
@@ -185,6 +253,9 @@ interface PowerDshMethods {
   listArchivedSessions(): Promise<ArchiveCatalog>;
   restoreArchivedSession(sessionId: string): Promise<ArchiveCatalog>;
   deleteArchivedSession(sessionId: string): Promise<ArchiveCatalog>;
+  readUsageStats(timeZone: string): Promise<UsageSnapshot>;
+  listProjects(): Promise<ProjectCatalog>;
+  removeProject(workspaceId: string): Promise<ProjectCatalog>;
 }
 type PowerDshMethod = keyof PowerDshMethods;
 interface Codec<T> {
@@ -305,6 +376,20 @@ interface NativeWorkspaceController {
     sessionId: string;
   }): Promise<{
     archivedSessionIds: readonly string[];
+  }>;
+  delete(request: {
+    workspaceId: string;
+  }): Promise<{
+    deleted: boolean;
+  }>;
+}
+/** Session list surface: the same activity order the native sidebar dates rows with. */
+interface NativeSessionController {
+  list(request: Record<string, never>, signal?: AbortSignal): Promise<{
+    items: readonly {
+      sessionId: string;
+      updatedAt: number;
+    }[];
   }>;
 }
 type NativeSessionTitleObservation = {
@@ -575,6 +660,7 @@ interface NativeContext {
     }[];
   };
   workspaceController?: NativeWorkspaceController;
+  sessionController?: NativeSessionController;
   sessionQuery?: NativeSessionQuery;
   sessionPersistence?: NativeSessionPersistence;
   workingDirectory: {

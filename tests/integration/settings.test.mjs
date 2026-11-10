@@ -105,13 +105,13 @@ test('settings route policy changes to their explicit injected Host methods', as
   app.unmount();
 });
 
-test('settings group twenty switches under five panels and default to General', async () => {
+test('settings group every switch under five panels and default to General', async () => {
   const app = await mount({ desktop: true });
   app.set({ notificationsEnabled: true });
   const groups = {
     general: ['notificationsEnabled', 'notificationSoundEnabled'],
     interface: ['showThinkingEffortSwitcher', 'showThemeSwitcher', 'flowingBackgroundEnabled', 'showBackgroundShortcut', 'showVersion'],
-    enhancements: ['skillManagerEnabled', 'mcpManagerEnabled', 'personalizationEnabled', 'archiveManagerEnabled'],
+    enhancements: ['skillManagerEnabled', 'mcpManagerEnabled', 'personalizationEnabled', 'archiveManagerEnabled', 'projectManagerEnabled', 'usageStatsEnabled'],
     simplify: ['blockOfficialAccount', 'blockOfficialSearch', 'blockOfficialTelemetry', 'blockTodo', 'blockPlan', 'blockGoal'],
     other: ['showRefreshButton', 'showRestartButton', 'blockDoubleClickRename'],
   };
@@ -139,7 +139,7 @@ test('settings group twenty switches under five panels and default to General', 
     fields.push(...actual);
     assert.ok(!view.some(node => node.type === 'textarea'));
   }
-  assert.equal(new Set(fields).size, 20);
+  assert.equal(new Set(fields).size, 22);
   app.unmount();
 });
 

@@ -8,16 +8,18 @@ const archiveCatalogCodec: Codec<ArchiveCatalog> = {
   create: () => ({ parse(value) {
     if (!isRecord(value) || typeof value.complete !== 'boolean'
       || !isArray(value.workspaces) || !isArray(value.sessions)) throw new TypeError('Invalid archive catalog');
+    // `path` is additive: a Host that predates it still yields a usable catalog.
+    const pathOf = (row: Record<string, unknown>) => typeof row.path === 'string' ? row.path : '';
     const workspaces = value.workspaces.map(row => {
       if (!isRecord(row) || !hasStrings(row, ['workspaceId', 'title'])) throw new TypeError('Invalid archive workspace');
-      return { workspaceId: row.workspaceId, title: row.title };
+      return { workspaceId: row.workspaceId, title: row.title, path: pathOf(row) };
     });
     const sessions = value.sessions.map(row => {
       if (!isRecord(row) || !hasStrings(row, ['sessionId', 'title', 'workspaceId', 'workspaceTitle'])
         || typeof row.updatedAt !== 'number' || !Number.isFinite(row.updatedAt)
         || typeof row.createdAt !== 'number' || !Number.isFinite(row.createdAt)) throw new TypeError('Invalid archive session');
       return { sessionId: row.sessionId, title: row.title, workspaceId: row.workspaceId,
-        workspaceTitle: row.workspaceTitle, updatedAt: row.updatedAt, createdAt: row.createdAt };
+        workspaceTitle: row.workspaceTitle, workspacePath: pathOf(row), updatedAt: row.updatedAt, createdAt: row.createdAt };
     });
     return { complete: value.complete, workspaces, sessions };
   } }),

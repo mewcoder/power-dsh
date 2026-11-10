@@ -82,7 +82,9 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const [projectId, setProjectId] = React.useState('');
     const [restoring, setRestoring] = React.useState<string | null>(null);
     const [deleting, setDeleting] = React.useState<string | null>(null);
+    // The dialog serves both one row and the whole list.
     const [confirming, setConfirming] = React.useState<ArchiveSessionRow | null>(null);
+    const [confirmingAll, setConfirmingAll] = React.useState(false);
     const [closedGroups, setClosedGroups] = React.useState<Record<string, boolean>>({});
     const [error, setError] = React.useState<{ id: string; message: string } | null>(null);
     const id = React.useId();
@@ -136,6 +138,29 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         if (mounted.current) setDeleting(null);
       }
     }
+    /**
+     * Delete every session currently listed. Runs one request at a time so a
+     * failure leaves the remaining rows intact and reported instead of aborting
+     * the whole batch silently.
+     */
+    async function confirmDeleteAll() {
+      if (pending.current) return;
+      const targets = (catalog?.sessions ?? []).map(row => row.sessionId);
+      if (targets.length === 0) { setConfirmingAll(false); return; }
+      pending.current = true;
+      setError(null);
+      const failures: string[] = [];
+      for (const sessionId of targets) {
+        setDeleting(sessionId);
+        try { await deleteOneInBatch(sessionId); }
+        catch (failure) { failures.push(`${sessionId}: ${errorMessage(failure) ?? ''}`); }
+      }
+      pending.current = false;
+      if (!mounted.current) return;
+      setDeleting(null);
+      setConfirmingAll(false);
+      if (failures.length) setError({ id: '', message: archiveErrorMessage(undefined, 'archiveDeleteFailed') });
+    }
     const renderRow = (row: ArchiveSessionRow) => {
       const rowBusy = restoring === row.sessionId || deleting === row.sessionId;
       const time = row.updatedAt > 0 ? new Date(row.updatedAt).toLocaleString() : '';
@@ -164,7 +189,10 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const renderGroup = (group: ArchiveGroup, index: number) => {
       const titleId = `${id}-archive-group-${index}`;
       const open = Boolean(query.trim()) || !closedGroups[group.key];
+      const path = group.path;
       return h('section', { key: group.key, className: 'power-dsh-archive-group', 'aria-labelledby': titleId },
+        // One row: chevron, folder, title, then the path as a smaller caption, and
+        // the count pinned right.
         h('div', { className: 'power-dsh-archive-group-header' },
           h('button', {
             id: titleId, type: 'button', className: 'power-dsh-archive-group-toggle',
@@ -175,6 +203,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             },
           }, h(SkillChevron), h('span', { className: 'power-dsh-archive-group-folder' }, h(FolderIcon)),
           h('span', { className: 'power-dsh-archive-group-title' }, group.title)),
+          path && h(Tooltip, { label: path, side: 'top', portal: true, delayMs: 0, maxWidth: 520 },
+            h('span', { className: 'power-dsh-archive-group-path', tabIndex: 0 }, path)),
           h('span', { className: 'power-dsh-archive-count' }, t('archiveCount').replace('{count}', () => String(group.sessions.length)))),
         open && h('ul', { id: `${titleId}-body`, className: 'power-dsh-archive-rows' }, group.sessions.map(renderRow)));
     };
@@ -182,7 +212,13 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       h('style', null, styles),
       h('header', null,
         h('h2', { className: 'power-dsh-title' }, t('archiveTab')),
-        h('p', { className: 'power-dsh-description' }, t('archiveDescription'))),
+        // Description and the bulk action share one row, the action pinned right.
+        h('div', { className: 'power-dsh-archive-head' },
+          h('p', { className: 'power-dsh-description' }, t('archiveDescription')),
+          catalog && catalog.sessions.length > 0 && h('button', {
+            type: 'button', className: 'power-dsh-archive-action power-dsh-archive-delete-all',
+            disabled: busy, onClick: () => { if (!busy && mounted.current) setConfirmingAll(true); },
+          }, t('archiveDeleteAll')))),
       snapshot.status === 'loading' && h('p', { className: 'power-dsh-notice', role: 'status' }, t('loading')),
       snapshot.status === 'error' && errorFeedback({ t, message: snapshot.error || t('archiveLoadFailed'),
         code: 'PD-ARCHIVE-LOAD', operation: 'listArchivedSessions', placement: 'page', retry: loadArchivedSessions, disabled: busy }),
@@ -202,15 +238,18 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
           && h('p', { className: 'power-dsh-skill-empty' }, t(query || projectId ? 'archiveNoMatches' : 'archiveEmpty'))),
       error && !(catalog?.sessions ?? []).some(row => row.sessionId === error.id)
         && errorFeedback({ t, message: error.message, code: 'PD-ARCHIVE-ACTION', operation: 'archiveSession', placement: 'page' }),
-      confirming && h(Modal, {
-        open: true, onClose: () => { if (deleting === null) setConfirming(null); },
-        title: t('archiveDeleteTitle'), closeLabel: t('close'),
-        description: t('archiveDeleteDescription').replace('{name}', () => confirming.title || t('archiveUntitled')),
+      (confirming !== null || confirmingAll) && h(Modal, {
+        open: true, onClose: () => { if (deleting === null) { setConfirming(null); setConfirmingAll(false); } },
+        title: t(confirmingAll ? 'archiveDeleteAllTitle' : 'archiveDeleteTitle'), closeLabel: t('close'),
+        description: confirmingAll
+          ? t('archiveDeleteAllDescription').replace('{count}', () => String(catalog?.sessions.length ?? 0))
+          : t('archiveDeleteDescription').replace('{name}', () => confirming?.title || t('archiveUntitled')),
         footer: h(React.Fragment, null,
           h(Button, { variant: 'outline', 'data-modal-autofocus': true, disabled: deleting !== null,
-            onClick: () => { if (deleting === null) setConfirming(null); } }, t('cancel')),
+            onClick: () => { if (deleting === null) { setConfirming(null); setConfirmingAll(false); } } }, t('cancel')),
           h(Button, { variant: 'outline', className: 'power-dsh-archive-confirm-delete', disabled: deleting !== null,
-            onClick: () => { void confirmDelete(confirming.sessionId); } }, t(deleting !== null ? 'archiveDeleting' : 'archiveDeleteConfirm'))),
+            onClick: () => { if (confirmingAll) void confirmDeleteAll(); else if (confirming) void confirmDelete(confirming.sessionId); } },
+            t(deleting !== null ? 'archiveDeleting' : 'archiveDeleteConfirm'))),
       }));
   }
 
@@ -253,6 +292,18 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       await loadArchivedSessions();
       throw new Error(result.error.message);
     }
+    archive = { status: 'ready', value: result.value, error: '' };
+    archiveSource.notify();
+  };
+  /**
+   * One request of a batch. Each call answers with the catalog after that
+   * deletion, and the batch keeps going: bumping the generation per request
+   * (as the single-row wrapper does) would invalidate its own next call.
+   */
+  const deleteOneInBatch = async (sessionId: string): Promise<void> => {
+    const result = await ctx.remote.powerDsh.deleteArchivedSession(sessionId);
+    if (!active) return;
+    if (!result.ok) throw new Error(result.error.message);
     archive = { status: 'ready', value: result.value, error: '' };
     archiveSource.notify();
   };

@@ -44,6 +44,12 @@ test('archived projects collapse and expand without hiding rows from search', as
   assert.ok(page.row('s1'));
   assert.ok(page.row('s3'));
 
+  const pathLine = page.render().find(node => node.props.className === 'power-dsh-archive-group-path' && [node.props.children].flat(Infinity).includes('/work/alpha'));
+  assert.ok(pathLine, 'Each project group shows its workspace directory.');
+  assert.equal(pathLine.type, 'span', 'The path sits on the group header row instead of a second line.');
+  assert.equal(pathLine.props.tabIndex, 0);
+  assert.ok(page.render().some(node => node.type === 'native-tooltip-fixture' && node.props.label === '/work/alpha' && node.props.portal === true));
+
   alpha.props.onClick();
   assert.equal(page.group('Project Alpha').props['aria-expanded'], false);
   assert.equal(page.row('s1'), undefined);
@@ -91,6 +97,20 @@ test('archive rows restore and delete through the native confirmation with nativ
   app.unmount();
 });
 
+test('the trailing group uses the native ungrouped wording without a path line', async () => {
+  const app = await mount({ localeLanguage: 'zh', archiveCatalog: archiveCatalogFixture({ sessions: [
+    archiveSessionFixture({ sessionId: 's1', title: 'Alpha one', workspaceId: 'w1', workspaceTitle: 'Project Alpha', workspacePath: '/work/alpha' }),
+    archiveSessionFixture({ sessionId: 's9', title: 'Orphan', workspaceId: '', workspaceTitle: '', workspacePath: '' }),
+  ] }) });
+  const page = await archivePage(app, 'zh');
+  assert.ok(page.group('未分组'), 'The trailing group matches the native Workspace wording.');
+  assert.equal(page.render().filter(node => node.props.className === 'power-dsh-archive-group-path').length, 1,
+    'Only the real workspace renders a directory line.');
+  assert.ok(page.render().some(node => node.props.className === 'power-dsh-archive-group-path'
+    && [node.props.children].flat(Infinity).includes('/work/alpha')));
+  app.unmount();
+});
+
 test('archive load and action failures stay recoverable and localized', async () => {
   const app = await mount({ archiveCatalog: catalog, archiveReadError: 'archiveUnavailable' });
   app.set({ archiveManagerEnabled: true });
@@ -110,4 +130,47 @@ test('archive load and action failures stay recoverable and localized', async ()
   assert.equal(page.row('s1').props['data-archive'], 's1', 'A failed delete keeps the row.');
   assert.ok(descendants(page.row('s1')).some(node => [node.props.children].flat(Infinity).includes('archiveDeleteRemoveFailed')));
   failing.unmount();
+});
+
+test('the header offers a delete-all action that confirms once and clears the list', async () => {
+  const app = await mount({ archiveCatalog: archiveCatalogFixture({ sessions: [
+    archiveSessionFixture({ sessionId: 's1' }),
+    archiveSessionFixture({ sessionId: 's2' }),
+    archiveSessionFixture({ sessionId: 's3' }),
+  ] }) });
+  app.set({ archiveManagerEnabled: true });
+  app.renderArchive();
+  await new Promise(setImmediate); await new Promise(setImmediate);
+  const page = () => descendants(app.renderArchive());
+  const bulk = () => page().find(node => typeof node.props?.className === 'string'
+    && node.props.className.includes('power-dsh-archive-delete-all'));
+  assert.ok(bulk(), 'The header carries the bulk action.');
+  assert.ok(bulk().props.children.includes('archiveDeleteAll'));
+  assert.ok(bulk().props.className.includes('power-dsh-archive-action'),
+    'The bulk action reuses the row action geometry, which declares the border.');
+  bulk().props.onClick();
+  const dialog = () => page().find(node => node.props?.role === 'dialog');
+  assert.ok(dialog(), 'The bulk action opens the native confirmation.');
+  const confirm = page().find(node => typeof node.props?.className === 'string'
+    && node.props.className.includes('power-dsh-archive-confirm-delete'));
+  await confirm.props.onClick();
+  // The batch awaits one request per row; flush the microtask queue between them.
+  for (let index = 0; index < 8; index++) await new Promise(setImmediate);
+  const deleted = app.archiveWrites.filter(entry => entry.method === 'deleteArchivedSession').map(entry => entry.sessionId);
+  assert.deepEqual(deleted.slice().sort(), ['s1', 's2', 's3'],
+    'Every listed session is deleted through the native confirmation.');
+  app.unmount();
+});
+
+test('the group path sits on the title row as a smaller caption', async () => {
+  const app = await mount();
+  app.set({ archiveManagerEnabled: true });
+  app.renderArchive();
+  await new Promise(setImmediate); await new Promise(setImmediate);
+  const header = descendants(app.renderArchive())
+    .find(node => node.props?.className === 'power-dsh-archive-group-header');
+  const classes = descendants(header).map(node => node.props?.className).filter(Boolean);
+  assert.ok(classes.includes('power-dsh-archive-group-path'), 'The path stays on the header row.');
+  assert.ok(!classes.includes('power-dsh-archive-group-head'), 'There is no second line for the path.');
+  app.unmount();
 });

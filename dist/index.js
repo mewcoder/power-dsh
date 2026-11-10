@@ -57,7 +57,7 @@ var OperationQueue = class {
 };
 
 // src/features/version-display/definition.ts
-const definition$17 = Object.freeze({
+const definition$19 = Object.freeze({
 	id: "version-display",
 	category: "interface",
 	order: 6,
@@ -66,11 +66,11 @@ const definition$17 = Object.freeze({
 });
 
 // src/features/version-display/config.ts
-var config_exports$17 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$17,
+var config_exports$19 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$19,
 	settingsTool: () => settingsTool$10
 });
-const configFields$17 = { showVersion: z.boolean().default(false).volatile() };
+const configFields$19 = { showVersion: z.boolean().default(false).volatile() };
 const settingsTool$10 = {
 	parameters: { showVersion: {
 		type: "boolean",
@@ -104,7 +104,7 @@ const settingsTool$10 = {
 };
 
 // src/features/appearance-shortcut/definition.ts
-const definition$16 = Object.freeze({
+const definition$18 = Object.freeze({
 	id: "appearance-shortcut",
 	category: "interface",
 	order: 4,
@@ -113,11 +113,11 @@ const definition$16 = Object.freeze({
 });
 
 // src/features/appearance-shortcut/config.ts
-var config_exports$16 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$16,
+var config_exports$18 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$18,
 	settingsTool: () => settingsTool$9
 });
-const configFields$16 = { showThemeSwitcher: z.boolean().default(false).volatile() };
+const configFields$18 = { showThemeSwitcher: z.boolean().default(false).volatile() };
 const settingsTool$9 = {
 	parameters: { showThemeSwitcher: {
 		type: "boolean",
@@ -140,7 +140,7 @@ const settingsTool$9 = {
 };
 
 // src/features/refresh-button/definition.ts
-const definition$15 = Object.freeze({
+const definition$17 = Object.freeze({
 	id: "refresh-button",
 	category: "other",
 	order: 1,
@@ -149,11 +149,11 @@ const definition$15 = Object.freeze({
 });
 
 // src/features/refresh-button/config.ts
-var config_exports$15 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$15,
+var config_exports$17 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$17,
 	settingsTool: () => settingsTool$8
 });
-const configFields$15 = { showRefreshButton: z.boolean().default(false).volatile() };
+const configFields$17 = { showRefreshButton: z.boolean().default(false).volatile() };
 const settingsTool$8 = {
 	parameters: { showRefreshButton: {
 		type: "boolean",
@@ -176,7 +176,7 @@ const settingsTool$8 = {
 };
 
 // src/features/restart-button/definition.ts
-const definition$14 = Object.freeze({
+const definition$16 = Object.freeze({
 	id: "restart-button",
 	category: "other",
 	order: 2,
@@ -185,11 +185,11 @@ const definition$14 = Object.freeze({
 });
 
 // src/features/restart-button/config.ts
-var config_exports$14 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$14,
+var config_exports$16 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$16,
 	settingsTool: () => settingsTool$7
 });
-const configFields$14 = { showRestartButton: z.boolean().default(false).volatile() };
+const configFields$16 = { showRestartButton: z.boolean().default(false).volatile() };
 const settingsTool$7 = {
 	parameters: { showRestartButton: {
 		type: "boolean",
@@ -337,14 +337,14 @@ var DesktopRestart = class {
 };
 
 // src/features/restart-button/host.ts
-var host_exports$12 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$12,
-	methods: () => methods$12
+var host_exports$14 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$14,
+	methods: () => methods$14
 });
-function createHost$12(ctx, config) {
+function createHost$14(ctx, config) {
 	return { restart: new DesktopRestart(ctx, config) };
 }
-const methods$12 = {
+const methods$14 = {
 	restartStatus() {
 		return this.run(() => this.restart.status());
 	},
@@ -361,7 +361,7 @@ function isStringArray(value) {
 	return isArray(value) && value.every((item) => typeof item === "string");
 }
 /** Validate external wire objects before reading their fields. */
-function isRecord(value) {
+function isRecord$1(value) {
 	return typeof value === "object" && value !== null;
 }
 function hasStrings(value, keys) {
@@ -386,7 +386,7 @@ const RESTART_STATUS_RPC = {
 		mode: "strict",
 		typeSymbol: "power-dsh#RestartStatus",
 		create: () => ({ parse(value) {
-			if (!isRecord(value) || typeof value.supported !== "boolean" || typeof value.running !== "boolean" || !isOneOf(value.error, ["", "restartFailed"])) throw new TypeError("Invalid restart status");
+			if (!isRecord$1(value) || typeof value.supported !== "boolean" || typeof value.running !== "boolean" || !isOneOf(value.error, ["", "restartFailed"])) throw new TypeError("Invalid restart status");
 			return {
 				supported: value.supported,
 				running: value.running,
@@ -406,15 +406,15 @@ const RESTART_APP_RPC = {
 		mode: "strict",
 		typeSymbol: "power-dsh#RestartAccepted",
 		create: () => ({ parse(value) {
-			if (!isRecord(value) || value.accepted !== true) throw new TypeError("Invalid restart acceptance");
+			if (!isRecord$1(value) || value.accepted !== true) throw new TypeError("Invalid restart acceptance");
 			return { accepted: true };
 		} })
 	}
 };
-const rpc$12 = [RESTART_STATUS_RPC, RESTART_APP_RPC];
+const rpc$14 = [RESTART_STATUS_RPC, RESTART_APP_RPC];
 
 // src/features/notifications/definition.ts
-const definition$13 = Object.freeze({
+const definition$15 = Object.freeze({
 	id: "notifications",
 	category: "general",
 	order: 0,
@@ -427,8 +427,8 @@ const definition$13 = Object.freeze({
 });
 
 // src/features/notifications/config.ts
-var config_exports$13 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$13 });
-const configFields$13 = {
+var config_exports$15 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$15 });
+const configFields$15 = {
 	notificationsEnabled: z.boolean().default(false).volatile(),
 	notificationSoundEnabled: z.boolean().default(true).volatile(),
 	notificationSound: z.string().default("default").volatile()
@@ -436,7 +436,7 @@ const configFields$13 = {
 
 // src/features/notifications/notifications.ts
 const summarySchema = { parse(value) {
-	if (!isRecord(value) || typeof value.seq !== "number" || !Number.isSafeInteger(value.seq) || value.seq < -1 || typeof value.turn !== "number" || !Number.isSafeInteger(value.turn) || value.turn < 0 || typeof value.reason !== "string") throw new TypeError("Invalid power-dsh notification summary");
+	if (!isRecord$1(value) || typeof value.seq !== "number" || !Number.isSafeInteger(value.seq) || value.seq < -1 || typeof value.turn !== "number" || !Number.isSafeInteger(value.turn) || value.turn < 0 || typeof value.reason !== "string") throw new TypeError("Invalid power-dsh notification summary");
 	return {
 		seq: value.seq,
 		turn: value.turn,
@@ -632,17 +632,17 @@ var SystemSounds = class {
 };
 
 // src/features/notifications/host.ts
-var host_exports$11 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$11,
-	methods: () => methods$11
+var host_exports$13 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$13,
+	methods: () => methods$13
 });
-function createHost$11(ctx, config) {
+function createHost$13(ctx, config) {
 	ctx.inject(["sessionProjections"], async (child) => {
 		await child.sessionProjections.register(notificationProjection());
 	});
 	return { sounds: new SystemSounds(ctx, config) };
 }
-const methods$11 = {
+const methods$13 = {
 	listSystemSounds() {
 		return this.run(() => this.sounds.list());
 	},
@@ -687,7 +687,7 @@ function policyRpc(method, resultType) {
 			mode: "strict",
 			typeSymbol: `power-dsh#${resultType}`,
 			create: () => ({ parse(value) {
-				if (!isRecord(value) || typeof value.blocked !== "boolean") throw new TypeError("Invalid policy result");
+				if (!isRecord$1(value) || typeof value.blocked !== "boolean") throw new TypeError("Invalid policy result");
 				return { blocked: value.blocked };
 			} })
 		}
@@ -699,11 +699,11 @@ const soundCatalogCodec = {
 	mode: "strict",
 	typeSymbol: "power-dsh#SystemSounds",
 	create: () => ({ parse(value) {
-		if (!isRecord(value) || !isOneOf(value.platform, [
+		if (!isRecord$1(value) || !isOneOf(value.platform, [
 			"darwin",
 			"win32",
 			"other"
-		]) || !isArray(value.sounds) || !value.sounds.every((row) => isRecord(row) && typeof row.id === "string" && typeof row.name === "string")) throw new TypeError("Invalid system sounds");
+		]) || !isArray(value.sounds) || !value.sounds.every((row) => isRecord$1(row) && typeof row.id === "string" && typeof row.name === "string")) throw new TypeError("Invalid system sounds");
 		return {
 			platform: value.platform,
 			sounds: value.sounds.map((row) => ({
@@ -743,15 +743,15 @@ const PLAY_SYSTEM_SOUND_RPC = {
 		mode: "strict",
 		typeSymbol: "power-dsh#SoundPlayback",
 		create: () => ({ parse(value) {
-			if (!isRecord(value) || typeof value.played !== "boolean") throw new TypeError("Invalid sound playback");
+			if (!isRecord$1(value) || typeof value.played !== "boolean") throw new TypeError("Invalid sound playback");
 			return { played: value.played };
 		} })
 	}
 };
-const rpc$11 = [LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC];
+const rpc$13 = [LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC];
 
 // src/features/personalization/definition.ts
-const definition$12 = Object.freeze({
+const definition$14 = Object.freeze({
 	id: "personalization",
 	category: "enhance",
 	order: 9,
@@ -760,8 +760,8 @@ const definition$12 = Object.freeze({
 });
 
 // src/features/personalization/config.ts
-var config_exports$12 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$12 });
-const configFields$12 = { personalizationEnabled: z.boolean().default(false).volatile() };
+var config_exports$14 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$14 });
+const configFields$14 = { personalizationEnabled: z.boolean().default(false).volatile() };
 
 // src/features/personalization/personalization.ts
 const MAX_PROMPT_LENGTH = 2e4;
@@ -830,14 +830,14 @@ var PersonalizationFile = class {
 };
 
 // src/features/personalization/host.ts
-var host_exports$10 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$10,
-	methods: () => methods$10
+var host_exports$12 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$12,
+	methods: () => methods$12
 });
-function createHost$10(_ctx, _config, { owner, ensureActive }) {
+function createHost$12(_ctx, _config, { owner, ensureActive }) {
 	return { instructions: new PersonalizationFile(owner.profileContext.home, ensureActive) };
 }
-const methods$10 = {
+const methods$12 = {
 	readPersonalization() {
 		return this.run(() => this.instructions.read());
 	},
@@ -851,7 +851,7 @@ const fileCodec = {
 	mode: "strict",
 	typeSymbol: "power-dsh#PersonalizationFile",
 	create: () => ({ parse(value) {
-		if (!isRecord(value) || typeof value.path !== "string" || typeof value.text !== "string" || typeof value.revision !== "string" || !/^[a-f\d]{64}$/.test(value.revision)) throw new TypeError("Invalid instruction file");
+		if (!isRecord$1(value) || typeof value.path !== "string" || typeof value.text !== "string" || typeof value.revision !== "string" || !/^[a-f\d]{64}$/.test(value.revision)) throw new TypeError("Invalid instruction file");
 		return {
 			path: value.path,
 			text: value.text,
@@ -877,10 +877,10 @@ function fileRpc(method, fields) {
 }
 const READ_PERSONALIZATION_RPC = fileRpc("readPersonalization", []);
 const SAVE_PERSONALIZATION_RPC = fileRpc("savePersonalization", ["text", "revision"]);
-const rpc$10 = [READ_PERSONALIZATION_RPC, SAVE_PERSONALIZATION_RPC];
+const rpc$12 = [READ_PERSONALIZATION_RPC, SAVE_PERSONALIZATION_RPC];
 
 // src/features/skills/definition.ts
-const definition$11 = Object.freeze({
+const definition$13 = Object.freeze({
 	id: "skills",
 	category: "enhance",
 	order: 7,
@@ -889,8 +889,8 @@ const definition$11 = Object.freeze({
 });
 
 // src/features/skills/config.ts
-var config_exports$11 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$11 });
-const configFields$11 = {
+var config_exports$13 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$13 });
+const configFields$13 = {
 	skillManagerEnabled: z.boolean().default(false).volatile(),
 	disabledSkills: z.array(z.object({
 		name: z.string().required(),
@@ -999,7 +999,7 @@ function records(value) {
 	if (!Array.isArray(value) || value.length > 2048) throw new Error("Invalid DSH skill preferences.");
 	const result = /* @__PURE__ */ new Map();
 	for (const row of value) {
-		if (!isRecord(row) || typeof row.name !== "string" || !NAME.test(row.name) || !hasStrings(row, [
+		if (!isRecord$1(row) || typeof row.name !== "string" || !NAME.test(row.name) || !hasStrings(row, [
 			"name",
 			"description",
 			"source",
@@ -1375,11 +1375,11 @@ var SkillPolicy = class {
 };
 
 // src/features/skills/host.ts
-var host_exports$9 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$9,
-	methods: () => methods$9
+var host_exports$11 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$11,
+	methods: () => methods$11
 });
-function createHost$9(ctx, config, { owner, ensureActive }) {
+function createHost$11(ctx, config, { owner, ensureActive }) {
 	const skills = { current: null };
 	ctx.inject([
 		"skills",
@@ -1403,7 +1403,7 @@ function createHost$9(ctx, config, { owner, ensureActive }) {
 	});
 	return { skills };
 }
-const methods$9 = {
+const methods$11 = {
 	listSkills(cwd, scope) {
 		return this.run(() => {
 			if (!this.skills.current) throw new Error("DSH skill management is unavailable.");
@@ -1423,9 +1423,9 @@ const skillCatalogCodec = {
 	mode: "strict",
 	typeSymbol: "power-dsh#SkillCatalog",
 	create: () => ({ parse(value) {
-		if (!isRecord(value) || typeof value.cwd !== "string" || !isOneOf(value.scope, ["user", "project"]) || typeof value.complete !== "boolean" || !isArray(value.workspaces) || !value.workspaces.every((item) => isRecord(item) && typeof item.path === "string" && typeof item.title === "string") || !isArray(value.skills)) throw new TypeError("Invalid skill catalog");
+		if (!isRecord$1(value) || typeof value.cwd !== "string" || !isOneOf(value.scope, ["user", "project"]) || typeof value.complete !== "boolean" || !isArray(value.workspaces) || !value.workspaces.every((item) => isRecord$1(item) && typeof item.path === "string" && typeof item.title === "string") || !isArray(value.skills)) throw new TypeError("Invalid skill catalog");
 		const skills = value.skills.map((row) => {
-			if (!isRecord(row) || !hasStrings(row, [
+			if (!isRecord$1(row) || !hasStrings(row, [
 				"name",
 				"description",
 				"source",
@@ -1486,10 +1486,10 @@ const SET_SKILL_ENABLED_RPC = skillRpc("setSkillEnabled", [
 	"name",
 	"enabled"
 ]);
-const rpc$9 = [LIST_SKILLS_RPC, SET_SKILL_ENABLED_RPC];
+const rpc$11 = [LIST_SKILLS_RPC, SET_SKILL_ENABLED_RPC];
 
 // src/features/mcp/definition.ts
-const definition$10 = Object.freeze({
+const definition$12 = Object.freeze({
 	id: "mcp",
 	category: "enhance",
 	order: 8,
@@ -1498,8 +1498,8 @@ const definition$10 = Object.freeze({
 });
 
 // src/features/mcp/config.ts
-var config_exports$10 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$10 });
-const configFields$10 = { mcpManagerEnabled: z.boolean().default(false).volatile() };
+var config_exports$12 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$12 });
+const configFields$12 = { mcpManagerEnabled: z.boolean().default(false).volatile() };
 
 // src/features/mcp/mcp-policy.ts
 const MCP_CLIENT$1 = "@deepseek-ai/dsh-mcp-client";
@@ -2048,11 +2048,11 @@ var McpProviders = class {
 };
 
 // src/features/mcp/host.ts
-var host_exports$8 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$8,
-	methods: () => methods$8
+var host_exports$10 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$10,
+	methods: () => methods$10
 });
-function createHost$8(ctx, _config, { owner, ensureActive }) {
+function createHost$10(ctx, _config, { owner, ensureActive }) {
 	const options = { ensureActive };
 	const mcp = new McpPolicy(owner, options);
 	ctx.inject(["agentPresets"], (child) => {
@@ -2076,7 +2076,7 @@ function createHost$8(ctx, _config, { owner, ensureActive }) {
 	});
 	return { mcp };
 }
-const methods$8 = {
+const methods$10 = {
 	listMcpServers() {
 		return this.run(() => this.mcp.list());
 	},
@@ -2090,9 +2090,9 @@ const mcpCatalogCodec = {
 	mode: "strict",
 	typeSymbol: "power-dsh#McpCatalog",
 	create: () => ({ parse(value) {
-		if (!isRecord(value) || typeof value.complete !== "boolean" || !isArray(value.servers)) throw new TypeError("Invalid MCP catalog");
+		if (!isRecord$1(value) || typeof value.complete !== "boolean" || !isArray(value.servers)) throw new TypeError("Invalid MCP catalog");
 		const servers = value.servers.map((row) => {
-			if (!isRecord(row) || !hasStrings(row, [
+			if (!isRecord$1(row) || !hasStrings(row, [
 				"id",
 				"name",
 				"source",
@@ -2155,10 +2155,10 @@ function mcpRpc(method, fields) {
 }
 const LIST_MCP_SERVERS_RPC = mcpRpc("listMcpServers", []);
 const SET_MCP_SERVER_ENABLED_RPC = mcpRpc("setMcpServerEnabled", ["id", "enabled"]);
-const rpc$8 = [LIST_MCP_SERVERS_RPC, SET_MCP_SERVER_ENABLED_RPC];
+const rpc$10 = [LIST_MCP_SERVERS_RPC, SET_MCP_SERVER_ENABLED_RPC];
 
 // src/features/account-blocking/definition.ts
-const definition$9 = Object.freeze({
+const definition$11 = Object.freeze({
 	id: "account-blocking",
 	category: "simplify",
 	order: 8,
@@ -2167,11 +2167,11 @@ const definition$9 = Object.freeze({
 });
 
 // src/features/account-blocking/config.ts
-var config_exports$9 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$9,
+var config_exports$11 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$11,
 	settingsTool: () => settingsTool$6
 });
-const configFields$9 = { blockOfficialAccount: z.boolean().default(false).volatile() };
+const configFields$11 = { blockOfficialAccount: z.boolean().default(false).volatile() };
 const settingsTool$6 = {
 	parameters: { blockOfficialAccount: {
 		type: "boolean",
@@ -2273,23 +2273,23 @@ var AccountPolicy = class extends PluginPolicy {
 };
 
 // src/features/account-blocking/host.ts
-var host_exports$7 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$7,
-	methods: () => methods$7
+var host_exports$9 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$9,
+	methods: () => methods$9
 });
-function createHost$7(_ctx, _config, { owner, ensureActive }) {
+function createHost$9(_ctx, _config, { owner, ensureActive }) {
 	return { policy: new AccountPolicy(owner, { ensureActive }) };
 }
-const methods$7 = { async setAccountBlocked(blocked) {
+const methods$9 = { async setAccountBlocked(blocked) {
 	return this.run(() => this.policy.setBlocked(blocked));
 } };
 
 // src/features/account-blocking/rpc.ts
 const ACCOUNT_RPC = policyRpc("setAccountBlocked", "AccountPolicyResult");
-const rpc$7 = [ACCOUNT_RPC];
+const rpc$9 = [ACCOUNT_RPC];
 
 // src/features/search-blocking/definition.ts
-const definition$8 = Object.freeze({
+const definition$10 = Object.freeze({
 	id: "search-blocking",
 	category: "simplify",
 	order: 9,
@@ -2298,11 +2298,11 @@ const definition$8 = Object.freeze({
 });
 
 // src/features/search-blocking/config.ts
-var config_exports$8 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$8,
+var config_exports$10 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$10,
 	settingsTool: () => settingsTool$5
 });
-const configFields$8 = { blockOfficialSearch: z.boolean().default(false).volatile() };
+const configFields$10 = { blockOfficialSearch: z.boolean().default(false).volatile() };
 const settingsTool$5 = {
 	parameters: { blockOfficialSearch: {
 		type: "boolean",
@@ -2469,25 +2469,25 @@ var SearchPolicy = class {
 };
 
 // src/features/search-blocking/host.ts
-var host_exports$6 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$6,
-	methods: () => methods$6
+var host_exports$8 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$8,
+	methods: () => methods$8
 });
-function createHost$6(ctx, config, { owner, ensureActive }) {
+function createHost$8(ctx, config, { owner, ensureActive }) {
 	const search = new SearchPolicy(owner, config, { ensureActive });
 	ctx.inject(["agents", "agentPresets"], (child) => search.bind(child));
 	return { search };
 }
-const methods$6 = { async setSearchBlocked(blocked) {
+const methods$8 = { async setSearchBlocked(blocked) {
 	return this.run(() => this.search.setBlocked(blocked));
 } };
 
 // src/features/search-blocking/rpc.ts
 const SEARCH_RPC = policyRpc("setSearchBlocked", "SearchPolicyResult");
-const rpc$6 = [SEARCH_RPC];
+const rpc$8 = [SEARCH_RPC];
 
 // src/features/telemetry-blocking/definition.ts
-const definition$7 = Object.freeze({
+const definition$9 = Object.freeze({
 	id: "telemetry-blocking",
 	category: "simplify",
 	order: 10,
@@ -2496,11 +2496,11 @@ const definition$7 = Object.freeze({
 });
 
 // src/features/telemetry-blocking/config.ts
-var config_exports$7 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$7,
+var config_exports$9 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$9,
 	settingsTool: () => settingsTool$4
 });
-const configFields$7 = { blockOfficialTelemetry: z.boolean().default(false).volatile() };
+const configFields$9 = { blockOfficialTelemetry: z.boolean().default(false).volatile() };
 const settingsTool$4 = {
 	parameters: { blockOfficialTelemetry: {
 		type: "boolean",
@@ -2611,23 +2611,23 @@ var TelemetryPolicy = class extends PluginPolicy {
 };
 
 // src/features/telemetry-blocking/host.ts
-var host_exports$5 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$5,
-	methods: () => methods$5
+var host_exports$7 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$7,
+	methods: () => methods$7
 });
-function createHost$5(_ctx, _config, { owner, ensureActive }) {
+function createHost$7(_ctx, _config, { owner, ensureActive }) {
 	return { telemetry: new TelemetryPolicy(owner, { ensureActive }) };
 }
-const methods$5 = { async setTelemetryBlocked(blocked) {
+const methods$7 = { async setTelemetryBlocked(blocked) {
 	return this.run(() => this.telemetry.setBlocked(blocked));
 } };
 
 // src/features/telemetry-blocking/rpc.ts
 const TELEMETRY_RPC = policyRpc("setTelemetryBlocked", "TelemetryPolicyResult");
-const rpc$5 = [TELEMETRY_RPC];
+const rpc$7 = [TELEMETRY_RPC];
 
 // src/features/todo-blocking/definition.ts
-const definition$6 = Object.freeze({
+const definition$8 = Object.freeze({
 	id: "todo-blocking",
 	category: "simplify",
 	order: 11,
@@ -2636,11 +2636,11 @@ const definition$6 = Object.freeze({
 });
 
 // src/features/todo-blocking/config.ts
-var config_exports$6 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$6,
+var config_exports$8 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$8,
 	settingsTool: () => settingsTool$3
 });
-const configFields$6 = { blockTodo: z.boolean().default(false).volatile() };
+const configFields$8 = { blockTodo: z.boolean().default(false).volatile() };
 const settingsTool$3 = {
 	parameters: { blockTodo: {
 		type: "boolean",
@@ -2749,25 +2749,25 @@ var TodoPolicy = class {
 };
 
 // src/features/todo-blocking/host.ts
-var host_exports$4 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$4,
-	methods: () => methods$4
+var host_exports$6 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$6,
+	methods: () => methods$6
 });
-function createHost$4(ctx, config, { owner, ensureActive }) {
+function createHost$6(ctx, config, { owner, ensureActive }) {
 	const todo = new TodoPolicy(owner, config, { ensureActive });
 	ctx.inject(["agentPresets"], (child) => todo.bind(child));
 	return { todo };
 }
-const methods$4 = { async setTodoBlocked(blocked) {
+const methods$6 = { async setTodoBlocked(blocked) {
 	return this.run(() => this.todo.setBlocked(blocked));
 } };
 
 // src/features/todo-blocking/rpc.ts
 const TODO_RPC = policyRpc("setTodoBlocked", "TodoPolicyResult");
-const rpc$4 = [TODO_RPC];
+const rpc$6 = [TODO_RPC];
 
 // src/features/plan-blocking/definition.ts
-const definition$5 = Object.freeze({
+const definition$7 = Object.freeze({
 	id: "plan-blocking",
 	category: "simplify",
 	order: 11.5,
@@ -2776,11 +2776,11 @@ const definition$5 = Object.freeze({
 });
 
 // src/features/plan-blocking/config.ts
-var config_exports$5 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$5,
+var config_exports$7 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$7,
 	settingsTool: () => settingsTool$2
 });
-const configFields$5 = { blockPlan: z.boolean().default(false).volatile() };
+const configFields$7 = { blockPlan: z.boolean().default(false).volatile() };
 const settingsTool$2 = {
 	parameters: { blockPlan: {
 		type: "boolean",
@@ -2885,25 +2885,25 @@ var PlanPolicy = class {
 };
 
 // src/features/plan-blocking/host.ts
-var host_exports$3 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$3,
-	methods: () => methods$3
+var host_exports$5 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$5,
+	methods: () => methods$5
 });
-function createHost$3(ctx, config, { owner, ensureActive }) {
+function createHost$5(ctx, config, { owner, ensureActive }) {
 	const plan = new PlanPolicy(owner, config, { ensureActive });
 	ctx.inject(["agentPresets"], (child) => plan.bind(child));
 	return { plan };
 }
-const methods$3 = { async setPlanBlocked(blocked) {
+const methods$5 = { async setPlanBlocked(blocked) {
 	return this.run(() => this.plan.setBlocked(blocked));
 } };
 
 // src/features/plan-blocking/rpc.ts
 const PLAN_RPC = policyRpc("setPlanBlocked", "PlanPolicyResult");
-const rpc$3 = [PLAN_RPC];
+const rpc$5 = [PLAN_RPC];
 
 // src/features/goal-blocking/definition.ts
-const definition$4 = Object.freeze({
+const definition$6 = Object.freeze({
 	id: "goal-blocking",
 	category: "simplify",
 	order: 11.75,
@@ -2912,11 +2912,11 @@ const definition$4 = Object.freeze({
 });
 
 // src/features/goal-blocking/config.ts
-var config_exports$4 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$4,
+var config_exports$6 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$6,
 	settingsTool: () => settingsTool$1
 });
-const configFields$4 = { blockGoal: z.boolean().default(false).volatile() };
+const configFields$6 = { blockGoal: z.boolean().default(false).volatile() };
 const settingsTool$1 = {
 	parameters: { blockGoal: {
 		type: "boolean",
@@ -3027,25 +3027,25 @@ var GoalPolicy = class {
 };
 
 // src/features/goal-blocking/host.ts
-var host_exports$2 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$2,
-	methods: () => methods$2
+var host_exports$4 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$4,
+	methods: () => methods$4
 });
-function createHost$2(ctx, config, { owner, ensureActive }) {
+function createHost$4(ctx, config, { owner, ensureActive }) {
 	const goal = new GoalPolicy(owner, config, { ensureActive });
 	ctx.inject(["agentPresets"], (child) => goal.bind(child));
 	return { goal };
 }
-const methods$2 = { async setGoalBlocked(blocked) {
+const methods$4 = { async setGoalBlocked(blocked) {
 	return this.run(() => this.goal.setBlocked(blocked));
 } };
 
 // src/features/goal-blocking/rpc.ts
 const GOAL_RPC = policyRpc("setGoalBlocked", "GoalPolicyResult");
-const rpc$2 = [GOAL_RPC];
+const rpc$4 = [GOAL_RPC];
 
 // src/features/double-click-rename/definition.ts
-const definition$3 = Object.freeze({
+const definition$5 = Object.freeze({
 	id: "double-click-rename",
 	category: "other",
 	order: 3,
@@ -3054,11 +3054,11 @@ const definition$3 = Object.freeze({
 });
 
 // src/features/double-click-rename/config.ts
-var config_exports$3 = /* @__PURE__ */ __exportAll({
-	configFields: () => configFields$3,
+var config_exports$5 = /* @__PURE__ */ __exportAll({
+	configFields: () => configFields$5,
 	settingsTool: () => settingsTool
 });
-const configFields$3 = { blockDoubleClickRename: z.boolean().default(false).volatile() };
+const configFields$5 = { blockDoubleClickRename: z.boolean().default(false).volatile() };
 const settingsTool = {
 	parameters: { blockDoubleClickRename: {
 		type: "boolean",
@@ -3081,7 +3081,7 @@ const settingsTool = {
 };
 
 // src/features/thinking-effort/definition.ts
-const definition$2 = Object.freeze({
+const definition$4 = Object.freeze({
 	id: "thinking-effort",
 	category: "interface",
 	order: 3,
@@ -3090,14 +3090,14 @@ const definition$2 = Object.freeze({
 });
 
 // src/features/thinking-effort/config.ts
-var config_exports$2 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$2 });
-const configFields$2 = {
+var config_exports$4 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$4 });
+const configFields$4 = {
 	showThinkingEffortSwitcher: z.boolean().default(false).volatile(),
 	thinkingEffortGlyph: z.string().default("arc").volatile()
 };
 
 // src/features/flowing-background/definition.ts
-const definition$1 = Object.freeze({
+const definition$3 = Object.freeze({
 	id: "flowing-background",
 	category: "interface",
 	order: 5,
@@ -3112,8 +3112,8 @@ const definition$1 = Object.freeze({
 });
 
 // src/features/flowing-background/config.ts
-var config_exports$1 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$1 });
-const configFields$1 = {
+var config_exports$3 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$3 });
+const configFields$3 = {
 	flowingBackgroundEnabled: z.boolean().default(false).volatile(),
 	flowingBackgroundKind: z.string().default("pattern").volatile(),
 	flowingBackgroundOpacity: z.number().default(100).volatile(),
@@ -3239,14 +3239,14 @@ var WallpaperStore = class {
 };
 
 // src/features/flowing-background/host.ts
-var host_exports$1 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$1,
-	methods: () => methods$1
+var host_exports$3 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$3,
+	methods: () => methods$3
 });
-function createHost$1(_ctx, _config, { owner, ensureActive }) {
+function createHost$3(_ctx, _config, { owner, ensureActive }) {
 	return { wallpaper: new WallpaperStore(owner.profileContext.home, ensureActive) };
 }
-const methods$1 = {
+const methods$3 = {
 	readWallpaper() {
 		return this.run(() => this.wallpaper.read());
 	},
@@ -3263,7 +3263,7 @@ const wallpaperCodec = {
 	mode: "strict",
 	typeSymbol: "power-dsh#WallpaperAsset",
 	create: () => ({ parse(value) {
-		if (!isRecord(value) || typeof value.name !== "string" || typeof value.mime !== "string" || typeof value.bytes !== "number" || typeof value.dataUrl !== "string" || !value.dataUrl.startsWith("data:image/")) throw new TypeError("Invalid wallpaper asset");
+		if (!isRecord$1(value) || typeof value.name !== "string" || typeof value.mime !== "string" || typeof value.bytes !== "number" || typeof value.dataUrl !== "string" || !value.dataUrl.startsWith("data:image/")) throw new TypeError("Invalid wallpaper asset");
 		return {
 			name: value.name,
 			mime: value.mime,
@@ -3283,7 +3283,7 @@ const clearedCodec = {
 	mode: "strict",
 	typeSymbol: "power-dsh#WallpaperCleared",
 	create: () => ({ parse(value) {
-		if (!isRecord(value) || value.cleared !== true) throw new TypeError("Invalid wallpaper clear result");
+		if (!isRecord$1(value) || value.cleared !== true) throw new TypeError("Invalid wallpaper clear result");
 		return { cleared: true };
 	} })
 };
@@ -3306,14 +3306,14 @@ function descriptor(method, fields, result) {
 const READ_WALLPAPER_RPC = descriptor("readWallpaper", [], nullableWallpaperCodec);
 const SAVE_WALLPAPER_RPC = descriptor("saveWallpaper", ["dataUrl", "name"], wallpaperCodec);
 const CLEAR_WALLPAPER_RPC = descriptor("clearWallpaper", [], clearedCodec);
-const rpc$1 = [
+const rpc$3 = [
 	READ_WALLPAPER_RPC,
 	SAVE_WALLPAPER_RPC,
 	CLEAR_WALLPAPER_RPC
 ];
 
 // src/features/archive/definition.ts
-const definition = Object.freeze({
+const definition$2 = Object.freeze({
 	id: "archive",
 	category: "enhance",
 	order: 10,
@@ -3322,8 +3322,8 @@ const definition = Object.freeze({
 });
 
 // src/features/archive/config.ts
-var config_exports = /* @__PURE__ */ __exportAll({ configFields: () => configFields });
-const configFields = { archiveManagerEnabled: z.boolean().default(false).volatile() };
+var config_exports$2 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$2 });
+const configFields$2 = { archiveManagerEnabled: z.boolean().default(false).volatile() };
 
 // src/features/archive/archive-catalog.ts
 /**
@@ -3382,7 +3382,7 @@ var ArchiveService = class {
 		if (!controller || !this.sessionQuery) throw new Error("archiveUnavailable");
 		const abort = new AbortController();
 		try {
-			const baseline = await readBaseline(controller, abort.signal);
+			const baseline = await readBaseline$1(controller, abort.signal);
 			const titles = await this.titlesFor(baseline.archivedSessionIds, abort.signal);
 			return buildArchiveCatalog(baseline, titles);
 		} finally {
@@ -3412,7 +3412,7 @@ var ArchiveService = class {
 		try {
 			let baseline;
 			try {
-				baseline = await readBaseline(controller, abort.signal);
+				baseline = await readBaseline$1(controller, abort.signal);
 			} catch {
 				throw new Error("archiveDeleteCheckFailed");
 			}
@@ -3471,7 +3471,7 @@ function validSessionId(sessionId) {
 	return typeof sessionId === "string" && sessionId.length > 0 && sessionId.length <= 1024;
 }
 /** Resolve the first complete Workspace baseline and stop the stream. */
-async function readBaseline(controller, signal) {
+async function readBaseline$1(controller, signal) {
 	for await (const frame of controller.follow(signal)) if ((frame.type === "baseline" || frame.type === "replace") && frame.value) return frame.value;
 	throw new Error("archiveUnavailable");
 }
@@ -3497,11 +3497,11 @@ async function removeArtifact(artifactPath, sessionId) {
 }
 
 // src/features/archive/host.ts
-var host_exports = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost,
-	methods: () => methods
+var host_exports$2 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$2,
+	methods: () => methods$2
 });
-function createHost(ctx, _config, _options) {
+function createHost$2(ctx, _config, _options) {
 	const archive = new ArchiveService();
 	ctx.inject(["workspaceController", "sessionQuery"], (child) => {
 		archive.workspaceController = child.workspaceController ?? null;
@@ -3519,7 +3519,7 @@ function createHost(ctx, _config, _options) {
 	});
 	return { archive };
 }
-const methods = {
+const methods$2 = {
 	listArchivedSessions() {
 		return this.run(() => this.archive.list());
 	},
@@ -3536,10 +3536,10 @@ const archiveCatalogCodec = {
 	mode: "strict",
 	typeSymbol: "power-dsh#ArchiveCatalog",
 	create: () => ({ parse(value) {
-		if (!isRecord(value) || typeof value.complete !== "boolean" || !isArray(value.workspaces) || !isArray(value.sessions)) throw new TypeError("Invalid archive catalog");
+		if (!isRecord$1(value) || typeof value.complete !== "boolean" || !isArray(value.workspaces) || !isArray(value.sessions)) throw new TypeError("Invalid archive catalog");
 		const pathOf = (row) => typeof row.path === "string" ? row.path : "";
 		const workspaces = value.workspaces.map((row) => {
-			if (!isRecord(row) || !hasStrings(row, ["workspaceId", "title"])) throw new TypeError("Invalid archive workspace");
+			if (!isRecord$1(row) || !hasStrings(row, ["workspaceId", "title"])) throw new TypeError("Invalid archive workspace");
 			return {
 				workspaceId: row.workspaceId,
 				title: row.title,
@@ -3547,7 +3547,7 @@ const archiveCatalogCodec = {
 			};
 		});
 		const sessions = value.sessions.map((row) => {
-			if (!isRecord(row) || !hasStrings(row, [
+			if (!isRecord$1(row) || !hasStrings(row, [
 				"sessionId",
 				"title",
 				"workspaceId",
@@ -3589,25 +3589,737 @@ function archiveRpc(method, fields) {
 const LIST_ARCHIVED_SESSIONS_RPC = archiveRpc("listArchivedSessions", []);
 const RESTORE_ARCHIVED_SESSION_RPC = archiveRpc("restoreArchivedSession", ["sessionId"]);
 const DELETE_ARCHIVED_SESSION_RPC = archiveRpc("deleteArchivedSession", ["sessionId"]);
-const rpc = [
+const rpc$2 = [
 	LIST_ARCHIVED_SESSIONS_RPC,
 	RESTORE_ARCHIVED_SESSION_RPC,
 	DELETE_ARCHIVED_SESSION_RPC
 ];
 
+// src/features/usage-stats/definition.ts
+const definition$1 = Object.freeze({
+	id: "usage-stats",
+	category: "enhance",
+	order: 12,
+	keys: Object.freeze(["usageStatsEnabled"]),
+	spec: "src/features/usage-stats/spec.md"
+});
+
+// src/features/usage-stats/config.ts
+var config_exports$1 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$1 });
+const configFields$1 = { usageStatsEnabled: z.boolean().default(false).volatile() };
+
+// src/features/usage-stats/usage-fold.ts
+const DAY_MS = 864e5;
+/**
+* Bucket one instant into a `YYYY-MM-DD` day key in the requested zone.
+* Falls back to UTC when the runtime rejects the zone.
+*/
+function dayKeyFormatter(timeZone) {
+	const options = {
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit"
+	};
+	let format;
+	try {
+		format = new Intl.DateTimeFormat("en-CA", {
+			...options,
+			timeZone
+		});
+	} catch {
+		format = new Intl.DateTimeFormat("en-CA", {
+			...options,
+			timeZone: "UTC"
+		});
+	}
+	return (time) => {
+		const parts = format.formatToParts(new Date(time));
+		const pick = (type) => parts.find((part) => part.type === type)?.value ?? "";
+		return `${pick("year")}-${pick("month")}-${pick("day")}`;
+	};
+}
+function isRecord(value) {
+	return typeof value === "object" && value !== null;
+}
+function finite(value) {
+	return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
+}
+/** Provider-reported usage of one settled assistant message, when present. */
+function usageOf(event) {
+	if (event.type !== "assistant/message" || !isRecord(event.data)) return null;
+	const usage = event.data.usage;
+	if (!isRecord(usage)) return null;
+	const inputTokens = finite(usage.inputTokens);
+	const outputTokens = finite(usage.outputTokens);
+	const cacheReadTokens = finite(usage.cacheReadTokens);
+	const cacheWriteTokens = finite(usage.cacheWriteTokens);
+	const reported = finite(usage.totalTokens);
+	const derived = inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens;
+	const totalTokens = reported > 0 ? reported : derived;
+	if (totalTokens === 0) return null;
+	return {
+		inputTokens,
+		outputTokens,
+		cacheReadTokens,
+		cacheWriteTokens,
+		totalTokens
+	};
+}
+/** Provider and model that produced one assistant message, when declared. */
+function modelOf(event) {
+	if (event.type !== "assistant/message" || !isRecord(event.data)) return null;
+	const message = event.data.message;
+	if (!isRecord(message)) return null;
+	const source = message.source;
+	if (!isRecord(source) || typeof source.model !== "string" || !source.model) return null;
+	return {
+		provider: typeof source.provider === "string" ? source.provider : "",
+		modelId: source.model
+	};
+}
+function timeOf(event) {
+	return typeof event.time === "number" && Number.isFinite(event.time) && event.time > 0 ? event.time : null;
+}
+function dayDifference(left, right) {
+	const a = Date.parse(`${left}T00:00:00.000Z`);
+	const b = Date.parse(`${right}T00:00:00.000Z`);
+	if (!Number.isFinite(a) || !Number.isFinite(b)) return NaN;
+	return Math.round((a - b) / DAY_MS);
+}
+function addDays(dateKey, days) {
+	const base = Date.parse(`${dateKey}T00:00:00.000Z`);
+	if (!Number.isFinite(base)) return dateKey;
+	return new Date(base + days * DAY_MS).toISOString().slice(0, 10);
+}
+/**
+* Longest run of consecutive active days, and the run that reaches today or
+* yesterday. A single quiet day keeps the current streak alive.
+*/
+function streakDays(days, today) {
+	const unique = [...new Set(days)].sort();
+	let longest = 0;
+	let run = 0;
+	let previous = "";
+	for (const day of unique) {
+		run = previous && dayDifference(day, previous) === 1 ? run + 1 : 1;
+		previous = day;
+		if (run > longest) longest = run;
+	}
+	let current = 0;
+	if (unique.length > 0) {
+		const gap = dayDifference(today, unique[unique.length - 1]);
+		if (gap === 0 || gap === 1) current = run;
+	}
+	return {
+		current,
+		longest
+	};
+}
+/** Fill every quiet day between the first and last activity with a zero row. */
+function fillDays(rows, firstDate, lastDate) {
+	if (!firstDate || !lastDate) return [];
+	const known = new Map(rows.map((row) => [row.date, row]));
+	const total = dayDifference(lastDate, firstDate);
+	if (!Number.isFinite(total) || total < 0) return [];
+	const days = [];
+	for (let offset = 0; offset <= total; offset++) {
+		const date = addDays(firstDate, offset);
+		days.push(known.get(date) ?? {
+			date,
+			totalTokens: 0,
+			turnCount: 0,
+			toolCallCount: 0
+		});
+	}
+	return days;
+}
+/**
+* Fold one session log into cacheable day and model aggregates.
+*
+* Only provider-reported `assistant/message` usage counts toward tokens; the
+* fold never estimates. Turns and tool calls still count without usage so the
+* activity heatmap can show work a provider did not bill.
+*/
+function foldSession(session, toDay) {
+	const dayRows = /* @__PURE__ */ new Map();
+	const modelRows = /* @__PURE__ */ new Map();
+	const dailyModelRows = /* @__PURE__ */ new Map();
+	const fold = {
+		days: [],
+		models: [],
+		dailyModels: [],
+		inputTokens: 0,
+		outputTokens: 0,
+		cacheReadTokens: 0,
+		cacheWriteTokens: 0,
+		totalTokens: 0,
+		turnCount: 0,
+		hasUsage: false,
+		firstTime: null,
+		lastTime: null,
+		longestSpanMs: 0
+	};
+	const bump = (time, field) => {
+		const date = toDay(time);
+		const row = dayRows.get(date) ?? {
+			date,
+			totalTokens: 0,
+			turnCount: 0,
+			toolCallCount: 0
+		};
+		row[field] += 1;
+		dayRows.set(date, row);
+	};
+	const observe = (time) => {
+		if (fold.firstTime === null || time < fold.firstTime) fold.firstTime = time;
+		if (fold.lastTime === null || time > fold.lastTime) fold.lastTime = time;
+	};
+	for (const event of session.events) {
+		const time = timeOf(event);
+		if (time !== null) observe(time);
+		if (event.type === "assistant/message") {
+			const usage = usageOf(event);
+			if (!usage || time === null) continue;
+			fold.hasUsage = true;
+			const date = toDay(time);
+			const row = dayRows.get(date) ?? {
+				date,
+				totalTokens: 0,
+				turnCount: 0,
+				toolCallCount: 0
+			};
+			row.totalTokens += usage.totalTokens;
+			dayRows.set(date, row);
+			fold.totalTokens += usage.totalTokens;
+			fold.inputTokens += usage.inputTokens;
+			fold.outputTokens += usage.outputTokens;
+			fold.cacheReadTokens += usage.cacheReadTokens;
+			fold.cacheWriteTokens += usage.cacheWriteTokens;
+			const model = modelOf(event);
+			if (model) {
+				const key = `${model.provider}\u0000${model.modelId}`;
+				const entry = modelRows.get(key) ?? {
+					modelId: model.modelId,
+					provider: model.provider,
+					totalTokens: 0,
+					requestCount: 0
+				};
+				entry.totalTokens += usage.totalTokens;
+				entry.requestCount += 1;
+				modelRows.set(key, entry);
+				const dayKey = `${date}\u0000${key}`;
+				const daily = dailyModelRows.get(dayKey) ?? {
+					date,
+					modelId: model.modelId,
+					provider: model.provider,
+					totalTokens: 0
+				};
+				daily.totalTokens += usage.totalTokens;
+				dailyModelRows.set(dayKey, daily);
+			}
+		} else if (event.type === "turn/start") {
+			fold.turnCount += 1;
+			if (time !== null) bump(time, "turnCount");
+		} else if (event.type === "tool/call" && time !== null) bump(time, "toolCallCount");
+	}
+	if (fold.firstTime !== null && fold.lastTime !== null) {
+		const start = typeof session.createdAt === "number" && session.createdAt > 0 ? Math.min(session.createdAt, fold.firstTime) : fold.firstTime;
+		fold.longestSpanMs = Math.max(0, fold.lastTime - start);
+	}
+	fold.days = [...dayRows.values()].sort((left, right) => left.date.localeCompare(right.date));
+	fold.models = [...modelRows.values()];
+	fold.dailyModels = [...dailyModelRows.values()].sort((left, right) => left.date.localeCompare(right.date) || left.modelId.localeCompare(right.modelId));
+	return fold;
+}
+/**
+* Merge per-session folds into the lifetime projection shown by the page.
+* Days are bucketed in the caller's zone, so the same logs can report
+* different day boundaries for different clients.
+*/
+function mergeUsage(input) {
+	const dayRows = /* @__PURE__ */ new Map();
+	const modelRows = /* @__PURE__ */ new Map();
+	const dailyModelRows = /* @__PURE__ */ new Map();
+	const summary = {
+		totalTokens: 0,
+		inputTokens: 0,
+		outputTokens: 0,
+		cacheReadTokens: 0,
+		cacheWriteTokens: 0,
+		peakDayTokens: 0,
+		longestSessionMs: 0,
+		currentStreakDays: 0,
+		longestStreakDays: 0,
+		activeDays: 0,
+		sessionCount: 0,
+		turnCount: 0
+	};
+	const toDay = dayKeyFormatter(input.timeZone);
+	let firstDate = "";
+	let lastDate = "";
+	for (const session of input.sessions) {
+		for (const row of session.days) {
+			const target = dayRows.get(row.date) ?? {
+				date: row.date,
+				totalTokens: 0,
+				turnCount: 0,
+				toolCallCount: 0
+			};
+			target.totalTokens += row.totalTokens;
+			target.turnCount += row.turnCount;
+			target.toolCallCount += row.toolCallCount;
+			dayRows.set(row.date, target);
+		}
+		for (const model of session.models) {
+			const key = `${model.provider}\u0000${model.modelId}`;
+			const target = modelRows.get(key) ?? {
+				modelId: model.modelId,
+				provider: model.provider,
+				totalTokens: 0,
+				requestCount: 0
+			};
+			target.totalTokens += model.totalTokens;
+			target.requestCount += model.requestCount;
+			modelRows.set(key, target);
+		}
+		for (const daily of session.dailyModels) {
+			const key = `${daily.date}\u0000${daily.provider}\u0000${daily.modelId}`;
+			const target = dailyModelRows.get(key) ?? {
+				date: daily.date,
+				modelId: daily.modelId,
+				provider: daily.provider,
+				totalTokens: 0
+			};
+			target.totalTokens += daily.totalTokens;
+			dailyModelRows.set(key, target);
+		}
+		summary.totalTokens += session.totalTokens;
+		summary.inputTokens += session.inputTokens;
+		summary.outputTokens += session.outputTokens;
+		summary.cacheReadTokens += session.cacheReadTokens;
+		summary.cacheWriteTokens += session.cacheWriteTokens;
+		summary.turnCount += session.turnCount;
+		if (session.hasUsage) summary.sessionCount += 1;
+		if (session.longestSpanMs > summary.longestSessionMs) summary.longestSessionMs = session.longestSpanMs;
+		if (session.firstTime !== null) {
+			const first = toDay(session.firstTime);
+			if (!firstDate || first < firstDate) firstDate = first;
+		}
+		if (session.lastTime !== null) {
+			const last = toDay(session.lastTime);
+			if (!lastDate || last > lastDate) lastDate = last;
+		}
+	}
+	const rows = [...dayRows.values()].sort((left, right) => left.date.localeCompare(right.date));
+	for (const row of rows) if (row.totalTokens > summary.peakDayTokens) summary.peakDayTokens = row.totalTokens;
+	summary.activeDays = rows.filter((row) => row.totalTokens > 0).length;
+	const streak = streakDays(rows.filter((row) => row.totalTokens > 0).map((row) => row.date), toDay(input.generatedAt));
+	summary.currentStreakDays = streak.current;
+	summary.longestStreakDays = streak.longest;
+	return {
+		complete: input.complete,
+		generatedAt: input.generatedAt,
+		timeZone: input.timeZone,
+		firstDate,
+		lastDate,
+		summary,
+		days: fillDays(rows, firstDate, lastDate),
+		dailyModels: [...dailyModelRows.values()].sort((left, right) => left.date.localeCompare(right.date) || left.modelId.localeCompare(right.modelId)),
+		models: [...modelRows.values()].sort((left, right) => right.totalTokens - left.totalTokens || left.modelId.localeCompare(right.modelId))
+	};
+}
+
+// src/features/usage-stats/usage-service.ts
+/** Bound the per-session fold cache so a long-lived Host never grows without limit. */
+const MAX_CACHED_SESSIONS = 512;
+/** Bound concurrent log reads: each cold read decodes and parses a whole log. */
+const READ_CONCURRENCY = 4;
+/**
+* Folds every readable stored session log into one lifetime usage projection.
+*
+* Only provider-reported assistant usage counts; the fold never estimates.
+* Per-session results are cached by the persistence revision and reporting
+* zone, so a refresh only re-reads logs that actually changed.
+*/
+var UsageService = class {
+	persistence = null;
+	cache = /* @__PURE__ */ new Map();
+	async snapshot(timeZone, signal) {
+		const persistence = this.persistence;
+		if (!persistence) throw new Error("usageUnavailable");
+		const zone = normalizeZone(timeZone);
+		const stored = await persistence.list({ signal });
+		signal?.throwIfAborted();
+		const folds = [];
+		let complete = true;
+		const queue = [...stored].sort((left, right) => left.header.createdAt - right.header.createdAt);
+		let cursor = 0;
+		const worker = async () => {
+			while (cursor < queue.length) {
+				const entry = queue[cursor++];
+				if (!entry) return;
+				signal?.throwIfAborted();
+				try {
+					folds.push(await this.fold(entry, zone, signal));
+				} catch (error) {
+					if (signal?.aborted) throw error;
+					complete = false;
+				}
+			}
+		};
+		await Promise.all(Array.from({ length: Math.min(READ_CONCURRENCY, queue.length) }, worker));
+		signal?.throwIfAborted();
+		this.prune(new Set(stored.map((entry) => entry.header.id)));
+		return mergeUsage({
+			timeZone: zone,
+			complete,
+			generatedAt: Date.now(),
+			sessions: folds
+		});
+	}
+	async fold(entry, zone, signal) {
+		const persistence = this.persistence;
+		if (!persistence) throw new Error("usageUnavailable");
+		const cached = this.cache.get(entry.header.id);
+		if (cached && cached.revision === entry.revision && cached.zone === zone) return cached.fold;
+		const handle = await persistence.open(entry.header.id, "read", { signal });
+		let events;
+		try {
+			events = (await handle.read(0, Number.MAX_SAFE_INTEGER, { signal })).events;
+		} finally {
+			await handle.close().catch(() => void 0);
+		}
+		const fold = foldSession({
+			createdAt: entry.header.createdAt,
+			events
+		}, dayKeyFormatter(zone));
+		this.cache.delete(entry.header.id);
+		this.cache.set(entry.header.id, {
+			revision: entry.revision,
+			zone,
+			fold
+		});
+		return fold;
+	}
+	/** Drop cache rows for sessions that no longer exist, then enforce the bound. */
+	prune(live) {
+		for (const id of this.cache.keys()) if (!live.has(id)) this.cache.delete(id);
+		while (this.cache.size > MAX_CACHED_SESSIONS) {
+			const oldest = this.cache.keys().next().value;
+			if (oldest === void 0) return;
+			this.cache.delete(oldest);
+		}
+	}
+};
+/** Fall back to UTC for a missing or unknown zone rather than failing the page. */
+function normalizeZone(timeZone) {
+	if (typeof timeZone === "string" && timeZone.trim()) try {
+		new Intl.DateTimeFormat("en-CA", { timeZone });
+		return timeZone;
+	} catch {}
+	return "UTC";
+}
+
+// src/features/usage-stats/host.ts
+var host_exports$1 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$1,
+	methods: () => methods$1
+});
+function createHost$1(ctx, _config, _options) {
+	const usage = new UsageService();
+	ctx.inject(["sessionPersistence"], (child) => {
+		usage.persistence = child.sessionPersistence ?? null;
+		child.effect(() => () => {
+			usage.persistence = null;
+		});
+	});
+	return { usage };
+}
+const methods$1 = { readUsageStats(timeZone) {
+	return this.run(() => this.usage.snapshot(timeZone));
+} };
+
+// src/features/usage-stats/rpc.ts
+const usageSnapshotCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#UsageSnapshot",
+	create: () => ({ parse(value) {
+		if (!isRecord$1(value) || typeof value.complete !== "boolean" || typeof value.generatedAt !== "number" || !Number.isFinite(value.generatedAt) || !hasStrings(value, [
+			"timeZone",
+			"firstDate",
+			"lastDate"
+		]) || !isRecord$1(value.summary) || !isArray(value.days) || !isArray(value.dailyModels) || !isArray(value.models)) throw new TypeError("Invalid usage snapshot");
+		const summary = value.summary;
+		const fields = [
+			"totalTokens",
+			"inputTokens",
+			"outputTokens",
+			"cacheReadTokens",
+			"cacheWriteTokens",
+			"peakDayTokens",
+			"longestSessionMs",
+			"currentStreakDays",
+			"longestStreakDays",
+			"activeDays",
+			"sessionCount",
+			"turnCount"
+		];
+		const counts = {};
+		for (const field of fields) {
+			const count = summary[field];
+			if (typeof count !== "number" || !Number.isFinite(count) || count < 0) throw new TypeError("Invalid usage summary");
+			counts[field] = count;
+		}
+		const days = value.days.map((row) => {
+			if (!isRecord$1(row) || typeof row.date !== "string" || typeof row.totalTokens !== "number" || !Number.isFinite(row.totalTokens) || typeof row.turnCount !== "number" || typeof row.toolCallCount !== "number") throw new TypeError("Invalid usage day");
+			return {
+				date: row.date,
+				totalTokens: row.totalTokens,
+				turnCount: row.turnCount,
+				toolCallCount: row.toolCallCount
+			};
+		});
+		const dailyModels = value.dailyModels.map((row) => {
+			if (!isRecord$1(row) || !hasStrings(row, [
+				"date",
+				"modelId",
+				"provider"
+			]) || typeof row.totalTokens !== "number" || !Number.isFinite(row.totalTokens)) throw new TypeError("Invalid usage daily model");
+			return {
+				date: row.date,
+				modelId: row.modelId,
+				provider: row.provider,
+				totalTokens: row.totalTokens
+			};
+		});
+		const models = value.models.map((row) => {
+			if (!isRecord$1(row) || !hasStrings(row, ["modelId", "provider"]) || typeof row.totalTokens !== "number" || !Number.isFinite(row.totalTokens) || typeof row.requestCount !== "number" || !Number.isFinite(row.requestCount)) throw new TypeError("Invalid usage model");
+			return {
+				modelId: row.modelId,
+				provider: row.provider,
+				totalTokens: row.totalTokens,
+				requestCount: row.requestCount
+			};
+		});
+		return {
+			complete: value.complete,
+			generatedAt: value.generatedAt,
+			timeZone: value.timeZone,
+			firstDate: value.firstDate,
+			lastDate: value.lastDate,
+			summary: counts,
+			days,
+			dailyModels,
+			models
+		};
+	} })
+};
+const READ_USAGE_STATS_RPC = {
+	id: "power-dsh#powerDsh/readUsageStats",
+	service: "powerDsh",
+	namespace: "powerDsh",
+	method: "readUsageStats",
+	invocation: { kind: "direct" },
+	parameters: [{
+		name: "timeZone",
+		wire: "timeZone",
+		source: "json",
+		codec: stringCodec
+	}],
+	result: usageSnapshotCodec
+};
+const rpc$1 = [READ_USAGE_STATS_RPC];
+
+// src/features/projects/definition.ts
+const definition = Object.freeze({
+	id: "projects",
+	category: "enhance",
+	order: 10.5,
+	keys: Object.freeze(["projectManagerEnabled"]),
+	spec: "src/features/projects/spec.md"
+});
+
+// src/features/projects/config.ts
+var config_exports = /* @__PURE__ */ __exportAll({ configFields: () => configFields });
+const configFields = { projectManagerEnabled: z.boolean().default(false).volatile() };
+
+// src/features/projects/projects-catalog.ts
+/**
+* Fold the native Workspace baseline and the per-session activity into a plain
+* projection. Registry order is preserved so `manual` sorting mirrors DSH.
+*/
+function buildProjectCatalog(baseline, activity) {
+	return {
+		complete: true,
+		projects: baseline.items.map((item) => {
+			let lastActiveAt = 0;
+			for (const sessionId of item.sessionIds) {
+				const entry = activity.get(sessionId);
+				if (entry && entry.lastActiveAt > lastActiveAt) lastActiveAt = entry.lastActiveAt;
+			}
+			return {
+				workspaceId: item.workspaceId,
+				title: item.title,
+				path: typeof item.path === "string" ? item.path : "",
+				sessionCount: item.sessionIds.length,
+				lastActiveAt
+			};
+		})
+	};
+}
+
+// src/features/projects/projects-service.ts
+/**
+* Lists the native Workspace registrations with their session counts and latest
+* activity, and removes one registration while keeping files and sessions.
+* Holds no preferences and writes nothing else.
+*/
+var ProjectsService = class {
+	workspaceController = null;
+	sessionController = null;
+	async list() {
+		const controller = this.workspaceController;
+		if (!controller) throw new Error("projectsUnavailable");
+		const abort = new AbortController();
+		try {
+			const baseline = await readBaseline(controller, abort.signal);
+			const activity = await this.activity(abort.signal);
+			return buildProjectCatalog(baseline, activity);
+		} finally {
+			abort.abort();
+		}
+	}
+	/**
+	* Remove one Workspace registration. DSH keeps the directory and every
+	* session log; sessions fall back to the ungrouped area and stay searchable.
+	*/
+	async remove(workspaceId) {
+		const controller = this.workspaceController;
+		if (!controller || typeof controller.delete !== "function") throw new Error("projectsUnavailable");
+		if (!validWorkspaceId(workspaceId)) throw new Error("projectsInvalidWorkspace");
+		if (!(await this.list()).projects.some((row) => row.workspaceId === workspaceId)) throw new Error("projectsNotFound");
+		await controller.delete({ workspaceId });
+		return this.list();
+	}
+	/** Latest activity per session, taken from the same list the sidebar dates rows with. */
+	async activity(signal) {
+		const activity = /* @__PURE__ */ new Map();
+		const controller = this.sessionController;
+		if (!controller || typeof controller.list !== "function") return activity;
+		const { items } = await controller.list({}, signal).catch(() => ({ items: [] }));
+		for (const item of items) {
+			if (typeof item?.sessionId !== "string" || typeof item.updatedAt !== "number" || !Number.isFinite(item.updatedAt)) continue;
+			activity.set(item.sessionId, { lastActiveAt: item.updatedAt });
+		}
+		return activity;
+	}
+};
+function validWorkspaceId(workspaceId) {
+	return typeof workspaceId === "string" && workspaceId.length > 0 && workspaceId.length <= 1024;
+}
+/** Resolve the first complete Workspace baseline and stop the stream. */
+async function readBaseline(controller, signal) {
+	for await (const frame of controller.follow(signal)) if ((frame.type === "baseline" || frame.type === "replace") && frame.value) return frame.value;
+	throw new Error("projectsUnavailable");
+}
+
+// src/features/projects/host.ts
+var host_exports = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost,
+	methods: () => methods
+});
+function createHost(ctx, _config, _options) {
+	const projects = new ProjectsService();
+	ctx.inject(["workspaceController", "sessionController"], (child) => {
+		projects.workspaceController = child.workspaceController ?? null;
+		projects.sessionController = child.sessionController ?? null;
+		child.effect(() => () => {
+			projects.workspaceController = null;
+			projects.sessionController = null;
+		});
+	});
+	return { projects };
+}
+const methods = {
+	listProjects() {
+		return this.run(() => this.projects.list());
+	},
+	removeProject(workspaceId) {
+		return this.run(() => this.projects.remove(workspaceId));
+	}
+};
+
+// src/features/projects/rpc.ts
+const projectCatalogCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#ProjectCatalog",
+	create: () => ({ parse(value) {
+		if (!isRecord$1(value) || typeof value.complete !== "boolean" || !isArray(value.projects)) throw new TypeError("Invalid project catalog");
+		const projects = value.projects.map((row) => {
+			if (!isRecord$1(row) || !hasStrings(row, [
+				"workspaceId",
+				"title",
+				"path"
+			]) || typeof row.sessionCount !== "number" || !Number.isFinite(row.sessionCount) || typeof row.lastActiveAt !== "number" || !Number.isFinite(row.lastActiveAt)) throw new TypeError("Invalid project row");
+			return {
+				workspaceId: row.workspaceId,
+				title: row.title,
+				path: row.path,
+				sessionCount: row.sessionCount,
+				lastActiveAt: row.lastActiveAt
+			};
+		});
+		return {
+			complete: value.complete,
+			projects
+		};
+	} })
+};
+function projectRpc(method, fields) {
+	return {
+		id: `power-dsh#powerDsh/${method}`,
+		service: "powerDsh",
+		namespace: "powerDsh",
+		method,
+		invocation: { kind: "direct" },
+		parameters: fields.map((name) => ({
+			name,
+			wire: name,
+			source: "json",
+			codec: stringCodec
+		})),
+		result: projectCatalogCodec
+	};
+}
+const LIST_PROJECTS_RPC = projectRpc("listProjects", []);
+const REMOVE_PROJECT_RPC = projectRpc("removeProject", ["workspaceId"]);
+const rpc = [LIST_PROJECTS_RPC, REMOVE_PROJECT_RPC];
+
 // src/app/host-features.ts
 const HOST_FEATURES = Object.freeze([
+	{
+		definition: definition$19,
+		...config_exports$19
+	},
+	{
+		definition: definition$18,
+		...config_exports$18
+	},
 	{
 		definition: definition$17,
 		...config_exports$17
 	},
 	{
 		definition: definition$16,
-		...config_exports$16
+		...config_exports$16,
+		...host_exports$14,
+		rpc: rpc$14
 	},
 	{
 		definition: definition$15,
-		...config_exports$15
+		...config_exports$15,
+		...host_exports$13,
+		rpc: rpc$13
 	},
 	{
 		definition: definition$14,
@@ -3665,23 +4377,23 @@ const HOST_FEATURES = Object.freeze([
 	},
 	{
 		definition: definition$5,
-		...config_exports$5,
+		...config_exports$5
+	},
+	{
+		definition: definition$4,
+		...config_exports$4
+	},
+	{
+		definition: definition$3,
+		...config_exports$3,
 		...host_exports$3,
 		rpc: rpc$3
 	},
 	{
-		definition: definition$4,
-		...config_exports$4,
+		definition: definition$2,
+		...config_exports$2,
 		...host_exports$2,
 		rpc: rpc$2
-	},
-	{
-		definition: definition$3,
-		...config_exports$3
-	},
-	{
-		definition: definition$2,
-		...config_exports$2
 	},
 	{
 		definition: definition$1,
@@ -3731,7 +4443,10 @@ const MOD_RPC = composeRpc([
 	DELETE_ARCHIVED_SESSION_RPC,
 	READ_WALLPAPER_RPC,
 	SAVE_WALLPAPER_RPC,
-	CLEAR_WALLPAPER_RPC
+	CLEAR_WALLPAPER_RPC,
+	READ_USAGE_STATS_RPC,
+	LIST_PROJECTS_RPC,
+	REMOVE_PROJECT_RPC
 ]);
 
 // src/app/settings-tool.ts

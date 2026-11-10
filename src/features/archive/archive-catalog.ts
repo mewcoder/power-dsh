@@ -5,6 +5,8 @@ export interface ArchiveBaseline {
   readonly items: readonly {
     readonly workspaceId: string;
     readonly title: string;
+    /** Native Workspace directory; absent in older baselines. */
+    readonly path?: string;
     readonly sessionIds: readonly string[];
   }[];
   readonly archivedSessionIds: readonly string[];
@@ -21,11 +23,12 @@ export type ArchiveSort = 'updated' | 'created';
  * plain projection. Ordering is deterministic so identical inputs render alike.
  */
 export function buildArchiveCatalog(baseline: ArchiveBaseline, titles: ReadonlyMap<string, ArchiveTitleEntry>): ArchiveCatalog {
-  const workspaces = baseline.items.map(item => ({ workspaceId: item.workspaceId, title: item.title }));
-  const owner = new Map<string, { workspaceId: string; title: string }>();
+  const pathOf = (item: ArchiveBaseline['items'][number]) => typeof item.path === 'string' ? item.path : '';
+  const workspaces = baseline.items.map(item => ({ workspaceId: item.workspaceId, title: item.title, path: pathOf(item) }));
+  const owner = new Map<string, { workspaceId: string; title: string; path: string }>();
   for (const item of baseline.items) {
     for (const sessionId of item.sessionIds) {
-      if (!owner.has(sessionId)) owner.set(sessionId, { workspaceId: item.workspaceId, title: item.title });
+      if (!owner.has(sessionId)) owner.set(sessionId, { workspaceId: item.workspaceId, title: item.title, path: pathOf(item) });
     }
   }
   const seen = new Set<string>();
@@ -40,6 +43,7 @@ export function buildArchiveCatalog(baseline: ArchiveBaseline, titles: ReadonlyM
       title: meta?.title ?? '',
       workspaceId: workspace?.workspaceId ?? '',
       workspaceTitle: workspace?.title ?? '',
+      workspacePath: workspace?.path ?? '',
       updatedAt: meta?.updatedAt ?? 0,
       createdAt: meta?.createdAt ?? 0,
     });
@@ -50,6 +54,8 @@ export function buildArchiveCatalog(baseline: ArchiveBaseline, titles: ReadonlyM
 export interface ArchiveGroup {
   key: string;
   title: string;
+  /** Workspace directory for the group; empty for the trailing ungrouped group. */
+  path: string;
   sessions: ArchiveSessionRow[];
 }
 export interface ArchiveViewOptions {
@@ -85,14 +91,14 @@ export function groupArchivedSessions(
   const groups = new Map<string, ArchiveGroup>();
   for (const workspace of catalog.workspaces) {
     order.push(workspace.workspaceId);
-    groups.set(workspace.workspaceId, { key: workspace.workspaceId, title: workspace.title, sessions: [] });
+    groups.set(workspace.workspaceId, { key: workspace.workspaceId, title: workspace.title, path: workspace.path, sessions: [] });
   }
   const ungroupedKey = '__ungrouped__';
   for (const row of rows) {
     const key = row.workspaceId || ungroupedKey;
     let group = groups.get(key);
     if (!group) {
-      group = { key, title: row.workspaceTitle || ungroupedLabel, sessions: [] };
+      group = { key, title: row.workspaceTitle || ungroupedLabel, path: row.workspacePath, sessions: [] };
       groups.set(key, group);
       order.push(key);
     }

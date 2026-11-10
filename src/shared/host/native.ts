@@ -44,6 +44,11 @@ export interface NativeWorkspaceBaseline {
 export interface NativeWorkspaceController {
   follow(signal: AbortSignal): AsyncIterable<{ type: string; value?: NativeWorkspaceBaseline }>;
   unarchiveSession(request: { sessionId: string }): Promise<{ archivedSessionIds: readonly string[] }>;
+  delete(request: { workspaceId: string }): Promise<{ deleted: boolean }>;
+}
+/** Session list surface: the same activity order the native sidebar dates rows with. */
+export interface NativeSessionController {
+  list(request: Record<string, never>, signal?: AbortSignal): Promise<{ items: readonly { sessionId: string; updatedAt: number }[] }>;
 }
 export type NativeSessionTitleObservation =
   | { sessionId: string; status: 'fulfilled'; value: { session: { createdAt: number }; title?: { title: string; updatedAt: number } } }
@@ -141,6 +146,7 @@ export interface NativeContext {
   sessionProjections: { register(projection: unknown): Promise<unknown> };
   workspaceRegistry: { list(): { path: string; title: string }[] };
   workspaceController?: NativeWorkspaceController;
+  sessionController?: NativeSessionController;
   sessionQuery?: NativeSessionQuery;
   sessionPersistence?: NativeSessionPersistence;
   workingDirectory: { defaultDirectory: string };

@@ -310,14 +310,14 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   /**
    * Short-sleeved tee from Tabler Icons (MIT), sized to the host icon metrics.
    * Its glyph spans 18x17 of the 24-unit canvas, so a 22-unit viewBox renders it
-   * 13.1px wide - the host `trash-outline` glyph is 13.4px - with a 1.1 stroke
-   * landing on the host icons' 1px optical weight. Cropping tighter made the tee
-   * visibly larger than its neighbours.
+   * 13.1px wide - the host `trash-outline` glyph is 13.4px. The host draws its
+   * 16-unit icons at stroke 1, so a 22-unit viewBox needs 1 * 22/16 = 1.375 to
+   * land on the same 1px on screen; anything less reads visibly thinner.
    */
   function ShirtIcon({ size = 16 }: IconProps) {
     return h('svg', {
       width: size, height: size, viewBox: '1 1 22 22', fill: 'none',
-      stroke: 'currentColor', strokeWidth: 1.1, strokeLinecap: 'round', strokeLinejoin: 'round',
+      stroke: 'currentColor', strokeWidth: 1.375, strokeLinecap: 'round', strokeLinejoin: 'round',
       'aria-hidden': true, focusable: false,
     }, h('path', {
       d: 'M15 4l6 2v5h-3v8a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-8H3V6l6-2a3 3 0 0 0 6 0',
@@ -521,11 +521,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
               'aria-label': t('flowingBackgroundTuneOpen'), 'aria-describedby': `${control}-description`,
               'aria-haspopup': 'dialog', 'aria-expanded': openedTune,
               onClick: () => { if (!disabled) openPanel(leaveSettings); },
-            }, h('svg', {
-              width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
-              strokeWidth: 1.4, strokeLinecap: 'round', 'aria-hidden': true, focusable: false,
-            }, h('path', { d: 'M2 4h3m4 0h5M2 12h5m4 0h3' }),
-            h('circle', { cx: 7, cy: 4, r: 2 }), h('circle', { cx: 9, cy: 12, r: 2 })))),
+            }, h(ShirtIcon))),
           h('button', {
             type: 'button', role: 'switch', className: 'power-dsh-switch', id: control,
             'aria-checked': enabled, 'aria-labelledby': `${control}-label`,

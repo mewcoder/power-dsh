@@ -15,7 +15,7 @@ PowerDSH 按用户特性组织 Host、Client、配置、协议、文案与测试
 | [src/app/host-features.ts](../src/app/host-features.ts)、[client-features.ts](../src/app/client-features.ts) | Host 与 Client 的显式特性选择 |
 | [src/app/host.ts](../src/app/host.ts)、[client.ts](../src/app/client.ts) | 宿主接入、共享状态与贡献装配，不实现各功能业务 |
 | [src/app/config.ts](../src/app/config.ts)、[settings-tool.ts](../src/app/settings-tool.ts)、[rpc.ts](../src/app/rpc.ts) | 聚合配置、具名设置工具和严格 RPC，拒绝重复与缺项 |
-| [src/features/](../src/features/) | 十七项特性的定义、配置、实现、文案、主 Spec 和行为测试 |
+| [src/features/](../src/features/) | 十九项特性的定义、配置、实现、文案、主 Spec 和行为测试 |
 | [src/shared/host/](../src/shared/host/)、[client/](../src/shared/client/)、[rpc/](../src/shared/rpc/) | 队列与原生启停、设置/目录/侧栏外壳、复用 codec |
 | [tests/integration/](../tests/integration/)、[shared/](../tests/shared/)、[helpers/](../tests/helpers/) | 完整装配与组合、共享机制测试及内存夹具 |
 | [assets/](../assets/)、[cordis.patch.yml](../cordis.patch.yml)、[screenshots.json](../screenshots.json) | 元数据、图标、Bundle 与市场截图入口 |
@@ -29,7 +29,7 @@ PowerDSH 按用户特性组织 Host、Client、配置、协议、文案与测试
 
 ## Host 与 Client
 
-每个特性的 `definition.ts` 是纯元数据，`config.ts` 拥有本功能 schema 与具名工具贡献；有 Host 行为时由 `host.ts` 提供实例创建与具名方法。装配只组合这些声明，所有受控配置键、默认值、操作顺序、工具参数和输出保持兼容。具体行为由[十七项主 Spec](README.md#功能规格spec)维护。
+每个特性的 `definition.ts` 是纯元数据，`config.ts` 拥有本功能 schema 与具名工具贡献；有 Host 行为时由 `host.ts` 提供实例创建与具名方法。装配只组合这些声明，所有受控配置键、默认值、操作顺序、工具参数和输出保持兼容。具体行为由[十九项主 Spec](README.md#功能规格spec)维护。
 
 Host 负责持久配置、文件、进程、策略与安全数据投影；Client 负责设置贡献、页面、观察与交互。普通偏好通过原生 `configForms` 保存；精简等操作由 UI 与工具共用 Host 方法，不监听布尔配置异步执行。可选服务在特性内部子 context 接入，缺少辅助服务不应阻断其他入口。
 
@@ -49,13 +49,17 @@ DSH `0.2.2-rc.1` 的原生 logger 提供内存缓冲与 exporter；插件安装�
 
 [通知模块](../src/features/notifications/)拥有结束摘要投影、通知订阅和系统声音。Host 注册最小投影，Client 订阅原生列表与交互状态并调用浏览器通知；声音经 owner-only RPC 与托管 subprocess 播放。触发、权限、去重和声音边界由[任务通知 Spec](../src/features/notifications/spec.md)维护。
 
+## 使用统计
+
+[使用统计](../src/features/usage-stats/spec.md)拥有 `usageStatsEnabled`（默认 `false`），经原生 `configForms` 持久化，只控制「使用统计」设置页入口。Host 的 `UsageService` 通过可选 `ctx.inject(['sessionPersistence'])` 读取本机已落盘会话日志：`list()` 取得会话与 `revision`，`open(id,'read')` 读取事件后立即 `close()`，只折叠 `assistant/message` 的 `usage` 与 `message.source`、`turn/start`、`tool/call` 的时间戳。逐会话结果按 `revision` 与报告时区缓存（上限 512、并发 4），日志读取或解析失败的会话被跳过并标记不完整，不伪造零值。页面在 Client 侧只做展示、时区与图表布局，经单一 owner-only RPC `readUsageStats(timeZone)` 取回快照；不写入会话、不修改配置、无网络与进程。服务缺席时方法抛 `usageUnavailable`，页面显示共享错误反馈。
+
 ## 双击重命名屏蔽
 
 [双击模块](../src/features/double-click-rename/)根据持久偏好安装和释放捕获监听。读取当前事件路径中的会话行标记是已获授权的有限 DOM 例外，范围与兼容依据见[对应 Spec](../src/features/double-click-rename/spec.md)。
 
-## 背景设置
+## 自定义背景
 
-[背景设置](../src/features/flowing-background/spec.md)拥有 `flowingBackgroundEnabled`（默认 `false`）、`flowingBackgroundKind`（默认 `pattern`，可选 `wallpaper`）、`flowingBackgroundOpacity`（默认 `100`，0–100）与 `flowingBackgroundBlur`（默认 `0`，0–40）四个配置，均独立持久化，通过原生 `configForms` 保存。单一开关控制包括侧边栏在内的整个界面，类型、透明度与毛玻璃行只在开启时展开，不增加第二个开关。壁纸二进制不属于配置：Host 的 `WallpaperStore` 把图片与元数据写到 profile 的 `power-dsh/wallpaper.{bin,json}`，Client 经 `readWallpaper`／`saveWallpaper`／`clearWallpaper` 三个 owner-only RPC 读写，插件卸载后调用被拒绝；写入为 0600 临时文件加原子重命名，MIME、大小与文件名在两端校验。Client 在 `shell.overlay` additive slot 仅注册返回 null 的生命周期控制组件，不订阅会话或面板显示条件；已有对话、运行、设置及全局面板不停止动画。浮层不承担实际绘画，不读取消息正文或扫描业务事件。
+[自定义背景](../src/features/flowing-background/spec.md)拥有 `flowingBackgroundEnabled`（默认 `false`）、`flowingBackgroundKind`（默认 `pattern`，可选 `wallpaper`）、`flowingBackgroundOpacity`（默认 `100`，0–100）与 `flowingBackgroundBlur`（默认 `0`，0–40）四个配置，均独立持久化，通过原生 `configForms` 保存。单一开关控制包括侧边栏在内的整个界面，类型、透明度与毛玻璃行只在开启时展开，不增加第二个开关。壁纸二进制不属于配置：Host 的 `WallpaperStore` 把图片与元数据写到 profile 的 `power-dsh/wallpaper.{bin,json}`，Client 经 `readWallpaper`／`saveWallpaper`／`clearWallpaper` 三个 owner-only RPC 读写，插件卸载后调用被拒绝；写入为 0600 临时文件加原子重命名，MIME、大小与文件名在两端校验。Client 在 `shell.overlay` additive slot 仅注册返回 null 的生命周期控制组件，不订阅会话或面板显示条件；已有对话、运行、设置及全局面板不停止动画。浮层不承担实际绘画，不读取消息正文或扫描业务事件。
 
 适配器只在唯一、可见且符合已安装宿主结构的 AppFrame 内追加 absolute、inset 0、z-index -1 的单张连续 Canvas；框架使用 `isolation:isolate` 和原生 bg-base 底色。必需框架类名只读自两个确切官方 `style[data-plugin-css]` 标签：`@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css` 提供唯一简单类名 `_frame`、`_sidebarCol`、`_centerCol`，`@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css` 提供唯一简单类名 `_root`；标签和所需类名均须唯一，再用语义直接子元素、relative 定位和 grid 布局核对真实目标。用户明确授权的原生表面适配仅包括 AppFrame sidebarCol、centerCol、原生 SidebarRoot，以及任意 phase 的主 ConversationRoot，临时设置其内联 background-color:transparent 与 background-image:none。不硬编码 npm CSS Modules 哈希，不猜测替代选择器，不修改全局主题 token、输入卡片、编辑器、文件卡片、菜单、弹窗或任意后代，不替换宿主根节点。其他全局面板的独立不透明内容表面和操作系统原生标题栏继续保留。
 

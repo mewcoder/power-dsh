@@ -55,6 +55,10 @@ DSH `0.2.2-rc.1` 安装包已核对会话行事件标记，作为有限 DOM 例�
 
 [停用 Goal 模式](../src/features/goal-blocking/spec.md)只启停新对话使用的原生目标命令和工具声明，依据为 DSH `0.2.2-rc.1` 桌面发行包及同版参考源码。全局 `dsh-goal`、`dsh-goal-round-driver` 和 `dsh-client-ui-goal` 均保留；续跑驱动在装载或卸载时会解除已有目标的运行，因此不将它作为精简目标。已有 Agent 保留旧模式代际，不主动暂停、完成或取消目标；第三方插件与原生 Goal API 仍可使用。新功能未继承历史矩阵结论，实际安装与页面待验收。
 
+## 使用统计的新增范围与证据
+
+[使用统计](../src/features/usage-stats/spec.md)只读依赖原生 `sessionPersistence`：`list({signal})` 的 `header.{id,createdAt,cwd}` 与 `revision`、`open(id,'read',{signal})` 的 `read()`/`close()`，以及 `assistant/message.data.usage`（`TokenUsage`）与 `message.source.{provider,model}`、`turn/start`、`tool/call` 的 `time`。接口依据为本机 DSH `0.2.2-rc.1` 桌面安装包与官方仓库提交 `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` 的 `packages/session/session-persistence`、`session-persistence-jsonl` 与 `dsh-llm` 类型；本机 224 个真实会话日志的只读实测确认了日志分帧、事件形状与逐会话 `revision` 的存在。它不继承历史矩阵结论，也未在旧版或 Windows 上复测；实际安装、页面数字核对与缺服务降级尚待验收。
+
 ## 接口核对清单
 
 下表来自本项目实际调用点。接口最早出现在哪个版本仍需对照确切发行版确认；当前版本有同名方法不能证明旧版具有相同参数、返回字段、事件和清理行为。
@@ -71,6 +75,7 @@ DSH `0.2.2-rc.1` 安装包已核对会话行事件标记，作为有限 DOM 例�
 | 技能管理 | [SkillPolicy](../src/features/skills/skill-policy.ts)的 `skills.registerProvider()` / `snapshot()`、`agentPresets.serviceFor()` / `acquireScope()` / `compositionInventory()`、`createScope()`、`workspaceRegistry.list()` | provider 生命周期、用户与项目优先级、租约释放、模式服务隔离、导入项目字段 |
 | MCP 目录与启停 | [McpPolicy](../src/features/mcp/mcp-policy.ts)与[McpProviders](../src/features/mcp/mcp-providers.ts)的 bundle rows、模式清单、Loader entries、Fiber、scope、原生 manager | `fiberPhase` / `fiberState` 含义、Fiber 数字状态映射、归属去重、工具作用域、配置修订与原生写后读回 |
 | 归档管理 | [ArchiveService](../src/features/archive/archive-service.ts)的 `workspaceController.follow()` / `unarchiveSession()`、`sessionQuery.readTitleSnapshots()` / `listSessions()`、`sessionPersistence.stat()` | 基线帧 `items` / `archivedSessionIds` 形状、工作区归属、标题/`updatedAt`/`createdAt`、`live` 判定、`stat().location.path` 定位与只删本会话产物、服务缺席降级 |
+| 项目管理 | [ProjectsService](../src/features/projects/projects-service.ts)的 `workspaceController.follow()` / `delete()`、`sessionController.list()` | 基线帧 `items[].{workspaceId,title,path,sessionIds}` 形状、登记顺序、`delete` 只删登记并保留目录与会话、`list().items[].updatedAt` 与侧栏同源、服务缺席降级 |
 | 任务通知 | [通知投影](../src/features/notifications/notifications.ts)及 Host 注册、Client 的 `sessions.list` / `uiSession.sessionStatus` | 投影注册与释放、`turn/end` 原因、首次订阅基线、重连去重、提问与审批状态字段 |
 | 系统声音 | [SystemSounds](../src/features/notifications/system-sounds.ts)、`connection.isLoopback`、subprocess `resolveExecutable` / `spawn` 与托管句柄 | 本机识别、参数与取消语义、平台真实试听、远程界面不会在服务器播放 |
 | 全局指令 | `profileContext.home`、文件 RPC、宿主全局指令发现 | 正文落在同一个原生全局文件、冲突时不覆盖、禁用入口不改变正文及读取行为 |

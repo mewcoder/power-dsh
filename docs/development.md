@@ -31,7 +31,7 @@
    git diff
    ```
 
-3. **先明确 Spec，再实现并同步。** 每项用户功能在[功能索引](README.md#功能规格spec)对应一份主 Spec，按[功能 Spec 规范](feature-spec.md)明确范围、配置、生命周期与验收条件，再修改最小必要范围；同步受影响的 Spec、必要测试、双语文案、资源与包清单及更新日志。只为实际行为补必要测试，不为占位结构添加依赖或框架。所有功能按[错误处理规范](error-handling.md)复用共享反馈与诊断处理，明确失败后的数据保留、控件权限与恢复动作；仅在关键意外故障确有排障需要时使用宿主日志，不把异常吞成成功或空列表。不得替换宿主根节点、覆盖宿主布局、注入全局 CSS、查询其他插件 DOM 或运行时导入内部 UI 组件；仅遵循主 Spec 中已获授权的有限例外。[背景设置](../src/features/flowing-background/spec.md)按用户全局预览请求，获准在唯一已核对的 AppFrame 内设置局部 isolation、挂载自有底层画布，并仅对明确的 sidebarCol、centerCol、原生 SidebarRoot 及任意 phase 的主 ConversationRoot 临时设置内联透明背景。必需框架适配所需类名只读自当前两个精确官方样式标签 `@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css`、`@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css` 的唯一简单类名元数据，结合语义直接子元素和定位布局核对；同版本 CSS Modules 哈希可能因构建而异，不得硬编码 npm 哈希或猜测模糊选择器。head 的样式加载/替换观察和 body 的目标生命周期观察均随本功能释放。按用户后续明确要求，另允许从同一 SidebarRoot 官方样式标签读取唯一 `_scrollFade` 类名，仅对原生 SidebarRoot 内匹配该类名且 `aria-hidden="true"` 的底部滚动渐隐层临时设置 `display:none !important`，关闭或卸载按所有权恢复；该装饰类名为可选项，缺失或歧义不得阻断背景挂载。用户反馈的另一底部阴影获准从第三个精确官方标签 `@deepseek-ai/dsh-client-ui-workspace/WorkspaceBrowser.module.css` 读取唯一 root/treeBody/fade 映射，只隐藏原生 SidebarRoot 内工作区 root 下 treeBody 的直接 span.fade；该模块及类名同样可选，禁止固定哈希、全局 fade 匹配或扩大读取内容。用户另已授权 Windows 顶部整行操作栏尽量透明，允许只对已核对 AppFrame 且直接拥有自有背景层的 `::before` 添加受 `html[data-windows-titlebar]` 限制的局部透明背景规则，随背景层样式节点释放；不修改拖动布局、全局主题 token、原生窗口按钮或内部桌面 IPC。按用户要求，另允许对该已核对 AppFrame 的直接 sidebarCol，在 Windows 非抽屉模式且直接拥有自有背景层时设置原生同款 0.5px 主题色右边框，随自有样式节点释放。不得扩大为任意样式扫描，或涉及输入卡片、编辑器、文件卡片、菜单、弹窗、全局主题 token、任意后代；不适配操作系统原生标题栏。关闭、框架替换或卸载须按原值和优先级恢复仍属于本功能的写入，保留第三方后写值。
+3. **先明确 Spec，再实现并同步。** 每项用户功能在[功能索引](README.md#功能规格spec)对应一份主 Spec，按[功能 Spec 规范](feature-spec.md)明确范围、配置、生命周期与验收条件，再修改最小必要范围；同步受影响的 Spec、必要测试、双语文案、资源与包清单及更新日志。只为实际行为补必要测试，不为占位结构添加依赖或框架。所有功能按[错误处理规范](error-handling.md)复用共享反馈与诊断处理，明确失败后的数据保留、控件权限与恢复动作；仅在关键意外故障确有排障需要时使用宿主日志，不把异常吞成成功或空列表。不得替换宿主根节点、覆盖宿主布局、注入全局 CSS、查询其他插件 DOM 或运行时导入内部 UI 组件；仅遵循主 Spec 中已获授权的有限例外。[自定义背景](../src/features/flowing-background/spec.md)按用户全局预览请求，获准在唯一已核对的 AppFrame 内设置局部 isolation、挂载自有底层画布，并仅对明确的 sidebarCol、centerCol、原生 SidebarRoot 及任意 phase 的主 ConversationRoot 临时设置内联透明背景。必需框架适配所需类名只读自当前两个精确官方样式标签 `@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css`、`@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css` 的唯一简单类名元数据，结合语义直接子元素和定位布局核对；同版本 CSS Modules 哈希可能因构建而异，不得硬编码 npm 哈希或猜测模糊选择器。head 的样式加载/替换观察和 body 的目标生命周期观察均随本功能释放。按用户后续明确要求，另允许从同一 SidebarRoot 官方样式标签读取唯一 `_scrollFade` 类名，仅对原生 SidebarRoot 内匹配该类名且 `aria-hidden="true"` 的底部滚动渐隐层临时设置 `display:none !important`，关闭或卸载按所有权恢复；该装饰类名为可选项，缺失或歧义不得阻断背景挂载。用户反馈的另一底部阴影获准从第三个精确官方标签 `@deepseek-ai/dsh-client-ui-workspace/WorkspaceBrowser.module.css` 读取唯一 root/treeBody/fade 映射，只隐藏原生 SidebarRoot 内工作区 root 下 treeBody 的直接 span.fade；该模块及类名同样可选，禁止固定哈希、全局 fade 匹配或扩大读取内容。用户另已授权 Windows 顶部整行操作栏尽量透明，允许只对已核对 AppFrame 且直接拥有自有背景层的 `::before` 添加受 `html[data-windows-titlebar]` 限制的局部透明背景规则，随背景层样式节点释放；不修改拖动布局、全局主题 token、原生窗口按钮或内部桌面 IPC。按用户要求，另允许对该已核对 AppFrame 的直接 sidebarCol，在 Windows 非抽屉模式且直接拥有自有背景层时设置原生同款 0.5px 主题色右边框，随自有样式节点释放。不得扩大为任意样式扫描，或涉及输入卡片、编辑器、文件卡片、菜单、弹窗、全局主题 token、任意后代；不适配操作系统原生标题栏。关闭、框架替换或卸载须按原值和优先级恢复仍属于本功能的写入，保留第三方后写值。
 4. **检查仓库与实际产物。** 按[环境与检查](#环境与检查)准备依赖，再执行：
 
    ```sh
@@ -59,7 +59,7 @@ npm run check
 
 修改源码或类型后执行 `npm run build`，更新 `dist/index.js`、`dist/index.d.ts` 与 `dist/client.js`；`build:client` 仅用于客户端开发。`check:types` 执行严格类型检查，`check:build` 在内存验证三个产物新鲜度；`check` 还核对完整源码是否纳入类型检查、特性登记、配置归属、Spec/测试、依赖边界、浏览器模块图、资源、文案与链接，再递归执行行为测试。检查不自动改写产物来掩盖遗漏。
 
-[实际包检查](../scripts/check-package.mjs)在系统临时目录生成并解包标准 npm tarball，核对编译 JS、公开声明、运行导入/依赖、Client factory、图标许可、locale、截图和十七份 Spec，排除 TS 编译输入、测试、构建配置/脚本及开发规范。文档另允许第三方声明、截图与 npm 自动收录的索引。
+[实际包检查](../scripts/check-package.mjs)在系统临时目录生成并解包标准 npm tarball，核对编译 JS、公开声明、运行导入/依赖、Client factory、图标许可、locale、截图和十八份 Spec，排除 TS 编译输入、测试、构建配置/脚本及开发规范。文档另允许第三方声明、截图与 npm 自动收录的索引。
 
 `npm run check:install` 运行[独立安装检查](../scripts/check-install.mjs)：重新验证产物新鲜度，将实际 tarball 安装到仓库外的临时项目，只安装生产依赖、禁止安装脚本，验证所有公开导出、Host 配置、Client 登记和独立 TypeScript 消费者的 `Context.plugin` 接入，并确认没有安装编译器、打包工具或另一份 React。它需要访问公共 npm 注册表；成功或失败都会清理临时项目，不使用用户 DSH/profile。包内容检查本身不下载依赖，两项都不能替代实际宿主验收。
 
@@ -135,14 +135,14 @@ npm run check
 
 ### 启用与功能行为
 
-启用后进入 **设置 → PowerDSH**，按需开启功能。入口、默认值和操作行为以[十七项主 Spec](README.md#功能规格spec)为准，分类与键盘交互见 [UI 规范](ui.md#分类-tab)。
+启用后进入 **设置 → PowerDSH**，按需开启功能。入口、默认值和操作行为以[十九项主 Spec](README.md#功能规格spec)为准，分类与键盘交互见 [UI 规范](ui.md#分类-tab)。
 
 安装和验收时注意：
 
 - 精简会更改宿主持久配置。停用或卸载 Mod 不会自动恢复其他插件；需要撤销时先关闭对应精简开关，并核对实际目标，见[原生精简操作](architecture.md#原生精简操作)。
 - 桌面端点击版本号可能开始下载更新，见[显示版本号](../src/features/version-display/spec.md)。
 - 重启会退出应用，系统通知与声音依赖平台及权限；按对应主 Spec 的验收条件操作。
-- [背景设置](../src/features/flowing-background/spec.md)在「界面」中默认关闭，经原生 `configForms` 独立保存。验收全局单张连续画布、侧栏与主内容区的底层透出，以及已有对话、运行、设置和全局面板间切换时动画持续；没有会话或面板门控。核对只适配已授权结构表面，窄窗口侧栏抽屉保留原生底色，输入卡片、编辑器、文件卡片、菜单和弹窗不被透明化；独立不透明内容表面与操作系统原生标题栏不在强制透明范围。另核对样式原值与优先级恢复、第三方后写值保留、动态表面替换不重启动画、关闭或框架替换后的 GPU/观察器/节点释放、减少动态效果静态、页面隐藏暂停和 WebGL 静态降级。缺失、歧义或不支持的框架不得回退前景。源码实现、本次检查、安装状态与实际页面结果分别记录，旧版新建聊天范围的检查不能代替本次全局验证。
+- [自定义背景](../src/features/flowing-background/spec.md)在「界面」中默认关闭，经原生 `configForms` 独立保存。验收全局单张连续画布、侧栏与主内容区的底层透出，以及已有对话、运行、设置和全局面板间切换时动画持续；没有会话或面板门控。核对只适配已授权结构表面，窄窗口侧栏抽屉保留原生底色，输入卡片、编辑器、文件卡片、菜单和弹窗不被透明化；独立不透明内容表面与操作系统原生标题栏不在强制透明范围。另核对样式原值与优先级恢复、第三方后写值保留、动态表面替换不重启动画、关闭或框架替换后的 GPU/观察器/节点释放、减少动态效果静态、页面隐藏暂停和 WebGL 静态降级。缺失、歧义或不支持的框架不得回退前景。源码实现、本次检查、安装状态与实际页面结果分别记录，旧版新建聊天范围的检查不能代替本次全局验证。
 - 旧 ID 设置回退与目录链接不等于完整配置迁移；升级时按[兼容性验证要求](compatibility.md#验证与记录)读回偏好。
 
 ## 修改与安装

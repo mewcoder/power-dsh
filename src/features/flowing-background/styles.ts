@@ -77,9 +77,9 @@ export const panelStyles = `
 .power-dsh-background-panel-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .power-dsh-background-panel-label { font-size: 14px; line-height: 22px; color: var(--dsw-alias-label-primary); }
 .power-dsh-background-panel-value { font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-secondary); }
-/* Same accent as the inline settings sliders; brand-primary resolves to
-   label-primary (near black) in the light theme, which read as an unstyled track. */
-.power-dsh-background-panel .power-dsh-slider { box-sizing: border-box; width: 100%; height: 20px; margin: 0; accent-color: var(--dsw-alias-state-business-primary); cursor: pointer; }
+/* Match the settings switches, which use brand-primary - the host's monochrome
+   accent. A blue slider here looked out of place beside them. */
+.power-dsh-background-panel .power-dsh-slider { box-sizing: border-box; width: 100%; height: 20px; margin: 0; accent-color: var(--dsw-alias-brand-primary); cursor: pointer; }
 /* The native range paints its own focus ring; adding an outline drew a second box. */
 .power-dsh-background-panel .power-dsh-slider:focus-visible { outline: none; }
 .power-dsh-background-panel .power-dsh-slider:disabled { opacity: .4; cursor: not-allowed; }
@@ -94,7 +94,7 @@ export const panelStyles = `
 /* The two options sit on one line, side by side. */
 .power-dsh-background-options { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; }
 .power-dsh-background-radio { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 18px; cursor: pointer; }
-.power-dsh-background-radio input { flex: none; width: 14px; height: 14px; margin: 0; accent-color: var(--dsw-alias-state-business-primary); cursor: pointer; }
+.power-dsh-background-radio input { flex: none; width: 14px; height: 14px; margin: 0; accent-color: var(--dsw-alias-brand-primary); cursor: pointer; }
 .power-dsh-background-radio input:disabled { cursor: default; }
 .power-dsh-background-radio input:disabled + .power-dsh-background-radio-label { opacity: .5; }
 .power-dsh-background-radio input:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)); outline-offset: 2px; }

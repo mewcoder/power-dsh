@@ -5,8 +5,8 @@ import { buildArchiveCatalog, groupArchivedSessions } from '../archive-catalog.t
 function baseline(overrides = {}) {
   return {
     items: [
-      { workspaceId: 'w1', title: 'Alpha', sessionIds: ['s1', 's2'] },
-      { workspaceId: 'w2', title: 'Beta', sessionIds: ['s3'] },
+      { workspaceId: 'w1', title: 'Alpha', path: '/work/alpha', sessionIds: ['s1', 's2'] },
+      { workspaceId: 'w2', title: 'Beta', path: '/work/beta', sessionIds: ['s3'] },
     ],
     archivedSessionIds: ['s2', 's3', 's4'],
     ...overrides,
@@ -21,13 +21,13 @@ test('buildArchiveCatalog folds archived ids with workspace ownership and titles
   const catalog = buildArchiveCatalog(baseline(), titles);
   assert.equal(catalog.complete, true);
   assert.deepEqual(catalog.workspaces, [
-    { workspaceId: 'w1', title: 'Alpha' },
-    { workspaceId: 'w2', title: 'Beta' },
+    { workspaceId: 'w1', title: 'Alpha', path: '/work/alpha' },
+    { workspaceId: 'w2', title: 'Beta', path: '/work/beta' },
   ]);
   assert.deepEqual(catalog.sessions, [
-    { sessionId: 's2', title: 'Hello', workspaceId: 'w1', workspaceTitle: 'Alpha', updatedAt: 20, createdAt: 100 },
-    { sessionId: 's3', title: 'World', workspaceId: 'w2', workspaceTitle: 'Beta', updatedAt: 10, createdAt: 200 },
-    { sessionId: 's4', title: '', workspaceId: '', workspaceTitle: '', updatedAt: 0, createdAt: 0 },
+    { sessionId: 's2', title: 'Hello', workspaceId: 'w1', workspaceTitle: 'Alpha', workspacePath: '/work/alpha', updatedAt: 20, createdAt: 100 },
+    { sessionId: 's3', title: 'World', workspaceId: 'w2', workspaceTitle: 'Beta', workspacePath: '/work/beta', updatedAt: 10, createdAt: 200 },
+    { sessionId: 's4', title: '', workspaceId: '', workspaceTitle: '', workspacePath: '', updatedAt: 0, createdAt: 0 },
   ]);
 });
 
@@ -45,6 +45,7 @@ test('groupArchivedSessions groups in native workspace order and puts leftover i
   ]));
   const groups = groupArchivedSessions(catalog, '', 'Ungrouped');
   assert.deepEqual(groups.map(group => group.title), ['Alpha', 'Beta', 'Ungrouped']);
+  assert.deepEqual(groups.map(group => group.path), ['/work/alpha', '/work/beta', ''], 'Groups carry the workspace directory; the ungrouped group has none.');
   assert.deepEqual(groups.map(group => group.sessions.map(row => row.sessionId)), [['s2'], ['s3'], ['s4']]);
 });
 

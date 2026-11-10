@@ -36,6 +36,8 @@ export interface Preferences {
   flowingBackgroundBlur: number;
   showBackgroundShortcut: boolean;
   archiveManagerEnabled: boolean;
+  usageStatsEnabled: boolean;
+  projectManagerEnabled: boolean;
 }
 export type PreferenceKey = keyof Preferences;
 export type PowerDshPreferences = Preferences;

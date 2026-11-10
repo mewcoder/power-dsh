@@ -67,6 +67,14 @@ import { createClientFeature as archive } from '../features/archive/client.ts';
 import { definition as archiveDefinition } from '../features/archive/definition.ts';
 import { locales as archiveLocales } from '../features/archive/locales.ts';
 import { rpc as archiveRpc } from '../features/archive/rpc.ts';
+import { createClientFeature as usageStats } from '../features/usage-stats/client.ts';
+import { definition as usageStatsDefinition } from '../features/usage-stats/definition.ts';
+import { locales as usageStatsLocales } from '../features/usage-stats/locales.ts';
+import { rpc as usageStatsRpc } from '../features/usage-stats/rpc.ts';
+import { createClientFeature as projects } from '../features/projects/client.ts';
+import { definition as projectsDefinition } from '../features/projects/definition.ts';
+import { locales as projectsLocales } from '../features/projects/locales.ts';
+import { rpc as projectsRpc } from '../features/projects/rpc.ts';
 
 export const clientFeatures: ClientFeatureSelection[] = [
   { definition: versionDisplayDefinition, create: versionDisplay, locales: versionDisplayLocales, rpc: [] },
@@ -87,4 +95,6 @@ export const clientFeatures: ClientFeatureSelection[] = [
   { definition: thinkingEffortDefinition, create: thinkingEffort, locales: thinkingEffortLocales, rpc: [] },
   { definition: flowingBackgroundDefinition, create: flowingBackground, locales: flowingBackgroundLocales, rpc: flowingBackgroundRpc },
   { definition: archiveDefinition, create: archive, locales: archiveLocales, rpc: archiveRpc },
+  { definition: usageStatsDefinition, create: usageStats, locales: usageStatsLocales, rpc: usageStatsRpc },
+  { definition: projectsDefinition, create: projects, locales: projectsLocales, rpc: projectsRpc },
 ];

@@ -1,7 +1,7 @@
 import type { Locales } from '../../shared/client/types.ts';
 export const locales = {
   en: {
-    flowingBackgroundEnabled: 'Background settings',
+    flowingBackgroundEnabled: 'Custom background',
     flowingBackgroundDescription: 'Choose a soft animated background for the interface',
     flowingBackgroundOpacity: 'Background opacity',
     flowingBackgroundOpacityDescription: '0% hides the background; 100% shows it fully',
@@ -53,7 +53,7 @@ export const locales = {
     flowingBackgroundRecoveryRetry: 'Turn the background off and on to retry. If the problem persists, copy the error information for a bug report.',
   },
   zh: {
-    flowingBackgroundEnabled: '背景设置',
+    flowingBackgroundEnabled: '自定义背景',
     flowingBackgroundDescription: '为界面选择柔和的动态背景',
     flowingBackgroundOpacity: '背景不透明度',
     flowingBackgroundOpacityDescription: '0% 隐藏背景，100% 完全显示背景',

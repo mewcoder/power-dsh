@@ -55,8 +55,9 @@ test('the main row opens a panel that previews and saves appearance values', asy
   assert.equal(button.props['data-native-button'], true);
   assert.equal(button.props.variant, 'ghost');
   assert.ok(button.props['aria-label']);
-  assert.ok(descendants(button).some(node => node.type === 'svg' && node.props['aria-hidden']));
-  assert.equal(button.props.children.some(child => child !== null && typeof child === 'object' && typeof child.type === 'string'), true);
+  // The entry renders the shared shirt glyph component, not an inline svg.
+  assert.equal(button.props.children.some(child => child !== null && typeof child === 'object' && typeof child.type === 'function'), true,
+    'The entry carries the shirt icon component.');
   assert.equal(settingsNodes.some(node => node.props.className === 'power-dsh-background-style-select'), false,
     'There is no separate background-type dropdown row.');
   button.props.onClick();

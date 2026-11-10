@@ -1,4 +1,4 @@
-import type { SkillCatalog, McpCatalog, PersonalizationFile, SystemSoundsCatalog, SoundPlayback, RestartStatus, RestartAccepted, ArchiveCatalog, WallpaperAsset, WallpaperCleared } from './wire.ts';
+import type { SkillCatalog, McpCatalog, PersonalizationFile, SystemSoundsCatalog, SoundPlayback, RestartStatus, RestartAccepted, ArchiveCatalog, WallpaperAsset, WallpaperCleared, UsageSnapshot, ProjectCatalog } from './wire.ts';
 
 /** Named Host operations, before the transport adds its result envelope. */
 export interface PowerDshMethods {
@@ -24,6 +24,9 @@ export interface PowerDshMethods {
   listArchivedSessions(): Promise<ArchiveCatalog>;
   restoreArchivedSession(sessionId: string): Promise<ArchiveCatalog>;
   deleteArchivedSession(sessionId: string): Promise<ArchiveCatalog>;
+  readUsageStats(timeZone: string): Promise<UsageSnapshot>;
+  listProjects(): Promise<ProjectCatalog>;
+  removeProject(workspaceId: string): Promise<ProjectCatalog>;
 }
 export type PowerDshMethod = keyof PowerDshMethods;
 

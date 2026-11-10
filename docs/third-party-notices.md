@@ -34,6 +34,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## 原生项目（Workspace）删除语义
+
+[项目管理](../src/features/projects/spec.md)的移除操作只调用原生 `workspaceController.delete({ workspaceId })`，沿用 DSH `0.2.2-rc.1` 安装包 `@deepseek-ai/dsh-api-workspace-controller` 与官方提交 `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` 的 `packages/workspace/workspace`、`packages/client/ui-workspace` 已核对的语义：删除一条项目登记，保留目录与全部会话日志，会话回到「未分组」。确认框文案对照原生「删除工作区」的保留说明改写为本功能措辞，行内与确认按钮沿用上文原生危险按钮规格；没有复制其页面结构、组件或代码。
+
+- [原生 Workspace 控制器](https://github.com/deepseek-ai/deepseek-harness/tree/master/packages/api/workspace-controller/src)
+- [原生 Workspace 注册表](https://github.com/deepseek-ai/deepseek-harness/tree/master/packages/workspace/workspace/src)
+- 对照发行包：`@deepseek-ai/dsh-api-workspace-controller@0.2.2-rc.1`、`@deepseek-ai/dsh-workspace@0.2.2-rc.1`。
+- [上游 MIT 许可证](https://github.com/deepseek-ai/deepseek-harness/blob/master/LICENSE)，全文见本文第一节。
+
 ## 原生模型设置按钮规格
 
 [归档管理](../src/features/archive/spec.md)的行内「取消归档」「删除」按钮和删除确认框的危险按钮按用户提供的原生参照，对齐 DSH `0.2.2-rc.1` 安装包 `@deepseek-ai/dsh-client-ui-settings-models` 的 `ModelsSection.module.css` 中 `.rowActions .secondaryButton`、`.rowActions .dangerButton` 与 `.deleteConfirm` 的几何、描边、颜色和 hover token。仅在本插件自有 `power-dsh-archive-*` 类内复现数值，不导入其模块、不引用生成的 CSS 类名，也不复制页面结构或文案。
@@ -104,7 +113,7 @@ Mod 使用已核对的 DSH `0.2.2-rc.1` 原生会话、交互及 subprocess 通�
 
 本功能的信号格、循环序列与点击提交均为独立实现；接口依据为 DSH `0.2.2-rc.1` 安装包只读源码，未执行参考仓库脚本或安装其依赖、插件。行为边界见[推理等级选择器](../src/features/thinking-effort/spec.md)。
 
-## 背景设置参考
+## 自定义背景参考
 
 本轮按用户要求结合下列三个实现的职责划分：`dsh-ui-appearance@0.1.28`（提交 `fe6d9b930b9554e99b7fcdd44c8628afc2e1191a`）的媒体淡化／模糊与界面玻璃分离；`dsh-homepage-glass@1.3.1`（提交 `a9bb39e7a9ceb1a83b1467312076f786d6e30fa0`）的动效节流、减少动效和 GPU 回收；`dsh-mpkg-wallpaper`（提交 `ab8d50db9b4a29916be7ba8b45aed452ee80d538`）的零值语义、表面／媒体归属与避免滤镜影响 fixed 弹层定位。PowerDSH 使用「背景不透明度」「背景模糊」描述已有功能，保留官方组件样式、Host 图片存储、自有图层范围和旧配置；仅作源码研究，未复制第三方样式、着色器或渲染器，也未安装或执行这些插件。各来源链接、许可与边界见下文。
 
@@ -112,9 +121,9 @@ Mod 使用已核对的 DSH `0.2.2-rc.1` 原生会话、交互及 subprocess 通�
 
 调节面板的尺寸与排版适配自官方提交 `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` 的 [Modal.module.css](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/client/ui-primitives/src/Modal.module.css)，独立背景材质层参考同提交的 [MenuSurface.module.css](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/client/ui-primitives/src/MenuSurface.module.css)。Copyright (c) 2026 DeepSeek，适用本文开头完整保留的 MIT 许可证。使用本功能自有类名与更低底色不透明度，不运行时导入内部样式模块；关闭、更换与移除操作复用公开 `Button`。
 
-[背景设置](../src/features/flowing-background/spec.md)参考 [DeepSeek 首页](https://www.deepseek.com/)及市场中的 [Tim5613/dsh-homepage-glass](https://github.com/Tim5613/dsh-homepage-glass/tree/a9bb39e7a9ceb1a83b1467312076f786d6e30fa0)，确切提交 `a9bb39e7a9ceb1a83b1467312076f786d6e30fa0`、包版本 `1.3.1`。阅读其 README、LICENSE 与 `lib/client.js` 中的 FLOW_PARAMS、颜色混合、时间归一化和遮罩；核对蓝白三色、softness 100 的两级宽范围混色、八次旋涡、坐标缩放与慢速流动。该插件背景本身没有 CSS blur，其 `backdrop-filter:blur(14px)` 属于输入卡，未搬入 PowerDSH。官网当前使用有界周期相位，参数也已对照。PowerDSH 独立编写值噪声、旋涡、颜色合成及相位实现，不引入依赖或远程资源。参考插件自身声明 MIT，但同时声明官网 GLSL 为逐字提取；其外层 MIT 不作为官网源码的独立再分发许可，因此没有复制该 shader、皮肤全局 CSS 或宿主 DOM 接入代码。底部采用官网归零遮罩，没有采用参考插件保留 30% 蓝色的改版。WebGL 不可用或上下文丢失时显示自有 CSS 渐变。
+[自定义背景](../src/features/flowing-background/spec.md)参考 [DeepSeek 首页](https://www.deepseek.com/)及市场中的 [Tim5613/dsh-homepage-glass](https://github.com/Tim5613/dsh-homepage-glass/tree/a9bb39e7a9ceb1a83b1467312076f786d6e30fa0)，确切提交 `a9bb39e7a9ceb1a83b1467312076f786d6e30fa0`、包版本 `1.3.1`。阅读其 README、LICENSE 与 `lib/client.js` 中的 FLOW_PARAMS、颜色混合、时间归一化和遮罩；核对蓝白三色、softness 100 的两级宽范围混色、八次旋涡、坐标缩放与慢速流动。该插件背景本身没有 CSS blur，其 `backdrop-filter:blur(14px)` 属于输入卡，未搬入 PowerDSH。官网当前使用有界周期相位，参数也已对照。PowerDSH 独立编写值噪声、旋涡、颜色合成及相位实现，不引入依赖或远程资源。参考插件自身声明 MIT，但同时声明官网 GLSL 为逐字提取；其外层 MIT 不作为官网源码的独立再分发许可，因此没有复制该 shader、皮肤全局 CSS 或宿主 DOM 接入代码。底部采用官网归零遮罩，没有采用参考插件保留 30% 蓝色的改版。WebGL 不可用或上下文丢失时显示自有 CSS 渐变。
 
-全局底层接入另外参考该提交中 `lib/client.js` 的挂载、负层级与结构背景透出思路（416–493 行的布局说明与 `.dhps_flow`，642 行的 `host.appendChild(canvas)`）。参考插件直接处理整页框架/内容列透明度、主题 token 与输入卡片；PowerDSH 没有复制其全局 CSS、卡片样式或宿主 DOM 接入代码。用户已授权独立编写范围受控的 AppFrame 底层适配。初版采用 npm `0.2.2-rc.1` 包中的类名，但直接读取已安装桌面包发现同版 `@deepseek-ai/dsh-client-ui-layout` 的样式及类映射（第 74、83–93 行）使用 `PIRFFq_frame`、`PIRFFq_sidebarCol`、`PIRFFq_centerCol`，`@deepseek-ai/dsh-client-ui-sidebar` 第 116–125 行使用 `kB3qhq_root`，与 npm 包的 `pI_x6G_*`、`hHd-Xa_root` 不同；构建差异导致固定选择器无法命中。当前必需框架映射只读自已加载的两个精确官方 `style[data-plugin-css]` 标签 `@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css`、`@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css`，要求标签及所需简单后缀类名唯一，再核对语义直接子元素和定位布局；不复制、重新注入这些官方样式，也不扫描任意样式表。只对主 Spec 列明的结构表面设置内联透明背景，不将全局主题 token 或任意后代改为透明；输入卡片、编辑器、文件卡片、菜单和弹窗保留原生表面。同一框架的映射或目标表面替换只刷新适配，框架替换或关闭时按原值、优先级与所有权恢复。授权范围、窄窗口抽屉保护、延迟样式恢复、失败保护和验收限制见[背景设置 Spec](../src/features/flowing-background/spec.md)。本次未适配操作系统原生标题栏，也未强制清空其他面板的独立不透明内容表面；浏览器未连接，本次映射修复后的全局实屏效果尚未验收。
+全局底层接入另外参考该提交中 `lib/client.js` 的挂载、负层级与结构背景透出思路（416–493 行的布局说明与 `.dhps_flow`，642 行的 `host.appendChild(canvas)`）。参考插件直接处理整页框架/内容列透明度、主题 token 与输入卡片；PowerDSH 没有复制其全局 CSS、卡片样式或宿主 DOM 接入代码。用户已授权独立编写范围受控的 AppFrame 底层适配。初版采用 npm `0.2.2-rc.1` 包中的类名，但直接读取已安装桌面包发现同版 `@deepseek-ai/dsh-client-ui-layout` 的样式及类映射（第 74、83–93 行）使用 `PIRFFq_frame`、`PIRFFq_sidebarCol`、`PIRFFq_centerCol`，`@deepseek-ai/dsh-client-ui-sidebar` 第 116–125 行使用 `kB3qhq_root`，与 npm 包的 `pI_x6G_*`、`hHd-Xa_root` 不同；构建差异导致固定选择器无法命中。当前必需框架映射只读自已加载的两个精确官方 `style[data-plugin-css]` 标签 `@deepseek-ai/dsh-client-ui-layout/AppFrame.module.css`、`@deepseek-ai/dsh-client-ui-sidebar/SidebarRoot.module.css`，要求标签及所需简单后缀类名唯一，再核对语义直接子元素和定位布局；不复制、重新注入这些官方样式，也不扫描任意样式表。只对主 Spec 列明的结构表面设置内联透明背景，不将全局主题 token 或任意后代改为透明；输入卡片、编辑器、文件卡片、菜单和弹窗保留原生表面。同一框架的映射或目标表面替换只刷新适配，框架替换或关闭时按原值、优先级与所有权恢复。授权范围、窄窗口抽屉保护、延迟样式恢复、失败保护和验收限制见[自定义背景 Spec](../src/features/flowing-background/spec.md)。本次未适配操作系统原生标题栏，也未强制清空其他面板的独立不透明内容表面；浏览器未连接，本次映射修复后的全局实屏效果尚未验收。
 
 用户反馈底部 `_fade` 阴影后，另直接只读核对已安装 `0.2.2-rc.1` 官方工作区 Client 的 `WorkspaceBrowser.module.css` 标签、类名映射及分组/平铺/搜索结果渲染结构：原生底部 span.fade 为 24px 渐变，macOS 隐藏。PowerDSH 未复制或重新注入官方样式，仅增加精确模块元数据的可选读取和受控目标的 display 隐藏/恢复；动态哈希和授权范围见功能 Spec。
 
@@ -126,15 +135,24 @@ Mod 使用已核对的 DSH `0.2.2-rc.1` 原生会话、交互及 subprocess 通�
 
 [归档管理](../src/features/archive/spec.md)开发前从 [dsh-market](https://dshmarket.com/browse/) 检索并浅克隆 [MichengAI/dsh-archive-manager](https://github.com/MichengAI/dsh-archive-manager/tree/c2146d58cfb23066a2df26221bf78de4b4b0cc78)，提交 `c2146d58cfb23066a2df26221bf78de4b4b0cc78`，Apache-2.0。参考「按工作区分组 + 搜索 + 排序/项目筛选 + 取消归档 + 二次确认删除」的信息结构。其删除依赖私有 `locate()` 及内部记账/投影清理，本项目没有复制其代码或样式，改用公开 `sessionPersistence.stat().location.path` 定位转录产物并由 Host 文件系统删除，未采用其自动归档与保留时长。PowerDSH 的归档读取由 Host 侧 `workspaceController.follow` 基线配合 `sessionQuery.readTitleSnapshots` 完成，恢复走原生 `unarchiveSession`。
 
+## 使用统计页面参考
+
+[使用统计](../src/features/usage-stats/spec.md)按用户要求参考本机 NCode（`~/code/ZCode`，Apache-2.0）的「使用统计」页面，同步提交 `a9fe401eede6e6e5e01be9048679c206fe6f02d9`，阅读 `packages/ui/src/settings/usage-stats/` 下的摘要条、热力图与趋势/占比图表组件。只借鉴信息层级与交互：顶部五项摘要、52 周活动热力图（每日/每周/累计）、范围切换、按模型的每日趋势与模型占比列表。本项目没有复制其代码、Tailwind 类、Recharts 图表、ZCode 专属配色变量或 agent 数据库协议；数据改为读取 DSH 公开 `sessionPersistence` 日志并自行折叠，图表用内联 SVG `polyline` 与自有 CSS 绘制，颜色取宿主主题 token，无新增依赖。
+
+- [NCode 仓库](https://github.com/mewcoder/NCode)，同步提交 `a9fe401eede6e6e5e01be9048679c206fe6f02d9`。
+- [Apache License 2.0](https://github.com/mewcoder/NCode/blob/main/LICENSE)。
+
 ## Lucide Puzzle、Sparkles 与 Cable
 
-[Mod 图标](../assets/icon.svg)与 Mod 设置导航使用 Lucide Puzzle；[技能与 MCP 设置导航](../src/client.ts)分别使用 Lucide Sparkles 和 Cable；[归档设置导航](../src/features/archive/client.ts)使用 Lucide Archive 与 Folder。仅内联所需 SVG，不引入 Lucide 运行时依赖。图形使用约定见 [UI 规范](ui.md#logo-与图标)，独立 SVG 中也保留完整许可。
+[Mod 图标](../assets/icon.svg)与 Mod 设置导航使用 Lucide Puzzle；[技能与 MCP 设置导航](../src/client.ts)分别使用 Lucide Sparkles 和 Cable；[归档设置导航](../src/features/archive/client.ts)使用 Lucide Archive 与 Folder；[使用统计设置导航](../src/features/usage-stats/client.ts)使用 Lucide ChartColumn；[项目管理设置导航与行图标](../src/features/projects/client.ts)使用 Lucide FolderKanban 与 Folder。仅内联所需 SVG，不引入 Lucide 运行时依赖。图形使用约定见 [UI 规范](ui.md#logo-与图标)，独立 SVG 中也保留完整许可。
 
 - [Puzzle 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/puzzle.svg)
 - [Sparkles 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/sparkles.svg)
 - [Cable 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/cable.svg)
 - [Archive 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/archive.svg)
 - [Folder 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/folder.svg)
+- [FolderKanban 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/folder-kanban.svg)
+- [ChartColumn 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/chart-column.svg)
 - [上游许可证](https://raw.githubusercontent.com/lucide-icons/lucide/main/LICENSE)
 - 获取日期：2026-11-07。
 

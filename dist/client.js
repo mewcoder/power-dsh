@@ -28,7 +28,7 @@
 	}
 
 // src/shared/client/error-feedback.ts
-	const styles$12 = `
+	const styles$14 = `
 .power-dsh-feedback { min-width:0; color:var(--dsw-alias-state-error-primary); font:inherit; font-size:12px; line-height:18px; overflow-wrap:anywhere; }
 .power-dsh-feedback[data-placement="page"] { margin:12px 0 0; padding:12px 14px; border:.5px solid var(--dsw-alias-settings-card-stroke); border-radius:var(--dsw-radius-lg); background:var(--dsw-alias-settings-card-fill); font-size:13px; line-height:20px; }
 .power-dsh-feedback[data-placement="inline"] { margin:4px 0 0; }
@@ -154,7 +154,7 @@
 				"data-placement": placement,
 				"data-tone": "error",
 				style
-			}, message, h("style", null, styles$12), h("div", {
+			}, message, h("style", null, styles$14), h("div", {
 				className: "power-dsh-error-actions",
 				"data-has-retry": Boolean(retry)
 			}, h(ErrorDetails, {
@@ -275,7 +275,7 @@
 	}
 
 // src/shared/client/shell-styles.ts
-	const styles$11 = `
+	const styles$13 = `
 .power-dsh-page { min-width:0; width:100%; color:var(--dsw-alias-label-primary); font:inherit; line-height:22px; overflow-wrap:anywhere; }
 .power-dsh-page > header { display:flex; flex-direction:column; gap:12px; }
 .power-dsh-page .power-dsh-title { margin:0; color:var(--dsw-alias-label-primary); font-size:16px; font-weight:500; line-height:24px; }
@@ -431,7 +431,7 @@
 			return h("section", {
 				className: "power-dsh-page",
 				"aria-label": t("title")
-			}, h("style", null, styles$11 + features.map((feature) => feature.styles || "").join("")), h("header", null, h("h2", { className: "power-dsh-title" }, t("title")), h("p", { className: "power-dsh-description" }, t("description"))), notice && (noticeError ? errorFeedback({
+			}, h("style", null, styles$13 + features.map((feature) => feature.styles || "").join("")), h("header", null, h("h2", { className: "power-dsh-title" }, t("title")), h("p", { className: "power-dsh-description" }, t("description"))), notice && (noticeError ? errorFeedback({
 				t,
 				message: notice,
 				code: "PD-SETTINGS-LOAD",
@@ -470,7 +470,7 @@
 	}
 
 // src/shared/client/sidebar-styles.ts
-	const styles$10 = `
+	const styles$12 = `
 .power-dsh-header-seat { display:block; width:100%; height:0; }
 .power-dsh-header-seat .power-dsh-header-menu { position:fixed; top:12px; z-index:5; width:28px; height:28px; pointer-events:auto; -webkit-app-region:no-drag; }
 html[data-platform="darwin"] .power-dsh-header-seat .power-dsh-header-menu { top:11px; }
@@ -556,7 +556,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			return h("span", {
 				className: "power-dsh-header-seat",
 				ref: seat
-			}, h("style", null, styles$10), h("span", {
+			}, h("style", null, styles$12), h("span", {
 				className: "power-dsh-header-menu",
 				style: position === null ? { visibility: "hidden" } : { left: position }
 			}, h(Menu, {
@@ -602,7 +602,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/account-blocking/client.ts
-	function createClientFeature$17(runtime, env) {
+	function createClientFeature$19(runtime, env) {
 		const { ctx } = env;
 		const setAccountBlocked = async (blocked) => {
 			const result = await ctx.remote.powerDsh.setAccountBlocked(blocked);
@@ -620,7 +620,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/account-blocking/definition.ts
-	const definition$17 = Object.freeze({
+	const definition$19 = Object.freeze({
 		id: "account-blocking",
 		category: "simplify",
 		order: 8,
@@ -629,7 +629,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/account-blocking/locales.ts
-	const locales$18 = {
+	const locales$20 = {
 		"en": {
 			"blockOfficialAccount": "Disable official sign-in and model integrations",
 			"blockAccountDescription": "Disable official sign-in, account UI, and built-in model integrations."
@@ -704,10 +704,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 
 // src/features/account-blocking/rpc.ts
 	const ACCOUNT_RPC = policyRpc("setAccountBlocked", "AccountPolicyResult");
-	const rpc$12 = [ACCOUNT_RPC];
+	const rpc$14 = [ACCOUNT_RPC];
 
 // src/features/appearance-shortcut/styles.ts
-	const styles$9 = `
+	const styles$11 = `
 .power-dsh-appearance-seat { display:block; width:100%; height:0; }
 .power-dsh-appearance-seat .power-dsh-appearance-button { position:fixed; bottom:16px; z-index:5; display:flex; align-items:center; justify-content:center; box-sizing:border-box; width:32px; height:32px; padding:0; border:0; border-radius:var(--dsw-radius-md); background:transparent; color:var(--dsw-alias-label-primary); font:inherit; cursor:pointer; pointer-events:auto; -webkit-app-region:no-drag; }
 .power-dsh-appearance-seat .power-dsh-appearance-button:hover { background-color:var(--dsw-alias-interactive-bg-hover); }
@@ -717,7 +717,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 `;
 
 // src/features/appearance-shortcut/client.ts
-	function createClientFeature$16(runtime, env) {
+	function createClientFeature$18(runtime, env) {
 		const { React, h, observable, useSnapshot, NativeIcon, errorFeedback } = runtime;
 		const { ctx, source, t } = env;
 		const themeChoices = [
@@ -769,7 +769,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			return h("span", {
 				className: "power-dsh-appearance-seat",
 				ref: seat
-			}, h("style", null, styles$9), h("button", {
+			}, h("style", null, styles$11), h("button", {
 				type: "button",
 				className: "power-dsh-appearance-button",
 				title: error || title,
@@ -902,7 +902,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/appearance-shortcut/definition.ts
-	const definition$16 = Object.freeze({
+	const definition$18 = Object.freeze({
 		id: "appearance-shortcut",
 		category: "interface",
 		order: 4,
@@ -911,7 +911,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/appearance-shortcut/locales.ts
-	const locales$17 = {
+	const locales$19 = {
 		"en": {
 			"showThemeSwitcher": "Appearance shortcut",
 			"themeSwitcherDescription": "Quickly switch appearance at the bottom of the sidebar",
@@ -936,7 +936,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	function isGestureNode(node) {
 		return typeof node === "object" && node !== null && "getAttribute" in node && typeof node.getAttribute === "function";
 	}
-	function createClientFeature$15(runtime, env) {
+	function createClientFeature$17(runtime, env) {
 		const { ctx, form, savePreference } = env;
 		function bindDoubleClickRenameBlocker(form) {
 			let listening = false;
@@ -991,7 +991,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/double-click-rename/definition.ts
-	const definition$15 = Object.freeze({
+	const definition$17 = Object.freeze({
 		id: "double-click-rename",
 		category: "other",
 		order: 3,
@@ -1000,7 +1000,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/double-click-rename/locales.ts
-	const locales$16 = {
+	const locales$18 = {
 		"en": {
 			"blockDoubleClickRename": "Block double-click renaming",
 			"blockDoubleClickRenameDescription": "Disable double-click renaming of session titles in the sidebar"
@@ -1012,7 +1012,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	};
 
 // src/shared/client/catalog-styles.ts
-	const styles$8 = `
+	const styles$10 = `
 /* Reserve the host scroll gutter only for the options column containing this page. */
 [data-shortcut-modal="settings"] > div:has(:is(.power-dsh-skills-page,.power-dsh-mcp-page)) { scrollbar-gutter:stable; }
 /* Adapted from DSH PluginInventorySettingsTab (MIT); see docs/third-party-notices.md. */
@@ -1097,7 +1097,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/mcp/styles.ts
-	const styles$7 = `
+	const styles$9 = `
 .power-dsh-mcp-page .power-dsh-skill-cards { align-items:start; }
 .power-dsh-mcp-page .power-dsh-skill-card-content[data-expandable="true"] { cursor:pointer; }
 .power-dsh-mcp-page .power-dsh-mcp-runtime { display:inline-flex; flex:none; align-items:center; gap:6px; min-height:18px; white-space:nowrap; color:var(--dsw-alias-label-secondary); font-size:12px; line-height:18px; }
@@ -1135,10 +1135,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		disabled: "idle",
 		unknown: "idle"
 	};
-	function createClientFeature$14(runtime, env) {
+	function createClientFeature$16(runtime, env) {
 		const { React, h, Tooltip, StateDot, observable, useSnapshot, useMounted, errorFeedback } = runtime;
 		const { ctx, form, source, t, savePreference, preferenceSlot, namespace } = env;
-		const styles = styles$11 + styles$8 + styles$7;
+		const styles = styles$13 + styles$10 + styles$9;
 		const { SkillSearchIcon, SkillChevron } = createCatalogUI(runtime);
 		function McpIcon({ size = 16 }) {
 			return h("svg", {
@@ -1537,7 +1537,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/mcp/definition.ts
-	const definition$14 = Object.freeze({
+	const definition$16 = Object.freeze({
 		id: "mcp",
 		category: "enhance",
 		order: 8,
@@ -1546,7 +1546,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/mcp/locales.ts
-	const locales$15 = {
+	const locales$17 = {
 		"en": {
 			"mcpManagerEnabled": "MCP management",
 			"mcpManagerDescription": "Manage MCP in settings",
@@ -1729,10 +1729,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 	const LIST_MCP_SERVERS_RPC = mcpRpc("listMcpServers", []);
 	const SET_MCP_SERVER_ENABLED_RPC = mcpRpc("setMcpServerEnabled", ["id", "enabled"]);
-	const rpc$11 = [LIST_MCP_SERVERS_RPC, SET_MCP_SERVER_ENABLED_RPC];
+	const rpc$13 = [LIST_MCP_SERVERS_RPC, SET_MCP_SERVER_ENABLED_RPC];
 
 // src/features/notifications/styles.ts
-	const styles$6 = `
+	const styles$8 = `
 .power-dsh-page .power-dsh-sound-controls { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; flex:none; max-width:50%; }
 .power-dsh-page .power-dsh-sound-select { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; gap:12px; min-height:36px; max-width:100%; padding:0 14px; border:0; border-radius:var(--dsw-radius-md); background:var(--dsw-alias-bg-module-platform); color:var(--dsw-alias-label-primary); font:inherit; font-size:14px; line-height:22px; cursor:pointer; }
 .power-dsh-page .power-dsh-sound-preview { display:inline-flex; align-items:center; justify-content:center; flex:none; width:36px; height:36px; padding:0; border:0; border-radius:var(--dsw-radius-md); background:transparent; color:var(--dsw-alias-label-secondary); cursor:pointer; }
@@ -1745,10 +1745,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 `;
 
 // src/features/notifications/client.ts
-	function createClientFeature$13(runtime, env) {
+	function createClientFeature$15(runtime, env) {
 		const { React, h, Menu, observable, useSnapshot, errorFeedback } = runtime;
 		const { ctx, form, source, t, savePreference } = env;
-		const styles = styles$6;
+		const styles = styles$8;
 		let active = true;
 		ctx.effect(() => () => {
 			active = false;
@@ -2221,7 +2221,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/notifications/definition.ts
-	const definition$13 = Object.freeze({
+	const definition$15 = Object.freeze({
 		id: "notifications",
 		category: "general",
 		order: 0,
@@ -2234,7 +2234,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/notifications/locales.ts
-	const locales$14 = {
+	const locales$16 = {
 		"en": {
 			"notificationsEnabled": "Task notifications",
 			"notificationsDescription": "Send desktop notifications when tasks finish, fail, or need confirmation.",
@@ -2349,10 +2349,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			} })
 		}
 	};
-	const rpc$10 = [LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC];
+	const rpc$12 = [LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC];
 
 // src/features/personalization/styles.ts
-	const styles$5 = `
+	const styles$7 = `
 .power-dsh-page .power-dsh-prompt-editor { display:flex; flex-direction:column; gap:8px; padding:16px 0; }
 .power-dsh-page .power-dsh-prompt-input { box-sizing:border-box; display:block; width:100%; max-width:100%; min-height:260px; margin:0; padding:12px 14px; resize:vertical; border:.5px solid var(--dsw-alias-border-l4); border-radius:var(--dsw-radius-lg); background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-primary); font:inherit; font-size:14px; line-height:22px; transition:border-color 120ms ease,box-shadow 120ms ease; }
 .power-dsh-page .power-dsh-prompt-input::placeholder { color:var(--dsw-alias-label-caption); }
@@ -2362,10 +2362,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 `;
 
 // src/features/personalization/client.ts
-	function createClientFeature$12(runtime, env) {
+	function createClientFeature$14(runtime, env) {
 		const { React, h, observable, useSnapshot, useMounted, errorFeedback } = runtime;
 		const { ctx, source, t, savePreference, preferenceSlot, namespace } = env;
-		const styles = styles$11 + styles$5;
+		const styles = styles$13 + styles$7;
 		function PersonalizationIcon({ size = 16 }) {
 			return h("svg", {
 				width: size,
@@ -2560,7 +2560,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/personalization/definition.ts
-	const definition$12 = Object.freeze({
+	const definition$14 = Object.freeze({
 		id: "personalization",
 		category: "enhance",
 		order: 9,
@@ -2569,7 +2569,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/personalization/locales.ts
-	const locales$13 = {
+	const locales$15 = {
 		"en": {
 			"personalizationTab": "Global instructions",
 			"personalizationEnabled": "Global instructions",
@@ -2623,10 +2623,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 	const READ_PERSONALIZATION_RPC = fileRpc("readPersonalization", []);
 	const SAVE_PERSONALIZATION_RPC = fileRpc("savePersonalization", ["text", "revision"]);
-	const rpc$9 = [READ_PERSONALIZATION_RPC, SAVE_PERSONALIZATION_RPC];
+	const rpc$11 = [READ_PERSONALIZATION_RPC, SAVE_PERSONALIZATION_RPC];
 
 // src/features/refresh-button/client.ts
-	function createClientFeature$11(runtime, env) {
+	function createClientFeature$13(runtime, env) {
 		const { React, useSnapshot } = runtime;
 		const { source, t } = env;
 		function useHeaderAction({ wide, latestWide, mounted }) {
@@ -2663,7 +2663,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/refresh-button/definition.ts
-	const definition$11 = Object.freeze({
+	const definition$13 = Object.freeze({
 		id: "refresh-button",
 		category: "other",
 		order: 1,
@@ -2672,7 +2672,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/refresh-button/locales.ts
-	const locales$12 = {
+	const locales$14 = {
 		"en": {
 			"showRefreshButton": "Show refresh button",
 			"refreshDescription": "Reload the current interface",
@@ -2688,7 +2688,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	};
 
 // src/features/restart-button/client.ts
-	function createClientFeature$10(runtime, env) {
+	function createClientFeature$12(runtime, env) {
 		const { React, h, Modal, Button, observable, useSnapshot } = runtime;
 		const { ctx, form, source, t } = env;
 		function isMacDesktop() {
@@ -2831,7 +2831,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/restart-button/definition.ts
-	const definition$10 = Object.freeze({
+	const definition$12 = Object.freeze({
 		id: "restart-button",
 		category: "other",
 		order: 2,
@@ -2840,7 +2840,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/restart-button/locales.ts
-	const locales$11 = {
+	const locales$13 = {
 		"en": {
 			"showRestartButton": "Show restart button",
 			"restartDescription": "Restart the application",
@@ -2900,10 +2900,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			} })
 		}
 	};
-	const rpc$8 = [RESTART_STATUS_RPC, RESTART_APP_RPC];
+	const rpc$10 = [RESTART_STATUS_RPC, RESTART_APP_RPC];
 
 // src/features/search-blocking/client.ts
-	function createClientFeature$9(runtime, env) {
+	function createClientFeature$11(runtime, env) {
 		const { ctx } = env;
 		const setSearchBlocked = async (blocked) => {
 			const result = await ctx.remote.powerDsh.setSearchBlocked(blocked);
@@ -2921,7 +2921,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/search-blocking/definition.ts
-	const definition$9 = Object.freeze({
+	const definition$11 = Object.freeze({
 		id: "search-blocking",
 		category: "simplify",
 		order: 9,
@@ -2930,7 +2930,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/search-blocking/locales.ts
-	const locales$10 = {
+	const locales$12 = {
 		"en": {
 			"blockOfficialSearch": "Disable official search",
 			"blockSearchDescription": "Disable built-in WebSearch while keeping WebFetch."
@@ -2943,10 +2943,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 
 // src/features/search-blocking/rpc.ts
 	const SEARCH_RPC = policyRpc("setSearchBlocked", "SearchPolicyResult");
-	const rpc$7 = [SEARCH_RPC];
+	const rpc$9 = [SEARCH_RPC];
 
 // src/features/skills/styles.ts
-	const styles$4 = `
+	const styles$6 = `
 .power-dsh-page .power-dsh-skill-navigation { display:flex; align-items:flex-end; flex-wrap:wrap; gap:12px; margin-top:14px; border-bottom:.5px solid var(--dsw-alias-border-l2); }
 .power-dsh-page .power-dsh-skill-navigation > .power-dsh-tabs { margin-top:0; border-bottom:0; }
 .power-dsh-skills-page .power-dsh-tab:focus-visible { color:var(--dsw-alias-label-primary); }
@@ -2965,10 +2965,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 `;
 
 // src/features/skills/client.ts
-	function createClientFeature$8(runtime, env) {
+	function createClientFeature$10(runtime, env) {
 		const { React, h, Menu, Tooltip, observable, useSnapshot, useMounted, errorFeedback } = runtime;
 		const { ctx, form, source, t, savePreference, preferenceSlot, namespace } = env;
-		const styles = styles$11 + styles$8 + styles$4;
+		const styles = styles$13 + styles$10 + styles$6;
 		const { SkillSearchIcon, SkillChevron } = createCatalogUI(runtime);
 		function SkillsIcon({ size = 16 }) {
 			return h("svg", {
@@ -3399,7 +3399,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/skills/definition.ts
-	const definition$8 = Object.freeze({
+	const definition$10 = Object.freeze({
 		id: "skills",
 		category: "enhance",
 		order: 7,
@@ -3408,7 +3408,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/skills/locales.ts
-	const locales$9 = {
+	const locales$11 = {
 		"en": {
 			"skillManagerEnabled": "Skill management",
 			"skillManagerDescription": "Manage skills in settings",
@@ -3541,10 +3541,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		"name",
 		"enabled"
 	]);
-	const rpc$6 = [LIST_SKILLS_RPC, SET_SKILL_ENABLED_RPC];
+	const rpc$8 = [LIST_SKILLS_RPC, SET_SKILL_ENABLED_RPC];
 
 // src/features/telemetry-blocking/client.ts
-	function createClientFeature$7(runtime, env) {
+	function createClientFeature$9(runtime, env) {
 		const { ctx } = env;
 		const setTelemetryBlocked = async (blocked) => {
 			const result = await ctx.remote.powerDsh.setTelemetryBlocked(blocked);
@@ -3562,7 +3562,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/telemetry-blocking/definition.ts
-	const definition$7 = Object.freeze({
+	const definition$9 = Object.freeze({
 		id: "telemetry-blocking",
 		category: "simplify",
 		order: 10,
@@ -3571,7 +3571,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/telemetry-blocking/locales.ts
-	const locales$8 = {
+	const locales$10 = {
 		"en": {
 			"blockOfficialTelemetry": "Disable official feedback and telemetry",
 			"blockTelemetryDescription": "Disable usage statistics, environment data collection, Session-log uploads, and plugin inventory reporting"
@@ -3584,10 +3584,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 
 // src/features/telemetry-blocking/rpc.ts
 	const TELEMETRY_RPC = policyRpc("setTelemetryBlocked", "TelemetryPolicyResult");
-	const rpc$5 = [TELEMETRY_RPC];
+	const rpc$7 = [TELEMETRY_RPC];
 
 // src/features/todo-blocking/client.ts
-	function createClientFeature$6(runtime, env) {
+	function createClientFeature$8(runtime, env) {
 		const { ctx } = env;
 		const setTodoBlocked = async (blocked) => {
 			const result = await ctx.remote.powerDsh.setTodoBlocked(blocked);
@@ -3605,7 +3605,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/todo-blocking/definition.ts
-	const definition$6 = Object.freeze({
+	const definition$8 = Object.freeze({
 		id: "todo-blocking",
 		category: "simplify",
 		order: 11,
@@ -3614,7 +3614,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/todo-blocking/locales.ts
-	const locales$7 = {
+	const locales$9 = {
 		"en": {
 			"blockTodo": "Disable Todo tool",
 			"blockTodoDescription": "Stop generating to-do lists in new conversations"
@@ -3627,10 +3627,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 
 // src/features/todo-blocking/rpc.ts
 	const TODO_RPC = policyRpc("setTodoBlocked", "TodoPolicyResult");
-	const rpc$4 = [TODO_RPC];
+	const rpc$6 = [TODO_RPC];
 
 // src/features/plan-blocking/client.ts
-	function createClientFeature$5(runtime, env) {
+	function createClientFeature$7(runtime, env) {
 		const { ctx } = env;
 		const setPlanBlocked = async (blocked) => {
 			const result = await ctx.remote.powerDsh.setPlanBlocked(blocked);
@@ -3648,7 +3648,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/plan-blocking/definition.ts
-	const definition$5 = Object.freeze({
+	const definition$7 = Object.freeze({
 		id: "plan-blocking",
 		category: "simplify",
 		order: 11.5,
@@ -3657,7 +3657,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/plan-blocking/locales.ts
-	const locales$6 = {
+	const locales$8 = {
 		en: {
 			blockPlan: "Disable Plan mode",
 			blockPlanDescription: "Disable the built-in Plan mode for new conversations"
@@ -3670,10 +3670,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 
 // src/features/plan-blocking/rpc.ts
 	const PLAN_RPC = policyRpc("setPlanBlocked", "PlanPolicyResult");
-	const rpc$3 = [PLAN_RPC];
+	const rpc$5 = [PLAN_RPC];
 
 // src/features/goal-blocking/client.ts
-	function createClientFeature$4(runtime, env) {
+	function createClientFeature$6(runtime, env) {
 		const { ctx } = env;
 		const setGoalBlocked = async (blocked) => {
 			const result = await ctx.remote.powerDsh.setGoalBlocked(blocked);
@@ -3691,7 +3691,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/goal-blocking/definition.ts
-	const definition$4 = Object.freeze({
+	const definition$6 = Object.freeze({
 		id: "goal-blocking",
 		category: "simplify",
 		order: 11.75,
@@ -3700,7 +3700,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/goal-blocking/locales.ts
-	const locales$5 = {
+	const locales$7 = {
 		en: {
 			blockGoal: "Disable Goal mode",
 			blockGoalDescription: "Disable the built-in Goal mode for new conversations"
@@ -3713,10 +3713,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 
 // src/features/goal-blocking/rpc.ts
 	const GOAL_RPC = policyRpc("setGoalBlocked", "GoalPolicyResult");
-	const rpc$2 = [GOAL_RPC];
+	const rpc$4 = [GOAL_RPC];
 
 // src/features/version-display/styles.ts
-	const styles$3 = `
+	const styles$5 = `
 .power-dsh-version-seat { display:block; flex:1 1 100%; min-width:0; width:100%; height:0; }
 .power-dsh-version-seat .power-dsh-version-badge { position:fixed; left:207px; top:30px; z-index:5; box-sizing:border-box; margin:0; padding:0; border:0; border-radius:2px; background:transparent; color:var(--dsw-alias-label-secondary); font:inherit; font-size:12px; font-weight:400; line-height:16px; letter-spacing:0; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; pointer-events:auto; cursor:pointer; -webkit-app-region:no-drag; }
 html[data-platform="darwin"] .power-dsh-version-seat .power-dsh-version-badge { top:64px; }
@@ -3728,7 +3728,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 `;
 
 // src/features/version-display/client.ts
-	function createClientFeature$3(runtime, env) {
+	function createClientFeature$5(runtime, env) {
 		const { React, h, useSnapshot, useMounted, errorFeedback } = runtime;
 		const { source, t, version } = env;
 		function VersionBadge({ wide, t, source, version }) {
@@ -3771,7 +3771,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 			return h("span", {
 				className: "power-dsh-version-seat",
 				ref: seat
-			}, h("style", null, styles$3), h("button", {
+			}, h("style", null, styles$5), h("button", {
 				type: "button",
 				className: "power-dsh-version-badge",
 				style: { maxWidth: `${available}px` },
@@ -3803,7 +3803,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 	}
 
 // src/features/version-display/definition.ts
-	const definition$3 = Object.freeze({
+	const definition$5 = Object.freeze({
 		id: "version-display",
 		category: "interface",
 		order: 6,
@@ -3812,7 +3812,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 	});
 
 // src/features/version-display/locales.ts
-	const locales$4 = {
+	const locales$6 = {
 		"en": {
 			"showVersion": "Show version number",
 			"versionDescription": "Show the version number at the upper left. Click it to check for updates",
@@ -3943,7 +3943,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 	}
 
 // src/features/thinking-effort/styles.ts
-	const styles$2 = `
+	const styles$4 = `
 .power-dsh-effort-button { display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; width:28px; height:28px; min-width:28px; order:1; margin-left:-8px; margin-right:-8px; padding:0; border:none; border-radius:var(--dsw-radius-sm); outline:none; box-shadow:none; background:transparent; color:var(--dsw-alias-label-secondary); font:inherit; cursor:pointer; }
 .power-dsh-effort-button:focus-visible { outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
 .power-dsh-effort-button:disabled { cursor:default; }
@@ -3985,7 +3985,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 			return null;
 		}
 	}
-	function createClientFeature$2(runtime, env) {
+	function createClientFeature$4(runtime, env) {
 		const { React, h, Tooltip, Menu, observable, useSnapshot, errorFeedback } = runtime;
 		const { ctx, t, savePreference, preferenceSlot, source } = env;
 		const emptyStore = observable(() => EMPTY_SNAPSHOT$1);
@@ -4123,7 +4123,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 					});
 				}
 			}, graphic);
-			return h(React.Fragment, null, h("style", null, styles$2), h(Tooltip, {
+			return h(React.Fragment, null, h("style", null, styles$4), h(Tooltip, {
 				label: hint,
 				side: "top",
 				portal: true,
@@ -4235,7 +4235,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 	}
 
 // src/features/thinking-effort/definition.ts
-	const definition$2 = Object.freeze({
+	const definition$4 = Object.freeze({
 		id: "thinking-effort",
 		category: "interface",
 		order: 3,
@@ -4244,7 +4244,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 	});
 
 // src/features/thinking-effort/locales.ts
-	const locales$3 = {
+	const locales$5 = {
 		"en": {
 			"showThinkingEffortSwitcher": "Quick reasoning level switch",
 			"thinkingEffort": "Reasoning level",
@@ -4546,7 +4546,7 @@ void main() {
 	}
 
 // src/features/flowing-background/styles.ts
-	const styles$1 = `
+	const styles$3 = `
 .power-dsh-flowing-background {
   position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none !important;
   user-select: none; contain: strict;
@@ -4618,9 +4618,9 @@ void main() {
 .power-dsh-background-panel-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .power-dsh-background-panel-label { font-size: 14px; line-height: 22px; color: var(--dsw-alias-label-primary); }
 .power-dsh-background-panel-value { font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-secondary); }
-/* Same accent as the inline settings sliders; brand-primary resolves to
-   label-primary (near black) in the light theme, which read as an unstyled track. */
-.power-dsh-background-panel .power-dsh-slider { box-sizing: border-box; width: 100%; height: 20px; margin: 0; accent-color: var(--dsw-alias-state-business-primary); cursor: pointer; }
+/* Match the settings switches, which use brand-primary - the host's monochrome
+   accent. A blue slider here looked out of place beside them. */
+.power-dsh-background-panel .power-dsh-slider { box-sizing: border-box; width: 100%; height: 20px; margin: 0; accent-color: var(--dsw-alias-brand-primary); cursor: pointer; }
 /* The native range paints its own focus ring; adding an outline drew a second box. */
 .power-dsh-background-panel .power-dsh-slider:focus-visible { outline: none; }
 .power-dsh-background-panel .power-dsh-slider:disabled { opacity: .4; cursor: not-allowed; }
@@ -4635,7 +4635,7 @@ void main() {
 /* The two options sit on one line, side by side. */
 .power-dsh-background-options { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; }
 .power-dsh-background-radio { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 18px; cursor: pointer; }
-.power-dsh-background-radio input { flex: none; width: 14px; height: 14px; margin: 0; accent-color: var(--dsw-alias-state-business-primary); cursor: pointer; }
+.power-dsh-background-radio input { flex: none; width: 14px; height: 14px; margin: 0; accent-color: var(--dsw-alias-brand-primary); cursor: pointer; }
 .power-dsh-background-radio input:disabled { cursor: default; }
 .power-dsh-background-radio input:disabled + .power-dsh-background-radio-label { opacity: .5; }
 .power-dsh-background-radio input:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)); outline-offset: 2px; }
@@ -4831,7 +4831,7 @@ void main() {
 			const fades = /* @__PURE__ */ new Map();
 			const refresh = (names) => {
 				if (readAppearance) applyAppearance(layer, readAppearance());
-				const css = `${styles$1}
+				const css = `${styles$3}
 html[data-windows-titlebar] .${names.frame}:has(> .power-dsh-flowing-background)::before { background: transparent !important; }
 html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .power-dsh-flowing-background) > .${names.sidebarCol} { border-right: 0.5px solid var(--dsw-alias-border-l3) !important; }`;
 				if (sheet.textContent !== css) sheet.textContent = css;
@@ -4877,7 +4877,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			layer.setAttribute("data-kind", wallpaper ? "wallpaper" : "pattern");
 			layer.setAttribute("aria-hidden", "true");
 			const sheet = doc.createElement("style");
-			sheet.textContent = styles$1;
+			sheet.textContent = styles$3;
 			let stop = () => {};
 			let canvas = null;
 			if (wallpaper) {
@@ -5095,7 +5095,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			reader.readAsDataURL(file);
 		});
 	}
-	function createClientFeature$1(runtime, env) {
+	function createClientFeature$3(runtime, env) {
 		const { React, h, Button, Tooltip, NativeIcon, observable, useSnapshot, errorFeedback } = runtime;
 		const { ctx, t, source } = env;
 		let fault = null;
@@ -5341,7 +5341,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 						closePanel();
 					}
 				}
-			}, h("style", null, settingsStyles + panelStyles + styles$12), h("div", {
+			}, h("style", null, settingsStyles + panelStyles + styles$14), h("div", {
 				className: "power-dsh-background-panel-material",
 				"aria-hidden": true
 			}), h("div", { className: "power-dsh-background-panel-head" }, h("h2", { className: "power-dsh-background-panel-title" }, title), h(Button, {
@@ -5453,9 +5453,9 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		/**
 		* Short-sleeved tee from Tabler Icons (MIT), sized to the host icon metrics.
 		* Its glyph spans 18x17 of the 24-unit canvas, so a 22-unit viewBox renders it
-		* 13.1px wide - the host `trash-outline` glyph is 13.4px - with a 1.1 stroke
-		* landing on the host icons' 1px optical weight. Cropping tighter made the tee
-		* visibly larger than its neighbours.
+		* 13.1px wide - the host `trash-outline` glyph is 13.4px. The host draws its
+		* 16-unit icons at stroke 1, so a 22-unit viewBox needs 1 * 22/16 = 1.375 to
+		* land on the same 1px on screen; anything less reads visibly thinner.
 		*/
 		function ShirtIcon({ size = 16 }) {
 			return h("svg", {
@@ -5464,7 +5464,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				viewBox: "1 1 22 22",
 				fill: "none",
 				stroke: "currentColor",
-				strokeWidth: 1.1,
+				strokeWidth: 1.375,
 				strokeLinecap: "round",
 				strokeLinejoin: "round",
 				"aria-hidden": true,
@@ -5736,25 +5736,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 					onClick: () => {
 						if (!disabled) openPanel(leaveSettings);
 					}
-				}, h("svg", {
-					width: 16,
-					height: 16,
-					viewBox: "0 0 16 16",
-					fill: "none",
-					stroke: "currentColor",
-					strokeWidth: 1.4,
-					strokeLinecap: "round",
-					"aria-hidden": true,
-					focusable: false
-				}, h("path", { d: "M2 4h3m4 0h5M2 12h5m4 0h3" }), h("circle", {
-					cx: 7,
-					cy: 4,
-					r: 2
-				}), h("circle", {
-					cx: 9,
-					cy: 12,
-					r: 2
-				})))), h("button", {
+				}, h(ShirtIcon))), h("button", {
 					type: "button",
 					role: "switch",
 					className: "power-dsh-switch",
@@ -5796,7 +5778,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 	}
 
 // src/features/flowing-background/definition.ts
-	const definition$1 = Object.freeze({
+	const definition$3 = Object.freeze({
 		id: "flowing-background",
 		category: "interface",
 		order: 5,
@@ -5811,9 +5793,9 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 	});
 
 // src/features/flowing-background/locales.ts
-	const locales$2 = {
+	const locales$4 = {
 		en: {
-			flowingBackgroundEnabled: "Background settings",
+			flowingBackgroundEnabled: "Custom background",
 			flowingBackgroundDescription: "Choose a soft animated background for the interface",
 			flowingBackgroundOpacity: "Background opacity",
 			flowingBackgroundOpacityDescription: "0% hides the background; 100% shows it fully",
@@ -5865,7 +5847,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			flowingBackgroundRecoveryRetry: "Turn the background off and on to retry. If the problem persists, copy the error information for a bug report."
 		},
 		zh: {
-			flowingBackgroundEnabled: "背景设置",
+			flowingBackgroundEnabled: "自定义背景",
 			flowingBackgroundDescription: "为界面选择柔和的动态背景",
 			flowingBackgroundOpacity: "背景不透明度",
 			flowingBackgroundOpacityDescription: "0% 隐藏背景，100% 完全显示背景",
@@ -5966,7 +5948,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 	const READ_WALLPAPER_RPC = descriptor("readWallpaper", [], nullableWallpaperCodec);
 	const SAVE_WALLPAPER_RPC = descriptor("saveWallpaper", ["dataUrl", "name"], wallpaperCodec);
 	const CLEAR_WALLPAPER_RPC = descriptor("clearWallpaper", [], clearedCodec);
-	const rpc$1 = [
+	const rpc$3 = [
 		READ_WALLPAPER_RPC,
 		SAVE_WALLPAPER_RPC,
 		CLEAR_WALLPAPER_RPC
@@ -6026,8 +6008,11 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 	}
 
 // src/features/archive/styles.ts
-	const styles = `
+	const styles$2 = `
 .power-dsh-archive-page .power-dsh-skill-panel { gap:18px; }
+/* Description and the bulk action share one row, the action pinned right. */
+.power-dsh-archive-page .power-dsh-archive-head { display:flex; align-items:center; gap:12px; }
+.power-dsh-archive-page .power-dsh-archive-head .power-dsh-description { flex:1 1 auto; min-width:0; }
 .power-dsh-archive-page .power-dsh-archive-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
 .power-dsh-archive-page .power-dsh-archive-toolbar .power-dsh-skill-search-field { flex:1 1 220px; width:auto; }
 .power-dsh-archive-page .power-dsh-archive-select { box-sizing:border-box; display:inline-flex; align-items:center; gap:8px; height:36px; max-width:220px; border:.5px solid var(--dsw-alias-border-l4); border-radius:var(--dsw-radius-md); padding:0 10px 0 12px; background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-primary); font:inherit; font-size:13px; cursor:pointer; }
@@ -6038,7 +6023,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 .power-dsh-archive-page .power-dsh-archive-menu { min-width:0; max-width:100%; }
 .power-dsh-archive-page .power-dsh-archive-group { display:flex; flex-direction:column; gap:8px; }
 .power-dsh-archive-page .power-dsh-archive-group + .power-dsh-archive-group { border-top:.5px solid var(--dsw-alias-border-l2); padding-top:14px; }
-.power-dsh-archive-page .power-dsh-archive-group-header { display:flex; align-items:center; gap:8px; min-height:28px; }
+.power-dsh-archive-page .power-dsh-archive-group-header { display:flex; align-items:center; gap:8px; min-height:26px; }
 .power-dsh-archive-page .power-dsh-archive-group-toggle { display:flex; flex:0 1 auto; align-items:center; gap:8px; min-width:0; border:0; border-radius:var(--dsw-radius-sm); padding:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
 .power-dsh-archive-page .power-dsh-archive-group-toggle:hover { color:var(--dsw-alias-label-primary); }
 .power-dsh-archive-page .power-dsh-archive-group-toggle:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
@@ -6047,7 +6032,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 .power-dsh-archive-page .power-dsh-archive-group-folder { display:inline-flex; flex:none; color:var(--dsw-alias-label-tertiary); }
 .power-dsh-archive-page .power-dsh-archive-group-title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-primary); font-size:14px; line-height:22px; font-weight:500; }
 .power-dsh-archive-page .power-dsh-archive-count { flex:none; margin-left:auto; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
-.power-dsh-archive-page .power-dsh-archive-group-path { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
+/* Inline after the title, one step smaller so it reads as a qualifier. */
+.power-dsh-archive-page .power-dsh-archive-group-path { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-tertiary); font-size:11px; line-height:16px; }
 .power-dsh-archive-page .power-dsh-archive-rows { margin:0; padding:0; list-style:none; overflow:hidden; border:.5px solid var(--dsw-alias-settings-card-stroke); border-radius:var(--dsw-radius-xl); background:var(--dsw-alias-settings-card-fill); }
 .power-dsh-archive-page .power-dsh-archive-row { display:flex; align-items:center; gap:12px; padding:12px 14px; }
 .power-dsh-archive-page .power-dsh-archive-row + .power-dsh-archive-row { border-top:.5px solid var(--dsw-alias-border-l2); }
@@ -6064,16 +6050,20 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 }
 .power-dsh-archive-page .power-dsh-archive-action:disabled { opacity:.4; cursor:default; }
 .power-dsh-archive-page .power-dsh-archive-action:focus-visible { outline:none; box-shadow:0 0 0 2px var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); }
+/* Bulk delete reads as a danger action: error-coloured text and outline. It is
+   declared after .archive-action, whose colour rule would otherwise win. */
+.power-dsh-archive-page .power-dsh-archive-action.power-dsh-archive-delete-all { flex:none; border-color:var(--dsw-alias-state-error-primary); color:var(--dsw-alias-state-error-primary); }
+@media (hover:hover) { .power-dsh-archive-page .power-dsh-archive-action.power-dsh-archive-delete-all:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover-danger); } }
 .power-dsh-archive-confirm-delete:not(:disabled) { --dsh-button-outline-color:var(--dsw-alias-state-error-primary); color:var(--dsw-alias-state-error-primary); }
 @media (hover:hover) { .power-dsh-archive-confirm-delete:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover-danger); } }
 @media (prefers-reduced-motion:no-preference) { .power-dsh-archive-page .power-dsh-archive-group-toggle > .power-dsh-skill-chevron { transition:transform 140ms var(--ds-ease-in-out); } }
 `;
 
 // src/features/archive/client.ts
-	function createClientFeature(runtime, env) {
+	function createClientFeature$2(runtime, env) {
 		const { React, h, Menu, Modal, Button, Tooltip, observable, useSnapshot, useMounted, errorFeedback } = runtime;
 		const { ctx, t, savePreference, preferenceSlot, namespace } = env;
-		const styles$13 = styles$11 + styles$8 + styles;
+		const styles = styles$13 + styles$10 + styles$2;
 		const { SkillSearchIcon, SkillChevron } = createCatalogUI(runtime);
 		function ArchiveIcon({ size = 16 }) {
 			return h("svg", {
@@ -6177,6 +6167,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			const [restoring, setRestoring] = React.useState(null);
 			const [deleting, setDeleting] = React.useState(null);
 			const [confirming, setConfirming] = React.useState(null);
+			const [confirmingAll, setConfirmingAll] = React.useState(false);
 			const [closedGroups, setClosedGroups] = React.useState({});
 			const [error, setError] = React.useState(null);
 			const id = React.useId();
@@ -6249,6 +6240,38 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 					if (mounted.current) setDeleting(null);
 				}
 			}
+			/**
+			* Delete every session currently listed. Runs one request at a time so a
+			* failure leaves the remaining rows intact and reported instead of aborting
+			* the whole batch silently.
+			*/
+			async function confirmDeleteAll() {
+				if (pending.current) return;
+				const targets = (catalog?.sessions ?? []).map((row) => row.sessionId);
+				if (targets.length === 0) {
+					setConfirmingAll(false);
+					return;
+				}
+				pending.current = true;
+				setError(null);
+				const failures = [];
+				for (const sessionId of targets) {
+					setDeleting(sessionId);
+					try {
+						await deleteOneInBatch(sessionId);
+					} catch (failure) {
+						failures.push(`${sessionId}: ${errorMessage(failure) ?? ""}`);
+					}
+				}
+				pending.current = false;
+				if (!mounted.current) return;
+				setDeleting(null);
+				setConfirmingAll(false);
+				if (failures.length) setError({
+					id: "",
+					message: archiveErrorMessage(void 0, "archiveDeleteFailed")
+				});
+			}
 			const renderRow = (row) => {
 				const rowBusy = restoring === row.sessionId || deleting === row.sessionId;
 				const time = row.updatedAt > 0 ? new Date(row.updatedAt).toLocaleString() : "";
@@ -6318,7 +6341,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 					side: "top",
 					portal: true,
 					delayMs: 0,
-					maxWidth: 480
+					maxWidth: 520
 				}, h("span", {
 					className: "power-dsh-archive-group-path",
 					tabIndex: 0
@@ -6330,7 +6353,14 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			return h("section", {
 				className: "power-dsh-page power-dsh-skills-page power-dsh-archive-page",
 				"aria-label": t("archiveTab")
-			}, h("style", null, styles$13), h("header", null, h("h2", { className: "power-dsh-title" }, t("archiveTab")), h("p", { className: "power-dsh-description" }, t("archiveDescription"))), snapshot.status === "loading" && h("p", {
+			}, h("style", null, styles), h("header", null, h("h2", { className: "power-dsh-title" }, t("archiveTab")), h("div", { className: "power-dsh-archive-head" }, h("p", { className: "power-dsh-description" }, t("archiveDescription")), catalog && catalog.sessions.length > 0 && h("button", {
+				type: "button",
+				className: "power-dsh-archive-action power-dsh-archive-delete-all",
+				disabled: busy,
+				onClick: () => {
+					if (!busy && mounted.current) setConfirmingAll(true);
+				}
+			}, t("archiveDeleteAll")))), snapshot.status === "loading" && h("p", {
 				className: "power-dsh-notice",
 				role: "status"
 			}, t("loading")), snapshot.status === "error" && errorFeedback({
@@ -6372,27 +6402,34 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				code: "PD-ARCHIVE-ACTION",
 				operation: "archiveSession",
 				placement: "page"
-			}), confirming && h(Modal, {
+			}), (confirming !== null || confirmingAll) && h(Modal, {
 				open: true,
 				onClose: () => {
-					if (deleting === null) setConfirming(null);
+					if (deleting === null) {
+						setConfirming(null);
+						setConfirmingAll(false);
+					}
 				},
-				title: t("archiveDeleteTitle"),
+				title: t(confirmingAll ? "archiveDeleteAllTitle" : "archiveDeleteTitle"),
 				closeLabel: t("close"),
-				description: t("archiveDeleteDescription").replace("{name}", () => confirming.title || t("archiveUntitled")),
+				description: confirmingAll ? t("archiveDeleteAllDescription").replace("{count}", () => String(catalog?.sessions.length ?? 0)) : t("archiveDeleteDescription").replace("{name}", () => confirming?.title || t("archiveUntitled")),
 				footer: h(React.Fragment, null, h(Button, {
 					variant: "outline",
 					"data-modal-autofocus": true,
 					disabled: deleting !== null,
 					onClick: () => {
-						if (deleting === null) setConfirming(null);
+						if (deleting === null) {
+							setConfirming(null);
+							setConfirmingAll(false);
+						}
 					}
 				}, t("cancel")), h(Button, {
 					variant: "outline",
 					className: "power-dsh-archive-confirm-delete",
 					disabled: deleting !== null,
 					onClick: () => {
-						confirmDelete(confirming.sessionId);
+						if (confirmingAll) confirmDeleteAll();
+						else if (confirming) confirmDelete(confirming.sessionId);
 					}
 				}, t(deleting !== null ? "archiveDeleting" : "archiveDeleteConfirm")))
 			}));
@@ -6468,6 +6505,22 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			};
 			archiveSource.notify();
 		};
+		/**
+		* One request of a batch. Each call answers with the catalog after that
+		* deletion, and the batch keeps going: bumping the generation per request
+		* (as the single-row wrapper does) would invalidate its own next call.
+		*/
+		const deleteOneInBatch = async (sessionId) => {
+			const result = await ctx.remote.powerDsh.deleteArchivedSession(sessionId);
+			if (!active) return;
+			if (!result.ok) throw new Error(result.error.message);
+			archive = {
+				status: "ready",
+				value: result.value,
+				error: ""
+			};
+			archiveSource.notify();
+		};
 		preferenceSlot("archiveManagerEnabled", "settings.section", {
 			id: "power-dsh-archive",
 			order: 54,
@@ -6498,7 +6551,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 	}
 
 // src/features/archive/definition.ts
-	const definition = Object.freeze({
+	const definition$2 = Object.freeze({
 		id: "archive",
 		category: "enhance",
 		order: 10,
@@ -6507,11 +6560,11 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 	});
 
 // src/features/archive/locales.ts
-	const locales$1 = {
+	const locales$3 = {
 		"en": {
 			"archiveManagerEnabled": "Archive management",
 			"archiveManagerDescription": "Review and restore archived sessions",
-			"archiveTab": "Archive",
+			"archiveTab": "Archived",
 			"archiveDescription": "Review and restore archived sessions in DSH",
 			"archiveSearch": "Search archived sessions",
 			"archiveEmpty": "No archived sessions",
@@ -6529,6 +6582,9 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			"archiveDeleteTitle": "Delete session?",
 			"archiveDeleteDescription": "This permanently deletes session “{name}” and its transcript. This cannot be undone.",
 			"archiveDeleteConfirm": "Delete permanently",
+			"archiveDeleteAll": "Delete all",
+			"archiveDeleteAllTitle": "Delete all archived sessions?",
+			"archiveDeleteAllDescription": "This permanently deletes all {count} archived sessions and their transcripts. This cannot be undone.",
 			"archiveDeleting": "Deleting…",
 			"archiveDeleteFailed": "Could not delete this session. Please try again.",
 			"archiveDeleteLive": "This session is still running. Stop it before deleting.",
@@ -6551,7 +6607,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		"zh": {
 			"archiveManagerEnabled": "归档管理",
 			"archiveManagerDescription": "查看并恢复已归档会话",
-			"archiveTab": "归档",
+			"archiveTab": "已归档",
 			"archiveDescription": "查看并恢复 DSH 中已归档的会话",
 			"archiveSearch": "搜索已归档会话",
 			"archiveEmpty": "暂无归档会话",
@@ -6569,6 +6625,9 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			"archiveDeleteTitle": "删除会话？",
 			"archiveDeleteDescription": "将永久删除会话“{name}”及其对话记录，此操作不可恢复。",
 			"archiveDeleteConfirm": "永久删除",
+			"archiveDeleteAll": "全部删除",
+			"archiveDeleteAllTitle": "删除全部归档会话？",
+			"archiveDeleteAllDescription": "将永久删除全部 {count} 个归档会话及其对话记录，此操作不可恢复。",
 			"archiveDeleting": "正在删除…",
 			"archiveDeleteFailed": "无法删除此会话，请重试。",
 			"archiveDeleteLive": "该会话仍在运行，请先停止后再删除。",
@@ -6648,55 +6707,1286 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 	const LIST_ARCHIVED_SESSIONS_RPC = archiveRpc("listArchivedSessions", []);
 	const RESTORE_ARCHIVED_SESSION_RPC = archiveRpc("restoreArchivedSession", ["sessionId"]);
 	const DELETE_ARCHIVED_SESSION_RPC = archiveRpc("deleteArchivedSession", ["sessionId"]);
-	const rpc = [
+	const rpc$2 = [
 		LIST_ARCHIVED_SESSIONS_RPC,
 		RESTORE_ARCHIVED_SESSION_RPC,
 		DELETE_ARCHIVED_SESSION_RPC
 	];
 
+// src/features/usage-stats/styles.ts
+	const styles$1 = `
+/* Usage page mirrors the native settings density: quiet cards, no nested chrome. */
+.power-dsh-usage-page .power-dsh-usage-body { display:flex; flex-direction:column; gap:20px; margin-top:16px; }
+.power-dsh-usage-page .power-dsh-usage-summary { display:flex; flex-wrap:wrap; border:.5px solid var(--dsw-alias-settings-card-stroke); border-radius:var(--dsw-radius-xl); background:var(--dsw-alias-settings-card-fill); overflow:hidden; }
+.power-dsh-usage-page .power-dsh-usage-metric { flex:1 1 0; min-width:120px; padding:14px 16px; text-align:center; }
+.power-dsh-usage-page .power-dsh-usage-metric + .power-dsh-usage-metric { border-left:.5px solid var(--dsw-alias-border-l2); }
+.power-dsh-usage-page .power-dsh-usage-metric-value { color:var(--dsw-alias-label-primary); font-size:16px; font-weight:500; line-height:24px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.power-dsh-usage-page .power-dsh-usage-metric-label { margin-top:2px; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.power-dsh-usage-page .power-dsh-usage-card { display:flex; flex-direction:column; gap:14px; padding:14px 16px; border:.5px solid var(--dsw-alias-settings-card-stroke); border-radius:var(--dsw-radius-xl); background:var(--dsw-alias-settings-card-fill); }
+.power-dsh-usage-page .power-dsh-usage-card-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
+.power-dsh-usage-page .power-dsh-usage-card-title { margin:0; color:var(--dsw-alias-label-primary); font-size:13px; font-weight:500; line-height:20px; }
+.power-dsh-usage-page .power-dsh-usage-section-title { margin:0; color:var(--dsw-alias-label-primary); font-size:13px; font-weight:500; line-height:20px; }
+.power-dsh-usage-page .power-dsh-usage-range { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
+/* Segmented control: the selected pill is the only raised surface. */
+.power-dsh-usage-page .power-dsh-usage-tabs { display:inline-flex; align-items:center; gap:2px; padding:2px; border-radius:999px; background:var(--dsw-alias-bg-module-platform); }
+.power-dsh-usage-page .power-dsh-usage-tab { border:0; border-radius:999px; padding:2px 10px; background:transparent; color:var(--dsw-alias-label-tertiary); font:inherit; font-size:12px; line-height:18px; cursor:pointer; }
+.power-dsh-usage-page .power-dsh-usage-tab[aria-selected="true"] { background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-primary); box-shadow:0 0 0 .5px var(--dsw-alias-border-l2); }
+.power-dsh-usage-page .power-dsh-usage-tab[aria-disabled="true"] { cursor:default; opacity:.6; }
+.power-dsh-usage-page .power-dsh-usage-tab:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
+.power-dsh-usage-page .power-dsh-usage-heatmap { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.power-dsh-usage-page .power-dsh-usage-heatmap-grid { display:grid; gap:3px; min-width:0; }
+.power-dsh-usage-page .power-dsh-usage-heatmap-column { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.power-dsh-usage-page .power-dsh-usage-heatmap-cell { display:block; aspect-ratio:1; width:100%; min-width:0; border-radius:3px; corner-shape:round; background:var(--dsw-alias-bg-module-platform); }
+.power-dsh-usage-page .power-dsh-usage-heatmap-cell[data-has-usage="true"] { box-shadow:inset 0 0 0 .5px color-mix(in srgb,var(--dsw-alias-state-business-primary) 30%,transparent); }
+.power-dsh-usage-page .power-dsh-usage-heatmap-cell[data-level="1"] { background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 22%,var(--dsw-alias-bg-module-platform)); }
+.power-dsh-usage-page .power-dsh-usage-heatmap-cell[data-level="2"] { background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 42%,var(--dsw-alias-bg-module-platform)); }
+.power-dsh-usage-page .power-dsh-usage-heatmap-cell[data-level="3"] { background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 68%,var(--dsw-alias-bg-module-platform)); }
+.power-dsh-usage-page .power-dsh-usage-heatmap-cell[data-level="4"] { background:var(--dsw-alias-state-business-primary); }
+.power-dsh-usage-page .power-dsh-usage-heatmap-months { display:grid; gap:3px; min-width:0; }
+.power-dsh-usage-page .power-dsh-usage-heatmap-month { min-width:0; overflow:hidden; color:var(--dsw-alias-label-tertiary); font-size:10px; line-height:14px; white-space:nowrap; }
+.power-dsh-usage-page .power-dsh-usage-legend { display:flex; flex-wrap:wrap; align-items:center; gap:12px; min-width:0; }
+.power-dsh-usage-page .power-dsh-usage-legend-item { display:inline-flex; align-items:center; gap:6px; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.power-dsh-usage-page .power-dsh-usage-legend-dot { display:inline-block; flex:none; width:8px; height:8px; border-radius:50%; corner-shape:round; background:var(--dsw-alias-label-tertiary); }
+.power-dsh-usage-page .power-dsh-usage-legend-dot[data-model="0"], .power-dsh-usage-page .power-dsh-usage-model-bar-fill[data-model="0"], .power-dsh-usage-page .power-dsh-usage-chart-line[data-model="0"] { --power-dsh-model-color:#3b82f6; }
+.power-dsh-usage-page .power-dsh-usage-legend-dot[data-model="1"], .power-dsh-usage-page .power-dsh-usage-model-bar-fill[data-model="1"], .power-dsh-usage-page .power-dsh-usage-chart-line[data-model="1"] { --power-dsh-model-color:#8b5cf6; }
+.power-dsh-usage-page .power-dsh-usage-legend-dot[data-model="2"], .power-dsh-usage-page .power-dsh-usage-model-bar-fill[data-model="2"], .power-dsh-usage-page .power-dsh-usage-chart-line[data-model="2"] { --power-dsh-model-color:#14b8a6; }
+.power-dsh-usage-page .power-dsh-usage-legend-dot[data-model="3"], .power-dsh-usage-page .power-dsh-usage-model-bar-fill[data-model="3"], .power-dsh-usage-page .power-dsh-usage-chart-line[data-model="3"] { --power-dsh-model-color:#f59e0b; }
+.power-dsh-usage-page .power-dsh-usage-legend-dot[data-model="4"], .power-dsh-usage-page .power-dsh-usage-model-bar-fill[data-model="4"], .power-dsh-usage-page .power-dsh-usage-chart-line[data-model="4"] { --power-dsh-model-color:#ec4899; }
+.power-dsh-usage-page .power-dsh-usage-legend-dot[data-model="5"], .power-dsh-usage-page .power-dsh-usage-model-bar-fill[data-model="5"], .power-dsh-usage-page .power-dsh-usage-chart-line[data-model="5"] { --power-dsh-model-color:#64748b; }
+.power-dsh-usage-page .power-dsh-usage-legend-dot[data-model], .power-dsh-usage-page .power-dsh-usage-model-bar-fill[data-model] { background:var(--power-dsh-model-color); }
+.power-dsh-usage-page .power-dsh-usage-chart-line { stroke:var(--power-dsh-model-color); stroke-width:1.5; stroke-linejoin:round; stroke-linecap:round; }
+.power-dsh-usage-page .power-dsh-usage-chart { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.power-dsh-usage-page .power-dsh-usage-chart-svg { display:block; width:100%; height:180px; overflow:visible; }
+.power-dsh-usage-page .power-dsh-usage-chart-axis { stroke:var(--dsw-alias-border-l2); stroke-width:1; vector-effect:non-scaling-stroke; }
+.power-dsh-usage-page .power-dsh-usage-chart-axis-labels { display:flex; justify-content:space-between; gap:4px; min-width:0; }
+.power-dsh-usage-page .power-dsh-usage-chart-axis-label { min-width:0; overflow:hidden; color:var(--dsw-alias-label-tertiary); font-size:10px; line-height:14px; white-space:nowrap; }
+.power-dsh-usage-page .power-dsh-usage-models { display:flex; flex-direction:column; gap:2px; margin:0; padding:0; list-style:none; }
+.power-dsh-usage-page .power-dsh-usage-model { display:grid; grid-template-columns:8px minmax(0,1fr) minmax(60px,2fr) auto auto; align-items:center; gap:10px; padding:6px 0; }
+.power-dsh-usage-page .power-dsh-usage-model + .power-dsh-usage-model { border-top:.5px solid var(--dsw-alias-border-l2); }
+.power-dsh-usage-page .power-dsh-usage-model-name { min-width:0; overflow:hidden; color:var(--dsw-alias-label-primary); font-size:12px; line-height:18px; text-overflow:ellipsis; white-space:nowrap; }
+.power-dsh-usage-page .power-dsh-usage-model-bar { display:block; height:6px; border-radius:999px; background:var(--dsw-alias-bg-module-platform); overflow:hidden; }
+.power-dsh-usage-page .power-dsh-usage-model-bar-fill { display:block; height:100%; border-radius:999px; }
+.power-dsh-usage-page .power-dsh-usage-model-value { color:var(--dsw-alias-label-primary); font-family:var(--ds-font-family-code); font-size:12px; line-height:18px; font-variant-numeric:tabular-nums; }
+.power-dsh-usage-page .power-dsh-usage-model-requests { color:var(--dsw-alias-label-tertiary); font-size:11px; line-height:16px; white-space:nowrap; }
+.power-dsh-usage-page .power-dsh-usage-empty { margin:0; padding:24px 0; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; text-align:center; }
+.power-dsh-usage-page .power-dsh-usage-actions { display:flex; justify-content:flex-end; }
+@media (max-width:520px) {
+  .power-dsh-usage-page .power-dsh-usage-metric { flex:1 1 45%; }
+  .power-dsh-usage-page .power-dsh-usage-model { grid-template-columns:8px minmax(0,1fr) auto auto; }
+  .power-dsh-usage-page .power-dsh-usage-model-bar { display:none; }
+}
+@media (prefers-reduced-motion:no-preference) {
+  .power-dsh-usage-page .power-dsh-usage-tab { transition:background-color 120ms ease,color 120ms ease; }
+}
+`;
+
+// src/features/usage-stats/client.ts
+	const HEATMAP_WEEKS = 53;
+	const HEATMAP_DAYS = 7;
+	const DAY_MS = 864e5;
+	const MAX_TREND_MODELS = 6;
+	/** Compact token count; the unit stays implicit so the strip reads as one figure. */
+	function formatTokens(value, locale) {
+		if (!Number.isFinite(value) || value <= 0) return "0";
+		return new Intl.NumberFormat(locale, {
+			notation: value >= 1e4 ? "compact" : "standard",
+			maximumFractionDigits: value >= 1e4 ? 1 : 0
+		}).format(value);
+	}
+	/** Human duration in days, hours and minutes, largest two units. */
+	function formatDuration(ms, dayUnit, hourUnit, minuteUnit) {
+		const minutes = Math.max(0, Math.floor(ms / 6e4));
+		const days = Math.floor(minutes / 1440);
+		const hours = Math.floor(minutes % 1440 / 60);
+		const rest = minutes % 60;
+		const parts = [];
+		if (days > 0) parts.push(`${days}${dayUnit}`);
+		if (hours > 0) parts.push(`${hours}${hourUnit}`);
+		if (rest > 0 || parts.length === 0) parts.push(`${rest}${minuteUnit}`);
+		return parts.slice(0, 2).join(" ");
+	}
+	function dayIndex(date) {
+		const value = Date.parse(`${date}T00:00:00.000Z`);
+		return Number.isFinite(value) ? Math.floor(value / DAY_MS) : null;
+	}
+	function dayKey(index) {
+		return (/* @__PURE__ */ new Date(index * DAY_MS)).toISOString().slice(0, 10);
+	}
+	function levelFor(value, max) {
+		if (value <= 0 || max <= 0) return 0;
+		return Math.min(4, Math.max(1, Math.ceil(value / max * 4)));
+	}
+	/** The last `range` days, zero-filled, so both range tabs render a complete axis. */
+	function rangeDays(days, range, fallbackEnd) {
+		const count = range === "7d" ? 7 : 30;
+		const known = new Map(days.map((row) => [row.date, row]));
+		const lastIndex = dayIndex(fallbackEnd);
+		if (lastIndex === null) return days.slice(-count);
+		const result = [];
+		for (let offset = count - 1; offset >= 0; offset--) {
+			const date = dayKey(lastIndex - offset);
+			result.push(known.get(date) ?? {
+				date,
+				totalTokens: 0,
+				turnCount: 0,
+				toolCallCount: 0
+			});
+		}
+		return result;
+	}
+	/** Weekly and cumulative heatmap columns both derive from the same 53-week grid. */
+	function heatmapGrid(days) {
+		const byDate = new Map(days.map((row) => [row.date, row]));
+		const known = days.map((row) => dayIndex(row.date)).filter((value) => value !== null);
+		if (known.length === 0) return [];
+		const end = Math.max(...known);
+		const start = end - (/* @__PURE__ */ new Date(end * DAY_MS)).getUTCDay() - 364;
+		const columns = [];
+		for (let week = 0; week < HEATMAP_WEEKS; week++) {
+			const column = [];
+			for (let offset = 0; offset < HEATMAP_DAYS; offset++) {
+				const date = dayKey(start + week * HEATMAP_DAYS + offset);
+				column.push({
+					date,
+					row: byDate.get(date) ?? {
+						date,
+						totalTokens: 0,
+						turnCount: 0,
+						toolCallCount: 0
+					}
+				});
+			}
+			columns.push(column);
+		}
+		return columns;
+	}
+	/** Week labels keyed by the column that owns the month's first day. */
+	function monthLabels(columns, format) {
+		const labels = [];
+		for (const column of columns) {
+			const anchor = column.find((cell) => cell.date.endsWith("-01"))?.date ?? column[0]?.date ?? "";
+			const month = anchor.slice(0, 7);
+			const last = labels[labels.length - 1];
+			if (last && last.key === month) last.span += 1;
+			else labels.push({
+				key: month,
+				label: format(anchor),
+				span: 1
+			});
+		}
+		return labels;
+	}
+	function createClientFeature$1(runtime, env) {
+		const { React, h, Tooltip, Button, observable, useSnapshot, useMounted, errorFeedback } = runtime;
+		const { ctx, t, savePreference, preferenceSlot, namespace } = env;
+		const styles = styles$13 + styles$1;
+		function UsageIcon({ size = 16 }) {
+			return h("svg", {
+				width: size,
+				height: size,
+				viewBox: "0 0 24 24",
+				fill: "none",
+				stroke: "currentColor",
+				strokeWidth: 2,
+				strokeLinecap: "round",
+				strokeLinejoin: "round",
+				"aria-hidden": true,
+				focusable: false
+			}, h("path", { d: "M3 3v16a2 2 0 0 0 2 2h16" }), h("path", { d: "M7 16v-3" }), h("path", { d: "M12 16V8" }), h("path", { d: "M17 16v-6" }));
+		}
+		function localeTag() {
+			return typeof document !== "undefined" && document.documentElement.lang || "en";
+		}
+		function browserZone() {
+			try {
+				const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+				return typeof zone === "string" && zone ? zone : "UTC";
+			} catch {
+				return "UTC";
+			}
+		}
+		function UsagePage({ t, usageSource, loadUsageStats }) {
+			const snapshot = useSnapshot(usageSource);
+			const data = snapshot.value;
+			const [range, setRange] = React.useState("7d");
+			const [mode, setMode] = React.useState("daily");
+			const mounted = useMounted();
+			React.useEffect(() => {
+				loadUsageStats();
+				const refresh = () => {
+					loadUsageStats();
+				};
+				window.addEventListener("focus", refresh);
+				return () => window.removeEventListener("focus", refresh);
+			}, []);
+			const locale = localeTag();
+			const busy = snapshot.status === "loading";
+			const duration = (ms) => formatDuration(ms, t("usageUnitDay"), t("usageUnitHour"), t("usageUnitMinute"));
+			const formatDays = (count) => t(count === 1 ? "usageDay" : "usageDays").replace("{count}", () => String(count));
+			const summary = data?.summary;
+			const metrics = [
+				{
+					key: "usageTotalTokens",
+					value: summary ? formatTokens(summary.totalTokens, locale) : "—"
+				},
+				{
+					key: "usagePeakTokens",
+					value: summary ? formatTokens(summary.peakDayTokens, locale) : "—"
+				},
+				{
+					key: "usageLongestSession",
+					value: summary ? duration(summary.longestSessionMs) : "—"
+				},
+				{
+					key: "usageCurrentStreak",
+					value: summary ? formatDays(summary.currentStreakDays) : "—"
+				},
+				{
+					key: "usageLongestStreak",
+					value: summary ? formatDays(summary.longestStreakDays) : "—"
+				}
+			];
+			const columns = data ? heatmapGrid(data.days) : [];
+			const dailyMax = data ? Math.max(0, ...data.days.map((row) => row.totalTokens)) : 0;
+			const weeklyTotals = columns.map((column) => column.reduce((sum, cell) => sum + cell.row.totalTokens, 0));
+			const weeklyMax = Math.max(0, ...weeklyTotals);
+			const cumulative = weeklyTotals.reduce((result, value) => {
+				result.push((result[result.length - 1] ?? 0) + value);
+				return result;
+			}, []);
+			const cumulativeMax = Math.max(0, ...cumulative);
+			const heatLevel = (columnIndex, row) => {
+				if (mode === "daily") return levelFor(row.totalTokens, dailyMax);
+				return levelFor(mode === "weekly" ? weeklyTotals[columnIndex] ?? 0 : cumulative[columnIndex] ?? 0, mode === "weekly" ? weeklyMax : cumulativeMax);
+			};
+			const heatTitle = (columnIndex, row) => {
+				if (mode === "daily") return t("usageHeatmapCell").replace("{date}", () => row.date).replace("{tokens}", () => formatTokens(row.totalTokens, locale)).replace("{turns}", () => String(row.turnCount));
+				const last = columns[columnIndex]?.[6]?.date ?? row.date;
+				const value = mode === "weekly" ? weeklyTotals[columnIndex] ?? 0 : cumulative[columnIndex] ?? 0;
+				return t(mode === "weekly" ? "usageWeekCell" : "usageCumulativeCell").replace("{date}", () => last).replace("{tokens}", () => formatTokens(value, locale));
+			};
+			const formatMonth = (date) => {
+				const value = Date.parse(`${date}T00:00:00.000Z`);
+				if (!Number.isFinite(value)) return date.slice(5, 7);
+				return new Intl.DateTimeFormat(locale, {
+					timeZone: "UTC",
+					month: "short"
+				}).format(value);
+			};
+			const labels = monthLabels(columns, formatMonth);
+			const rangeRows = data ? rangeDays(data.days, range, data.lastDate) : [];
+			const topModels = (data?.models ?? []).slice(0, MAX_TREND_MODELS);
+			const trendMax = Math.max(0, ...(data?.dailyModels ?? []).filter((row) => topModels.some((model) => model.modelId === row.modelId && model.provider === row.provider)).map((row) => row.totalTokens));
+			const pointsFor = (model) => {
+				const byDate = /* @__PURE__ */ new Map();
+				for (const row of data?.dailyModels ?? []) if (row.modelId === model.modelId && row.provider === model.provider) byDate.set(row.date, row.totalTokens);
+				return rangeRows.map((row, index) => {
+					const value = byDate.get(row.date) ?? 0;
+					const x = rangeRows.length <= 1 ? 0 : index / (rangeRows.length - 1) * 100;
+					const y = trendMax > 0 ? 100 - value / trendMax * 100 : 100;
+					return `${x.toFixed(2)},${y.toFixed(2)}`;
+				}).join(" ");
+			};
+			const axisLabels = rangeRows.filter((_, index) => rangeRows.length <= 7 || index % Math.ceil(rangeRows.length / 6) === 0 || index === rangeRows.length - 1);
+			const modelTotal = (data?.models ?? []).reduce((sum, model) => sum + model.totalTokens, 0);
+			const modelShare = (model) => modelTotal > 0 ? Math.max(1, Math.round(model.totalTokens / modelTotal * 100)) : 0;
+			const modelRows = (data?.models ?? []).map((model, index) => h("li", {
+				key: `${model.provider}/${model.modelId}`,
+				className: "power-dsh-usage-model",
+				"data-model": index
+			}, h("span", {
+				className: "power-dsh-usage-legend-dot",
+				"data-model": index
+			}), h("span", { className: "power-dsh-usage-model-name" }, model.modelId || t("usageUnknownModel")), h("span", {
+				className: "power-dsh-usage-model-bar",
+				"aria-hidden": true
+			}, h("span", {
+				className: "power-dsh-usage-model-bar-fill",
+				"data-model": index,
+				style: { width: `${modelShare(model)}%` }
+			})), h("span", { className: "power-dsh-usage-model-value" }, formatTokens(model.totalTokens, locale)), h("span", { className: "power-dsh-usage-model-requests" }, t("usageModelRequests").replace("{count}", () => String(model.requestCount)))));
+			const selectTab = (next) => {
+				if (mounted.current && !busy) setRange(next);
+			};
+			const selectMode = (next) => {
+				if (mounted.current) setMode(next);
+			};
+			return h("section", {
+				className: "power-dsh-page power-dsh-usage-page",
+				"aria-label": t("usageTab")
+			}, h("style", null, styles), h("header", null, h("h2", { className: "power-dsh-title" }, t("usageTab")), h("p", { className: "power-dsh-description" }, t("usagePageDescription"))), snapshot.status === "error" && errorFeedback({
+				t,
+				message: t(snapshot.error || "usageLoadFailed"),
+				code: "PD-USAGE-LOAD",
+				operation: "readUsageStats",
+				placement: "page",
+				retry: loadUsageStats,
+				disabled: busy
+			}), busy && !data && h("p", {
+				className: "power-dsh-notice",
+				role: "status"
+			}, t("usageLoading")), data && !data.complete && h("p", {
+				className: "power-dsh-notice",
+				role: "status"
+			}, t("usagePartial")), data && h("div", { className: "power-dsh-usage-body" }, h("section", {
+				className: "power-dsh-usage-summary",
+				"aria-label": t("usageTab")
+			}, ...metrics.map((metric) => h("div", {
+				key: metric.key,
+				className: "power-dsh-usage-metric"
+			}, h("div", { className: "power-dsh-usage-metric-value" }, metric.value), h("div", { className: "power-dsh-usage-metric-label" }, t(metric.key))))), h("section", { className: "power-dsh-usage-card" }, h("div", { className: "power-dsh-usage-card-head" }, h("h3", { className: "power-dsh-usage-card-title" }, t("usageTokenActivity")), h("div", {
+				className: "power-dsh-usage-tabs",
+				role: "tablist",
+				"aria-label": t("usageTokenActivity")
+			}, ...[
+				"daily",
+				"weekly",
+				"cumulative"
+			].map((option) => h("button", {
+				key: option,
+				type: "button",
+				role: "tab",
+				className: "power-dsh-usage-tab",
+				"aria-selected": mode === option,
+				onClick: () => selectMode(option)
+			}, t(option === "daily" ? "usageHeatmapDaily" : option === "weekly" ? "usageHeatmapWeekly" : "usageHeatmapCumulative"))))), columns.length > 0 && h("div", {
+				className: "power-dsh-usage-heatmap",
+				"data-mode": mode
+			}, h("div", {
+				className: "power-dsh-usage-heatmap-grid",
+				style: { gridTemplateColumns: `repeat(${HEATMAP_WEEKS}, minmax(0, 1fr))` }
+			}, ...columns.map((column, columnIndex) => h("div", {
+				key: column[0]?.date ?? String(columnIndex),
+				className: "power-dsh-usage-heatmap-column"
+			}, ...column.map((cell) => {
+				const level = heatLevel(columnIndex, cell.row);
+				return h(Tooltip, {
+					key: cell.date,
+					label: heatTitle(columnIndex, cell.row),
+					side: "top",
+					portal: true,
+					delayMs: 0,
+					maxWidth: 360
+				}, h("span", {
+					className: "power-dsh-usage-heatmap-cell",
+					"data-level": level,
+					"data-has-usage": cell.row.totalTokens > 0
+				}));
+			})))), h("div", {
+				className: "power-dsh-usage-heatmap-months",
+				style: { gridTemplateColumns: `repeat(${HEATMAP_WEEKS}, minmax(0, 1fr))` }
+			}, ...labels.map((label) => h("span", {
+				key: label.key,
+				className: "power-dsh-usage-heatmap-month",
+				style: { gridColumn: `span ${label.span}` }
+			}, label.label)))), columns.length === 0 && h("p", { className: "power-dsh-usage-empty" }, t("usageEmpty"))), h("div", { className: "power-dsh-usage-range" }, h("h3", { className: "power-dsh-usage-section-title" }, t("usageRangeTitle")), h("div", {
+				className: "power-dsh-usage-tabs",
+				role: "tablist",
+				"aria-label": t("usageRangeTitle")
+			}, ...["7d", "30d"].map((option) => h("button", {
+				key: option,
+				type: "button",
+				role: "tab",
+				className: "power-dsh-usage-tab",
+				"aria-selected": range === option,
+				"aria-disabled": busy || void 0,
+				onClick: () => selectTab(option)
+			}, t(option === "7d" ? "usageRange7d" : "usageRange30d"))))), h("section", { className: "power-dsh-usage-card" }, h("div", { className: "power-dsh-usage-card-head" }, h("h3", { className: "power-dsh-usage-card-title" }, t("usageTrendTitle")), h("div", { className: "power-dsh-usage-legend" }, ...topModels.map((model) => h("span", {
+				key: `${model.provider}/${model.modelId}`,
+				className: "power-dsh-usage-legend-item"
+			}, h("span", {
+				className: "power-dsh-usage-legend-dot",
+				"data-model": topModels.indexOf(model)
+			}), model.modelId || t("usageUnknownModel"))))), trendMax > 0 ? h("div", { className: "power-dsh-usage-chart" }, h("svg", {
+				className: "power-dsh-usage-chart-svg",
+				viewBox: "0 0 100 100",
+				preserveAspectRatio: "none",
+				role: "img",
+				"aria-label": t("usageTrendTitle")
+			}, h("line", {
+				x1: 0,
+				y1: 100,
+				x2: 100,
+				y2: 100,
+				className: "power-dsh-usage-chart-axis"
+			}), ...topModels.map((model) => h("polyline", {
+				key: `${model.provider}/${model.modelId}`,
+				points: pointsFor(model),
+				className: "power-dsh-usage-chart-line",
+				"data-model": topModels.indexOf(model),
+				fill: "none",
+				vectorEffect: "non-scaling-stroke"
+			}))), h("div", { className: "power-dsh-usage-chart-axis-labels" }, ...axisLabels.map((row) => h("span", {
+				key: row.date,
+				className: "power-dsh-usage-chart-axis-label"
+			}, row.date.slice(5).replace("-", "/"))))) : h("p", { className: "power-dsh-usage-empty" }, t("usageChartEmpty"))), h("section", { className: "power-dsh-usage-card" }, h("h3", { className: "power-dsh-usage-card-title" }, t("usageModelTitle")), modelRows.length > 0 ? h("ul", { className: "power-dsh-usage-models" }, ...modelRows) : h("p", { className: "power-dsh-usage-empty" }, t("usageEmpty"))), h("div", { className: "power-dsh-usage-actions" }, h(Button, {
+				variant: "outline",
+				size: "sm",
+				disabled: busy,
+				"aria-busy": busy,
+				onClick: () => {
+					loadUsageStats();
+				}
+			}, t("usageRefresh")))));
+		}
+		let active = true;
+		let usage = {
+			status: "loading",
+			value: null,
+			error: ""
+		};
+		const usageSource = observable(() => usage);
+		let generation = 0;
+		ctx.effect(() => () => {
+			active = false;
+			generation++;
+		});
+		const loadUsageStats = async () => {
+			const current = ++generation;
+			if (usage.status !== "ready") {
+				usage = {
+					...usage,
+					status: "loading",
+					error: ""
+				};
+				usageSource.notify();
+			}
+			try {
+				const result = await ctx.remote.powerDsh.readUsageStats(browserZone());
+				if (!active || current !== generation) return;
+				if (!result.ok) throw new Error(result.error.message);
+				usage = {
+					status: "ready",
+					value: result.value,
+					error: ""
+				};
+			} catch (failure) {
+				if (!active || current !== generation) return;
+				const message = errorMessage(failure) ?? "";
+				usage = {
+					...usage,
+					status: "error",
+					error: message.includes("usageUnavailable") ? "usageUnavailable" : "usageLoadFailed"
+				};
+			}
+			usageSource.notify();
+		};
+		preferenceSlot("usageStatsEnabled", "settings.section", {
+			id: "power-dsh-usage",
+			order: 55,
+			locale: namespace,
+			label: () => t("usageTab")
+		}, (props) => h(UsagePage, {
+			...props,
+			usageSource,
+			loadUsageStats
+		}));
+		preferenceSlot("usageStatsEnabled", "settings.section.icon", { id: "power-dsh-usage" }, UsageIcon);
+		return {
+			settings: [{
+				field: "usageStatsEnabled",
+				description: "usageStatsDescription",
+				save: (next) => savePreference("usageStatsEnabled", next === true, "usageOutdated"),
+				hideError: true
+			}],
+			api: {
+				usageSource,
+				loadUsageStats
+			}
+		};
+	}
+
+// src/features/usage-stats/definition.ts
+	const definition$1 = Object.freeze({
+		id: "usage-stats",
+		category: "enhance",
+		order: 12,
+		keys: Object.freeze(["usageStatsEnabled"]),
+		spec: "src/features/usage-stats/spec.md"
+	});
+
+// src/features/usage-stats/locales.ts
+	const locales$2 = {
+		"en": {
+			"usageStatsEnabled": "Usage statistics",
+			"usageStatsDescription": "Review token activity across local sessions",
+			"usageTab": "Usage",
+			"usagePageDescription": "Review token activity recorded in local DSH sessions",
+			"usageTotalTokens": "Total tokens",
+			"usagePeakTokens": "Peak tokens",
+			"usageLongestSession": "Longest session",
+			"usageCurrentStreak": "Current streak",
+			"usageLongestStreak": "Longest streak",
+			"usageDays": "{count} days",
+			"usageDay": "{count} day",
+			"usageUnitDay": "d",
+			"usageUnitHour": "h",
+			"usageUnitMinute": "m",
+			"usageTokenActivity": "Token activity",
+			"usageHeatmapDaily": "Daily",
+			"usageHeatmapWeekly": "Weekly",
+			"usageHeatmapCumulative": "Cumulative",
+			"usageRangeTitle": "Time range",
+			"usageRange7d": "Last 7 days",
+			"usageRange30d": "Last 30 days",
+			"usageTrendTitle": "Daily token trend",
+			"usageModelTitle": "Model usage",
+			"usageModelRequests": "{count} requests",
+			"usageUnknownModel": "Unknown model",
+			"usageEmpty": "No token usage recorded yet",
+			"usageLoading": "Reading local session logs…",
+			"usagePartial": "Some session logs could not be read; the figures below cover the rest.",
+			"usageLoadFailed": "Could not read usage statistics. Please try again.",
+			"usageUnavailable": "Usage statistics are unavailable in this Host.",
+			"usageOutdated": "Usage statistics are not loaded in the Host yet. Re-enable power-dsh, then try again.",
+			"usageRefresh": "Refresh",
+			"usageHeatmapCell": "{date}: {tokens} tokens, {turns} turns",
+			"usageWeekCell": "Week of {date}: {tokens} tokens",
+			"usageCumulativeCell": "Through {date}: {tokens} tokens",
+			"usageChartEmpty": "No usage in this range"
+		},
+		"zh": {
+			"usageStatsEnabled": "使用统计",
+			"usageStatsDescription": "查看本地会话的 Token 用量",
+			"usageTab": "使用统计",
+			"usagePageDescription": "查看本地 DSH 会话记录的 Token 用量",
+			"usageTotalTokens": "累计 Token 数",
+			"usagePeakTokens": "峰值 Token 数",
+			"usageLongestSession": "最长聊天时长",
+			"usageCurrentStreak": "当前连续天数",
+			"usageLongestStreak": "最长连续天数",
+			"usageDays": "{count} 天",
+			"usageDay": "{count} 天",
+			"usageUnitDay": " 天",
+			"usageUnitHour": " 小时",
+			"usageUnitMinute": " 分钟",
+			"usageTokenActivity": "Token 活动",
+			"usageHeatmapDaily": "每日",
+			"usageHeatmapWeekly": "每周",
+			"usageHeatmapCumulative": "累计",
+			"usageRangeTitle": "时间范围",
+			"usageRange7d": "近 7 日",
+			"usageRange30d": "近 30 日",
+			"usageTrendTitle": "每日 Token 趋势图",
+			"usageModelTitle": "模型用量",
+			"usageModelRequests": "{count} 次请求",
+			"usageUnknownModel": "未知模型",
+			"usageEmpty": "暂无 Token 用量记录",
+			"usageLoading": "正在读取本地会话日志…",
+			"usagePartial": "部分会话日志无法读取，下方数字仅统计其余会话。",
+			"usageLoadFailed": "无法读取使用统计，请重试。",
+			"usageUnavailable": "当前 Host 不支持使用统计。",
+			"usageOutdated": "使用统计尚未在后端加载，请重新启用 power-dsh 后重试。",
+			"usageRefresh": "刷新",
+			"usageHeatmapCell": "{date}：{tokens} Token，{turns} 轮",
+			"usageWeekCell": "{date} 所在周：{tokens} Token",
+			"usageCumulativeCell": "截至 {date}：{tokens} Token",
+			"usageChartEmpty": "该范围内暂无用量"
+		}
+	};
+
+// src/features/usage-stats/rpc.ts
+	const usageSnapshotCodec = {
+		mode: "strict",
+		typeSymbol: "power-dsh#UsageSnapshot",
+		create: () => ({ parse(value) {
+			if (!isRecord(value) || typeof value.complete !== "boolean" || typeof value.generatedAt !== "number" || !Number.isFinite(value.generatedAt) || !hasStrings(value, [
+				"timeZone",
+				"firstDate",
+				"lastDate"
+			]) || !isRecord(value.summary) || !isArray(value.days) || !isArray(value.dailyModels) || !isArray(value.models)) throw new TypeError("Invalid usage snapshot");
+			const summary = value.summary;
+			const fields = [
+				"totalTokens",
+				"inputTokens",
+				"outputTokens",
+				"cacheReadTokens",
+				"cacheWriteTokens",
+				"peakDayTokens",
+				"longestSessionMs",
+				"currentStreakDays",
+				"longestStreakDays",
+				"activeDays",
+				"sessionCount",
+				"turnCount"
+			];
+			const counts = {};
+			for (const field of fields) {
+				const count = summary[field];
+				if (typeof count !== "number" || !Number.isFinite(count) || count < 0) throw new TypeError("Invalid usage summary");
+				counts[field] = count;
+			}
+			const days = value.days.map((row) => {
+				if (!isRecord(row) || typeof row.date !== "string" || typeof row.totalTokens !== "number" || !Number.isFinite(row.totalTokens) || typeof row.turnCount !== "number" || typeof row.toolCallCount !== "number") throw new TypeError("Invalid usage day");
+				return {
+					date: row.date,
+					totalTokens: row.totalTokens,
+					turnCount: row.turnCount,
+					toolCallCount: row.toolCallCount
+				};
+			});
+			const dailyModels = value.dailyModels.map((row) => {
+				if (!isRecord(row) || !hasStrings(row, [
+					"date",
+					"modelId",
+					"provider"
+				]) || typeof row.totalTokens !== "number" || !Number.isFinite(row.totalTokens)) throw new TypeError("Invalid usage daily model");
+				return {
+					date: row.date,
+					modelId: row.modelId,
+					provider: row.provider,
+					totalTokens: row.totalTokens
+				};
+			});
+			const models = value.models.map((row) => {
+				if (!isRecord(row) || !hasStrings(row, ["modelId", "provider"]) || typeof row.totalTokens !== "number" || !Number.isFinite(row.totalTokens) || typeof row.requestCount !== "number" || !Number.isFinite(row.requestCount)) throw new TypeError("Invalid usage model");
+				return {
+					modelId: row.modelId,
+					provider: row.provider,
+					totalTokens: row.totalTokens,
+					requestCount: row.requestCount
+				};
+			});
+			return {
+				complete: value.complete,
+				generatedAt: value.generatedAt,
+				timeZone: value.timeZone,
+				firstDate: value.firstDate,
+				lastDate: value.lastDate,
+				summary: counts,
+				days,
+				dailyModels,
+				models
+			};
+		} })
+	};
+	const READ_USAGE_STATS_RPC = {
+		id: "power-dsh#powerDsh/readUsageStats",
+		service: "powerDsh",
+		namespace: "powerDsh",
+		method: "readUsageStats",
+		invocation: { kind: "direct" },
+		parameters: [{
+			name: "timeZone",
+			wire: "timeZone",
+			source: "json",
+			codec: stringCodec
+		}],
+		result: usageSnapshotCodec
+	};
+	const rpc$1 = [READ_USAGE_STATS_RPC];
+
+// src/features/projects/projects-catalog.ts
+/**
+	* Apply the local search and the sort mode. `manual` keeps the native registry
+	* order; `recent` orders by the latest session activity and falls back to the
+	* registry order for ties and never-used projects.
+	*/
+	function arrangeProjects(catalog, query, sortBy = "recent") {
+		const needle = query.trim().toLocaleLowerCase();
+		const rows = needle ? catalog.projects.filter((row) => `${row.title} ${row.path}`.toLocaleLowerCase().includes(needle)) : [...catalog.projects];
+		if (sortBy === "manual") return rows;
+		const order = new Map(catalog.projects.map((row, index) => [row.workspaceId, index]));
+		return rows.sort((left, right) => right.lastActiveAt - left.lastActiveAt || (order.get(left.workspaceId) ?? 0) - (order.get(right.workspaceId) ?? 0));
+	}
+	/**
+	* Compact relative time using the same buckets as the native session rows so a
+	* project's activity reads like DSH's own timestamps.
+	*/
+	function relativeTime(at, now) {
+		const MINUTE = 6e4;
+		const HOUR = 36e5;
+		const DAY = 864e5;
+		const diff = Math.max(0, now - at);
+		if (diff < MINUTE) return {
+			unit: "now",
+			n: 0
+		};
+		if (diff < HOUR) return {
+			unit: "minutes",
+			n: Math.floor(diff / MINUTE)
+		};
+		if (diff < DAY) return {
+			unit: "hours",
+			n: Math.floor(diff / HOUR)
+		};
+		if (diff < 30 * DAY) return {
+			unit: "days",
+			n: Math.floor(diff / DAY)
+		};
+		if (diff < 365 * DAY) return {
+			unit: "months",
+			n: Math.floor(diff / (30 * DAY))
+		};
+		return {
+			unit: "years",
+			n: Math.floor(diff / (365 * DAY))
+		};
+	}
+
+// src/features/projects/styles.ts
+	const styles = `
+.power-dsh-projects-page .power-dsh-skill-panel { gap:18px; }
+.power-dsh-projects-page .power-dsh-projects-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.power-dsh-projects-page .power-dsh-projects-toolbar .power-dsh-skill-search-field { flex:1 1 220px; width:auto; }
+.power-dsh-projects-page .power-dsh-projects-select { box-sizing:border-box; display:inline-flex; align-items:center; gap:8px; height:36px; max-width:220px; border:.5px solid var(--dsw-alias-border-l4); border-radius:var(--dsw-radius-md); padding:0 10px 0 12px; background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-primary); font:inherit; font-size:13px; cursor:pointer; }
+.power-dsh-projects-page .power-dsh-projects-select:disabled { opacity:.5; cursor:default; }
+.power-dsh-projects-page .power-dsh-projects-select:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
+.power-dsh-projects-page .power-dsh-projects-select-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.power-dsh-projects-page .power-dsh-projects-select > svg { flex:none; color:var(--dsw-alias-label-tertiary); }
+.power-dsh-projects-page .power-dsh-projects-menu { min-width:0; max-width:100%; }
+.power-dsh-projects-page .power-dsh-projects-table { display:flex; flex-direction:column; overflow:hidden; border:.5px solid var(--dsw-alias-settings-card-stroke); border-radius:var(--dsw-radius-xl); background:var(--dsw-alias-settings-card-fill); }
+.power-dsh-projects-page .power-dsh-projects-head { display:grid; grid-template-columns:minmax(0,1fr) 88px 112px 76px; align-items:center; gap:12px; padding:10px 14px; background:var(--dsw-alias-bg-module-platform); color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
+.power-dsh-projects-page .power-dsh-projects-rows { margin:0; padding:0; list-style:none; }
+.power-dsh-projects-page .power-dsh-projects-row { display:grid; grid-template-columns:minmax(0,1fr) 88px 112px 76px; align-items:center; gap:12px; padding:12px 14px; }
+.power-dsh-projects-page .power-dsh-projects-row + .power-dsh-projects-row { border-top:.5px solid var(--dsw-alias-border-l2); }
+.power-dsh-projects-page .power-dsh-projects-cell { min-width:0; }
+.power-dsh-projects-page .power-dsh-projects-main { display:flex; align-items:center; gap:10px; }
+.power-dsh-projects-page .power-dsh-projects-folder { display:inline-flex; flex:none; color:var(--dsw-alias-label-tertiary); }
+.power-dsh-projects-page .power-dsh-projects-copy { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.power-dsh-projects-page .power-dsh-projects-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-primary); font-size:14px; line-height:20px; }
+.power-dsh-projects-page .power-dsh-projects-path { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
+.power-dsh-projects-page .power-dsh-projects-sessions,.power-dsh-projects-page .power-dsh-projects-activity { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-secondary); font-size:12px; line-height:18px; }
+.power-dsh-projects-page .power-dsh-projects-head .power-dsh-projects-main { display:block; }
+.power-dsh-projects-page .power-dsh-projects-actions { display:flex; justify-content:flex-end; }
+.power-dsh-projects-page .power-dsh-projects-sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+/* Row buttons follow the native Models settings danger button; see docs/third-party-notices.md. */
+.power-dsh-projects-page .power-dsh-projects-action { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; height:28px; border:.5px solid transparent; border-radius:var(--dsw-radius-sm); padding:0 10px; background:transparent; color:var(--dsw-alias-state-error-primary); font:inherit; font-size:12px; line-height:18px; cursor:pointer; }
+@media (hover:hover) { .power-dsh-projects-page .power-dsh-projects-action:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover-danger); } }
+.power-dsh-projects-page .power-dsh-projects-action:disabled { opacity:.4; cursor:default; }
+.power-dsh-projects-page .power-dsh-projects-action:focus-visible { outline:none; box-shadow:0 0 0 2px var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); }
+.power-dsh-projects-confirm-remove:not(:disabled) { --dsh-button-outline-color:var(--dsw-alias-state-error-primary); color:var(--dsw-alias-state-error-primary); }
+@media (hover:hover) { .power-dsh-projects-confirm-remove:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover-danger); } }
+@container power-dsh-skills (max-width:520px) {
+  .power-dsh-projects-page .power-dsh-projects-head,
+  .power-dsh-projects-page .power-dsh-projects-row { grid-template-columns:minmax(0,1fr) 92px 76px; }
+  .power-dsh-projects-page .power-dsh-projects-sessions { display:none; }
+}
+`;
+
+// src/features/projects/client.ts
+/** Translation keys for the compact activity buckets, in the native session-row wording. */
+	const timeKeys = {
+		now: "projectsTimeNow",
+		minutes: "projectsTimeMinutes",
+		hours: "projectsTimeHours",
+		days: "projectsTimeDays",
+		months: "projectsTimeMonths",
+		years: "projectsTimeYears"
+	};
+	function createClientFeature(runtime, env) {
+		const { React, h, Menu, Modal, Button, Tooltip, observable, useSnapshot, useMounted, errorFeedback } = runtime;
+		const { ctx, t, savePreference, preferenceSlot, namespace } = env;
+		const styles$15 = styles$13 + styles$10 + styles;
+		const { SkillSearchIcon } = createCatalogUI(runtime);
+		function FolderIcon({ size = 16 }) {
+			return h("svg", {
+				width: size,
+				height: size,
+				viewBox: "0 0 24 24",
+				fill: "none",
+				stroke: "currentColor",
+				strokeWidth: 2,
+				strokeLinecap: "round",
+				strokeLinejoin: "round",
+				"aria-hidden": true,
+				focusable: false
+			}, h("path", { d: "M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2z" }));
+		}
+		function ProjectsIcon({ size = 16 }) {
+			return h("svg", {
+				width: size,
+				height: size,
+				viewBox: "0 0 24 24",
+				fill: "none",
+				stroke: "currentColor",
+				strokeWidth: 2,
+				strokeLinecap: "round",
+				strokeLinejoin: "round",
+				"aria-hidden": true,
+				focusable: false
+			}, h("path", { d: "M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" }), h("path", { d: "M8 10v4" }), h("path", { d: "M12 10v2" }), h("path", { d: "M16 10v6" }));
+		}
+		const projectErrorKeys = ["projectsInvalidWorkspace", "projectsNotFound"];
+		const projectErrorMessage = (message, fallback) => {
+			if (message?.includes("projectsUnavailable")) return t("projectsUnavailable");
+			const key = message ? projectErrorKeys.find((candidate) => message.includes(candidate)) : void 0;
+			return t(key ?? fallback);
+		};
+		function ProjectsPage({ t, projectsSource, loadProjects, removeProject }) {
+			const snapshot = useSnapshot(projectsSource);
+			const catalog = snapshot.value;
+			const [query, setQuery] = React.useState("");
+			const [sortBy, setSortBy] = React.useState("recent");
+			const [removing, setRemoving] = React.useState(null);
+			const [confirming, setConfirming] = React.useState(null);
+			const [error, setError] = React.useState(null);
+			const [now, setNow] = React.useState(() => Date.now());
+			const [openSelect, setOpenSelect] = React.useState(null);
+			React.useId();
+			const mounted = useMounted();
+			const pending = React.useRef(false);
+			const busy = snapshot.status === "loading" || removing !== null;
+			React.useEffect(() => {
+				loadProjects();
+				const refresh = () => {
+					setNow(Date.now());
+					loadProjects();
+				};
+				window.addEventListener("focus", refresh);
+				return () => window.removeEventListener("focus", refresh);
+			}, []);
+			const rows = catalog ? arrangeProjects(catalog, query, sortBy) : [];
+			const sortOptions = [{
+				id: "recent",
+				label: t("projectsSortRecent")
+			}, {
+				id: "manual",
+				label: t("projectsSortManual")
+			}];
+			const select = (key, label, value, options, onChange) => {
+				const current = options.find((option) => option.id === value) ?? options[0];
+				const open = openSelect === key && !busy;
+				return h(Menu, {
+					open,
+					align: "end",
+					portal: true,
+					autoFocus: true,
+					minWidthFromAnchor: true,
+					className: "power-dsh-projects-menu",
+					selectedId: value,
+					items: options.map((option) => ({
+						id: option.id,
+						label: option.label
+					})),
+					onClose: () => setOpenSelect(null),
+					onSelect: (id) => {
+						setOpenSelect(null);
+						if (id !== value) onChange(id);
+					},
+					anchor: h("button", {
+						type: "button",
+						className: "power-dsh-projects-select",
+						disabled: busy,
+						"aria-haspopup": "menu",
+						"aria-expanded": open,
+						"aria-label": label,
+						onClick: () => setOpenSelect((state) => state === key ? null : key)
+					}, h("span", { className: "power-dsh-projects-select-label" }, current?.label ?? label), h("svg", {
+						width: 16,
+						height: 16,
+						viewBox: "0 0 16 16",
+						fill: "none",
+						stroke: "currentColor",
+						strokeWidth: 1.4,
+						strokeLinecap: "round",
+						strokeLinejoin: "round",
+						"aria-hidden": true
+					}, h("path", { d: "m4 6 4 4 4-4" })))
+				});
+			};
+			const disabled = busy || snapshot.status !== "ready" || !catalog?.complete;
+			const activityLabel = (row) => {
+				if (row.lastActiveAt <= 0) return t("projectsNeverUsed");
+				const { unit, n } = relativeTime(row.lastActiveAt, now);
+				return t(timeKeys[unit]).replace("{n}", () => String(n));
+			};
+			async function confirmRemove(workspaceId) {
+				if (pending.current) return;
+				pending.current = true;
+				setRemoving(workspaceId);
+				setError(null);
+				try {
+					await removeProject(workspaceId);
+					if (mounted.current) setConfirming(null);
+				} catch (failure) {
+					if (mounted.current) {
+						setConfirming(null);
+						setError({
+							id: workspaceId,
+							message: projectErrorMessage(errorMessage(failure), "projectsRemoveFailed")
+						});
+					}
+				} finally {
+					pending.current = false;
+					if (mounted.current) setRemoving(null);
+				}
+			}
+			const renderRow = (row) => {
+				const rowBusy = removing === row.workspaceId;
+				const name = row.title || row.path || row.workspaceId;
+				return h("li", {
+					key: row.workspaceId,
+					className: "power-dsh-projects-row",
+					role: "row",
+					"data-project": row.workspaceId
+				}, h("div", {
+					className: "power-dsh-projects-cell power-dsh-projects-main",
+					role: "cell"
+				}, h("span", { className: "power-dsh-projects-folder" }, h(FolderIcon)), h("div", { className: "power-dsh-projects-copy" }, h(Tooltip, {
+					label: name,
+					side: "top",
+					portal: true,
+					delayMs: 0,
+					maxWidth: 480
+				}, h("span", {
+					className: "power-dsh-projects-name",
+					tabIndex: 0
+				}, name)), row.path && h(Tooltip, {
+					label: row.path,
+					side: "top",
+					portal: true,
+					delayMs: 0,
+					maxWidth: 480
+				}, h("span", {
+					className: "power-dsh-projects-path",
+					tabIndex: 0
+				}, row.path)), error?.id === row.workspaceId && errorFeedback({
+					t,
+					id: `${row.workspaceId}-error`,
+					message: error.message,
+					code: "PD-PROJECTS-ACTION",
+					operation: "removeProject"
+				}))), h("span", {
+					className: "power-dsh-projects-cell power-dsh-projects-sessions",
+					role: "cell"
+				}, t("projectsSessions").replace("{count}", () => String(row.sessionCount))), h("span", {
+					className: "power-dsh-projects-cell power-dsh-projects-activity",
+					role: "cell"
+				}, activityLabel(row)), h("div", {
+					className: "power-dsh-projects-cell power-dsh-projects-actions",
+					role: "cell"
+				}, h("button", {
+					type: "button",
+					className: "power-dsh-projects-action power-dsh-projects-action-danger",
+					"data-remove": row.workspaceId,
+					"aria-label": `${t("projectsRemove")} ${name}`,
+					disabled: disabled || rowBusy,
+					"aria-busy": rowBusy,
+					onClick: () => {
+						if (mounted.current) setConfirming(row);
+					}
+				}, t(rowBusy ? "projectsRemoving" : "projectsRemove"))));
+			};
+			return h("section", {
+				className: "power-dsh-page power-dsh-skills-page power-dsh-projects-page",
+				"aria-label": t("projectsTab")
+			}, h("style", null, styles$15), h("header", null, h("h2", { className: "power-dsh-title" }, t("projectsTab")), h("p", { className: "power-dsh-description" }, t("projectsDescription"))), snapshot.status === "loading" && h("p", {
+				className: "power-dsh-notice",
+				role: "status"
+			}, t("loading")), snapshot.status === "error" && errorFeedback({
+				t,
+				message: snapshot.error || t("projectsLoadFailed"),
+				code: "PD-PROJECTS-LOAD",
+				operation: "listProjects",
+				placement: "page",
+				retry: loadProjects,
+				disabled: busy
+			}), h("div", { className: "power-dsh-skill-panel" }, catalog && h("div", { className: "power-dsh-projects-toolbar" }, h("label", { className: "power-dsh-skill-search-field" }, h(SkillSearchIcon), h("input", {
+				type: "search",
+				value: query,
+				disabled: busy,
+				placeholder: t("projectsSearch"),
+				"aria-label": t("projectsSearch"),
+				onChange: (event) => {
+					if (mounted.current) setQuery(event.target.value);
+				}
+			})), select("sort", t("projectsSortLabel"), sortBy, sortOptions, (value) => {
+				if (mounted.current) setSortBy(value);
+			})), catalog && snapshot.status === "ready" && rows.length > 0 && h("div", {
+				className: "power-dsh-projects-table",
+				role: "table",
+				"aria-label": t("projectsTab")
+			}, h("div", {
+				className: "power-dsh-projects-head",
+				role: "row"
+			}, h("span", {
+				className: "power-dsh-projects-cell power-dsh-projects-main",
+				role: "columnheader"
+			}, t("projectsColumnProject")), h("span", {
+				className: "power-dsh-projects-cell power-dsh-projects-sessions",
+				role: "columnheader"
+			}, t("projectsColumnSessions")), h("span", {
+				className: "power-dsh-projects-cell power-dsh-projects-activity",
+				role: "columnheader"
+			}, t("projectsColumnActivity")), h("span", {
+				className: "power-dsh-projects-cell power-dsh-projects-actions",
+				role: "columnheader"
+			}, h("span", { className: "power-dsh-projects-sr-only" }, t("projectsRemove")))), h("ul", {
+				className: "power-dsh-projects-rows",
+				role: "rowgroup"
+			}, rows.map(renderRow))), catalog && snapshot.status === "ready" && rows.length === 0 && h("p", { className: "power-dsh-skill-empty" }, t(query ? "projectsNoMatches" : "projectsEmpty"))), error && !(catalog?.projects ?? []).some((row) => row.workspaceId === error.id) && errorFeedback({
+				t,
+				message: error.message,
+				code: "PD-PROJECTS-ACTION",
+				operation: "removeProject",
+				placement: "page"
+			}), confirming && h(Modal, {
+				open: true,
+				onClose: () => {
+					if (removing === null) setConfirming(null);
+				},
+				title: t("projectsRemoveTitle"),
+				closeLabel: t("close"),
+				description: t("projectsRemoveDescription").replace("{name}", () => confirming.title || confirming.path || confirming.workspaceId),
+				footer: h(React.Fragment, null, h(Button, {
+					variant: "outline",
+					"data-modal-autofocus": true,
+					disabled: removing !== null,
+					onClick: () => {
+						if (removing === null) setConfirming(null);
+					}
+				}, t("cancel")), h(Button, {
+					variant: "outline",
+					className: "power-dsh-projects-confirm-remove",
+					disabled: removing !== null,
+					onClick: () => {
+						confirmRemove(confirming.workspaceId);
+					}
+				}, t(removing !== null ? "projectsRemoving" : "projectsRemoveConfirm")))
+			}));
+		}
+		let active = true;
+		let projects = {
+			status: "loading",
+			value: null,
+			error: ""
+		};
+		const projectsSource = observable(() => projects);
+		let generation = 0;
+		ctx.effect(() => () => {
+			active = false;
+			generation++;
+		});
+		const loadProjects = async () => {
+			const current = ++generation;
+			if (projects.status !== "ready") {
+				projects = {
+					...projects,
+					status: "loading",
+					error: ""
+				};
+				projectsSource.notify();
+			}
+			try {
+				const result = await ctx.remote.powerDsh.listProjects();
+				if (!active || current !== generation) return;
+				if (!result.ok) throw new Error(result.error.message);
+				projects = {
+					status: "ready",
+					value: result.value,
+					error: ""
+				};
+			} catch (failure) {
+				if (!active || current !== generation) return;
+				projects = {
+					...projects,
+					status: "error",
+					error: projectErrorMessage(errorMessage(failure), "projectsLoadFailed")
+				};
+			}
+			projectsSource.notify();
+		};
+		const removeProject = async (workspaceId) => {
+			const current = ++generation;
+			const result = await ctx.remote.powerDsh.removeProject(workspaceId);
+			if (!active || current !== generation) return;
+			if (!result.ok) {
+				await loadProjects();
+				throw new Error(result.error.message);
+			}
+			projects = {
+				status: "ready",
+				value: result.value,
+				error: ""
+			};
+			projectsSource.notify();
+		};
+		preferenceSlot("projectManagerEnabled", "settings.section", {
+			id: "power-dsh-projects",
+			order: 54.5,
+			locale: namespace,
+			label: () => t("projectsTab")
+		}, (props) => h(ProjectsPage, {
+			...props,
+			projectsSource,
+			loadProjects,
+			removeProject
+		}));
+		preferenceSlot("projectManagerEnabled", "settings.section.icon", { id: "power-dsh-projects" }, ProjectsIcon);
+		return {
+			settings: [{
+				field: "projectManagerEnabled",
+				description: "projectManagerDescription",
+				save: (next) => savePreference("projectManagerEnabled", next === true, "projectsOutdated"),
+				hideError: true
+			}],
+			api: {
+				projectsSource,
+				loadProjects,
+				removeProject
+			}
+		};
+	}
+
+// src/features/projects/definition.ts
+	const definition = Object.freeze({
+		id: "projects",
+		category: "enhance",
+		order: 10.5,
+		keys: Object.freeze(["projectManagerEnabled"]),
+		spec: "src/features/projects/spec.md"
+	});
+
+// src/features/projects/locales.ts
+	const locales$1 = {
+		"en": {
+			"projectManagerEnabled": "Project management",
+			"projectManagerDescription": "Review and remove DSH projects",
+			"projectsTab": "Projects",
+			"projectsDescription": "Removing a project only takes it out of the sidebar and the project picker. Sessions stay in recents and search, and files on disk are untouched.",
+			"projectsSearch": "Search projects, folders or devices",
+			"projectsEmpty": "No projects",
+			"projectsNoMatches": "No matching projects",
+			"projectsSortLabel": "Sort",
+			"projectsSortRecent": "Last active",
+			"projectsSortManual": "Manual",
+			"projectsColumnProject": "Project",
+			"projectsColumnSessions": "Sessions",
+			"projectsColumnActivity": "Last active",
+			"projectsSessions": "{count}",
+			"projectsNeverUsed": "Never used",
+			"projectsRemove": "Remove",
+			"projectsRemoving": "Removing…",
+			"projectsRemoveTitle": "Remove project?",
+			"projectsRemoveDescription": "“{name}” will be removed from the sidebar and the project picker. Its sessions stay in recents and search, and files on disk are untouched.",
+			"projectsRemoveConfirm": "Remove project",
+			"projectsRemoveFailed": "Could not remove this project. Please try again.",
+			"projectsLoadFailed": "Could not load projects. Please try again.",
+			"projectsUnavailable": "Project management is currently unavailable.",
+			"projectsInvalidWorkspace": "This project reference is invalid.",
+			"projectsNotFound": "This project no longer exists.",
+			"projectsOutdated": "Project management is not loaded in the Host yet. Re-enable power-dsh, then try again.",
+			"projectsTimeNow": "just now",
+			"projectsTimeMinutes": "{n} min ago",
+			"projectsTimeHours": "{n} h ago",
+			"projectsTimeDays": "{n} d ago",
+			"projectsTimeMonths": "{n} mo ago",
+			"projectsTimeYears": "{n} y ago"
+		},
+		"zh": {
+			"projectManagerEnabled": "项目管理",
+			"projectManagerDescription": "查看并移除 DSH 项目",
+			"projectsTab": "项目",
+			"projectsDescription": "移除项目只会把它从侧栏和项目选择器中拿掉。会话仍会留在最近和搜索中，磁盘上的文件不受影响。",
+			"projectsSearch": "搜索项目、文件夹或设备",
+			"projectsEmpty": "暂无项目",
+			"projectsNoMatches": "未找到匹配的项目",
+			"projectsSortLabel": "排序",
+			"projectsSortRecent": "最近活动",
+			"projectsSortManual": "手动排序",
+			"projectsColumnProject": "项目",
+			"projectsColumnSessions": "会话",
+			"projectsColumnActivity": "最近活动",
+			"projectsSessions": "{count}",
+			"projectsNeverUsed": "未使用",
+			"projectsRemove": "移除",
+			"projectsRemoving": "正在移除…",
+			"projectsRemoveTitle": "移除项目？",
+			"projectsRemoveDescription": "将把“{name}”从侧栏和项目选择器中移除。会话仍会留在最近和搜索中，磁盘上的文件不受影响。",
+			"projectsRemoveConfirm": "移除项目",
+			"projectsRemoveFailed": "无法移除该项目，请重试。",
+			"projectsLoadFailed": "无法加载项目，请重试。",
+			"projectsUnavailable": "项目管理暂不可用。",
+			"projectsInvalidWorkspace": "项目标识无效。",
+			"projectsNotFound": "该项目已不存在。",
+			"projectsOutdated": "项目管理尚未在后端加载，请重新启用 power-dsh 后重试。",
+			"projectsTimeNow": "刚刚",
+			"projectsTimeMinutes": "{n} 分钟前",
+			"projectsTimeHours": "{n} 小时前",
+			"projectsTimeDays": "{n} 天前",
+			"projectsTimeMonths": "{n} 个月前",
+			"projectsTimeYears": "{n} 年前"
+		}
+	};
+
+// src/features/projects/rpc.ts
+	const projectCatalogCodec = {
+		mode: "strict",
+		typeSymbol: "power-dsh#ProjectCatalog",
+		create: () => ({ parse(value) {
+			if (!isRecord(value) || typeof value.complete !== "boolean" || !isArray(value.projects)) throw new TypeError("Invalid project catalog");
+			const projects = value.projects.map((row) => {
+				if (!isRecord(row) || !hasStrings(row, [
+					"workspaceId",
+					"title",
+					"path"
+				]) || typeof row.sessionCount !== "number" || !Number.isFinite(row.sessionCount) || typeof row.lastActiveAt !== "number" || !Number.isFinite(row.lastActiveAt)) throw new TypeError("Invalid project row");
+				return {
+					workspaceId: row.workspaceId,
+					title: row.title,
+					path: row.path,
+					sessionCount: row.sessionCount,
+					lastActiveAt: row.lastActiveAt
+				};
+			});
+			return {
+				complete: value.complete,
+				projects
+			};
+		} })
+	};
+	function projectRpc(method, fields) {
+		return {
+			id: `power-dsh#powerDsh/${method}`,
+			service: "powerDsh",
+			namespace: "powerDsh",
+			method,
+			invocation: { kind: "direct" },
+			parameters: fields.map((name) => ({
+				name,
+				wire: name,
+				source: "json",
+				codec: stringCodec
+			})),
+			result: projectCatalogCodec
+		};
+	}
+	const LIST_PROJECTS_RPC = projectRpc("listProjects", []);
+	const REMOVE_PROJECT_RPC = projectRpc("removeProject", ["workspaceId"]);
+	const rpc = [LIST_PROJECTS_RPC, REMOVE_PROJECT_RPC];
+
 // src/app/client-features.ts
 	const clientFeatures = [
 		{
-			definition: definition$3,
-			create: createClientFeature$3,
-			locales: locales$4,
+			definition: definition$5,
+			create: createClientFeature$5,
+			locales: locales$6,
 			rpc: []
 		},
 		{
-			definition: definition$16,
-			create: createClientFeature$16,
-			locales: locales$17,
+			definition: definition$18,
+			create: createClientFeature$18,
+			locales: locales$19,
 			rpc: []
-		},
-		{
-			definition: definition$11,
-			create: createClientFeature$11,
-			locales: locales$12,
-			rpc: []
-		},
-		{
-			definition: definition$10,
-			create: createClientFeature$10,
-			locales: locales$11,
-			rpc: rpc$8
 		},
 		{
 			definition: definition$13,
 			create: createClientFeature$13,
 			locales: locales$14,
-			rpc: rpc$10
+			rpc: []
 		},
 		{
 			definition: definition$12,
 			create: createClientFeature$12,
 			locales: locales$13,
-			rpc: rpc$9
+			rpc: rpc$10
 		},
 		{
-			definition: definition$8,
-			create: createClientFeature$8,
-			locales: locales$9,
-			rpc: rpc$6
+			definition: definition$15,
+			create: createClientFeature$15,
+			locales: locales$16,
+			rpc: rpc$12
 		},
 		{
 			definition: definition$14,
@@ -6705,16 +7995,40 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			rpc: rpc$11
 		},
 		{
-			definition: definition$17,
-			create: createClientFeature$17,
-			locales: locales$18,
-			rpc: rpc$12
+			definition: definition$10,
+			create: createClientFeature$10,
+			locales: locales$11,
+			rpc: rpc$8
+		},
+		{
+			definition: definition$16,
+			create: createClientFeature$16,
+			locales: locales$17,
+			rpc: rpc$13
+		},
+		{
+			definition: definition$19,
+			create: createClientFeature$19,
+			locales: locales$20,
+			rpc: rpc$14
+		},
+		{
+			definition: definition$11,
+			create: createClientFeature$11,
+			locales: locales$12,
+			rpc: rpc$9
 		},
 		{
 			definition: definition$9,
 			create: createClientFeature$9,
 			locales: locales$10,
 			rpc: rpc$7
+		},
+		{
+			definition: definition$8,
+			create: createClientFeature$8,
+			locales: locales$9,
+			rpc: rpc$6
 		},
 		{
 			definition: definition$7,
@@ -6729,28 +8043,28 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			rpc: rpc$4
 		},
 		{
-			definition: definition$5,
-			create: createClientFeature$5,
-			locales: locales$6,
-			rpc: rpc$3
+			definition: definition$17,
+			create: createClientFeature$17,
+			locales: locales$18,
+			rpc: []
 		},
 		{
 			definition: definition$4,
 			create: createClientFeature$4,
 			locales: locales$5,
-			rpc: rpc$2
+			rpc: []
 		},
 		{
-			definition: definition$15,
-			create: createClientFeature$15,
-			locales: locales$16,
-			rpc: []
+			definition: definition$3,
+			create: createClientFeature$3,
+			locales: locales$4,
+			rpc: rpc$3
 		},
 		{
 			definition: definition$2,
 			create: createClientFeature$2,
 			locales: locales$3,
-			rpc: []
+			rpc: rpc$2
 		},
 		{
 			definition: definition$1,
@@ -6878,7 +8192,10 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		DELETE_ARCHIVED_SESSION_RPC,
 		READ_WALLPAPER_RPC,
 		SAVE_WALLPAPER_RPC,
-		CLEAR_WALLPAPER_RPC
+		CLEAR_WALLPAPER_RPC,
+		READ_USAGE_STATS_RPC,
+		LIST_PROJECTS_RPC,
+		REMOVE_PROJECT_RPC
 	]);
 
 // src/app/client.ts

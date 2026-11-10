@@ -62,6 +62,14 @@ import { definition as archiveDefinition } from '../features/archive/definition.
 import * as archiveConfig from '../features/archive/config.ts';
 import * as archiveHost from '../features/archive/host.ts';
 import { rpc as archiveRpc } from '../features/archive/rpc.ts';
+import { definition as usageDefinition } from '../features/usage-stats/definition.ts';
+import * as usageConfig from '../features/usage-stats/config.ts';
+import * as usageHost from '../features/usage-stats/host.ts';
+import { rpc as usageRpc } from '../features/usage-stats/rpc.ts';
+import { definition as projectsDefinition } from '../features/projects/definition.ts';
+import * as projectsConfig from '../features/projects/config.ts';
+import * as projectsHost from '../features/projects/host.ts';
+import { rpc as projectsRpc } from '../features/projects/rpc.ts';
 
 export const HOST_FEATURES = Object.freeze([
   { definition: versionDefinition, ...versionConfig },
@@ -82,6 +90,8 @@ export const HOST_FEATURES = Object.freeze([
   { definition: effortDefinition, ...effortConfig },
   { definition: backgroundDefinition, ...backgroundConfig, ...backgroundHost, rpc: backgroundRpc },
   { definition: archiveDefinition, ...archiveConfig, ...archiveHost, rpc: archiveRpc },
+  { definition: usageDefinition, ...usageConfig, ...usageHost, rpc: usageRpc },
+  { definition: projectsDefinition, ...projectsConfig, ...projectsHost, rpc: projectsRpc },
 ] satisfies HostFeature[]);
 
 export const hostFeatures = HOST_FEATURES;
