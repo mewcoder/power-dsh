@@ -78,7 +78,8 @@ export const panelStyles = `
 .power-dsh-background-panel-label { font-size: 14px; line-height: 22px; color: var(--dsw-alias-label-primary); }
 .power-dsh-background-panel-value { font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-secondary); }
 .power-dsh-background-panel .power-dsh-slider { box-sizing: border-box; width: 100%; height: 20px; margin: 0; accent-color: var(--dsw-alias-brand-primary); cursor: pointer; }
-.power-dsh-background-panel .power-dsh-slider:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)); outline-offset: 4px; border-radius: var(--dsw-radius-xs); }
+/* The native range paints its own focus ring; adding an outline drew a second box. */
+.power-dsh-background-panel .power-dsh-slider:focus-visible { outline: none; }
 .power-dsh-background-panel .power-dsh-slider:disabled { opacity: .4; cursor: not-allowed; }
 /* Grouping: each block states what it changes, so the panel reads top-down. */
 .power-dsh-background-panel-section { display: flex; flex-direction: column; gap: 12px; }

@@ -109,7 +109,10 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   function BackgroundController() {
     const snapshot = useSnapshot(source ?? EMPTY_SOURCE);
     const asset = useSnapshot(wallpaperSource);
-    const { kind } = readStyle(snapshot);
+    const panel = useSnapshot(panelStore);
+    // While the panel is open it owns the type, so switching to a wallpaper
+    // previews immediately instead of waiting for the save on close.
+    const kind = panel.open ? panel.kind : readStyle(snapshot).kind;
     const dataUrl = kind === 'wallpaper' ? asset.value?.dataUrl : undefined;
     const name = kind === 'wallpaper' ? asset.value?.name : undefined;
     // Only the artwork identity re-attaches; opacity and blur are read live so the
@@ -305,16 +308,22 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       }),
       h('p', { id: description, className: 'power-dsh-background-panel-hint' }, t(descriptionKey)));
   }
-  // Lucide Shirt, ISC licensed; the host sprite has no clothing glyph, so the
-  // official artwork is inlined at the neighbouring icons' 16px optical size.
+  /**
+   * Short-sleeved tee, drawn in the host's own icon dialect: a 16x16 viewBox with
+   * a 1px stroke and round joins, matching `edit-outline` and `trash-outline`.
+   * Lucide artwork is designed on 24x24 at 2px, so scaling it to 16px made the
+   * glyph read heavy and cramped beside the host icons.
+   */
   function ShirtIcon({ size = 16 }: IconProps) {
     return h('svg', {
-      width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
-      stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
+      width: size, height: size, viewBox: '0 0 16 16', fill: 'none',
+      stroke: 'currentColor', strokeWidth: 1, strokeLinecap: 'round', strokeLinejoin: 'round',
       'aria-hidden': true, focusable: false,
-    }, h('path', {
-      d: 'M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z',
-    }));
+    },
+      // Body and both sleeves in one closed outline.
+      h('path', { d: 'M6.2 2.6 2.5 4.1l1.1 2.6 1.9-.8v7.5h5V5.9l1.9.8 1.1-2.6-3.7-1.5' }),
+      // Collar, closing the neckline between the two shoulders.
+      h('path', { d: 'M6.2 2.6a2.4 2.4 0 0 0 3.6 0' }));
   }
 
   /**

@@ -4619,7 +4619,8 @@ void main() {
 .power-dsh-background-panel-label { font-size: 14px; line-height: 22px; color: var(--dsw-alias-label-primary); }
 .power-dsh-background-panel-value { font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-secondary); }
 .power-dsh-background-panel .power-dsh-slider { box-sizing: border-box; width: 100%; height: 20px; margin: 0; accent-color: var(--dsw-alias-brand-primary); cursor: pointer; }
-.power-dsh-background-panel .power-dsh-slider:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)); outline-offset: 4px; border-radius: var(--dsw-radius-xs); }
+/* The native range paints its own focus ring; adding an outline drew a second box. */
+.power-dsh-background-panel .power-dsh-slider:focus-visible { outline: none; }
 .power-dsh-background-panel .power-dsh-slider:disabled { opacity: .4; cursor: not-allowed; }
 /* Grouping: each block states what it changes, so the panel reads top-down. */
 .power-dsh-background-panel-section { display: flex; flex-direction: column; gap: 12px; }
@@ -5180,7 +5181,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		function BackgroundController() {
 			const snapshot = useSnapshot(source ?? EMPTY_SOURCE);
 			const asset = useSnapshot(wallpaperSource);
-			const { kind } = readStyle(snapshot);
+			const panel = useSnapshot(panelStore);
+			const kind = panel.open ? panel.kind : readStyle(snapshot).kind;
 			const dataUrl = kind === "wallpaper" ? asset.value?.dataUrl : void 0;
 			const name = kind === "wallpaper" ? asset.value?.name : void 0;
 			React.useLayoutEffect(() => {
@@ -5447,19 +5449,25 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				className: "power-dsh-background-panel-hint"
 			}, t(descriptionKey)));
 		}
+		/**
+		* Short-sleeved tee, drawn in the host's own icon dialect: a 16x16 viewBox with
+		* a 1px stroke and round joins, matching `edit-outline` and `trash-outline`.
+		* Lucide artwork is designed on 24x24 at 2px, so scaling it to 16px made the
+		* glyph read heavy and cramped beside the host icons.
+		*/
 		function ShirtIcon({ size = 16 }) {
 			return h("svg", {
 				width: size,
 				height: size,
-				viewBox: "0 0 24 24",
+				viewBox: "0 0 16 16",
 				fill: "none",
 				stroke: "currentColor",
-				strokeWidth: 2,
+				strokeWidth: 1,
 				strokeLinecap: "round",
 				strokeLinejoin: "round",
 				"aria-hidden": true,
 				focusable: false
-			}, h("path", { d: "M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z" }));
+			}, h("path", { d: "M6.2 2.6 2.5 4.1l1.1 2.6 1.9-.8v7.5h5V5.9l1.9.8 1.1-2.6-3.7-1.5" }), h("path", { d: "M6.2 2.6a2.4 2.4 0 0 0 3.6 0" }));
 		}
 		/**
 		* Sidebar entry, shown when `showBackgroundShortcut` is on. It reuses the same
