@@ -110,7 +110,7 @@ test('settings group twenty switches under five panels and default to General', 
   app.set({ notificationsEnabled: true });
   const groups = {
     general: ['notificationsEnabled', 'notificationSoundEnabled'],
-    interface: ['showThinkingEffortSwitcher', 'showThemeSwitcher', 'flowingBackgroundEnabled', 'showVersion', 'showBackgroundShortcut'],
+    interface: ['showThinkingEffortSwitcher', 'showThemeSwitcher', 'flowingBackgroundEnabled', 'showBackgroundShortcut', 'showVersion'],
     enhancements: ['skillManagerEnabled', 'mcpManagerEnabled', 'personalizationEnabled', 'archiveManagerEnabled'],
     simplify: ['blockOfficialAccount', 'blockOfficialSearch', 'blockOfficialTelemetry', 'blockTodo', 'blockPlan', 'blockGoal'],
     other: ['showRefreshButton', 'showRestartButton', 'blockDoubleClickRename'],

@@ -34,6 +34,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## 原生模型设置按钮规格
+
+[归档管理](../src/features/archive/spec.md)的行内「取消归档」「删除」按钮和删除确认框的危险按钮按用户提供的原生参照，对齐 DSH `0.2.2-rc.1` 安装包 `@deepseek-ai/dsh-client-ui-settings-models` 的 `ModelsSection.module.css` 中 `.rowActions .secondaryButton`、`.rowActions .dangerButton` 与 `.deleteConfirm` 的几何、描边、颜色和 hover token。仅在本插件自有 `power-dsh-archive-*` 类内复现数值，不导入其模块、不引用生成的 CSS 类名，也不复制页面结构或文案。
+
+- [原生模型设置源码](https://github.com/deepseek-ai/deepseek-harness/tree/master/packages/client/ui-settings-models/src/client)
+- 对照发行包：`@deepseek-ai/dsh-client-ui-settings-models@0.2.2-rc.1`。
+- [上游 MIT 许可证](https://github.com/deepseek-ai/deepseek-harness/blob/master/LICENSE)，全文见上一节。
+
 ## 技能与 MCP 来源研究
 
 接口研究依据 DSH `0.2.2-rc.1` 安装包的公开实现：`dsh-skill` 的分层目录、rank 与调用策略，`dsh-skill-filesystem` 的 cwd 与项目根语义，`dsh-scope` 的上下文所有权，以及 Plugin Manager、Settings、Loader、Cordis Registry / Fiber 和 preset composition。原生服务是否存在须按目标发行包核对；profile 条目清单不能证明没有 preset、Agent 或动态实例。现行行为和接口约束分别维护在[技能管理](../src/features/skills/spec.md)与[MCP 管理](../src/features/mcp/spec.md)，历史版本差异见[兼容性调查](compatibility-audit.md#官方发行标签的接口证据)。
@@ -120,14 +128,14 @@ Mod 使用已核对的 DSH `0.2.2-rc.1` 原生会话、交互及 subprocess 通�
 
 ## Lucide Puzzle、Sparkles 与 Cable
 
-[Mod 图标](../assets/icon.svg)与 Mod 设置导航使用 Lucide Puzzle；[技能与 MCP 设置导航](../src/client.ts)分别使用 Lucide Sparkles 和 Cable；[归档设置导航](../src/features/archive/client.ts)使用 Lucide Archive、Folder 与 Trash。仅内联所需 SVG，不引入 Lucide 运行时依赖。图形使用约定见 [UI 规范](ui.md#logo-与图标)，独立 SVG 中也保留完整许可。
+[Mod 图标](../assets/icon.svg)与 Mod 设置导航使用 Lucide Puzzle；[技能与 MCP 设置导航](../src/client.ts)分别使用 Lucide Sparkles 和 Cable；[归档设置导航](../src/features/archive/client.ts)使用 Lucide Archive 与 Folder；[快捷切换背景按钮](../src/features/flowing-background/client.ts)使用 Lucide Shirt。仅内联所需 SVG，不引入 Lucide 运行时依赖。图形使用约定见 [UI 规范](ui.md#logo-与图标)，独立 SVG 中也保留完整许可。
 
 - [Puzzle 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/puzzle.svg)
 - [Sparkles 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/sparkles.svg)
 - [Cable 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/cable.svg)
 - [Archive 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/archive.svg)
+- [Shirt 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/shirt.svg)
 - [Folder 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/folder.svg)
-- [Trash 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/trash-2.svg)
 - [上游许可证](https://raw.githubusercontent.com/lucide-icons/lucide/main/LICENSE)
 - 获取日期：2026-11-07。
 

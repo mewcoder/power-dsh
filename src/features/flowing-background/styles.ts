@@ -24,10 +24,13 @@ export const settingsStyles = `
 @media (hover:hover) { .power-dsh-page .power-dsh-background-style-select:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover); } }
 .power-dsh-page .power-dsh-background-tune-trigger { display:inline-flex; align-items:center; justify-content:center; flex:none; width:28px; height:28px; padding:0; }
 
-.power-dsh-background-shortcut { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border:0; border-radius:var(--dsw-radius-sm); padding:0; background:transparent; color:var(--dsw-alias-label-secondary); cursor:pointer; }
+.power-dsh-background-seat { display:block; width:100%; height:0; }
+/* Matches the appearance shortcut beside it: fixed on the footer row, 32x32. */
+.power-dsh-background-shortcut { position:fixed; bottom:16px; z-index:5; display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; width:32px; height:32px; border:0; border-radius:var(--dsw-radius-md); padding:0; background:transparent; color:var(--dsw-alias-label-primary); font:inherit; cursor:pointer; pointer-events:auto; -webkit-app-region:no-drag; }
 @media (hover:hover) { .power-dsh-background-shortcut:hover { background:var(--dsw-alias-interactive-bg-hover); } }
 .power-dsh-background-shortcut:active { background:var(--dsw-alias-interactive-bg-active); }
-.power-dsh-background-shortcut:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary)); outline-offset:2px; }
+.power-dsh-background-shortcut:disabled { opacity:.5; cursor:default; }
+.power-dsh-background-shortcut:focus-visible { outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary)); outline-offset:2px; }
 .power-dsh-page .power-dsh-slider-field { display:inline-flex; align-items:center; gap:10px; min-width:190px; justify-content:flex-end; }
 .power-dsh-page .power-dsh-slider { box-sizing:border-box; width:150px; margin:0; accent-color:var(--dsw-alias-state-business-primary); cursor:pointer; }
 .power-dsh-page .power-dsh-slider:disabled { opacity:.5; cursor:default; }

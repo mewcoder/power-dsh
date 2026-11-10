@@ -1,5 +1,5 @@
 import { errorMessage } from '../../shared/client/runtime.ts';
-import type { ClientEnvironment, ClientFeature, ClientRuntime, FormSnapshot, SettingsViewContext, SlotProps, SnapshotSource } from '../../shared/client/types.ts';
+import type { ClientEnvironment, ClientFeature, ClientRuntime, FormSnapshot, IconProps, SettingsViewContext, SlotProps, SnapshotSource } from '../../shared/client/types.ts';
 import { styles as feedbackStyles } from '../../shared/client/error-feedback.ts';
 import { watchBackground } from './attachment.ts';
 import type { AttachmentFailure } from './attachment.ts';
@@ -305,6 +305,18 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       }),
       h('p', { id: description, className: 'power-dsh-background-panel-hint' }, t(descriptionKey)));
   }
+  // Lucide Shirt, ISC licensed; the host sprite has no clothing glyph, so the
+  // official artwork is inlined at the neighbouring icons' 16px optical size.
+  function ShirtIcon({ size = 16 }: IconProps) {
+    return h('svg', {
+      width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
+      stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
+      'aria-hidden': true, focusable: false,
+    }, h('path', {
+      d: 'M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z',
+    }));
+  }
+
   /**
    * Sidebar entry, shown when `showBackgroundShortcut` is on. It reuses the same
    * panel as the settings row; `openPanel` still refuses when the form is not
@@ -313,23 +325,52 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   function BackgroundShortcut({ t }: Pick<SlotProps, 't'>) {
     const config = useSnapshot(source ?? EMPTY_SOURCE);
     const state = useSnapshot(panelStore);
+    // The appearance shortcut is fixed-positioned from its own seat; this button
+    // anchors to the same row so the pair reads as one control group, with the
+    // background entry on the left.
+    const seat = React.useRef<HTMLSpanElement | null>(null);
+    const [left, setLeft] = React.useState<number | null>(null);
     const visible = config.status === 'ready' && config.writable
       && config.value?.showBackgroundShortcut === true;
+    React.useLayoutEffect(() => {
+      if (!visible || !seat.current) return;
+      const element = seat.current;
+      const measure = () => {
+        const appearance = element.parentElement?.querySelector<HTMLElement>('.power-dsh-appearance-button');
+        const anchor = appearance ?? element;
+        // The appearance button is 32px wide and sits at `seat.right - 40`, so its
+        // left edge is `seat.right - 72`. Butt the two together with no gap; the
+        // 32px hit areas already keep their glyphs visually separated.
+        setLeft(Math.max(0, anchor.getBoundingClientRect().right - 72));
+      };
+      measure();
+      const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+      observer?.observe(element);
+      window.addEventListener('resize', measure);
+      window.visualViewport?.addEventListener('resize', measure);
+      return () => {
+        observer?.disconnect();
+        window.removeEventListener('resize', measure);
+        window.visualViewport?.removeEventListener('resize', measure);
+      };
+    }, [visible]);
     if (!visible) return null;
     const enabled = config.value?.flowingBackgroundEnabled === true;
     const label = enabled ? t('flowingBackgroundTuneOpen') : t('flowingBackgroundEnabled');
     return h(React.Fragment, null,
       h('style', null, settingsStyles + panelStyles),
-      h(Tooltip, { label, side: 'top', portal: true, delayMs: 200, maxWidth: 320 },
-        h('button', {
-          type: 'button', className: 'power-dsh-background-shortcut',
-          'aria-label': label, 'aria-haspopup': 'dialog', 'aria-expanded': state.open,
-          onClick: () => {
-            if (state.open) { void closePanel(); return; }
-            // The sidebar has no settings modal to close, so nothing is left behind.
-            openPanel(() => {});
-          },
-        }, h(NativeIcon, { glyph: 'enhance-outline' }))));
+      h('span', { className: 'power-dsh-background-seat', ref: seat },
+        h(Tooltip, { label, side: 'top', portal: true, delayMs: 200, maxWidth: 320 },
+          h('button', {
+            type: 'button', className: 'power-dsh-background-shortcut',
+            style: left === null ? { visibility: 'hidden' } : { left },
+            'aria-label': label, 'aria-haspopup': 'dialog', 'aria-expanded': state.open,
+            onClick: () => {
+              if (state.open) { void closePanel(); return; }
+              // The sidebar has no settings modal to close, so nothing is left behind.
+              openPanel(() => {});
+            },
+          }, h(ShirtIcon)))));
   }
 
   // Frame-wide, click-through overlay; the panel itself opts back into pointer events.
@@ -360,6 +401,10 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   const kindSetting = { field: 'flowingBackgroundKind', description: 'flowingBackgroundKindDescription', hidden: true } as const;
   const opacitySetting = { field: 'flowingBackgroundOpacity', description: 'flowingBackgroundOpacityDescription', hidden: true } as const;
   const blurSetting = { field: 'flowingBackgroundBlur', description: 'flowingBackgroundBlurDescription', hidden: true } as const;
+  const shortcutSetting = {
+    field: 'showBackgroundShortcut', description: 'showBackgroundShortcutDescription',
+    canSave: () => source.getSnapshot().value?.flowingBackgroundEnabled === true,
+  } as const;
 
   const canEditWallpaper = () => {
     const snapshot = source.getSnapshot();
@@ -484,17 +529,17 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     }
 
     // `hidden` short-circuits `render` in the settings shell, so the main row is
-    // replaced by a render contribution rather than hidden.
+    // replaced by a render contribution rather than hidden. The shortcut row is
+    // returned here so it sits directly under the background switch instead of
+    // trailing every other feature's settings.
     return [
       { ...main, render: mainRow },
+      shortcutSetting,
     ];
   }
 
   return {
-    settings: [
-      mainSetting, kindSetting, opacitySetting, blurSetting,
-      { field: 'showBackgroundShortcut', description: 'showBackgroundShortcutDescription' },
-    ],
+    settings: [mainSetting, kindSetting, opacitySetting, blurSetting, shortcutSetting],
     useSettings,
     styles: settingsStyles + panelStyles,
     sidebar: props => h(BackgroundShortcut, { ...props }),
