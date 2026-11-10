@@ -17,7 +17,10 @@ export function createSettingsPage(runtime: ClientRuntime) {
     const mounted = useMounted();
     const id = React.useId();
     const ready = snapshot.status === 'ready';
-    const disabled = !ready || !snapshot.writable || Boolean(saving);
+    // A save in flight must not disable the whole page: only the row being saved
+    // shows its busy state, and `pending` already serializes writes. Genuine
+    // read-only or unavailable states still disable every control.
+    const disabled = !ready || !snapshot.writable;
     const notice = !ready ? t(snapshot.status === 'loading' ? 'loading' : 'unavailable')
       : !snapshot.writable ? t('readOnly') : !version ? t('versionUnavailable') : null;
     const noticeError = snapshot.status === 'unavailable';
@@ -77,7 +80,7 @@ export function createSettingsPage(runtime: ClientRuntime) {
           'aria-checked': checked,
           'aria-labelledby': `${control}-label`, 'aria-describedby': `${control}-description${fieldError ? ` ${control}-error` : ''}`,
           'aria-invalid': Boolean(fieldError),
-          'aria-busy': busy, disabled,
+          'aria-busy': busy, disabled: disabled || busy,
           onClick: () => save(field, !checked),
         }, h('span', { className: 'power-dsh-switch-thumb', 'aria-hidden': true })));
     }
@@ -95,7 +98,7 @@ export function createSettingsPage(runtime: ClientRuntime) {
           id: `${id}-tab-${tab.id}`, type: 'button', role: 'tab', className: 'power-dsh-tab',
           ref: (element: HTMLButtonElement | null) => { tabRefs.current[tab.id] = element; },
           'aria-selected': activeTab === tab.id, 'aria-controls': `${id}-panel-${tab.id}`,
-          tabIndex: activeTab === tab.id ? 0 : -1, disabled: Boolean(saving),
+          tabIndex: activeTab === tab.id ? 0 : -1, 'aria-disabled': Boolean(saving) || undefined,
           onClick: () => selectTab(tab.id), onKeyDown: event => onTabKeyDown(event, index),
         }, t(`${tab.id}Tab`)))),
       h('div', {

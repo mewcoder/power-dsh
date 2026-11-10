@@ -166,7 +166,7 @@ test('settings tabs support wrapping arrow keys, Home and End with selection and
   app.unmount();
 });
 
-test('pending saves reject tab clicks and keyboard changes and keep errors in the current panel', async () => {
+test('a pending save marks only its own row busy and keeps the page operable', async () => {
   for (const [id, field, mechanism] of [
     ['interface', 'showVersion', 'form'], ['general', 'notificationsEnabled', 'form'],
     ['enhancements', 'skillManagerEnabled', 'form'], ['simplify', 'blockTodo', 'rpc'],
@@ -176,14 +176,23 @@ test('pending saves reject tab clicks and keyboard changes and keep errors in th
     app.selectSettingsTab(id);
     const view = () => descendants(app.renderSettings());
     const tabs = () => view().filter(node => node.props.role === 'tab');
+    const switches = () => view().filter(node => node.props.role === 'switch');
     const oldTabs = tabs();
     const control = view().find(node => node.props.id === `settings-test-${field}`);
     const action = control.props.onClick();
-    // Stale callbacks must also reject changes before a render exposes disabled tabs.
+    // The row being saved shows its own busy state; every other control stays live
+    // so the page never looks disabled while one write is in flight.
+    assert.equal(view().find(node => node.props.id === `settings-test-${field}`).props['aria-busy'], true);
+    assert.equal(view().find(node => node.props.id === `settings-test-${field}`).props.disabled, true,
+      'Only the saving row is disabled.');
+    assert.ok(switches().filter(node => node.props.id !== `settings-test-${field}`)
+      .every(node => !node.props.disabled), 'Other switches stay operable.');
+    assert.ok(tabs().every(tab => !tab.props.disabled), 'Tabs stay focusable.');
+    assert.ok(tabs().every(tab => tab.props['aria-disabled'] === true), 'Tabs announce the pending save.');
+    // Stale callbacks and fresh clicks must still refuse to move the panel mid-save.
     oldTabs.find(tab => !tab.props['aria-selected']).props.onClick();
     oldTabs.find(tab => tab.props['aria-selected']).props.onKeyDown({ key: 'ArrowRight', preventDefault() {} });
     assert.equal(tabs().find(tab => tab.props['aria-selected']).props.id, `settings-test-tab-${id}`);
-    assert.ok(tabs().every(tab => tab.props.disabled));
     for (const tab of tabs()) {
       tab.props.onClick();
       tab.props.onKeyDown({ key: 'End', preventDefault() {} });
@@ -195,7 +204,7 @@ test('pending saves reject tab clicks and keyboard changes and keep errors in th
     assert.equal(view().find(node => node.props.role === 'tabpanel').props.id, `settings-test-panel-${id}`);
     assert.ok(view().some(node => node.props.role === 'alert'));
     assert.equal(view().find(node => node.props.id === `settings-test-${field}`).props['aria-checked'], false);
-    assert.ok(tabs().every(tab => !tab.props.disabled));
+    assert.ok(tabs().every(tab => tab.props['aria-disabled'] === undefined), 'The pending hint clears.');
     app.selectSettingsTab(id === 'general' ? 'enhancements' : 'general');
     assert.equal(view().find(node => node.props.role === 'tabpanel').props.id, `settings-test-panel-${id === 'general' ? 'enhancements' : 'general'}`);
     app.unmount();
