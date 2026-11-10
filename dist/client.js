@@ -330,7 +330,7 @@
 			const mounted = useMounted();
 			const id = React.useId();
 			const ready = snapshot.status === "ready";
-			const disabled = !ready || !snapshot.writable || Boolean(saving);
+			const disabled = !ready || !snapshot.writable;
 			const notice = !ready ? t(snapshot.status === "loading" ? "loading" : "unavailable") : !snapshot.writable ? t("readOnly") : !version ? t("versionUnavailable") : null;
 			const noticeError = snapshot.status === "unavailable";
 			async function save(field, next) {
@@ -421,7 +421,7 @@
 					"aria-describedby": `${control}-description${fieldError ? ` ${control}-error` : ""}`,
 					"aria-invalid": Boolean(fieldError),
 					"aria-busy": busy,
-					disabled,
+					disabled: disabled || busy,
 					onClick: () => save(field, !checked)
 				}, h("span", {
 					className: "power-dsh-switch-thumb",
@@ -456,7 +456,7 @@
 				"aria-selected": activeTab === tab.id,
 				"aria-controls": `${id}-panel-${tab.id}`,
 				tabIndex: activeTab === tab.id ? 0 : -1,
-				disabled: Boolean(saving),
+				"aria-disabled": Boolean(saving) || void 0,
 				onClick: () => selectTab(tab.id),
 				onKeyDown: (event) => onTabKeyDown(event, index)
 			}, t(`${tab.id}Tab`)))), h("div", {
@@ -3973,7 +3973,7 @@ html[data-windows-titlebar] .power-dsh-version-seat .power-dsh-version-badge { t
 		status: "idle",
 		error: null
 	};
-	const GLYPHS = ["signal", "arc"];
+	const GLYPHS = ["arc", "signal"];
 	function resolveGlyph(value) {
 		return value === "signal" ? "signal" : "arc";
 	}
@@ -4618,7 +4618,9 @@ void main() {
 .power-dsh-background-panel-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .power-dsh-background-panel-label { font-size: 14px; line-height: 22px; color: var(--dsw-alias-label-primary); }
 .power-dsh-background-panel-value { font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-secondary); }
-.power-dsh-background-panel .power-dsh-slider { box-sizing: border-box; width: 100%; height: 20px; margin: 0; accent-color: var(--dsw-alias-brand-primary); cursor: pointer; }
+/* Same accent as the inline settings sliders; brand-primary resolves to
+   label-primary (near black) in the light theme, which read as an unstyled track. */
+.power-dsh-background-panel .power-dsh-slider { box-sizing: border-box; width: 100%; height: 20px; margin: 0; accent-color: var(--dsw-alias-state-business-primary); cursor: pointer; }
 /* The native range paints its own focus ring; adding an outline drew a second box. */
 .power-dsh-background-panel .power-dsh-slider:focus-visible { outline: none; }
 .power-dsh-background-panel .power-dsh-slider:disabled { opacity: .4; cursor: not-allowed; }
@@ -4633,7 +4635,7 @@ void main() {
 /* The two options sit on one line, side by side. */
 .power-dsh-background-options { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; }
 .power-dsh-background-radio { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 18px; cursor: pointer; }
-.power-dsh-background-radio input { flex: none; width: 14px; height: 14px; margin: 0; accent-color: var(--dsw-alias-brand-primary); cursor: pointer; }
+.power-dsh-background-radio input { flex: none; width: 14px; height: 14px; margin: 0; accent-color: var(--dsw-alias-state-business-primary); cursor: pointer; }
 .power-dsh-background-radio input:disabled { cursor: default; }
 .power-dsh-background-radio input:disabled + .power-dsh-background-radio-label { opacity: .5; }
 .power-dsh-background-radio input:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)); outline-offset: 2px; }
@@ -5449,20 +5451,20 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			}, t(descriptionKey)));
 		}
 		/**
-		* Short-sleeved tee from Tabler Icons (MIT), tightened to fill the frame. The
-		* artwork is drawn inside roughly x 2.5-21.5 and y 4-21 of its 24x24 canvas,
-		* so it read small beside the host icons, whose glyphs fill all 16 units. The
-		* viewBox is cropped to that box and the stroke set to 1.4, keeping the 1px
-		* optical weight a 16px render of the host icons has.
+		* Short-sleeved tee from Tabler Icons (MIT), sized to the host icon metrics.
+		* Its glyph spans 18x17 of the 24-unit canvas, so a 22-unit viewBox renders it
+		* 13.1px wide - the host `trash-outline` glyph is 13.4px - with a 1.1 stroke
+		* landing on the host icons' 1px optical weight. Cropping tighter made the tee
+		* visibly larger than its neighbours.
 		*/
 		function ShirtIcon({ size = 16 }) {
 			return h("svg", {
 				width: size,
 				height: size,
-				viewBox: "2.5 3.5 19 18",
+				viewBox: "1 1 22 22",
 				fill: "none",
 				stroke: "currentColor",
-				strokeWidth: 1.4,
+				strokeWidth: 1.1,
 				strokeLinecap: "round",
 				strokeLinejoin: "round",
 				"aria-hidden": true,
@@ -5996,6 +5998,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			groups.set(workspace.workspaceId, {
 				key: workspace.workspaceId,
 				title: workspace.title,
+				path: workspace.path,
 				sessions: []
 			});
 		}
@@ -6007,6 +6010,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				group = {
 					key,
 					title: row.workspaceTitle || ungroupedLabel,
+					path: row.workspacePath,
 					sessions: []
 				};
 				groups.set(key, group);
@@ -6035,14 +6039,15 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 .power-dsh-archive-page .power-dsh-archive-group { display:flex; flex-direction:column; gap:8px; }
 .power-dsh-archive-page .power-dsh-archive-group + .power-dsh-archive-group { border-top:.5px solid var(--dsw-alias-border-l2); padding-top:14px; }
 .power-dsh-archive-page .power-dsh-archive-group-header { display:flex; align-items:center; gap:8px; min-height:28px; }
-.power-dsh-archive-page .power-dsh-archive-group-toggle { display:flex; flex:1 1 auto; align-items:center; gap:8px; min-width:0; border:0; border-radius:var(--dsw-radius-sm); padding:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.power-dsh-archive-page .power-dsh-archive-group-toggle { display:flex; flex:0 1 auto; align-items:center; gap:8px; min-width:0; border:0; border-radius:var(--dsw-radius-sm); padding:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
 .power-dsh-archive-page .power-dsh-archive-group-toggle:hover { color:var(--dsw-alias-label-primary); }
 .power-dsh-archive-page .power-dsh-archive-group-toggle:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
 .power-dsh-archive-page .power-dsh-archive-group-toggle > .power-dsh-skill-chevron { flex:none; color:var(--dsw-alias-label-tertiary); transform:rotate(-90deg); }
 .power-dsh-archive-page .power-dsh-archive-group-toggle[aria-expanded="true"] > .power-dsh-skill-chevron { transform:none; }
 .power-dsh-archive-page .power-dsh-archive-group-folder { display:inline-flex; flex:none; color:var(--dsw-alias-label-tertiary); }
 .power-dsh-archive-page .power-dsh-archive-group-title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-primary); font-size:14px; line-height:22px; font-weight:500; }
-.power-dsh-archive-page .power-dsh-archive-count { flex:none; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
+.power-dsh-archive-page .power-dsh-archive-count { flex:none; margin-left:auto; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
+.power-dsh-archive-page .power-dsh-archive-group-path { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
 .power-dsh-archive-page .power-dsh-archive-rows { margin:0; padding:0; list-style:none; overflow:hidden; border:.5px solid var(--dsw-alias-settings-card-stroke); border-radius:var(--dsw-radius-xl); background:var(--dsw-alias-settings-card-fill); }
 .power-dsh-archive-page .power-dsh-archive-row { display:flex; align-items:center; gap:12px; padding:12px 14px; }
 .power-dsh-archive-page .power-dsh-archive-row + .power-dsh-archive-row { border-top:.5px solid var(--dsw-alias-border-l2); }
@@ -6290,6 +6295,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			const renderGroup = (group, index) => {
 				const titleId = `${id}-archive-group-${index}`;
 				const open = Boolean(query.trim()) || !closedGroups[group.key];
+				const path = group.path;
 				return h("section", {
 					key: group.key,
 					className: "power-dsh-archive-group",
@@ -6307,7 +6313,16 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 							[group.key]: !current[group.key]
 						}));
 					}
-				}, h(SkillChevron), h("span", { className: "power-dsh-archive-group-folder" }, h(FolderIcon)), h("span", { className: "power-dsh-archive-group-title" }, group.title)), h("span", { className: "power-dsh-archive-count" }, t("archiveCount").replace("{count}", () => String(group.sessions.length)))), open && h("ul", {
+				}, h(SkillChevron), h("span", { className: "power-dsh-archive-group-folder" }, h(FolderIcon)), h("span", { className: "power-dsh-archive-group-title" }, group.title)), path && h(Tooltip, {
+					label: path,
+					side: "top",
+					portal: true,
+					delayMs: 0,
+					maxWidth: 480
+				}, h("span", {
+					className: "power-dsh-archive-group-path",
+					tabIndex: 0
+				}, path)), h("span", { className: "power-dsh-archive-count" }, t("archiveCount").replace("{count}", () => String(group.sessions.length)))), open && h("ul", {
 					id: `${titleId}-body`,
 					className: "power-dsh-archive-rows"
 				}, group.sessions.map(renderRow)));
@@ -6570,7 +6585,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			"archiveLoadFailed": "无法加载归档会话，请重试。",
 			"archiveUnavailable": "归档管理暂不可用。",
 			"archiveUntitled": "未命名会话",
-			"archiveUngrouped": "未归类",
+			"archiveUngrouped": "未分组",
 			"archiveOutdated": "归档管理尚未在后端加载，请重新启用 power-dsh 后重试。"
 		}
 	};
@@ -6581,11 +6596,13 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		typeSymbol: "power-dsh#ArchiveCatalog",
 		create: () => ({ parse(value) {
 			if (!isRecord(value) || typeof value.complete !== "boolean" || !isArray(value.workspaces) || !isArray(value.sessions)) throw new TypeError("Invalid archive catalog");
+			const pathOf = (row) => typeof row.path === "string" ? row.path : "";
 			const workspaces = value.workspaces.map((row) => {
 				if (!isRecord(row) || !hasStrings(row, ["workspaceId", "title"])) throw new TypeError("Invalid archive workspace");
 				return {
 					workspaceId: row.workspaceId,
-					title: row.title
+					title: row.title,
+					path: pathOf(row)
 				};
 			});
 			const sessions = value.sessions.map((row) => {
@@ -6600,6 +6617,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 					title: row.title,
 					workspaceId: row.workspaceId,
 					workspaceTitle: row.workspaceTitle,
+					workspacePath: pathOf(row),
 					updatedAt: row.updatedAt,
 					createdAt: row.createdAt
 				};

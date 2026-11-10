@@ -213,7 +213,10 @@ test('the display style setting shows only with the switcher in Interface and sw
 
   trigger.props.onClick();
   view = app.renderSettings();
-  const signal = descendants(view).find(node => node.props.role === 'menuitem' && node.props['data-id'] === 'signal');
+  const items = descendants(view).filter(node => node.props.role === 'menuitem');
+  assert.deepEqual(items.map(item => item.props['data-id']), ['arc', 'signal'],
+    'The default style is listed first, then the alternative.');
+  const signal = items.find(item => item.props['data-id'] === 'signal');
   assert.ok(signal, 'The style menu offers the signal bars.');
   await signal.props.onClick();
 

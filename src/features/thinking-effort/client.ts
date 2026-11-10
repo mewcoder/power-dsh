@@ -4,7 +4,8 @@ import { arcGeometry, barGeometry, currentChoiceIndex, effortChoices, litBars, t
 import { settingsStyles, styles } from './styles.ts';
 
 const EMPTY_SNAPSHOT: DirectorySnapshot = { current: null, groups: [], status: 'idle', error: null };
-const GLYPHS = ['signal', 'arc'] as const;
+// Display order: the default style first, then the alternative.
+const GLYPHS = ['arc', 'signal'] as const;
 type Glyph = typeof GLYPHS[number];
 
 function resolveGlyph(value: unknown): Glyph {

@@ -3331,14 +3331,17 @@ const configFields = { archiveManagerEnabled: z.boolean().default(false).volatil
 * plain projection. Ordering is deterministic so identical inputs render alike.
 */
 function buildArchiveCatalog(baseline, titles) {
+	const pathOf = (item) => typeof item.path === "string" ? item.path : "";
 	const workspaces = baseline.items.map((item) => ({
 		workspaceId: item.workspaceId,
-		title: item.title
+		title: item.title,
+		path: pathOf(item)
 	}));
 	const owner = /* @__PURE__ */ new Map();
 	for (const item of baseline.items) for (const sessionId of item.sessionIds) if (!owner.has(sessionId)) owner.set(sessionId, {
 		workspaceId: item.workspaceId,
-		title: item.title
+		title: item.title,
+		path: pathOf(item)
 	});
 	const seen = /* @__PURE__ */ new Set();
 	const sessions = [];
@@ -3352,6 +3355,7 @@ function buildArchiveCatalog(baseline, titles) {
 			title: meta?.title ?? "",
 			workspaceId: workspace?.workspaceId ?? "",
 			workspaceTitle: workspace?.title ?? "",
+			workspacePath: workspace?.path ?? "",
 			updatedAt: meta?.updatedAt ?? 0,
 			createdAt: meta?.createdAt ?? 0
 		});
@@ -3533,11 +3537,13 @@ const archiveCatalogCodec = {
 	typeSymbol: "power-dsh#ArchiveCatalog",
 	create: () => ({ parse(value) {
 		if (!isRecord(value) || typeof value.complete !== "boolean" || !isArray(value.workspaces) || !isArray(value.sessions)) throw new TypeError("Invalid archive catalog");
+		const pathOf = (row) => typeof row.path === "string" ? row.path : "";
 		const workspaces = value.workspaces.map((row) => {
 			if (!isRecord(row) || !hasStrings(row, ["workspaceId", "title"])) throw new TypeError("Invalid archive workspace");
 			return {
 				workspaceId: row.workspaceId,
-				title: row.title
+				title: row.title,
+				path: pathOf(row)
 			};
 		});
 		const sessions = value.sessions.map((row) => {
@@ -3552,6 +3558,7 @@ const archiveCatalogCodec = {
 				title: row.title,
 				workspaceId: row.workspaceId,
 				workspaceTitle: row.workspaceTitle,
+				workspacePath: pathOf(row),
 				updatedAt: row.updatedAt,
 				createdAt: row.createdAt
 			};

@@ -145,12 +145,14 @@ interface RestartAccepted {
 interface ArchiveWorkspaceRow {
   workspaceId: string;
   title: string;
+  path: string;
 }
 interface ArchiveSessionRow {
   sessionId: string;
   title: string;
   workspaceId: string;
   workspaceTitle: string;
+  workspacePath: string;
   updatedAt: number;
   createdAt: number;
 }
