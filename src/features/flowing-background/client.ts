@@ -1,5 +1,5 @@
 import { errorMessage } from '../../shared/client/runtime.ts';
-import type { ClientEnvironment, ClientFeature, ClientRuntime, FormSnapshot, SettingsViewContext, SnapshotSource } from '../../shared/client/types.ts';
+import type { ClientEnvironment, ClientFeature, ClientRuntime, FormSnapshot, SettingsViewContext, SlotProps, SnapshotSource } from '../../shared/client/types.ts';
 import { styles as feedbackStyles } from '../../shared/client/error-feedback.ts';
 import { watchBackground } from './attachment.ts';
 import type { AttachmentFailure } from './attachment.ts';
@@ -305,6 +305,33 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       }),
       h('p', { id: description, className: 'power-dsh-background-panel-hint' }, t(descriptionKey)));
   }
+  /**
+   * Sidebar entry, shown when `showBackgroundShortcut` is on. It reuses the same
+   * panel as the settings row; `openPanel` still refuses when the form is not
+   * ready or writable, so the button reports why instead of opening an empty one.
+   */
+  function BackgroundShortcut({ t }: Pick<SlotProps, 't'>) {
+    const config = useSnapshot(source ?? EMPTY_SOURCE);
+    const state = useSnapshot(panelStore);
+    const visible = config.status === 'ready' && config.writable
+      && config.value?.showBackgroundShortcut === true;
+    if (!visible) return null;
+    const enabled = config.value?.flowingBackgroundEnabled === true;
+    const label = enabled ? t('flowingBackgroundTuneOpen') : t('flowingBackgroundEnabled');
+    return h(React.Fragment, null,
+      h('style', null, settingsStyles + panelStyles),
+      h(Tooltip, { label, side: 'top', portal: true, delayMs: 200, maxWidth: 320 },
+        h('button', {
+          type: 'button', className: 'power-dsh-background-shortcut',
+          'aria-label': label, 'aria-haspopup': 'dialog', 'aria-expanded': state.open,
+          onClick: () => {
+            if (state.open) { void closePanel(); return; }
+            // The sidebar has no settings modal to close, so nothing is left behind.
+            openPanel(() => {});
+          },
+        }, h(NativeIcon, { glyph: 'enhance-outline' }))));
+  }
+
   // Frame-wide, click-through overlay; the panel itself opts back into pointer events.
   ctx?.slots?.inject?.('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay', id: 'power-dsh-background-tune', order: -99, locale: env.namespace,
@@ -464,9 +491,13 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   }
 
   return {
-    settings: [mainSetting, kindSetting, opacitySetting, blurSetting],
+    settings: [
+      mainSetting, kindSetting, opacitySetting, blurSetting,
+      { field: 'showBackgroundShortcut', description: 'showBackgroundShortcutDescription' },
+    ],
     useSettings,
     styles: settingsStyles + panelStyles,
+    sidebar: props => h(BackgroundShortcut, { ...props }),
     api: { wallpaperSource, loadWallpaper, saveWallpaper, clearWallpaper },
   } satisfies ClientFeature;
 }

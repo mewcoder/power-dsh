@@ -173,6 +173,7 @@ test('all feature configuration defaults and settings tool output requirements s
     showThinkingEffortSwitcher: false,
     thinkingEffortGlyph: 'arc',
     flowingBackgroundEnabled: false,
+    showBackgroundShortcut: false,
     flowingBackgroundKind: 'pattern',
     flowingBackgroundOpacity: 100,
     flowingBackgroundBlur: 0,

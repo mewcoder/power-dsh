@@ -541,3 +541,21 @@ test('wallpaper actions use the shipped sprite glyphs as icon-only controls', as
     'Neither action renders a text label.');
   app.unmount();
 });
+
+test('the sidebar shortcut appears beside the appearance button only when enabled', async () => {
+  const app = await mount();
+  const shortcut = () => descendants(app.renderFooter()).find(node => node.type === 'button'
+    && node.props.className === 'power-dsh-background-shortcut');
+  app.set({ flowingBackgroundEnabled: true });
+  assert.equal(shortcut(), undefined, 'The shortcut is off by default.');
+  app.set({ showBackgroundShortcut: true });
+  assert.ok(shortcut(), 'Turning the preference on registers the sidebar entry.');
+  assert.ok(shortcut().props['aria-label']);
+  assert.equal(shortcut().props['aria-haspopup'], 'dialog');
+  shortcut().props.onClick();
+  assert.ok(descendants(app.renderTunePanel()).some(node => node.props.className === 'power-dsh-background-panel'),
+    'The sidebar entry opens the same panel as the settings row.');
+  app.set({ showBackgroundShortcut: false });
+  assert.equal(shortcut(), undefined, 'Turning it off removes the entry.');
+  app.unmount();
+});
