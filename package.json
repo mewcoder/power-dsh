@@ -1,6 +1,7 @@
 {
   "name": "power-dsh",
   "version": "0.0.1",
+  "license": "MIT",
   "private": true,
   "packageManager": "pnpm@12.5.1",
   "description": "A DeepSeek Harness (DSH) enhancement plugin. Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.",
