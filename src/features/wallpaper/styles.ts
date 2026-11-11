@@ -1,6 +1,7 @@
 export const styles = `
 .power-dsh-wallpaper-page > .power-dsh-wallpaper-settings { margin-top:20px; }
 .power-dsh-wallpaper-settings { display:flex; flex-direction:column; gap:20px; min-width:0; padding:0 0 16px; width:100%; }
+.power-dsh-wallpaper-picker-group { display:flex; flex-direction:column; gap:8px; }
 .power-dsh-wallpaper-presets { display:grid; grid-template-columns:repeat(auto-fill,minmax(128px,1fr)); gap:8px; }
 .power-dsh-wallpaper-tile { position:relative; min-width:0; border-radius:var(--dsw-radius-md); }
 .power-dsh-wallpaper-tile[data-selected] { outline:1.5px solid var(--dsw-alias-label-tertiary); outline-offset:0; }

@@ -18,6 +18,7 @@ test('a saved wallpaper round-trips through the profile directory', async t => {
   assert.equal(await store.read(), null, 'A missing wallpaper reads as empty, not as an error.');
   const saved = await store.save(PNG, 'my photo.png');
   assert.equal(saved.name, 'my photo.png');
+  assert.equal(saved.path, store.binary, 'Expose the stored copy path, not a guessed source path.');
   assert.equal(saved.mime, 'image/png');
   assert.equal(saved.dataUrl, PNG);
   const reread = await store.read();

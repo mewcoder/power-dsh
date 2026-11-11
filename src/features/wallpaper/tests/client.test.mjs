@@ -10,7 +10,7 @@ const TAB = 'settings.section:power-dsh-wallpaper';
 const ICON = 'settings.section.icon:power-dsh-wallpaper';
 const FLOW = 'shell.overlay:power-dsh-flowing-background';
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
-const image = { name: 'sky.png', mime: 'image/png', bytes: 4, dataUrl: PNG };
+const image = { path: '/test/profile/power-dsh/wallpaper.bin', name: 'sky.png', mime: 'image/png', bytes: 4, dataUrl: PNG };
 const tick = () => new Promise(setImmediate);
 
 // Execute nested production components with separate hook scopes per React position.
@@ -183,7 +183,9 @@ test('custom image import selects custom and removing the active image selects n
   assert.ok(descendants(view.preset('custom')).some(node => node.props.style?.backgroundImage?.includes(PNG)));
   await pick(view, { name: 'other.webp', type: 'image/webp', size: 12, dataUrl: 'data:image/webp;base64,YQ==' });
   assert.equal(view.app.wallpaperWrites[1].name, 'other.webp');
-  assert.ok(view.render().some(node => node.type === 'native-tooltip-fixture' && node.props.label.startsWith('other.webp · ')));
+  assert.ok(view.render().some(node => node.type === 'native-tooltip-fixture' && node.props.label === '/test/profile/power-dsh/wallpaper.bin'));
+  assert.equal(view.render().some(node => node.type === 'native-tooltip-fixture' && node.props.label.includes('wallpaperFormats')), false);
+  assert.ok(view.render().some(node => node.type === 'p' && node.props.children.includes('wallpaperFormats')));
   await view.action('wallpaperRemove').props.onClick();
   assert.deepEqual(view.app.wallpaperWrites.at(-1), { cleared: true });
   assert.equal(view.app.settingsValue().wallpaperSelection, 'none');
@@ -206,10 +208,10 @@ test('a submitted image save updates the persistent asset after leaving and reop
   assert.equal(view.app.wallpaperWrites.length, 1, 'The Host operation is already submitted.');
   view.leave();
   view.render();
-  finish({ ok: true, value: { ...image, name: 'later.png' } });
+  finish({ ok: true, value: { ...image, name: 'later.png', dataUrl: 'data:image/png;base64,YQ==' } });
   await saving;
   view.enter();
-  assert.ok(view.render().some(node => node.type === 'native-tooltip-fixture' && node.props.label.startsWith('later.png · ')),
+  assert.ok(descendants(view.preset('custom')).some(node => node.props.style?.backgroundImage?.includes('data:image/png;base64,YQ==')),
     'Returning shows the successful Host result rather than the old cached file.');
   view.app.unmount();
 });
@@ -224,7 +226,7 @@ test('invalid, oversized and unreadable files do not replace the saved image', a
     await pick(view, file);
     assert.equal(view.app.wallpaperWrites.length, 0);
     assert.ok(view.error('PD-WALLPAPER-ASSET'));
-    assert.ok(view.render().some(node => node.type === 'native-tooltip-fixture' && node.props.label.startsWith('sky.png · ')));
+    assert.ok(view.render().some(node => node.type === 'native-tooltip-fixture' && node.props.label === image.path));
   }
   view.app.unmount();
 });
@@ -233,7 +235,7 @@ test('asset save and remove failures preserve the existing wallpaper and expose 
   const view = await setup({ wallpaper: image, wallpaperReply: async () => ({ ok: false, error: { message: 'private failure' } }), wallpaperClearError: 'private failure' });
   await pick(view, { name: 'new.png', type: 'image/png', size: 12, dataUrl: PNG });
   assert.ok(view.error('PD-WALLPAPER-ASSET'));
-  assert.ok(view.render().some(node => node.type === 'native-tooltip-fixture' && node.props.label.startsWith(`${image.name} · `)));
+  assert.ok(view.render().some(node => node.type === 'native-tooltip-fixture' && node.props.label === image.path));
   await view.action('wallpaperRemove').props.onClick();
   assert.ok(view.error('PD-WALLPAPER-ASSET'));
   assert.ok(view.action('wallpaperReplace'));

@@ -97,6 +97,7 @@ export interface PersonalizationFile {
 }
 
 export interface WallpaperAsset {
+  path?: string;
   name: string;
   mime: string;
   bytes: number;

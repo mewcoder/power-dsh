@@ -61,7 +61,7 @@ export class WallpaperStore {
       throw error;
     }
     this.ensureActive();
-    return { name: meta.name, mime: meta.mime, bytes: bytes.byteLength, dataUrl: `data:${meta.mime};base64,${bytes.toString('base64')}` };
+    return { path: this.binary, name: meta.name, mime: meta.mime, bytes: bytes.byteLength, dataUrl: `data:${meta.mime};base64,${bytes.toString('base64')}` };
   }
 
   async save(dataUrl: string, rawName: string): Promise<WallpaperAsset> {

@@ -5533,6 +5533,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 	const styles$3 = `
 .power-dsh-wallpaper-page > .power-dsh-wallpaper-settings { margin-top:20px; }
 .power-dsh-wallpaper-settings { display:flex; flex-direction:column; gap:20px; min-width:0; padding:0 0 16px; width:100%; }
+.power-dsh-wallpaper-picker-group { display:flex; flex-direction:column; gap:8px; }
 .power-dsh-wallpaper-presets { display:grid; grid-template-columns:repeat(auto-fill,minmax(128px,1fr)); gap:8px; }
 .power-dsh-wallpaper-tile { position:relative; min-width:0; border-radius:var(--dsw-radius-md); }
 .power-dsh-wallpaper-tile[data-selected] { outline:1.5px solid var(--dsw-alias-label-tertiary); outline-offset:0; }
@@ -6083,9 +6084,10 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 					key: id,
 					"data-selected": selected === id || void 0,
 					"data-has-actions": id === "custom" && Boolean(asset) || void 0
-				}, id === "custom" ? h(Tooltip, {
-					label: asset ? `${asset.name} · ${t("wallpaperFormats")}` : t("wallpaperFormats"),
-					portal: true
+				}, id === "custom" && asset?.path ? h(Tooltip, {
+					label: asset.path,
+					portal: true,
+					maxWidth: 520
 				}, radio) : radio, id === "custom" && asset && h("div", { className: "power-dsh-wallpaper-tile-actions" }, h(Tooltip, {
 					label: t("wallpaperReplace"),
 					portal: true
@@ -6198,12 +6200,12 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				}
 			};
 			const busy = disabled || current.picking || current.status === "loading";
-			return h("div", { className: "power-dsh-wallpaper-settings" }, h(PresetPicker, {
+			return h("div", { className: "power-dsh-wallpaper-settings" }, h("div", { className: "power-dsh-wallpaper-picker-group" }, h(PresetPicker, {
 				disabled: busy,
 				asset: current.asset,
 				pick: () => input.current?.click(),
 				remove
-			}), h("input", {
+			}), h("p", { className: "power-dsh-wallpaper-caption" }, t("wallpaperFormats"))), h("input", {
 				ref: input,
 				type: "file",
 				className: "power-dsh-wallpaper-file",
@@ -6467,7 +6469,9 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		typeSymbol: "power-dsh#WallpaperAsset",
 		create: () => ({ parse(value) {
 			if (!isRecord(value) || typeof value.name !== "string" || typeof value.mime !== "string" || typeof value.bytes !== "number" || typeof value.dataUrl !== "string" || !value.dataUrl.startsWith("data:image/")) throw new TypeError("Invalid wallpaper asset");
+			if (value.path !== void 0 && typeof value.path !== "string") throw new TypeError("Invalid wallpaper path");
 			return {
+				...value.path ? { path: value.path } : {},
 				name: value.name,
 				mime: value.mime,
 				bytes: value.bytes,

@@ -3581,6 +3581,7 @@ var WallpaperStore = class {
 		}
 		this.ensureActive();
 		return {
+			path: this.binary,
 			name: meta.name,
 			mime: meta.mime,
 			bytes: bytes.byteLength,
@@ -3666,7 +3667,9 @@ const wallpaperCodec = {
 	typeSymbol: "power-dsh#WallpaperAsset",
 	create: () => ({ parse(value) {
 		if (!isRecord$1(value) || typeof value.name !== "string" || typeof value.mime !== "string" || typeof value.bytes !== "number" || typeof value.dataUrl !== "string" || !value.dataUrl.startsWith("data:image/")) throw new TypeError("Invalid wallpaper asset");
+		if (value.path !== void 0 && typeof value.path !== "string") throw new TypeError("Invalid wallpaper path");
 		return {
+			...value.path ? { path: value.path } : {},
 			name: value.name,
 			mime: value.mime,
 			bytes: value.bytes,

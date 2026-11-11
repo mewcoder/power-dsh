@@ -586,7 +586,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
               if (result.ok) wallpaperValue = result.value;
               return result;
             }
-            wallpaperValue = { name: revision, mime: 'image/png', bytes: 4, dataUrl: blocked };
+            wallpaperValue = { path: '/test/profile/power-dsh/wallpaper.bin', name: revision, mime: 'image/png', bytes: 4, dataUrl: blocked };
             return { ok: true, value: wallpaperValue };
           }
           if (descriptor.method === 'clearWallpaper') {

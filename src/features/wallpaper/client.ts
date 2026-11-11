@@ -318,7 +318,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             h('circle', { cx: 10, cy: 10, r: 7 }), h('path', { d: 'm5 5 10 10' })))),
         h('span', { className: 'power-dsh-wallpaper-preset-label' }, t(`wallpaperPreset_${id}`)));
         return h('div', { className: 'power-dsh-wallpaper-tile', key: id, 'data-selected': selected === id || undefined, 'data-has-actions': id === 'custom' && Boolean(asset) || undefined },
-          id === 'custom' ? h(Tooltip, { label: asset ? `${asset.name} · ${t('wallpaperFormats')}` : t('wallpaperFormats'), portal: true }, radio) : radio,
+          id === 'custom' && asset?.path ? h(Tooltip, { label: asset.path, portal: true, maxWidth: 520 }, radio) : radio,
           id === 'custom' && asset && h('div', { className: 'power-dsh-wallpaper-tile-actions' },
             h(Tooltip, { label: t('wallpaperReplace'), portal: true },
               h(Button, { type: 'button', variant: 'ghost', size: 'sm', className: 'power-dsh-wallpaper-tile-action', disabled,
@@ -381,7 +381,9 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     };
     const busy = disabled || current.picking || current.status === 'loading';
     return h('div', { className: 'power-dsh-wallpaper-settings' },
-      h(PresetPicker, { disabled: busy, asset: current.asset, pick: () => input.current?.click(), remove }),
+      h('div', { className: 'power-dsh-wallpaper-picker-group' },
+        h(PresetPicker, { disabled: busy, asset: current.asset, pick: () => input.current?.click(), remove }),
+        h('p', { className: 'power-dsh-wallpaper-caption' }, t('wallpaperFormats'))),
       h('input', { ref: input, type: 'file', className: 'power-dsh-wallpaper-file', tabIndex: -1,
         'aria-hidden': true, accept: ACCEPTED.join(','), disabled: busy, onChange: pick }),
       current.status === 'loading' && loadingFeedback({ label: t('loading'), compact: true }),

@@ -166,6 +166,7 @@ interface PersonalizationFile {
   revision: string;
 }
 interface WallpaperAsset {
+  path?: string;
   name: string;
   mime: string;
   bytes: number;

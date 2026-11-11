@@ -9,7 +9,8 @@ const wallpaperCodec: Codec<WallpaperAsset> = {
     if (!isRecord(value) || typeof value.name !== 'string' || typeof value.mime !== 'string'
       || typeof value.bytes !== 'number' || typeof value.dataUrl !== 'string'
       || !value.dataUrl.startsWith('data:image/')) throw new TypeError('Invalid wallpaper asset');
-    return { name: value.name, mime: value.mime, bytes: value.bytes, dataUrl: value.dataUrl };
+    if (value.path !== undefined && typeof value.path !== 'string') throw new TypeError('Invalid wallpaper path');
+    return { ...(value.path ? { path: value.path } : {}), name: value.name, mime: value.mime, bytes: value.bytes, dataUrl: value.dataUrl };
   } }),
 };
 const nullableWallpaperCodec: Codec<WallpaperAsset | null> = {
