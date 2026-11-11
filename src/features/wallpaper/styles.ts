@@ -2,18 +2,21 @@ export const styles = `
 .power-dsh-wallpaper-page > .power-dsh-wallpaper-settings { margin-top:20px; }
 .power-dsh-wallpaper-settings { display:flex; flex-direction:column; gap:20px; min-width:0; padding:0 0 16px; width:100%; }
 .power-dsh-wallpaper-presets { display:grid; grid-template-columns:repeat(auto-fill,minmax(128px,1fr)); gap:8px; }
-.power-dsh-wallpaper-tile { position:relative; min-width:0; }
-.power-dsh-wallpaper-preset { box-sizing:border-box; display:flex; flex-direction:column; gap:6px; width:100%; min-width:0; padding:4px; border:1px solid transparent; border-radius:var(--dsw-radius-md); background:transparent; color:var(--dsw-alias-label-secondary); font:inherit; cursor:pointer; text-align:left; }
-.power-dsh-wallpaper-preset[aria-checked="true"] { border-color:var(--dsw-alias-brand-primary); color:var(--dsw-alias-label-primary); }
+.power-dsh-wallpaper-tile { position:relative; min-width:0; border-radius:var(--dsw-radius-md); }
+.power-dsh-wallpaper-tile[data-selected] { outline:1.5px solid var(--dsw-alias-label-tertiary); outline-offset:0; }
+.power-dsh-wallpaper-preset { appearance:none; -webkit-appearance:none; box-shadow:none; box-sizing:border-box; display:flex; flex-direction:column; gap:6px; width:100%; min-width:0; padding:4px; border:1px solid transparent; border-radius:var(--dsw-radius-md); background:transparent; color:var(--dsw-alias-label-secondary); font:inherit; cursor:pointer; text-align:left; }
+.power-dsh-wallpaper-preset[aria-checked="true"] { color:var(--dsw-alias-label-primary); }
 .power-dsh-wallpaper-preset-preview { display:flex; align-items:center; justify-content:center; width:100%; aspect-ratio:8/5; border-radius:var(--dsw-radius-sm); background-color:var(--dsw-alias-bg-layer-1); background-size:cover; background-position:center; overflow:hidden; color:var(--dsw-alias-label-tertiary); font-size:24px; }
+.power-dsh-wallpaper-preset-preview[data-empty] { background-color:var(--dsw-alias-bg-module-platform); box-shadow:inset 0 0 0 0.5px var(--dsw-alias-border-l2); }
 .power-dsh-wallpaper-preset-label { display:block; width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:12px; line-height:28px; }
 .power-dsh-wallpaper-tile[data-has-actions] .power-dsh-wallpaper-preset-label { box-sizing:border-box; padding-right:60px; }
 .power-dsh-wallpaper-preset:focus-visible { outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary)); outline-offset:2px; }
 .power-dsh-wallpaper-preset:disabled { opacity:.4; cursor:default; }
 .power-dsh-wallpaper-tile-actions { position:absolute; right:5px; bottom:5px; display:flex; align-items:center; gap:2px; color:var(--dsw-alias-label-secondary); }
-.power-dsh-wallpaper-tile-actions .power-dsh-wallpaper-tile-action { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0; }
+.power-dsh-wallpaper-tile-actions .power-dsh-wallpaper-tile-action { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0; color:var(--dsw-alias-label-tertiary); }
+.power-dsh-wallpaper-tile-actions .power-dsh-wallpaper-tile-action:is(:hover,:focus-visible):not(:disabled) { color:var(--dsw-alias-label-secondary); }
 @media(hover:hover) {
-  .power-dsh-wallpaper-preset:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover); }
+  .power-dsh-wallpaper-preset:hover:not(:disabled):not([aria-checked="true"]) { background:var(--dsw-alias-interactive-bg-hover); }
 }
 .power-dsh-wallpaper-file { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
 .power-dsh-wallpaper-slider { display:flex; align-items:center; gap:12px; min-width:0; }

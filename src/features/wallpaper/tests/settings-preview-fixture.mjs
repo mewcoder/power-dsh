@@ -40,6 +40,6 @@ export function settingsPreviewFixture() {
   };
   row.children.push(input);
   return { body, overlay, mask, panel, row, input, captures,
-    event: (pointerId = 7, extra = {}) => ({ pointerId, button: 0, isPrimary: true, currentTarget: input, ...extra }),
+    event: (pointerId = 7, extra = {}) => ({ pointerId, button: 0, isPrimary: true, timeStamp: 0, clientX: 100, currentTarget: input, ...extra }),
   };
 }

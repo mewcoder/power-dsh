@@ -5534,18 +5534,21 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 .power-dsh-wallpaper-page > .power-dsh-wallpaper-settings { margin-top:20px; }
 .power-dsh-wallpaper-settings { display:flex; flex-direction:column; gap:20px; min-width:0; padding:0 0 16px; width:100%; }
 .power-dsh-wallpaper-presets { display:grid; grid-template-columns:repeat(auto-fill,minmax(128px,1fr)); gap:8px; }
-.power-dsh-wallpaper-tile { position:relative; min-width:0; }
-.power-dsh-wallpaper-preset { box-sizing:border-box; display:flex; flex-direction:column; gap:6px; width:100%; min-width:0; padding:4px; border:1px solid transparent; border-radius:var(--dsw-radius-md); background:transparent; color:var(--dsw-alias-label-secondary); font:inherit; cursor:pointer; text-align:left; }
-.power-dsh-wallpaper-preset[aria-checked="true"] { border-color:var(--dsw-alias-brand-primary); color:var(--dsw-alias-label-primary); }
+.power-dsh-wallpaper-tile { position:relative; min-width:0; border-radius:var(--dsw-radius-md); }
+.power-dsh-wallpaper-tile[data-selected] { outline:1.5px solid var(--dsw-alias-label-tertiary); outline-offset:0; }
+.power-dsh-wallpaper-preset { appearance:none; -webkit-appearance:none; box-shadow:none; box-sizing:border-box; display:flex; flex-direction:column; gap:6px; width:100%; min-width:0; padding:4px; border:1px solid transparent; border-radius:var(--dsw-radius-md); background:transparent; color:var(--dsw-alias-label-secondary); font:inherit; cursor:pointer; text-align:left; }
+.power-dsh-wallpaper-preset[aria-checked="true"] { color:var(--dsw-alias-label-primary); }
 .power-dsh-wallpaper-preset-preview { display:flex; align-items:center; justify-content:center; width:100%; aspect-ratio:8/5; border-radius:var(--dsw-radius-sm); background-color:var(--dsw-alias-bg-layer-1); background-size:cover; background-position:center; overflow:hidden; color:var(--dsw-alias-label-tertiary); font-size:24px; }
+.power-dsh-wallpaper-preset-preview[data-empty] { background-color:var(--dsw-alias-bg-module-platform); box-shadow:inset 0 0 0 0.5px var(--dsw-alias-border-l2); }
 .power-dsh-wallpaper-preset-label { display:block; width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:12px; line-height:28px; }
 .power-dsh-wallpaper-tile[data-has-actions] .power-dsh-wallpaper-preset-label { box-sizing:border-box; padding-right:60px; }
 .power-dsh-wallpaper-preset:focus-visible { outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary)); outline-offset:2px; }
 .power-dsh-wallpaper-preset:disabled { opacity:.4; cursor:default; }
 .power-dsh-wallpaper-tile-actions { position:absolute; right:5px; bottom:5px; display:flex; align-items:center; gap:2px; color:var(--dsw-alias-label-secondary); }
-.power-dsh-wallpaper-tile-actions .power-dsh-wallpaper-tile-action { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0; }
+.power-dsh-wallpaper-tile-actions .power-dsh-wallpaper-tile-action { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0; color:var(--dsw-alias-label-tertiary); }
+.power-dsh-wallpaper-tile-actions .power-dsh-wallpaper-tile-action:is(:hover,:focus-visible):not(:disabled) { color:var(--dsw-alias-label-secondary); }
 @media(hover:hover) {
-  .power-dsh-wallpaper-preset:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover); }
+  .power-dsh-wallpaper-preset:hover:not(:disabled):not([aria-checked="true"]) { background:var(--dsw-alias-interactive-bg-hover); }
 }
 .power-dsh-wallpaper-file { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
 .power-dsh-wallpaper-slider { display:flex; align-items:center; gap:12px; min-width:0; }
@@ -5641,6 +5644,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		"PageUp",
 		"PageDown"
 	];
+	const PREVIEW_HOLD_MS = 200;
+	const PREVIEW_DRAG_PX = 4;
 	const readImage = (file) => new Promise((resolve, reject) => {
 		const reader = new FileReader();
 		reader.onerror = () => reject(/* @__PURE__ */ new Error("read failed"));
@@ -5891,17 +5896,30 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				setPressed(false);
 				cancel(field);
 			};
+			const validateGesture = () => {
+				const current = gesture.current.active;
+				if (current && (!editable() || choice() !== current.choice)) {
+					discard();
+					return false;
+				}
+				return true;
+			};
 			const matches = (event) => !event || !gesture.current.active || event.pointerId === gesture.current.active.id;
 			React.useEffect(() => {
 				mounted.current = true;
 				window.addEventListener("blur", discard);
 				const off = source.subscribe(() => {
-					if (!editable() || choice() === "none" || gesture.current.active && choice() !== gesture.current.active.choice) discard();
+					if (!editable() || choice() === "none") discard();
+					else validateGesture();
+				});
+				const offState = store.subscribe(() => {
+					validateGesture();
 				});
 				return () => {
 					mounted.current = false;
 					ignored.current = true;
 					off();
+					offState();
 					window.removeEventListener("blur", discard);
 					restore();
 					cancel(field);
@@ -5932,25 +5950,37 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 						publish({ previewError: true });
 						return;
 					}
-					const release = temporarilyHideSettings(event.currentTarget);
-					if (release) previewRestorers.add(release);
 					gesture.current.active = {
 						id: event.pointerId,
 						choice: choice(),
-						restore: release
+						input: event.currentTarget,
+						startedAt: event.timeStamp,
+						startX: event.clientX,
+						attempted: false,
+						restore: null
 					};
 					setPressed(true);
+				},
+				onPointerMove: (event) => {
+					if (!validateGesture()) return;
+					const current = gesture.current.active;
+					if (!mounted.current || blocked || !editable() || !current || current.attempted || !matches(event) || event.isPrimary === false) return;
+					if (event.timeStamp - current.startedAt < PREVIEW_HOLD_MS || Math.abs(event.clientX - current.startX) < PREVIEW_DRAG_PX) return;
+					current.attempted = true;
+					const release = temporarilyHideSettings(current.input);
+					current.restore = release;
+					if (release) previewRestorers.add(release);
 					publish({ previewError: !release });
 				},
 				onChange: (event) => {
-					if (!mounted.current || blocked || ignored.current || !editable()) return;
+					if (!mounted.current || blocked || ignored.current || !editable() || !validateGesture()) return;
 					const next = Number(event.currentTarget.value);
 					if (!Number.isFinite(next)) return;
 					preview[field] = Math.round(Math.min(max, Math.max(0, next)));
 					publish();
 				},
 				onPointerUp: (event) => {
-					if (!mounted.current || !matches(event) || event?.isPrimary === false) return;
+					if (!mounted.current || !matches(event) || event?.isPrimary === false || !validateGesture()) return;
 					restore();
 					setPressed(false);
 					if (ignored.current) return;
@@ -6034,6 +6064,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				}, h("span", {
 					className: "power-dsh-wallpaper-preset-preview",
 					style: { backgroundImage },
+					"data-empty": !backgroundImage || void 0,
 					"aria-hidden": true
 				}, !backgroundImage && (id === "custom" ? "+" : h("svg", {
 					width: 20,
@@ -6050,6 +6081,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				return h("div", {
 					className: "power-dsh-wallpaper-tile",
 					key: id,
+					"data-selected": selected === id || void 0,
 					"data-has-actions": id === "custom" && Boolean(asset) || void 0
 				}, id === "custom" ? h(Tooltip, {
 					label: asset ? `${asset.name} · ${t("wallpaperFormats")}` : t("wallpaperFormats"),
@@ -6067,7 +6099,18 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 					onClick: () => {
 						if (!disabled && editable()) pick();
 					}
-				}, h(NativeIcon, { glyph: "edit-outline" }))), h(Tooltip, {
+				}, h("svg", {
+					width: 14,
+					height: 14,
+					viewBox: "0 0 16 16",
+					fill: "none",
+					stroke: "currentColor",
+					strokeWidth: 1.3,
+					strokeLinecap: "round",
+					strokeLinejoin: "round",
+					"aria-hidden": true,
+					focusable: false
+				}, h("path", { d: "M3 5h10m-2.5-2.5L13 5l-2.5 2.5M13 11H3m2.5-2.5L3 11l2.5 2.5" })))), h(Tooltip, {
 					label: t("wallpaperRemove"),
 					portal: true
 				}, h(Button, {
@@ -6078,7 +6121,10 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 					disabled,
 					"aria-label": t("wallpaperRemove"),
 					onClick: remove
-				}, h(NativeIcon, { glyph: "trash-outline" })))));
+				}, h(NativeIcon, {
+					glyph: "trash-outline",
+					size: 14
+				})))));
 			}));
 		}
 		function Controls({ disabled }) {
@@ -6367,11 +6413,11 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			wallpaperPreset_seaside: "Big fat fish",
 			wallpaperPreset_custom: "Custom",
 			wallpaperEnabled: "Enable custom wallpaper",
-			wallpaperDescription: "Choose a preset or custom wallpaper for the interface",
-			wallpaperPageDescription: "Choose a wallpaper and adjust visibility and blur",
+			wallpaperDescription: "Change the interface background",
+			wallpaperPageDescription: "Choose a wallpaper and adjust its appearance",
 			wallpaperImage: "Wallpaper",
 			wallpaperChoose: "Choose image",
-			wallpaperReplace: "Replace",
+			wallpaperReplace: "Change image",
 			wallpaperRemove: "Remove",
 			wallpaperEmpty: "No wallpaper",
 			wallpaperFormats: "PNG / JPEG / WebP · Max 25 MB",
@@ -6394,11 +6440,11 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			wallpaperPreset_seaside: "大肥鱼",
 			wallpaperPreset_custom: "自定义",
 			wallpaperEnabled: "开启自定义壁纸",
-			wallpaperDescription: "为界面选择预制或自定义壁纸",
-			wallpaperPageDescription: "选择壁纸并调节可见度与模糊",
+			wallpaperDescription: "更换界面背景",
+			wallpaperPageDescription: "选择壁纸并调整显示效果",
 			wallpaperImage: "壁纸",
 			wallpaperChoose: "选择图片",
-			wallpaperReplace: "更换",
+			wallpaperReplace: "更换图片",
 			wallpaperRemove: "移除",
 			wallpaperEmpty: "未设置壁纸",
 			wallpaperFormats: "PNG / JPEG / WebP · 最大 25 MB",

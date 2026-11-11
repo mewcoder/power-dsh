@@ -557,6 +557,203 @@ test('slow saves stay serial and old acknowledgements cannot overwrite newer com
   view.app.unmount();
 });
 
+test('clicks, stationary holds, tiny jitter and short drags keep settings visible while saving normal adjustments', async () => {
+  const gestures = [
+    { name: 'simple click', up: { timeStamp: 100 } },
+    { name: 'stationary long hold without movement', up: { timeStamp: 250 } },
+    { name: 'stationary move after a hold', move: { timeStamp: 250, clientX: 100 }, up: { timeStamp: 260 } },
+    { name: 'tiny positive jitter', move: { timeStamp: 250, clientX: 103.9 }, up: { timeStamp: 260 } },
+    { name: 'tiny negative jitter', move: { timeStamp: 250, clientX: 96.1 }, up: { timeStamp: 260 } },
+    { name: 'short drag', move: { timeStamp: 199, clientX: 120 }, up: { timeStamp: 199, clientX: 120 } },
+    { name: 'release after a short drag without another move', move: { timeStamp: 100, clientX: 120 }, up: { timeStamp: 250, clientX: 120 } },
+  ];
+  for (const field of ['wallpaperVisibility', 'wallpaperBlur']) {
+    for (const gesture of gestures) {
+      const writes = [];
+      const view = await setup({ formReply: (name, value) => { writes.push({ field: name, value }); return true; } },
+        { wallpaperEnabled: true, wallpaperVisibility: 40, wallpaperBlur: 4 });
+      const dom = settingsPreviewFixture();
+      let lookups = 0;
+      const closest = dom.input.closest;
+      dom.input.closest = selector => { lookups++; return closest(selector); };
+      view.slider(field).props.onPointerDown(dom.event());
+      assert.equal(dom.overlay.style.getPropertyValue('visibility'), '', gesture.name);
+      assert.equal(lookups, 0, 'Pointer down does not call the settings hiding helper.');
+      if (gesture.move) view.slider(field).props.onPointerMove(dom.event(7, gesture.move));
+      assert.equal(dom.overlay.style.getPropertyValue('visibility'), '', gesture.name);
+      assert.equal(dom.row.hasAttribute('data-wallpaper-previewing'), false, gesture.name);
+      const next = field === 'wallpaperBlur' ? 12 : 80;
+      change(view, field, next);
+      assert.deepEqual(writes, []);
+      await view.slider(field).props.onPointerUp(dom.event(7, gesture.up));
+      assert.equal(dom.overlay.style.getPropertyValue('visibility'), '', gesture.name);
+      assert.equal(lookups, 0, `${gesture.name} never attempts to hide settings.`);
+      assert.deepEqual(writes, [{ field, value: next }]);
+      assert.equal(view.app.settingsValue()[field], next);
+      view.app.unmount();
+    }
+  }
+});
+
+test('preview activates at exactly 200ms and four horizontal pixels in either direction and attempts hiding only once', async () => {
+  for (const distance of [4, -4]) {
+    const view = await setup({}, { wallpaperEnabled: true, wallpaperVisibility: 40 });
+    const dom = settingsPreviewFixture();
+    let lookups = 0;
+    const closest = dom.input.closest;
+    dom.input.closest = selector => { lookups++; return closest(selector); };
+    view.slider('wallpaperVisibility').props.onPointerDown(dom.event(7, { timeStamp: 50, clientX: 150 }));
+    assert.equal(lookups, 0);
+    view.slider('wallpaperVisibility').props.onPointerMove(dom.event(7, { timeStamp: 249, clientX: 150 + distance }));
+    assert.equal(dom.overlay.style.getPropertyValue('visibility'), '');
+    view.slider('wallpaperVisibility').props.onPointerMove(dom.event(7, { timeStamp: 250, clientX: 150 + distance }));
+    assert.equal(dom.overlay.style.getPropertyValue('visibility'), 'hidden');
+    assert.equal(dom.row.style.getPropertyValue('visibility'), 'visible');
+    assert.equal(lookups, 1);
+    view.slider('wallpaperVisibility').props.onPointerMove(dom.event(7, { timeStamp: 300, clientX: 170 }));
+    assert.equal(lookups, 1, 'Further movement does not repeat the helper call.');
+    await view.slider('wallpaperVisibility').props.onPointerUp(dom.event(7, { timeStamp: 310 }));
+    assert.equal(dom.overlay.style.getPropertyValue('visibility'), '');
+    view.app.unmount();
+  }
+});
+
+test('ending or invalidating a pending press prevents late movement from activating preview', async () => {
+  for (const reason of ['up', 'onPointerCancel', 'onLostPointerCapture', 'onBlur', 'windowBlur', 'leave', 'unmount', 'loading', 'disabled', 'selection']) {
+    const writes = [];
+    const view = await setup({ formReply: (field, value) => { writes.push({ field, value }); return true; } },
+      { wallpaperEnabled: true, wallpaperSelection: 'flow', wallpaperVisibility: 40 });
+    const dom = settingsPreviewFixture();
+    const last = view.slider('wallpaperVisibility');
+    last.props.onPointerDown(dom.event());
+    if (reason === 'up') await last.props.onPointerUp(dom.event(7, { timeStamp: 100 }));
+    else if (reason === 'windowBlur') view.app.blur();
+    else if (reason === 'leave') view.leave();
+    else if (reason === 'unmount') view.app.unmount();
+    else if (reason === 'loading') view.app.setFormStatus('loading');
+    else if (reason === 'disabled') view.app.set({ wallpaperEnabled: false });
+    else if (reason === 'selection') view.app.set({ wallpaperSelection: 'custom' });
+    else last.props[reason](dom.event());
+    if (!['leave', 'unmount'].includes(reason)) view.render();
+    if (reason === 'loading') view.app.setFormStatus('ready');
+    if (reason === 'leave') view.enter();
+    last.props.onPointerMove(dom.event(7, { timeStamp: 500, clientX: 120 }));
+    assert.equal(dom.overlay.style.getPropertyValue('visibility'), '', reason);
+    assert.equal(dom.row.hasAttribute('data-wallpaper-previewing'), false, reason);
+    assert.deepEqual(writes, [], reason);
+    if (reason !== 'unmount') view.app.unmount();
+  }
+});
+
+test('preset selection rollback cancels pending and active slider gestures without another form update', async () => {
+  for (const [field, confirmed, draft, fresh] of [['wallpaperVisibility', 40, 80, 61], ['wallpaperBlur', 4, 12, 9]]) {
+    for (const phase of ['pending', 'hidden']) {
+      let release;
+      const writes = [];
+      const view = await setup({ formReply: (name, value) => {
+        writes.push({ field: name, value });
+        return name === 'wallpaperSelection' ? new Promise(resolve => { release = resolve; }) : true;
+      } }, { wallpaperEnabled: true, wallpaperSelection: 'flow', wallpaperVisibility: 40, wallpaperBlur: 4 });
+      const selecting = view.preset('seaside').props.onClick();
+      await tick();
+      assert.equal(view.preset('seaside').props['aria-checked'], true);
+      assert.equal(view.app.settingsValue().wallpaperSelection, 'flow');
+      const dom = settingsPreviewFixture();
+      view.slider(field).props.onPointerDown(dom.event());
+      if (phase === 'hidden') view.slider(field).props.onPointerMove(dom.event(7, { timeStamp: 220, clientX: 108 }));
+      change(view, field, draft);
+      const last = view.slider(field).props;
+      release(false);
+      await selecting;
+      // These checks precede any page render or additional form-source notification.
+      assert.equal(dom.overlay.style.getPropertyValue('visibility'), '', `${field}/${phase} restores settings synchronously on rollback.`);
+      assert.equal(dom.row.style.getPropertyValue('visibility'), '', `${field}/${phase} restores the original row visibility.`);
+      assert.equal(dom.row.hasAttribute('data-wallpaper-previewing'), false);
+      assert.equal(view.slider(field).props['data-pressed'], undefined);
+      assert.equal(view.slider(field).props.value, confirmed);
+      assert.equal(view.preset('flow').props['aria-checked'], true);
+      last.onPointerMove(dom.event(7, { timeStamp: 500, clientX: 120 }));
+      last.onChange({ currentTarget: { value: String(draft) } });
+      await last.onPointerUp(dom.event(7, { timeStamp: 510, clientX: 120 }));
+      await tick();
+      assert.equal(dom.overlay.style.getPropertyValue('visibility'), '', 'Late movement cannot reactivate the rolled-back gesture.');
+      assert.equal(view.slider(field).props.value, confirmed);
+      assert.deepEqual(writes, [{ field: 'wallpaperSelection', value: 'seaside' }], 'The discarded draft is never written.');
+      view.slider(field).props.onPointerDown(dom.event(7, { timeStamp: 1000 }));
+      view.slider(field).props.onPointerMove(dom.event(7, { timeStamp: 1220, clientX: 108 }));
+      assert.equal(dom.overlay.style.getPropertyValue('visibility'), 'hidden', 'A fresh gesture remains available after rollback.');
+      change(view, field, fresh);
+      await view.slider(field).props.onPointerUp(dom.event(7, { timeStamp: 1230, clientX: 108 }));
+      assert.equal(dom.overlay.style.getPropertyValue('visibility'), '');
+      assert.equal(view.app.settingsValue()[field], fresh);
+      assert.deepEqual(writes, [{ field: 'wallpaperSelection', value: 'seaside' }, { field, value: fresh }]);
+      view.app.unmount();
+    }
+  }
+});
+
+test('successful pending preset selection preserves its matching slider gesture and draft', async () => {
+  for (const [field, draft] of [['wallpaperVisibility', 80], ['wallpaperBlur', 12]]) {
+    let release;
+    const writes = [];
+    const view = await setup({ formReply: (name, value) => {
+      writes.push({ field: name, value });
+      return name === 'wallpaperSelection' ? new Promise(resolve => { release = resolve; }) : true;
+    } }, { wallpaperEnabled: true, wallpaperSelection: 'flow', wallpaperVisibility: 40, wallpaperBlur: 4 });
+    const selecting = view.preset('seaside').props.onClick();
+    await tick();
+    const dom = settingsPreviewFixture();
+    view.slider(field).props.onPointerDown(dom.event());
+    view.slider(field).props.onPointerMove(dom.event(7, { timeStamp: 220, clientX: 108 }));
+    change(view, field, draft);
+    release(true);
+    await selecting;
+    assert.equal(view.app.settingsValue().wallpaperSelection, 'seaside');
+    assert.equal(dom.overlay.style.getPropertyValue('visibility'), 'hidden', 'Confirming the same effective choice does not cancel preview.');
+    assert.equal(dom.row.style.getPropertyValue('visibility'), 'visible');
+    assert.equal(dom.row.getAttribute('data-wallpaper-previewing'), '');
+    assert.equal(view.slider(field).props['data-pressed'], true);
+    assert.equal(view.slider(field).props.value, draft);
+    assert.deepEqual(writes, [{ field: 'wallpaperSelection', value: 'seaside' }]);
+    await view.slider(field).props.onPointerUp(dom.event(7, { timeStamp: 230, clientX: 108 }));
+    assert.equal(dom.overlay.style.getPropertyValue('visibility'), '');
+    assert.equal(view.app.settingsValue()[field], draft);
+    assert.deepEqual(writes, [{ field: 'wallpaperSelection', value: 'seaside' }, { field, value: draft }]);
+    view.app.unmount();
+  }
+});
+
+test('an optimistic different preset cancels a slider gesture before its form write completes', async () => {
+  for (const field of ['wallpaperVisibility', 'wallpaperBlur']) {
+    let release;
+    const writes = [];
+    const view = await setup({ formReply: (name, value) => {
+      writes.push({ field: name, value });
+      return name === 'wallpaperSelection' ? new Promise(resolve => { release = resolve; }) : true;
+    } }, { wallpaperEnabled: true, wallpaperSelection: 'flow', wallpaperVisibility: 40, wallpaperBlur: 4 });
+    const dom = settingsPreviewFixture();
+    view.slider(field).props.onPointerDown(dom.event());
+    view.slider(field).props.onPointerMove(dom.event(7, { timeStamp: 220, clientX: 108 }));
+    change(view, field, field === 'wallpaperVisibility' ? 80 : 12);
+    const last = view.slider(field).props;
+    const selecting = view.preset('seaside').props.onClick();
+    assert.equal(dom.overlay.style.getPropertyValue('visibility'), '', 'Local choice changes restore settings before the form source changes.');
+    assert.equal(dom.row.hasAttribute('data-wallpaper-previewing'), false);
+    assert.equal(view.app.settingsValue().wallpaperSelection, 'flow');
+    assert.equal(view.slider(field).props['data-pressed'], undefined);
+    last.onPointerMove(dom.event(7, { timeStamp: 500, clientX: 120 }));
+    last.onChange({ currentTarget: { value: '15' } });
+    await last.onPointerUp(dom.event(7, { timeStamp: 510 }));
+    await tick();
+    release(true);
+    await selecting;
+    assert.equal(dom.overlay.style.getPropertyValue('visibility'), '');
+    assert.equal(view.app.settingsValue()[field], field === 'wallpaperVisibility' ? 40 : 4);
+    assert.deepEqual(writes, [{ field: 'wallpaperSelection', value: 'seaside' }]);
+    view.app.unmount();
+  }
+});
+
 test('both sliders capture before hiding settings, keep active controls visible and restore before a slow save settles', async () => {
   for (const [field, next] of [['wallpaperVisibility', 80], ['wallpaperBlur', 12]]) {
     let release;
@@ -572,7 +769,9 @@ test('both sliders capture before hiding settings, keep active controls visible 
     const entry = view.app.entries.get(TAB);
     const visibility = view.app.settingsVisibility();
     view.slider(field).props.onPointerDown(dom.event());
+    assert.equal(dom.overlay.style.getPropertyValue('visibility'), 'visible', 'Pressing alone never hides settings.');
     assert.deepEqual(dom.captures, [{ pointerId: 7, visibility: 'visible' }]);
+    view.slider(field).props.onPointerMove(dom.event(7, { timeStamp: 220, clientX: 108 }));
     assert.equal(dom.overlay.style.getPropertyValue('visibility'), 'hidden');
     assert.equal(dom.row.style.getPropertyValue('visibility'), 'visible');
     assert.equal(dom.row.style.getPropertyPriority('visibility'), 'important');
@@ -614,6 +813,7 @@ test('interrupted pointer previews restore settings and reject late input and re
       { wallpaperEnabled: true, wallpaperVisibility: 40 });
     const dom = settingsPreviewFixture();
     view.slider('wallpaperVisibility').props.onPointerDown(dom.event());
+    view.slider('wallpaperVisibility').props.onPointerMove(dom.event(7, { timeStamp: 220, clientX: 108 }));
     change(view, 'wallpaperVisibility', 80);
     const last = view.slider('wallpaperVisibility');
     if (reason === 'windowBlur') view.app.blur();
@@ -623,6 +823,8 @@ test('interrupted pointer previews restore settings and reject late input and re
     assert.equal(dom.overlay.style.getPropertyValue('visibility'), '', reason);
     assert.equal(dom.row.style.getPropertyValue('visibility'), '', reason);
     assert.equal(dom.row.hasAttribute('data-wallpaper-previewing'), false, reason);
+    last.props.onPointerMove(dom.event(7, { timeStamp: 500, clientX: 120 }));
+    assert.equal(dom.overlay.style.getPropertyValue('visibility'), '', 'Late movement cannot reactivate the preview.');
     last.props.onChange({ currentTarget: { value: '95' } });
     await last.props.onPointerUp(dom.event());
     await tick();
@@ -642,6 +844,7 @@ test('source unavailability, feature disable and selection changes restore an ac
       { wallpaperEnabled: true, wallpaperSelection: 'flow', wallpaperVisibility: 40 });
     const dom = settingsPreviewFixture();
     view.slider('wallpaperVisibility').props.onPointerDown(dom.event());
+    view.slider('wallpaperVisibility').props.onPointerMove(dom.event(7, { timeStamp: 220, clientX: 108 }));
     change(view, 'wallpaperVisibility', 80);
     const last = view.slider('wallpaperVisibility');
     if (reason === 'loading') view.app.setFormStatus('loading');
@@ -652,6 +855,8 @@ test('source unavailability, feature disable and selection changes restore an ac
     assert.equal(dom.row.style.getPropertyValue('visibility'), '', reason);
     assert.equal(dom.row.hasAttribute('data-wallpaper-previewing'), false, reason);
     if (reason === 'loading') view.app.setFormStatus('ready');
+    last.props.onPointerMove(dom.event(7, { timeStamp: 500, clientX: 120 }));
+    assert.equal(dom.overlay.style.getPropertyValue('visibility'), '', 'Late movement cannot reactivate the preview.');
     last.props.onChange({ currentTarget: { value: '95' } });
     await last.props.onPointerUp(dom.event());
     await tick();
@@ -669,6 +874,10 @@ test('unrelated pointers cannot start or end the primary slider preview', async 
   }
   assert.deepEqual(dom.captures, []);
   view.slider('wallpaperVisibility').props.onPointerDown(dom.event());
+  view.slider('wallpaperVisibility').props.onPointerMove(dom.event(9, { timeStamp: 220, clientX: 108 }));
+  view.slider('wallpaperVisibility').props.onPointerMove(dom.event(7, { timeStamp: 220, clientX: 108, isPrimary: false }));
+  assert.equal(dom.overlay.style.getPropertyValue('visibility'), '', 'Wrong pointers cannot activate a pending press.');
+  view.slider('wallpaperVisibility').props.onPointerMove(dom.event(7, { timeStamp: 220, clientX: 108 }));
   change(view, 'wallpaperVisibility', 80);
   await view.slider('wallpaperVisibility').props.onPointerUp(dom.event(9));
   view.slider('wallpaperVisibility').props.onPointerCancel(dom.event(9));
@@ -685,6 +894,7 @@ test('keyboard navigation after a canceled drag keeps settings visible and saves
   const view = await setup({}, { wallpaperEnabled: true, wallpaperVisibility: 40 });
   const dom = settingsPreviewFixture();
   view.slider('wallpaperVisibility').props.onPointerDown(dom.event());
+  view.slider('wallpaperVisibility').props.onPointerMove(dom.event(7, { timeStamp: 220, clientX: 108 }));
   change(view, 'wallpaperVisibility', 80);
   view.slider('wallpaperVisibility').props.onPointerCancel(dom.event());
   view.slider('wallpaperVisibility').props.onKeyDown({ key: 'ArrowRight' });
@@ -702,6 +912,7 @@ test('read-only wallpaper controls cannot start an invisible preview or submit a
     { wallpaperEnabled: true, wallpaperVisibility: 40 });
   const dom = settingsPreviewFixture();
   view.slider('wallpaperVisibility').props.onPointerDown(dom.event());
+  view.slider('wallpaperVisibility').props.onPointerMove(dom.event(7, { timeStamp: 220, clientX: 108 }));
   change(view, 'wallpaperVisibility', 90);
   await view.slider('wallpaperVisibility').props.onPointerUp(dom.event());
   assert.equal(dom.overlay.style.getPropertyValue('visibility'), '');
@@ -718,6 +929,7 @@ test('unsupported modal structure and failed capture leave settings visible duri
     if (reason === 'unsupported') dom.mask.attributes['aria-hidden'] = 'false';
     else dom.input.setPointerCapture = () => { throw new Error('Pointer no longer active'); };
     view.slider('wallpaperVisibility').props.onPointerDown(dom.event());
+    view.slider('wallpaperVisibility').props.onPointerMove(dom.event(7, { timeStamp: 220, clientX: 108 }));
     assert.equal(dom.overlay.style.getPropertyValue('visibility'), '');
     change(view, 'wallpaperVisibility', 70);
     await view.slider('wallpaperVisibility').props.onPointerUp(dom.event());

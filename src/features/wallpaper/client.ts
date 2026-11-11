@@ -11,6 +11,8 @@ import { temporarilyHideSettings } from './preview.ts';
 type Field = 'wallpaperVisibility' | 'wallpaperBlur';
 const ACCEPTED = ['image/png', 'image/jpeg', 'image/webp'];
 const NAVIGATION = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'];
+const PREVIEW_HOLD_MS = 200;
+const PREVIEW_DRAG_PX = 4;
 const readImage = (file: File) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader();
   reader.onerror = () => reject(new Error('read failed'));
@@ -181,7 +183,10 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
 
   function Slider({ field, disabled }: { field: Field; disabled: boolean }) {
     useSnapshot(store);
-    const gesture = React.useRef<{ active: { id: number; choice: WallpaperChoice; restore: (() => void) | null } | null }>({ active: null });
+    const gesture = React.useRef<{ active: {
+      id: number; choice: WallpaperChoice; input: HTMLInputElement; startedAt: number; startX: number;
+      attempted: boolean; restore: (() => void) | null;
+    } | null }>({ active: null });
     const mounted = React.useRef(true);
     const ignored = React.useRef(false);
     const [pressed, setPressed] = React.useState(false);
@@ -202,16 +207,23 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       if (gesture.current.active) ignored.current = true;
       restore(); setPressed(false); cancel(field);
     };
+    const validateGesture = () => {
+      const current = gesture.current.active;
+      if (current && (!editable() || choice() !== current.choice)) { discard(); return false; }
+      return true;
+    };
     const matches = (event?: PointerEvent<HTMLInputElement>) => !event || !gesture.current.active || event.pointerId === gesture.current.active.id;
     React.useEffect(() => {
       mounted.current = true;
       window.addEventListener('blur', discard);
       const off = source.subscribe(() => {
-        if (!editable() || choice() === 'none' || gesture.current.active && choice() !== gesture.current.active.choice) discard();
+        if (!editable() || choice() === 'none') discard();
+        else validateGesture();
       });
+      const offState = store.subscribe(() => { validateGesture(); });
       return () => {
         mounted.current = false; ignored.current = true;
-        off(); window.removeEventListener('blur', discard); restore(); cancel(field);
+        off(); offState(); window.removeEventListener('blur', discard); restore(); cancel(field);
       };
     }, []);
     return h('div', { className: 'power-dsh-wallpaper-field' },
@@ -226,21 +238,31 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             ignored.current = false;
             try { event.currentTarget.setPointerCapture(event.pointerId); }
             catch { publish({ previewError: true }); return; }
-            const release = temporarilyHideSettings(event.currentTarget);
-            if (release) previewRestorers.add(release);
-            gesture.current.active = { id: event.pointerId, choice: choice(), restore: release };
+            gesture.current.active = { id: event.pointerId, choice: choice(), input: event.currentTarget,
+              startedAt: event.timeStamp, startX: event.clientX, attempted: false, restore: null };
             setPressed(true);
+          },
+          onPointerMove: (event: PointerEvent<HTMLInputElement>) => {
+            if (!validateGesture()) return;
+            const current = gesture.current.active;
+            if (!mounted.current || blocked || !editable() || !current || current.attempted
+              || !matches(event) || event.isPrimary === false) return;
+            if (event.timeStamp - current.startedAt < PREVIEW_HOLD_MS || Math.abs(event.clientX - current.startX) < PREVIEW_DRAG_PX) return;
+            current.attempted = true;
+            const release = temporarilyHideSettings(current.input);
+            current.restore = release;
+            if (release) previewRestorers.add(release);
             publish({ previewError: !release });
           },
           onChange: (event: ChangeEvent<HTMLInputElement>) => {
-            if (!mounted.current || blocked || ignored.current || !editable()) return;
+            if (!mounted.current || blocked || ignored.current || !editable() || !validateGesture()) return;
             const next = Number(event.currentTarget.value);
             if (!Number.isFinite(next)) return;
             preview[field] = Math.round(Math.min(max, Math.max(0, next)));
             publish();
           },
           onPointerUp: (event?: PointerEvent<HTMLInputElement>) => {
-            if (!mounted.current || !matches(event) || event?.isPrimary === false) return;
+            if (!mounted.current || !matches(event) || event?.isPrimary === false || !validateGesture()) return;
             restore(); setPressed(false);
             if (ignored.current) return;
             return blocked ? undefined : commit(field);
@@ -291,19 +313,21 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             buttons.current.get(next)?.focus();
             if (next !== 'custom' || asset) return activate(next);
           },
-        }, h('span', { className: 'power-dsh-wallpaper-preset-preview', style: { backgroundImage }, 'aria-hidden': true },
+        }, h('span', { className: 'power-dsh-wallpaper-preset-preview', style: { backgroundImage }, 'data-empty': !backgroundImage || undefined, 'aria-hidden': true },
           !backgroundImage && (id === 'custom' ? '+' : h('svg', { width: 20, height: 20, viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.3 },
             h('circle', { cx: 10, cy: 10, r: 7 }), h('path', { d: 'm5 5 10 10' })))),
         h('span', { className: 'power-dsh-wallpaper-preset-label' }, t(`wallpaperPreset_${id}`)));
-        return h('div', { className: 'power-dsh-wallpaper-tile', key: id, 'data-has-actions': id === 'custom' && Boolean(asset) || undefined },
+        return h('div', { className: 'power-dsh-wallpaper-tile', key: id, 'data-selected': selected === id || undefined, 'data-has-actions': id === 'custom' && Boolean(asset) || undefined },
           id === 'custom' ? h(Tooltip, { label: asset ? `${asset.name} · ${t('wallpaperFormats')}` : t('wallpaperFormats'), portal: true }, radio) : radio,
           id === 'custom' && asset && h('div', { className: 'power-dsh-wallpaper-tile-actions' },
             h(Tooltip, { label: t('wallpaperReplace'), portal: true },
               h(Button, { type: 'button', variant: 'ghost', size: 'sm', className: 'power-dsh-wallpaper-tile-action', disabled,
-                'aria-label': t('wallpaperReplace'), onClick: () => { if (!disabled && editable()) pick(); } }, h(NativeIcon, { glyph: 'edit-outline' }))),
+                'aria-label': t('wallpaperReplace'), onClick: () => { if (!disabled && editable()) pick(); } }, h('svg', { width: 14, height: 14, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', strokeWidth: 1.3,
+                  strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, focusable: false },
+                  h('path', { d: 'M3 5h10m-2.5-2.5L13 5l-2.5 2.5M13 11H3m2.5-2.5L3 11l2.5 2.5' })))),
             h(Tooltip, { label: t('wallpaperRemove'), portal: true },
               h(Button, { type: 'button', variant: 'ghost', size: 'sm', className: 'power-dsh-wallpaper-tile-action', disabled,
-                'aria-label': t('wallpaperRemove'), onClick: remove }, h(NativeIcon, { glyph: 'trash-outline' })))));
+                'aria-label': t('wallpaperRemove'), onClick: remove }, h(NativeIcon, { glyph: 'trash-outline', size: 14 })))));
       }));
   }
 
