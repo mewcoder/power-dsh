@@ -20,7 +20,10 @@ export interface MenuProps {
   autoFocus?: boolean; minWidthFromAnchor?: boolean; className?: string;
 }
 export interface TooltipProps { label: string; side?: 'top' | 'bottom'; portal?: boolean; delayMs?: number; maxWidth?: number; children?: ReactTypes.ReactElement; }
-export interface ModalProps { open: boolean; onClose(): void; title: string; closeLabel: string; description: string; footer?: ReactTypes.ReactNode; }
+export interface ModalProps {
+  open: boolean; onClose(): void; title: string; closeLabel: string; description?: string;
+  footer?: ReactTypes.ReactNode; children?: ReactTypes.ReactNode; className?: string;
+}
 export type StateDotState = 'ongoing' | 'done' | 'error' | 'idle' | 'warning';
 export interface PublicPrimitives {
   Menu: ReactTypes.ComponentType<MenuProps>;
@@ -38,8 +41,9 @@ export interface ClientRuntime extends PublicPrimitives {
   errorFeedback(props: import('./error-feedback.ts').ErrorFeedbackProps): ReactTypes.ReactElement;
 }
 
-// disabledSkills is internal Host policy state and has no scalar Client setting.
-export type PreferenceValues = Omit<Preferences, 'disabledSkills'>;
+// disabledSkills and autoArchivedSessions are internal Host policy state with no
+// scalar Client setting.
+export type PreferenceValues = Omit<Preferences, 'disabledSkills' | 'autoArchivedSessions'>;
 export type PreferenceKey = keyof PreferenceValues;
 export type PreferenceValue = PreferenceValues[PreferenceKey];
 export interface FormSnapshot { status: 'loading' | 'ready' | 'unavailable'; writable: boolean; value?: Partial<PreferenceValues>; }
@@ -79,6 +83,7 @@ export type SavePreference = <K extends PreferenceKey>(field: K, value: Preferen
 export interface ClientEnvironment {
   ctx: ClientContext; form: SettingsForm; source: SnapshotSource<FormSnapshot>; t: Translate; version: string | null; namespace: string;
   savePreference: SavePreference;
+  footerBusy: SnapshotSource<boolean>;
   preferenceSlot(field: PreferenceKey, name: string, options: SlotOptions, component: SlotComponent): void;
 }
 export interface SavingSetting { field: PreferenceKey; value: PreferenceValue; }

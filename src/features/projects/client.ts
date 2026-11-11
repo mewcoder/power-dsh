@@ -32,14 +32,14 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       'aria-hidden': true, focusable: false,
     }, h('path', { d: 'M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2z' }));
   }
-  // Lucide FolderKanban, ISC licensed; see docs/third-party-notices.md.
+  // Lucide Folders, ISC licensed; see docs/third-party-notices.md.
   function ProjectsIcon({ size = 16 }: IconProps) {
     return h('svg', {
       width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
       stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
       'aria-hidden': true, focusable: false,
-    }, h('path', { d: 'M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z' }),
-    h('path', { d: 'M8 10v4' }), h('path', { d: 'M12 10v2' }), h('path', { d: 'M16 10v6' }));
+    }, h('path', { d: 'M20 5a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2.5a1.5 1.5 0 0 1 1.2.6l.6.8a1.5 1.5 0 0 0 1.2.6z' }),
+    h('path', { d: 'M3 8.268a2 2 0 0 0-1 1.738V19a2 2 0 0 0 2 2h11a2 2 0 0 0 1.732-1' }));
   }
   const projectErrorKeys = ['projectsInvalidWorkspace', 'projectsNotFound'];
   const projectErrorMessage = (message: string | undefined, fallback: 'projectsLoadFailed' | 'projectsRemoveFailed') => {

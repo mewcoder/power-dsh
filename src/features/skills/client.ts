@@ -3,13 +3,13 @@ import { createCatalogUI } from '../../shared/client/catalog-ui.ts';
 import { errorMessage } from '../../shared/client/runtime.ts';
 import { styles as shellStyles } from '../../shared/client/shell-styles.ts';
 import type { ClientEnvironment, ClientFeature, ClientRuntime, FeatureState, FormSnapshot, IconProps, PageSlotProps, SnapshotSource } from '../../shared/client/types.ts';
-import type { SkillCatalog, SkillEntry, SkillScope, SkillWorkspace } from './rpc.ts';
+import type { SkillCatalog, SkillDetail, SkillEntry, SkillScope, SkillWorkspace } from './rpc.ts';
 import { styles as featureStyles } from './styles.ts';
 interface SkillsState extends FeatureState<SkillCatalog> { cwd: string; scope: SkillScope; workspaces: SkillWorkspace[]; saving: { name: string } | null; }
-interface SkillsPageProps extends PageSlotProps { source: SnapshotSource<FormSnapshot>; skillsSource: SnapshotSource<SkillsState>; loadSkills(cwd?: string, scope?: SkillScope): Promise<void>; setSkillEnabled(name: string, enabled: boolean): Promise<void>; }
+interface SkillsPageProps extends PageSlotProps { source: SnapshotSource<FormSnapshot>; skillsSource: SnapshotSource<SkillsState>; loadSkills(cwd?: string, scope?: SkillScope): Promise<void>; setSkillEnabled(name: string, enabled: boolean): Promise<void>; readSkill(name: string): Promise<SkillDetail | null>; }
 
 export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironment) {
-  const { React, h, Menu, Tooltip, observable, useSnapshot, useMounted, errorFeedback } = runtime;
+  const { React, h, Menu, Modal, Button, Tooltip, observable, useSnapshot, useMounted, errorFeedback } = runtime;
   const { ctx, form, source, t, savePreference, preferenceSlot, namespace } = env;
   const styles = shellStyles + catalogStyles + featureStyles;
   const { SkillSearchIcon, SkillChevron } = createCatalogUI(runtime);
@@ -34,7 +34,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   }
 
 
-  function SkillsPage({ t, source, skillsSource, loadSkills, setSkillEnabled }: SkillsPageProps) {
+  function SkillsPage({ t, source, skillsSource, loadSkills, setSkillEnabled, readSkill }: SkillsPageProps) {
     const config = useSnapshot(source);
     const snapshot = useSnapshot(skillsSource);
     const catalog = snapshot.value;
@@ -44,8 +44,11 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const [query, setQuery] = React.useState('');
     const [error, setError] = React.useState<{ name: string; message: string } | null>(null);
     const [groupsOpen, setGroupsOpen] = React.useState({ preinstalled: false, personal: true });
+    const [detail, setDetail] = React.useState<{ name: string; status: 'loading' | 'ready' | 'error'; value: SkillDetail | null; error: string } | null>(null);
     const mounted = useMounted();
     const pending = React.useRef(false);
+    const detailGeneration = React.useRef(0);
+    const detailTrigger = React.useRef<HTMLButtonElement | null>(null);
     const id = React.useId();
     const busy = snapshot.status === 'loading' || Boolean(snapshot.saving);
     React.useEffect(() => { setProjectMenuOpen(false); }, [scope, busy]);
@@ -162,9 +165,69 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
           reason && h('p', { id: `${control}-reason`, className: 'power-dsh-skill-reason' }, reason),
           error?.name === skill.name && errorFeedback({ t, id: `${control}-error`, message: error.message,
              code: 'PD-SKILLS-CHANGE', operation: 'setSkillEnabled' }),
-          skill.origin && h('div', { className: 'power-dsh-skill-card-meta' },
-            h(Tooltip, { label: skill.origin.startsWith('.') ? skill.path || skill.origin : skill.origin, side: 'top', portal: true, delayMs: 0, maxWidth: 400 },
-              h('span', { className: 'power-dsh-skill-origin', tabIndex: 0 }, skill.origin)))));
+          // The footer holds only the detail action; source and path moved into the dialog.
+          h('div', { className: 'power-dsh-skill-card-meta' },
+            h('button', {
+              type: 'button', className: 'power-dsh-skill-card-detail', 'data-detail': skill.name,
+              'aria-haspopup': 'dialog', 'aria-label': `${t('skillDetail')}: ${skill.name}`,
+              'aria-describedby': reason ? `${control}-reason` : undefined,
+              onClick: (event: import('react').MouseEvent<HTMLButtonElement>) => {
+                detailTrigger.current = event.currentTarget;
+                if (mounted.current) void openDetail(skill);
+              },
+            }, t('skillDetail')))));
+    };
+    // Show the file as written, minus HTML comments: they are licence and provenance
+    // notices, and leaving them inline buries the instructions that follow.
+    const bodyText = (content: string) => content.replace(/<!--[\s\S]*?-->/g, '').replace(/\n{3,}/g, '\n\n').trim();
+    // Opening loads the skill body once; a stale answer never replaces a newer dialog.
+    async function openDetail(skill: SkillEntry) {
+      if (!mounted.current) return;
+      detailGeneration.current++;
+      const generation = detailGeneration.current;
+      setDetail({ name: skill.name, status: 'loading', value: null, error: '' });
+      try {
+        const value = await readSkill(skill.name);
+        if (!mounted.current || generation !== detailGeneration.current) return;
+        setDetail({ name: skill.name, status: 'ready', value, error: '' });
+      } catch (failure) {
+        if (!mounted.current || generation !== detailGeneration.current) return;
+        setDetail({ name: skill.name, status: 'error', value: null, error: errorMessage(failure) || t('skillDetailFailed') });
+      }
+    }
+    function closeDetail() {
+      if (!mounted.current) return;
+      detailGeneration.current++;
+      setDetail(null);
+      detailTrigger.current?.focus?.();
+    }
+    // Read-only reader: description and the SKILL.md body, with a short metadata list.
+    const renderDetail = () => {
+      const current = detail!;
+      const skill = current.value;
+      const label = (key: string, value: import('react').ReactNode) => h('div', { key, className: 'power-dsh-skill-detail-row' },
+        h('dt', { className: 'power-dsh-skill-detail-label' }, t(key)), h('dd', { className: 'power-dsh-skill-detail-value' }, value));
+      return h(Modal, {
+        open: true, onClose: closeDetail, title: t('skillDetailTitle'), closeLabel: t('close'),
+        className: 'power-dsh-skill-detail', description: skill?.name ?? current.name,
+        footer: h(Button, { variant: 'outline', 'data-modal-autofocus': true, onClick: closeDetail }, t('close')),
+      },
+      current.status === 'loading' && h('p', { className: 'power-dsh-notice', role: 'status' }, t('skillDetailLoading')),
+      current.status === 'error' && errorFeedback({ t, message: current.error, code: 'PD-SKILLS-DETAIL',
+        operation: 'readSkill', retry: () => { const row = (catalog?.skills ?? []).find(candidate => candidate.name === current.name); if (row) void openDetail(row); } }),
+      current.status === 'ready' && skill === null && h('p', { className: 'power-dsh-notice', role: 'status' }, t('skillDetailMissing')),
+      current.status === 'ready' && skill && h('div', { className: 'power-dsh-skill-detail-body' },
+        // Path is the one fact the card cannot show; the switch already states enablement.
+        skill.path && h('dl', { className: 'power-dsh-skill-detail-list' },
+          label('skillDetailPath', h('code', { className: 'power-dsh-skill-detail-code' }, skill.path))),
+        // The description introduces the body, so it sits between metadata and content.
+        skill.description && h('p', { className: 'power-dsh-skill-detail-description', title: skill.description }, skill.description),
+        // The body needs no heading: it is the dialog's main content. It stays plain
+        // Markdown text — the source of truth, with no renderer that could drift from
+        // the host or drop parts of the file.
+        skill.content
+          ? h('pre', { className: 'power-dsh-skill-detail-markdown', tabIndex: 0 }, bodyText(skill.content))
+          : h('p', { className: 'power-dsh-skill-detail-empty' }, t('skillDetailNoContent'))));
     };
     const renderGroup = (group: 'preinstalled' | 'personal', label: string, selectedRows: SkillEntry[]) => {
       if (selectedRows.length === 0) return null;
@@ -206,7 +269,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         : [renderGroup('personal', 'skillPersonalGroup', rows.filter(skill => displaySource(skill) !== 'skillBundledSource')),
           renderGroup('preinstalled', 'skillPreinstalledGroup', rows.filter(skill => displaySource(skill) === 'skillBundledSource'))]),
       catalog && snapshot.status === 'ready' && catalog.complete && rows.length === 0
-        && h('p', { className: 'power-dsh-skill-empty' }, t(scope === 'project' && projectWorkspaces?.length === 0 ? 'skillNoProjects' : query ? 'skillNoMatches' : 'skillEmpty'))));
+        && h('p', { className: 'power-dsh-skill-empty' }, t(scope === 'project' && projectWorkspaces?.length === 0 ? 'skillNoProjects' : query ? 'skillNoMatches' : 'skillEmpty')),
+      detail && renderDetail()));
   }
   let active = true;
   ctx.effect(() => () => { active = false; });
@@ -236,6 +300,14 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       skillCatalog = { ...skillCatalog, status: 'error', error: errorMessage(failure) || t('skillLoadFailed') };
     }
     skillsSource.notify();
+  };
+  // The body is read on demand only; nothing is cached after the dialog closes.
+  const readSkill = async (name: string): Promise<SkillDetail | null> => {
+    if (!active || typeof name !== 'string' || name === '') throw new Error(t('skillUnavailable'));
+    const result = await ctx.remote.powerDsh.readSkill(
+      skillCatalog.scope === 'project' ? skillCatalog.cwd : '', skillCatalog.scope, name);
+    if (!result.ok) throw new Error(result.error.message);
+    return result.value;
   };
   const setSkillEnabled = async (name: string, enabled: boolean) => {
     const config = form.getSnapshot();
@@ -268,7 +340,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   };
   preferenceSlot('skillManagerEnabled', 'settings.section', {
     id: 'power-dsh-skills', order: 52, locale: namespace, label: () => t('skillsTab'),
-  }, (props: PageSlotProps) => h(SkillsPage, { ...props, source, skillsSource, loadSkills, setSkillEnabled }));
+  }, (props: PageSlotProps) => h(SkillsPage, { ...props, source, skillsSource, loadSkills, setSkillEnabled, readSkill }));
   preferenceSlot('skillManagerEnabled', 'settings.section.icon', { id: 'power-dsh-skills' }, SkillsIcon);
-  return { settings: [{ field: 'skillManagerEnabled', description: 'skillManagerDescription', save: next => savePreference('skillManagerEnabled', next === true, 'skillManagerOutdated') }], api: { skillsSource, loadSkills, setSkillEnabled } } satisfies ClientFeature;
+  return { settings: [{ field: 'skillManagerEnabled', description: 'skillManagerDescription', save: next => savePreference('skillManagerEnabled', next === true, 'skillManagerOutdated') }], api: { skillsSource, loadSkills, setSkillEnabled, readSkill } } satisfies ClientFeature;
 }

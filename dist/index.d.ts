@@ -36,6 +36,8 @@ interface Preferences {
   flowingBackgroundBlur: number;
   showBackgroundShortcut: boolean;
   archiveManagerEnabled: boolean;
+  autoArchiveDays: number;
+  autoArchivedSessions: string[];
   usageStatsEnabled: boolean;
   projectManagerEnabled: boolean;
 }
@@ -91,6 +93,19 @@ interface SkillCatalog {
   complete: boolean;
   skills: SkillRow[];
 }
+interface SkillDetail {
+  name: string;
+  description: string;
+  /** Markdown body from `SKILL.md`; empty when the provider serves no body. */
+  content: string;
+  /** Native discovery source, kept verbatim so the dialog can name it. */
+  source: string;
+  path: string;
+  origin: string;
+  enabled: boolean;
+  modelInvocable: boolean;
+  userInvocable: boolean;
+}
 type McpRuntimeState = 'pending' | 'loading' | 'active' | 'failed' | 'unloading' | 'inactive' | 'disabled' | 'unknown';
 type McpTransport = 'stdio' | 'streamable-http' | 'unknown';
 interface McpServer {
@@ -110,6 +125,35 @@ interface McpServer {
 interface McpCatalog {
   complete: boolean;
   servers: McpServer[];
+}
+/** Only explicitly declared reconnect fields; omitted values use the host's defaults. */
+interface McpReconnectConfig {
+  enabled?: boolean;
+  initialDelayMs?: number;
+  maxDelayMs?: number;
+  maxAttempts?: number;
+}
+/** Read-only transport projection with no argument, environment, or header values. */
+interface McpServerConfig {
+  transport: McpTransport;
+  /** Present only when the entry declares the field; defaults are not listed. */
+  serverName?: string;
+  command?: string;
+  argsHidden?: boolean;
+  cwd?: string;
+  url?: string;
+  envKeys: string[];
+  headerKeys: string[];
+  reconnect?: McpReconnectConfig;
+  /** Config fields supplied by a loader expression, so their value is not shown. */
+  expressions: string[];
+  /** The endpoint was omitted or contained parts outside the displayed origin. */
+  urlQueryHidden: boolean;
+}
+interface McpServerDetail {
+  server: McpServer;
+  /** Null when the entry's configuration is not readable from this profile. */
+  config: McpServerConfig | null;
 }
 interface PersonalizationFile {
   path: string;
@@ -169,6 +213,15 @@ interface UsageDayRow {
   totalTokens: number;
   turnCount: number;
   toolCallCount: number;
+  /** Disjoint provider counters; the four parts sum to the day's total. */
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  /** Recorded assistant messages on this day, including those without usage. */
+  requestCount: number;
+  /** Completed step runtime clipped to this calendar day. */
+  activeMs: number;
 }
 interface UsageModelRow {
   modelId: string;
@@ -182,6 +235,8 @@ interface UsageDailyModelRow {
   modelId: string;
   provider: string;
   totalTokens: number;
+  /** Billed settlements attributed to this model on this day. */
+  requestCount: number;
 }
 interface UsageSummary {
   totalTokens: number;
@@ -207,6 +262,8 @@ interface UsageSnapshot {
   firstDate: string;
   lastDate: string;
   summary: UsageSummary;
+  /** Activity dates per main-session family, without identifiers; count each family once in a date range. */
+  sessionDays: string[][];
   /** Continuous daily series over the whole history, zero-filled for quiet days. */
   days: UsageDayRow[];
   /** Per-day totals for the models that appear in `models`, largest first. */
@@ -247,8 +304,10 @@ interface PowerDshMethods {
   saveWallpaper(dataUrl: string, name: string): Promise<WallpaperAsset>;
   clearWallpaper(): Promise<WallpaperCleared>;
   listSkills(cwd: string, scope: string): Promise<SkillCatalog>;
+  readSkill(cwd: string, scope: string, name: string): Promise<SkillDetail | null>;
   setSkillEnabled(cwd: string, scope: string, name: string, enabled: boolean): Promise<SkillCatalog>;
   listMcpServers(): Promise<McpCatalog>;
+  readMcpServer(id: string): Promise<McpServerDetail | null>;
   setMcpServerEnabled(id: string, enabled: boolean): Promise<McpCatalog>;
   listArchivedSessions(): Promise<ArchiveCatalog>;
   restoreArchivedSession(sessionId: string): Promise<ArchiveCatalog>;
@@ -473,6 +532,13 @@ interface NativeSkills {
     complete: boolean;
     skills: NativeSkill[];
   }>;
+  /** Load one skill's full definition, including its Markdown body. */
+  get(name: string, options?: {
+    cwd?: string;
+    scope?: unknown;
+  }): Promise<(NativeSkill & {
+    content: string;
+  }) | undefined>;
   registerProvider(factory: (control: NativeSkillControl) => {
     name: string;
     list(options?: {

@@ -107,7 +107,9 @@ test('settings route policy changes to their explicit injected Host methods', as
 
 test('settings group every switch under five panels and default to General', async () => {
   const app = await mount({ desktop: true });
-  app.set({ notificationsEnabled: true });
+  // Dependent rows follow their parent switch: the notification sound row needs
+  // notifications on, and the background shortcut row needs the background on.
+  app.set({ notificationsEnabled: true, flowingBackgroundEnabled: true });
   const groups = {
     general: ['notificationsEnabled', 'notificationSoundEnabled'],
     interface: ['showThinkingEffortSwitcher', 'showThemeSwitcher', 'flowingBackgroundEnabled', 'showBackgroundShortcut', 'showVersion'],

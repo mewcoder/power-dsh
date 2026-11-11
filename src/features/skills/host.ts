@@ -29,6 +29,12 @@ export const methods = {
       return this.skills.current.list(cwd, scope);
     });
   },
+  readSkill(cwd: string, scope: string, name: string) {
+    return this.run(() => {
+      if (!this.skills.current) throw new Error('DSH skill management is unavailable.');
+      return this.skills.current.read(cwd, scope, name);
+    });
+  },
   setSkillEnabled(cwd: string, scope: string, name: string, enabled: boolean) {
     return this.run(() => {
       if (!this.skills.current) throw new Error('DSH skill management is unavailable.');

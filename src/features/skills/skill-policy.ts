@@ -1,6 +1,6 @@
 import { errorCode, type NativeContext, type NativeAgent, type NativeSkill, type NativeSkillRecord, type NativeSkillControl, type NativeSkills, type NativeLease, type NativeScope, type CreateScope, type LifecycleOptions, type Release } from '../../shared/host/native.ts';
 import type { LivePreferences } from '../../shared/types/preferences.ts';
-import type { SkillCatalog, SkillScope, SkillWorkspace } from './rpc.ts';
+import type { SkillCatalog, SkillDetail, SkillScope, SkillWorkspace } from './rpc.ts';
 import { isRecord, hasStrings, isOneOf } from '../../shared/types/protocol.ts';
 interface SkillView { cwd: string; scope: SkillScope; workspaces: SkillWorkspace[]; projectRoot: string; scopeKey: unknown }
 type SkillIdentity = Pick<NativeSkill, 'name' | 'description' | 'source' | 'provider' | 'path' | 'origin' | 'resourceBase'>;
@@ -286,6 +286,40 @@ export class SkillPolicy {
   }
 
   async list(cwd = '', scope = '') { return this.readView(await this.context(cwd, scope)); }
+
+  /**
+   * Load one skill's body for the read-only detail dialog.
+   *
+   * The body is read through the same preset scope the catalog used, so a
+   * project copy resolves exactly as the listed row did. Nothing is cached,
+   * written, or kept after the response.
+   * @param cwd - project directory for the project scope; ignored for user scope.
+   * @param scope - `user` or `project`.
+   * @param name - skill name as the catalog lists it.
+   * @returns the skill with its Markdown body, or null when it is not listed.
+   */
+  async read(cwd: string, scope: string, name: string): Promise<SkillDetail | null> {
+    if (typeof name !== 'string' || !NAME.test(name)) throw new TypeError('Invalid skill operation.');
+    const view = await this.context(cwd, scope);
+    const before = await this.readView(view);
+    const row = before.skills.find(skill => skill.name === name);
+    if (!row) return null;
+    let content = '';
+    try {
+      const definition = await this.registry.get(name, this.lookup(view));
+      this.active();
+      if (definition === undefined) return null;
+      // A masked skill's body is withheld by this module, so the stored copy has none.
+      if (typeof definition?.content === 'string') content = definition.content;
+    } catch (error) {
+      if (errorCode(error) === 'INACTIVE_EFFECT') throw error;
+      this.active();
+      throw new Error('The skill body could not be read.');
+    }
+    this.active();
+    return { name: row.name, description: row.description, content, source: row.source, path: row.path,
+      origin: row.origin, enabled: row.enabled, modelInvocable: row.modelInvocable, userInvocable: row.userInvocable };
+  }
 
   async setEnabled(cwd: string, scope: string, name: string, enabled: boolean) {
     if (typeof name !== 'string' || !NAME.test(name) || typeof enabled !== 'boolean') throw new TypeError('Invalid skill operation.');

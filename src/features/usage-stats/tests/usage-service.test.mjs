@@ -13,7 +13,7 @@ function entry(id, createdAt, events, revision = `${id}:1`) {
 }
 
 function persistence(sessions) {
-  const state = { listed: 0, opened: [], closed: 0, reads: 0 };
+  const state = { listed: 0, opened: [], closed: 0, reads: 0, readOffsets: [] };
   const byId = new Map(sessions.map(session => [session.id, session]));
   return {
     state,
@@ -21,7 +21,7 @@ function persistence(sessions) {
     async list() {
       state.listed++;
       return [...byId.values()].map(session => ({
-        header: { id: session.id, createdAt: session.createdAt },
+        header: { id: session.id, createdAt: session.createdAt, ...session.header },
         revision: session.revision,
         location: { kind: 'jsonl', path: `/logs/${session.id}` },
       }));
@@ -31,7 +31,12 @@ function persistence(sessions) {
       if (!session) throw new Error('missing');
       state.opened.push(id);
       return {
-        async read() { state.reads++; return { eventState: 'detached', events: session.events }; },
+        inheritedEventCount: session.inheritedEventCount ?? 0,
+        async read(offset = 0, length = Number.MAX_SAFE_INTEGER) {
+          state.reads++;
+          state.readOffsets.push([id, offset]);
+          return { eventState: 'detached', events: session.events.slice(offset, offset + length) };
+        },
         async close() { state.closed++; },
       };
     },
@@ -116,4 +121,46 @@ test('snapshot drops cached sessions that disappeared from storage', async () =>
   store.list = async () => (await remaining()).filter(row => row.header.id !== 'b');
   await service.snapshot('UTC');
   assert.deepEqual([...service.cache.keys()], ['a']);
+});
+
+test('fork history is read once and nested subagent activity counts as one family', async () => {
+  const first = at('2026-03-01'), second = at('2026-03-02'), third = at('2026-03-03');
+  const parentEvents = [
+    { type: 'step/start', time: first },
+    assistant(first + 30_000, { inputTokens: 100, outputTokens: 10, totalTokens: 110 }),
+    { type: 'step/end', time: first + 60_000 },
+  ];
+  const childEvents = [...parentEvents,
+    { type: 'session/end-seed', time: second, data: { inherited: true } },
+    { type: 'step/start', time: second },
+    assistant(second + 60_000, { inputTokens: 10, cacheReadTokens: 90, outputTokens: 20, totalTokens: 120 }),
+    { type: 'step/end', time: second + 120_000 },
+  ];
+  const grandEvents = [...childEvents,
+    { type: 'session/end-seed', time: second + 180_000, data: { inherited: true } },
+    assistant(second + 181_000, { inputTokens: 0, cacheReadTokens: 50, outputTokens: 5, totalTokens: 55 }),
+  ];
+  const forkEvents = [...parentEvents,
+    { type: 'session/end-seed', time: third, data: { inherited: true } },
+    assistant(third, { inputTokens: 20, outputTokens: 10, totalTokens: 30 }),
+  ];
+  const store = persistence([
+    entry('parent', first, parentEvents),
+    { ...entry('child', second, childEvents), inheritedEventCount: parentEvents.length,
+      header: { origin: 'subagent', parentSession: 'parent' } },
+    { ...entry('grandchild', second + 180_000, grandEvents), inheritedEventCount: childEvents.length,
+      header: { origin: 'subagent', parentSession: 'child' } },
+    { ...entry('fork', third, forkEvents), inheritedEventCount: parentEvents.length,
+      header: { parentSession: 'parent' } },
+  ]);
+  const service = new UsageService(); service.persistence = store;
+  const report = await service.snapshot('UTC');
+  assert.equal(report.summary.totalTokens, 315, 'Copied ancestor token usage is never charged again.');
+  assert.equal(report.summary.cacheReadTokens, 140);
+  assert.equal(report.days.reduce((sum, day) => sum + day.requestCount, 0), 4);
+  assert.equal(report.days.reduce((sum, day) => sum + day.activeMs, 0), 180_000);
+  assert.equal(report.summary.sessionCount, 2, 'Ordinary forks remain independent; subagents join their parent.');
+  assert.deepEqual(report.sessionDays, [['2026-03-01', '2026-03-02'], ['2026-03-03']]);
+  assert.deepEqual(store.state.readOffsets.sort(([a], [b]) => a.localeCompare(b)),
+    [['child', parentEvents.length], ['fork', parentEvents.length], ['grandchild', childEvents.length], ['parent', 0]]);
 });

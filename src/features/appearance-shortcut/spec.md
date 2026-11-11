@@ -16,7 +16,7 @@ SVG `use` 引用原生 Medium sprite：`dsw-icon-light-outline-medium`、`dsw-ic
 
 32px 方形命中区固定于窗口底部 16px，左边为自身容器右边减 40px。仅测量自身容器，通过 ResizeObserver、窗口与 visualViewport resize 更新横坐标，隐藏时释放观察器与监听。点击停止传播，样式和事件只作用于插件元素，hover、焦点与颜色使用宿主 token。
 
-原生状态提示优先使用右侧空间：连接状态订阅在独立声明 `connection` 依赖的子 context 中读取 `connection.state`，不让连接服务暂不可用阻断 Mod 设置入口、版本标记或刷新按钮。断线、重连时隐藏外观按钮；恢复 connected 后继续隐藏 3000ms，覆盖当前原生最长 800ms 重连驻留、2000ms 成功提示及 150ms 淡出。再次断线取消恢复计时，卸载清除计时和订阅。桌面协议 v1 通过 `updates.status()`、`updates.subscribe()` 获取更新展示状态；非 idle、初始读取中或读取失败时隐藏按钮，防止遮挡更新与重试提示，较晚返回的初始状态不能覆盖订阅的新值。
+原生状态提示优先使用右侧空间：外观与背景快捷入口共用[底栏可用状态](../../shared/client/footer-availability.ts)，每个 Client context 只创建一份连接／更新订阅。连接状态订阅在独立声明 `connection` 依赖的子 context 中读取 `connection.state`，不让连接服务暂不可用阻断 Mod 设置入口、版本标记或刷新按钮。断线、重连时隐藏外观按钮；恢复 connected 后继续隐藏 3000ms，覆盖当前原生最长 800ms 重连驻留、2000ms 成功提示及 150ms 淡出。再次断线取消恢复计时，卸载清除计时和订阅。桌面协议 v1 通过 `updates.status()`、`updates.subscribe()` 获取更新展示状态；非 idle、初始读取中或读取失败时隐藏按钮，防止遮挡更新与重试提示，较晚返回的初始状态不能覆盖订阅的新值。
 
 接口与时间依据为已核对的 DSH `0.2.2-rc.1` 设置外壳安装包实现，属于源码核对证据。此处不是原生提示的公开可见性接口，宿主更改展示时序或底部布局后需重新核对并实际页面验收。
 

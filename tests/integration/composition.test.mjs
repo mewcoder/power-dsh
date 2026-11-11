@@ -25,9 +25,9 @@ test('skill cards expose switches directly, reject old project actions and keep 
   assert.ok(!descendants(page.row('same-name')).some(node => node.props['aria-expanded'] !== undefined));
   const mcp = await mcpPage(app);
   assert.ok(mcp.control('browser'));
-  assert.equal(mcp.toggle('browser').props['aria-expanded'], false);
-  mcp.toggle('browser').props.onClick();
-  assert.equal(mcp.toggle('browser').props['aria-expanded'], true);
+  // Neither page offers a card disclosure; MCP tools live in the detail dialog.
+  assert.equal(mcp.toggle('browser'), undefined);
+  assert.ok(mcp.detail('browser'));
   assert.ok(!descendants(page.row('same-name')).some(node => node.props['aria-expanded'] !== undefined));
   assert.deepEqual(app.skillWrites, []);
   assert.deepEqual(app.mcpWrites, []);

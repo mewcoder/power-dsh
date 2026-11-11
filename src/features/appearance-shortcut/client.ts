@@ -1,5 +1,5 @@
 import { errorMessage } from '../../shared/client/runtime.ts';
-import type { ClientEnvironment, ClientFeature, ClientRuntime, FormSnapshot, SettingsForm, SlotProps, SnapshotSource, ThemeService, UpdatePresentation } from '../../shared/client/types.ts';
+import type { ClientEnvironment, ClientFeature, ClientRuntime, FormSnapshot, SettingsForm, SlotProps, SnapshotSource, ThemeService } from '../../shared/client/types.ts';
 import { styles } from './styles.ts';
 interface AppearanceProps extends SlotProps { source: SnapshotSource<FormSnapshot>; themeSource: SnapshotSource<ReturnType<ThemeService['getTheme']> | null>; themeForm: SnapshotSource<FormSnapshot>; setTheme(id: string): void; footerBusy: SnapshotSource<boolean>; }
 
@@ -57,51 +57,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         placement: 'compact', className: 'power-dsh-theme-error',
         style: position === null ? { visibility: 'hidden' } : { left: Math.max(8, position - 208) } }));
   }
-  // The current shell holds connecting for up to 800ms, recovery for
-  // 2000ms, and then fades out for 150ms. Allow 3000ms after recovery.
-  let connectionBusy = true;
-  let updateBusy = false;
-  const footerBusy = observable(() => connectionBusy || updateBusy);
-  ctx.inject(['connection'], child => child.effect(() => {
-    let timer: number | undefined;
-    const state = child.connection.state;
-    let previous = state?.getSnapshot();
-    connectionBusy = previous !== 'connected';
-    const sync = () => {
-      const next = state.getSnapshot();
-      if (next === previous) return;
-      window.clearTimeout(timer);
-      if (next !== 'connected') connectionBusy = true;
-      else if (previous !== 'connected') {
-        connectionBusy = true;
-        timer = window.setTimeout(() => { connectionBusy = false; footerBusy.notify(); }, 3000);
-      }
-      previous = next;
-      footerBusy.notify();
-    };
-    const unsubscribe = state?.subscribe(sync);
-    footerBusy.notify();
-    return () => { unsubscribe?.(); window.clearTimeout(timer); };
-  }));
-  ctx.effect(() => {
-    const bridge = window.dshDesktop?.protocolVersion === 1 ? window.dshDesktop.updates : undefined;
-    if (typeof bridge?.status !== 'function' || typeof bridge?.subscribe !== 'function') return;
-    let active = true;
-    let received = false;
-    updateBusy = true;
-    footerBusy.notify();
-    const publish = (presentation: UpdatePresentation) => {
-      if (!active) return;
-      updateBusy = presentation?.phase !== 'idle';
-      footerBusy.notify();
-    };
-    const unsubscribe = bridge.subscribe(presentation => { received = true; publish(presentation); });
-    bridge.status().then(presentation => { if (!received) publish(presentation); }, () => {
-      // A failed native status read also displays a retry indicator.
-      if (active && !received) { updateBusy = true; footerBusy.notify(); }
-    });
-    return () => { active = false; unsubscribe(); };
-  });
+  const footerBusy = env.footerBusy;
   let themeBinding: { theme: ThemeService; form: SettingsForm } | null = null;
   const unavailableForm: FormSnapshot = { status: 'unavailable', writable: false };
   const themeSource = observable(() => themeBinding?.theme.getTheme() ?? null);

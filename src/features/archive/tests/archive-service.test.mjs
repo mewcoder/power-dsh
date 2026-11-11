@@ -1,45 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mkdtemp, mkdir, writeFile, symlink, readdir, rm } from 'node:fs/promises';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { removeArtifact } from '../archive-service.ts';
-
-async function scratch() {
-  return mkdtemp(join(tmpdir(), 'power-dsh-archive-'));
-}
-
-test('removeArtifact deletes the session-owned directory whose name is the id', async () => {
-  const root = await scratch();
-  const dir = join(root, 'sess-1');
-  await mkdir(dir);
-  await writeFile(join(dir, 'gen-4.jsonl'), 'current');
-  await writeFile(join(dir, 'gen-3.jsonl'), 'older');
-  await removeArtifact(join(dir, 'gen-4.jsonl'), 'sess-1');
-  assert.deepEqual(await readdir(root), []);
-  await rm(root, { recursive: true, force: true });
-});
-
-test('removeArtifact deletes only the resolved file in a shared directory', async () => {
-  const root = await scratch();
-  await writeFile(join(root, 'a.jsonl'), 'a');
-  await writeFile(join(root, 'b.jsonl'), 'b');
-  await removeArtifact(join(root, 'a.jsonl'), 'sess-1');
-  assert.deepEqual((await readdir(root)).sort(), ['b.jsonl']);
-  await rm(root, { recursive: true, force: true });
-});
-
-test('removeArtifact refuses to delete through a symbolic-link session directory', async () => {
-  const root = await scratch();
-  const target = join(root, 'target');
-  await mkdir(target);
-  await writeFile(join(target, 'gen-4.jsonl'), 'current');
-  await symlink(target, join(root, 'sess-1'));
-  await assert.rejects(() => removeArtifact(join(root, 'sess-1', 'gen-4.jsonl'), 'sess-1'), /archiveDeleteUnsafe/);
-  await rm(root, { recursive: true, force: true });
-});
-
+import { dirname, join } from 'node:path';
 import { ArchiveService } from '../archive-service.ts';
+import { methods } from '../host.ts';
 
 function fakeController(ids) {
   const state = { ids: [...ids], unarchived: [] };
@@ -66,43 +31,195 @@ function fakeQuery() {
   };
 }
 
-test('delete removes the archived session artifact and clears its marker', async () => {
-  const root = await scratch();
-  const id = 'sess-del';
-  const dir = join(root, id);
-  await mkdir(dir);
-  await writeFile(join(dir, 'session.v4.jsonl.zstd'), 'x');
-  const controller = fakeController([id]);
+function deleteFixture(t, options = {}) {
+  const id = 'target';
+  const root = mkdtempSync(join(realpathSync(tmpdir()), 'power-dsh-archive-test-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const dir = join(root, '--project--', id);
+  const transcript = join(dir, options.filename ?? 'session.v4.jsonl');
+  const lock = join(dir, 'session.lock');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(transcript, 'transcript');
+  writeFileSync(lock, '');
   const service = new ArchiveService();
+  const controller = fakeController([id, 'keep']);
   service.workspaceController = controller;
   service.sessionQuery = fakeQuery();
-  service.sessionPersistence = { async stat() { return { header: { id }, location: { kind: 'jsonl', path: join(dir, 'session.v4.jsonl.zstd') } }; } };
-  const catalog = await service.delete(id);
-  assert.deepEqual(catalog.sessions, []);
+  const state = { opens: 0, closes: 0, held: false };
+  const access = {
+    registry: { get archivedSessionIds() { return controller.state.ids; } },
+    isLive: () => options.live === true,
+    persistence: {
+      name: 'session-persistence-jsonl',
+      async stat(sessionId) {
+        assert.equal(sessionId, id);
+        if (options.missing) return undefined;
+        return { header: { id }, formatStatus: options.formatStatus ?? 'current', revision: 'one', location: { kind: 'jsonl', path: transcript } };
+      },
+      async open(sessionId, mode) {
+        assert.equal(sessionId, id);
+        assert.equal(mode, 'write');
+        state.opens++;
+        if (options.writerHeld) throw Object.assign(new Error('owned'), { name: 'SessionAlreadyOwnedError' });
+        state.held = true;
+        await options.onOpen?.(controller, service);
+        return { header: { id }, async close() { state.closes++; state.held = false; } };
+      },
+    },
+  };
+  service.deleteAccess = access;
+  return { id, root, dir, transcript, lock, service, controller, access, state };
+}
+
+test('deletes one cold transcript under the writer lease and preserves neighboring data', async t => {
+  const { id, dir, transcript, lock, service, controller, state } = deleteFixture(t, { filename: 'session.v4.jsonl.zstd' });
+  const sibling = join(dirname(dir), 'keep');
+  mkdirSync(sibling);
+  writeFileSync(join(sibling, 'session.v4.jsonl.zstd'), 'unrelated');
+  const unarchive = controller.unarchiveSession;
+  controller.unarchiveSession = async request => {
+    assert.equal(state.held, true);
+    assert.equal(existsSync(transcript), false, 'A cold resume must not find the staged log.');
+    assert.equal(existsSync(lock), true, 'The native lock must stay at its original path.');
+    await unarchive(request);
+  };
+  const host = { archive: service, run: operation => operation() };
+  const catalog = await methods.deleteArchivedSession.call(host, id);
+  assert.deepEqual(catalog.sessions.map(row => row.sessionId), ['keep']);
   assert.deepEqual(controller.state.unarchived, [id]);
-  await assert.rejects(() => readdir(dir));
-  await rm(root, { recursive: true, force: true });
+  assert.deepEqual(readdirSync(dir), ['session.lock']);
+  assert.equal(readFileSync(join(sibling, 'session.v4.jsonl.zstd'), 'utf8'), 'unrelated');
+  assert.deepEqual(state, { opens: 1, closes: 1, held: false });
 });
 
-test('delete refuses a session that is not archived', async () => {
-  const service = new ArchiveService();
-  service.workspaceController = fakeController([]);
-  service.sessionQuery = fakeQuery();
-  service.sessionPersistence = { async stat() { throw new Error('must not be called'); } };
-  await assert.rejects(() => service.delete('sess-x'), /archiveNotArchived/);
+test('rolls back staging if the native archive marker cannot be cleared', async t => {
+  const { id, dir, transcript, service, controller, state } = deleteFixture(t);
+  controller.unarchiveSession = async () => { throw new Error('store rejected'); };
+  await assert.rejects(service.delete(id), /archiveDeleteUnarchiveFailed/);
+  assert.equal(readFileSync(transcript, 'utf8'), 'transcript');
+  assert.deepEqual(readdirSync(dir).sort(), ['session.lock', 'session.v4.jsonl']);
+  assert.deepEqual(controller.state.ids, [id, 'keep']);
+  assert.equal(state.closes, 1);
 });
 
-test('delete keeps files when the storage location cannot be resolved', async () => {
-  const root = await scratch();
-  const id = 'sess-live';
-  const dir = join(root, id);
-  await mkdir(dir);
-  await writeFile(join(dir, 'f'), 'x');
+test('preserves both copies if rollback cannot restore without overwriting a replacement', async t => {
+  const { id, dir, transcript, service, controller, state } = deleteFixture(t);
+  controller.unarchiveSession = async () => {
+    writeFileSync(transcript, 'replacement');
+    throw new Error('store rejected');
+  };
+  await assert.rejects(service.delete(id), /archiveDeleteRecoveryRequired/);
+  assert.equal(readFileSync(transcript, 'utf8'), 'replacement');
+  const staged = readdirSync(dir).find(name => name.startsWith('.power-dsh-delete-'));
+  assert.ok(staged);
+  assert.equal(readFileSync(join(dir, staged, 'session.v4.jsonl'), 'utf8'), 'transcript');
+  assert.deepEqual(controller.state.ids, [id, 'keep']);
+  assert.equal(state.closes, 1);
+  await assert.rejects(service.delete(id), /archiveDeleteRecoveryRequired/);
+  assert.equal(state.opens, 1, 'Do not touch storage again while a staged copy needs recovery.');
+});
+
+test('refuses deletion if another surface restores it while write ownership is acquired', async t => {
+  const { id, transcript, service, controller, state } = deleteFixture(t, {
+    onOpen: controller => controller.unarchiveSession({ sessionId: 'target' }),
+  });
+  await assert.rejects(service.delete(id), /archiveNotArchived/);
+  assert.equal(readFileSync(transcript, 'utf8'), 'transcript');
+  assert.deepEqual(controller.state.unarchived, [id]);
+  assert.equal(state.closes, 1);
+});
+
+test('closes the writer and keeps the transcript if native services are withdrawn', async t => {
+  const { id, transcript, service, controller, state } = deleteFixture(t, {
+    onOpen: (_controller, service) => { service.deleteAccess = null; },
+  });
+  await assert.rejects(service.delete(id), /archiveDeleteUnavailable/);
+  assert.equal(readFileSync(transcript, 'utf8'), 'transcript');
+  assert.deepEqual(controller.state.unarchived, []);
+  assert.equal(state.closes, 1);
+});
+
+test('returns a partial catalog if refresh fails after committed deletion', async t => {
+  const { id, transcript, service, controller } = deleteFixture(t);
+  const unarchive = controller.unarchiveSession;
+  controller.unarchiveSession = async request => {
+    await unarchive(request);
+    service.sessionQuery = null;
+  };
+  const catalog = await service.delete(id);
+  assert.equal(catalog.complete, false);
+  assert.deepEqual(catalog.sessions.map(row => row.sessionId), ['keep']);
+  assert.equal(existsSync(transcript), false);
+});
+
+test('leaves live, writer-owned, missing and legacy sessions untouched', async t => {
+  for (const [options, error] of [
+    [{ live: true }, /archiveDeleteBusy/], [{ writerHeld: true }, /archiveDeleteBusy/],
+    [{ missing: true }, /archiveDeleteUnsupported/], [{ formatStatus: 'migration-required' }, /archiveDeleteUnsupported/],
+  ]) {
+    const { id, transcript, service, controller, state } = deleteFixture(t, options);
+    await assert.rejects(service.delete(id), error);
+    assert.deepEqual(controller.state.ids, [id, 'keep']);
+    assert.deepEqual(controller.state.unarchived, []);
+    assert.equal(readFileSync(transcript, 'utf8'), 'transcript');
+    assert.equal(state.opens, options.writerHeld ? 1 : 0);
+  }
+});
+
+test('rejects alternate generations and a symlinked lock before acquiring a writer', async t => {
+  const { id, dir, lock, service, state } = deleteFixture(t);
+  const alternate = join(dir, 'session.v3.jsonl');
+  writeFileSync(alternate, 'previous generation');
+  await assert.rejects(service.delete(id), /archiveDeleteUnsupported/);
+  rmSync(alternate);
+  if (process.platform !== 'win32') {
+    rmSync(lock);
+    const target = join(dir, 'keep');
+    writeFileSync(target, 'must not be truncated');
+    symlinkSync(target, lock);
+    await assert.rejects(service.delete(id), /archiveDeleteUnsafe/);
+    assert.equal(readFileSync(target, 'utf8'), 'must not be truncated');
+  }
+  assert.equal(state.opens, 0);
+});
+
+test('refuses deletion without native services while leaving restore available', async t => {
+  const { id, transcript, service, controller } = deleteFixture(t);
+  service.deleteAccess = null;
+  await assert.rejects(service.delete(id), /archiveDeleteUnavailable/);
+  assert.equal(readFileSync(transcript, 'utf8'), 'transcript');
+  assert.deepEqual(controller.state.unarchived, []);
+  assert.deepEqual((await service.restore(id)).sessions.map(row => row.sessionId), ['keep']);
+});
+
+test('rows are dated by the native list activity, falling back to the title event', async () => {
   const service = new ArchiveService();
-  service.workspaceController = fakeController([id]);
+  service.workspaceController = fakeController(['s1', 's2']);
   service.sessionQuery = fakeQuery();
-  service.sessionPersistence = { async stat() { return { header: { id } }; } };
-  await assert.rejects(() => service.delete(id), /archiveDeleteUnsupported/);
-  assert.deepEqual(await readdir(dir), ['f']);
-  await rm(root, { recursive: true, force: true });
+  service.sessionController = { async list() { return { items: [{ sessionId: 's1', updatedAt: 500 }] }; } };
+  const catalog = await service.list();
+  assert.deepEqual(catalog.sessions.map(row => [row.sessionId, row.updatedAt]), [['s1', 500], ['s2', 2]],
+    'The list activity wins; a session missing from the list keeps the title event time.');
+});
+
+test('a failing session list keeps the archive readable', async () => {
+  const service = new ArchiveService();
+  service.workspaceController = fakeController(['s1']);
+  service.sessionQuery = fakeQuery();
+  service.sessionController = { async list() { throw new Error('list-failed'); } };
+  const catalog = await service.list();
+  assert.deepEqual(catalog.sessions.map(row => [row.sessionId, row.updatedAt]), [['s1', 2]]);
+});
+
+
+test('restores the transcript when the session becomes live during marker removal', async t => {
+  const options = { live: false };
+  const { id, transcript, service, controller } = deleteFixture(t, options);
+  const original = controller.unarchiveSession;
+  controller.unarchiveSession = async request => {
+    await original(request);
+    options.live = true;
+  };
+  await assert.rejects(service.delete(id), /archiveDeleteUnarchiveFailed/);
+  assert.equal(readFileSync(transcript, 'utf8'), 'transcript');
 });

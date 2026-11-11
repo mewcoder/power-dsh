@@ -76,6 +76,8 @@ export interface NativeSkillCandidate extends NativeSkillRecord { locator: Nativ
 export interface NativeSkillControl { signal: AbortSignal; invalidate(): void }
 export interface NativeSkills {
   snapshot(options: { cwd?: string; scope?: unknown }): Promise<{ complete: boolean; skills: NativeSkill[] }>;
+  /** Load one skill's full definition, including its Markdown body. */
+  get(name: string, options?: { cwd?: string; scope?: unknown }): Promise<(NativeSkill & { content: string }) | undefined>;
   registerProvider(factory: (control: NativeSkillControl) => {
     name: string;
     list(options?: { cwd?: string }): Promise<(NativeSkillRecord & { rank: number; locator: NativeSkillRecord; invocation: { modelInvocable: boolean; userInvocable: boolean } })[]>;

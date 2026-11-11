@@ -63,24 +63,20 @@ test('skill management requests real scopes, keeps full hover text and searches 
   assert.equal(page.row('project-style'), undefined);
   assert.equal(page.control('source-disabled').props.disabled, true);
   assert.ok(descendants(page.row('source-disabled')).some(node => node.props.children.includes('skillSourceDisabled')));
-  for (const [name, label, text] of [
-    ['code-review', '/skills/code-review/SKILL.md', '.dsh'],
-    ['custom-style', '/user/.agents/skills/custom-style/SKILL.md', '.agents'],
-    ['bundled-style', '@deepseek-ai/dsh-skill-office', '@deepseek-ai/dsh-skill-office'],
-  ]) {
-    const tip = descendants(page.row(name)).find(node => node.type === 'native-tooltip-fixture' && node.props.label === label);
-    assert.ok(tip);
-    assert.equal(tip.props.portal, true);
-    assert.equal(tip.props.delayMs, 0);
-    const anchor = tip.props.children[0];
-    assert.ok(anchor.props.children.includes(text));
-    assert.equal(anchor.props.title, undefined);
-    assert.equal(anchor.props.tabIndex, 0);
+  // The card footer no longer carries a source label; that moved into the detail dialog.
+  for (const name of ['code-review', 'custom-style', 'bundled-style']) {
+    assert.equal(descendants(page.row(name)).find(node => node.props.className === 'power-dsh-skill-origin'), undefined);
+    assert.ok(page.detail(name), 'Every card keeps a detail action.');
   }
   assert.equal(page.select('skillSources'), undefined);
   for (const name of ['code-review', 'custom-style', 'remote-style', 'source-disabled', 'bundled-style']) {
     assert.ok(!descendants(page.row(name)).some(node => node.props.children.includes('skillPersonalSource') || node.props.children.includes('skillBundledSource')));
-    assert.equal(descendants(page.row(name)).filter(node => node.type === 'button').length, 1);
+    // One switch plus one read-only detail action; no disclosure control.
+    const buttons = descendants(page.row(name)).filter(node => node.type === 'button');
+    assert.equal(buttons.filter(node => node.props.role === 'switch').length, 1);
+    assert.equal(buttons.filter(node => node.props['data-detail']).length, 1);
+    assert.ok(buttons.every(node => node.props.role === 'switch' || node.props['data-detail']));
+    assert.ok(!descendants(page.row(name)).some(node => node.props['aria-expanded'] !== undefined));
   }
   page.search().props.onChange({ target: { value: 'Remote instructions' } });
   assert.ok(page.row('remote-style'));
@@ -387,4 +383,125 @@ test('skill catalog codecs validate every field and discard data outside the pub
     }
   }
   app.unmount();
+});
+
+function skillDetailText(node) {
+  if (node === null || node === undefined || node === false) return [];
+  if (typeof node === 'string' || typeof node === 'number') return [String(node)];
+  if (Array.isArray(node)) return node.flatMap(skillDetailText);
+  if (typeof node !== 'object' || node.props?.hidden) return [];
+  return skillDetailText(node.props?.children);
+}
+
+test('skill detail reads the body on demand and shows description, metadata and instructions', async () => {
+  const app = await mount({
+    skillCatalog: catalogFixture({ skills: [skillFixture({ description: 'Review code and boundary cases' })] }),
+    skillDetail: { content: '# Review\n\nCheck the boundary cases.' },
+  });
+  const page = await skillsPage(app);
+  assert.equal(page.dialog(), undefined);
+  assert.equal(app.skillDetailReads.length, 0, 'Opening the page must not read a body.');
+  page.detail('code-review').props.onClick({ currentTarget: null });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(page.dialog().props.title, 'skillDetailTitle');
+  assert.equal(page.dialog().props.description, 'code-review');
+  const text = skillDetailText(page.dialog());
+  // Description, a short metadata list, then the body.
+  assert.ok(text.includes('Review code and boundary cases'));
+  // Only the path survives in the metadata block; enablement is the card's switch.
+  assert.ok(text.includes('/skills/code-review/SKILL.md'));
+  for (const gone of ['skillDetailSource', 'skillDetailEnabled', 'skillDetailModel', 'skillDetailUser']) {
+    assert.ok(!text.includes(gone), `The dialog must not repeat ${gone}`);
+  }
+  assert.ok(!text.includes('skillDetailHeading'), 'The body carries no heading of its own.');
+  const body = descendants(page.dialog()).find(node => node.props.className === 'power-dsh-skill-detail-markdown');
+  assert.equal(body.props.tabIndex, 0, 'The body takes keyboard focus so it can be scrolled and copied.');
+  // The description sits between the metadata list and the body.
+  const order = descendants(page.dialog()).find(node => node.props.className === 'power-dsh-skill-detail-body')
+    .props.children.filter(Boolean).map(node => node.props.className);
+  assert.deepEqual(order, ['power-dsh-skill-detail-list', 'power-dsh-skill-detail-description', 'power-dsh-skill-detail-markdown']);
+  assert.deepEqual(app.skillDetailReads, [{ name: 'code-review' }]);
+  assert.deepEqual(app.skillWrites, []);
+  // Closing is a view change only.
+  descendants(page.dialog()).find(node => node.props['data-native-button']).props.onClick();
+  assert.equal(page.dialog(), undefined);
+  assert.ok(page.row('code-review'));
+  app.unmount();
+});
+
+test('skill detail shows the Markdown source with HTML comments removed', async () => {
+  const content = '<!-- Derived from example. Licensed under Apache-2.0. -->\n\n# Electron App Automation\n\n1. **Launch** the app\n2. **Connect** to CDP\n\n\n\n## Notes\n\n- keep `code` as written';
+  const app = await mount({ skillCatalog: catalogFixture({ skills: [skillFixture()] }), skillDetail: { content } });
+  const page = await skillsPage(app);
+  page.detail('code-review').props.onClick({ currentTarget: null });
+  await new Promise(resolve => setImmediate(resolve));
+  const body = descendants(page.dialog()).find(node => node.props.className === 'power-dsh-skill-detail-markdown');
+  // Plain Markdown text: no renderer, no dependency on a host component.
+  assert.equal(body.type, 'pre');
+  const text = body.props.children[0];
+  assert.ok(!text.includes('<!--'), 'HTML comments are stripped from the reader.');
+  assert.ok(!text.includes('Derived from example'), 'The comment body is not shown.');
+  // Everything else stays byte-for-byte: the source of truth is what the skill loads.
+  for (const kept of ['# Electron App Automation', '1. **Launch** the app', '2. **Connect** to CDP', '## Notes', '- keep `code` as written']) {
+    assert.ok(text.includes(kept), `Expected the body to keep ${kept}`);
+  }
+  assert.ok(!text.includes('\n\n\n'), 'Runs of blank lines collapse to one.');
+  assert.equal(body.props.tabIndex, 0);
+  app.unmount();
+});
+
+test('skill detail keeps only the path and hides a skill without one', async () => {
+  const app = await mount({ skillCatalog: catalogFixture({ skills: [
+    skillFixture({ name: 'with-path', path: '/work/.agents/skills/with-path/SKILL.md' }),
+    skillFixture({ name: 'no-path', path: '' }),
+  ] }) });
+  const page = await skillsPage(app);
+  page.detail('with-path').props.onClick({ currentTarget: null });
+  await new Promise(resolve => setImmediate(resolve));
+  const text = skillDetailText(page.dialog());
+  assert.ok(text.includes('/work/.agents/skills/with-path/SKILL.md'));
+  app.unmount();
+
+  const second = await mount({ skillCatalog: catalogFixture({ skills: [skillFixture({ name: 'no-path', path: '' })] }) });
+  const page2 = await skillsPage(second);
+  page2.detail('no-path').props.onClick({ currentTarget: null });
+  await new Promise(resolve => setImmediate(resolve));
+  // No metadata list at all when there is no path to show.
+  assert.equal(descendants(page2.dialog()).find(node => node.props.className === 'power-dsh-skill-detail-list'), undefined);
+  assert.deepEqual(second.skillWrites, []);
+  second.unmount();
+});
+
+test('skill detail reports a missing body, a read failure and a vanished skill', async () => {
+  const app = await mount({
+    skillCatalog: catalogFixture({ skills: [skillFixture()] }),
+    skillDetailReply: name => name === 'code-review'
+      ? { ok: true, value: { name, description: '', content: '', source: 'user-dsh', path: '', origin: '', enabled: true, modelInvocable: true, userInvocable: true } }
+      : { ok: true, value: null },
+  });
+  const page = await skillsPage(app);
+  page.detail('code-review').props.onClick({ currentTarget: null });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.ok(skillDetailText(page.dialog()).includes('skillDetailNoContent'));
+  app.unmount();
+
+  const failing = await mount({ skillCatalog: catalogFixture({ skills: [skillFixture()] }), skillDetailError: 'The skill body could not be read.' });
+  const page2 = await skillsPage(failing);
+  page2.detail('code-review').props.onClick({ currentTarget: null });
+  await new Promise(resolve => setImmediate(resolve));
+  const failure = descendants(page2.dialog()).find(node => node.props['data-error-code'] === 'PD-SKILLS-DETAIL');
+  assert.ok(failure);
+  const retry = descendants(failure).find(node => node.props['data-native-button'] && node.props.children.includes('retry'));
+  retry.props.onClick();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(failing.skillDetailReads.length, 2);
+  failing.unmount();
+
+  const missing = await mount({ skillCatalog: catalogFixture({ skills: [skillFixture()] }), skillDetailReply: () => ({ ok: true, value: null }) });
+  const page3 = await skillsPage(missing);
+  page3.detail('code-review').props.onClick({ currentTarget: null });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.ok(skillDetailText(page3.dialog()).includes('skillDetailMissing'));
+  assert.deepEqual(missing.skillWrites, []);
+  missing.unmount();
 });

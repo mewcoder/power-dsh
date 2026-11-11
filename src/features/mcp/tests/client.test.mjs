@@ -135,13 +135,13 @@ test('MCP polls visible runtime status without blocking tools and releases refre
   assert.equal(app.mcpReads.length, reads + 1);
   assert.equal(app.mcpProps().mcpSource.getSnapshot().status, 'ready');
   assert.equal(page.control('browser').props.disabled, false);
-  page.toggle('browser').props.onClick();
+  page.detail('browser').props.onClick({ stopPropagation() {} });
   await app.tickIntervals();
   assert.equal(app.mcpReads.length, reads + 1, 'background reads never overlap');
   reply.resolve({ ok: true, value: mcpCatalogFixture({ servers: [mcpFixture({ runtimeState: 'failed' })] }) });
   await pending;
   assert.equal(descendants(page.row('browser')).find(node => node.props.className === 'power-dsh-mcp-runtime').props.children[1], 'mcpRuntimeFailed');
-  assert.equal(page.toggle('browser').props['aria-expanded'], true);
+  assert.equal(page.control('browser').props['aria-checked'], true, 'A status refresh keeps the switch and the card intact.');
   reply = Promise.withResolvers();
   const late = app.tickIntervals();
   const source = app.mcpProps().mcpSource;
@@ -202,22 +202,17 @@ test('MCP second-row tags use verified local and HTTP transports, omit unknown t
       assert.equal(lines[1].props.children[1].props.className, 'power-dsh-mcp-runtime');
       assert.ok(!descendants(lines[0]).some(node => node.props.className === 'power-dsh-mcp-runtime'));
       assert.equal(lines[1].props.onClick, undefined);
-      const toggle = page.toggle(name);
+      // The card carries no tool disclosure; the last row is count text plus the detail action.
+      assert.equal(page.toggle(name), undefined);
+      const actions = lines.at(-1);
+      assert.equal(actions.props.className, 'power-dsh-mcp-card-actions');
+      assert.equal(page.detail(name).props.children[0], language === 'en' ? 'Details' : '详情');
+      const filled = actions.props.children.filter(Boolean);
+      assert.equal(filled.length, name === 'network-server' ? 1 : 2, 'A closed server shows the action only.');
+      if (name !== 'network-server') assert.equal(filled[0].props.className, 'power-dsh-mcp-tools-summary');
       if (name === 'network-server') {
-        assert.equal(toggle, undefined);
-        assert.equal(lines.length, 3);
-        assert.equal(lines[2].props['data-state'], 'disabled');
-        assert.equal(lines[2].props.children[0], language === 'en' ? 'No available tools' : '暂无可用工具');
-        assert.equal(lines[2].props.onClick, undefined);
         assert.equal(lines[1].props.children[1].props.children[1], language === 'en' ? 'Disabled' : '已关闭');
-        continue;
       }
-      assert.equal(lines[2].props.className, toggle.props.className);
-      const children = toggle.props.children.filter(Boolean);
-      assert.equal(children[0].props.id, page.summary(name).props.id);
-      assert.equal(children[1].type.name, 'SkillChevron');
-      assert.ok(!descendants(toggle).some(node => node.props.className === 'power-dsh-mcp-transport'));
-      assert.equal(toggle.props['aria-labelledby'], `${page.row(name).props['aria-labelledby']} ${page.summary(name).props.id}`);
     }
     assert.equal(tag('opaque-server'), undefined);
     assert.equal(page.control('network-server').props['aria-checked'], false);
@@ -228,8 +223,6 @@ test('MCP second-row tags use verified local and HTTP transports, omit unknown t
     page.search().props.onChange({ target: { value: localLabel } });
     assert.ok(page.row('process-server'));
     assert.equal(page.row('network-server'), undefined);
-    page.toggle('process-server').props.onClick();
-    assert.equal(page.tools('process-server').props.hidden, false);
     assert.equal(page.control('process-server').props['aria-checked'], true);
     assert.deepEqual(app.mcpWrites, []);
     app.unmount();
@@ -280,7 +273,7 @@ test('MCP global groups use explicit membership and restore manual choices after
   app.unmount();
 });
 
-test('MCP cards preserve full-name tooltips, accessible disclosure controls and read-only reasons', async () => {
+test('MCP cards preserve full-name tooltips, a count line and read-only reasons without a disclosure', async () => {
   const longName = 'server-with-a-very-long-configuration-instance-name';
   const tools = ['generate_image', 'generation_result'];
   const app = await mount({ mcpCatalog: mcpCatalogFixture({ servers: [
@@ -293,9 +286,6 @@ test('MCP cards preserve full-name tooltips, accessible disclosure controls and 
   page.group('builtin').props.onClick();
   for (const name of [longName, 'mode-browser', 'provider-files', 'unknown-server']) {
     const card = page.row(name);
-    const toggle = page.toggle(name);
-    const region = page.tools(name);
-    const summary = page.summary(name);
     const title = descendants(card).find(node => node.props.id === card.props['aria-labelledby']);
     const tip = descendants(card).find(node => node.type === 'native-tooltip-fixture' && node.props.label === name);
     assert.ok(tip);
@@ -309,36 +299,22 @@ test('MCP cards preserve full-name tooltips, accessible disclosure controls and 
     assert.equal(tip.props.children[0].props.tabIndex, 0);
     const content = card.props.children.find(node => node?.props?.className === 'power-dsh-skill-card-content');
     const contentChildren = content.props.children.filter(Boolean);
-    const mainIndex = contentChildren.findIndex(node => node?.props?.className === 'power-dsh-skill-card-main');
-    const main = contentChildren[mainIndex];
-    const secondLine = contentChildren[mainIndex + 1];
-    const thirdLine = contentChildren[mainIndex + 2];
-    assert.equal(secondLine.props.className, 'power-dsh-mcp-card-meta');
-    assert.equal(secondLine.props.children.filter(Boolean)[0].props.className, 'power-dsh-mcp-runtime');
-    assert.equal(main.props.children.length, 2);
-    assert.ok(!descendants(main).some(node => node.props.className === 'power-dsh-mcp-runtime'));
-    assert.equal(main.props.children[0].type, 'native-tooltip-fixture');
-    assert.ok(descendants(main).some(node => node.props.id === title.props.id));
-    assert.ok(!descendants(main).some(node => node.props.className === 'power-dsh-mcp-card-toggle'));
-    assert.equal(thirdLine.type, 'button');
-    assert.equal(thirdLine.props.className, 'power-dsh-mcp-card-toggle');
-    const thirdLineChildren = thirdLine.props.children.filter(Boolean);
-    assert.equal(thirdLineChildren[0].props.id, summary.props.id);
-    assert.equal(thirdLineChildren[0].props.className, 'power-dsh-mcp-tools-summary');
-    assert.equal(thirdLineChildren[1].type.name, 'SkillChevron');
-    assert.equal(toggle.type, 'button');
-    assert.equal(toggle.props.type, 'button');
-    assert.equal(toggle.props['aria-expanded'], false);
-    assert.equal(toggle.props['aria-controls'], region.props.id);
-    assert.equal(toggle.props['aria-labelledby'], `${title.props.id} ${summary.props.id}`);
-    assert.equal(region.props.role, 'region');
-    assert.equal(region.props['aria-labelledby'], title.props.id);
-    assert.equal(region.props.hidden, true);
-    assert.equal(descendants(region).filter(node => node.type === 'li').length, 0);
-    assert.ok(title.props.children.includes(name));
+    const main = contentChildren.find(node => node?.props?.className === 'power-dsh-skill-card-main');
+    // No tool disclosure exists any more; the last row is the count plus the detail action.
+    assert.equal(page.toggle(name), undefined);
+    assert.equal(page.tools(name), undefined);
+    assert.ok(!descendants(card).some(node => node.props['data-expandable'] !== undefined));
+    assert.ok(!descendants(card).some(node => node.props['aria-expanded'] !== undefined));
     assert.equal(card.props.onClick, undefined);
+    assert.ok(!descendants(main).some(node => node.props.className === 'power-dsh-mcp-runtime'));
+    const actions = contentChildren.at(-1);
+    assert.equal(actions.props.className, 'power-dsh-mcp-card-actions');
+    const countNode = descendants(actions).find(node => node.props.className === 'power-dsh-mcp-tools-summary');
+    // Every fixture row exposes tools, so the count line is always present.
+    const expectedCount = { [longName]: 'mcpToolCount' }[name] ?? 'mcpSingleTool';
+    assert.equal(countNode?.props.children[0] ?? '', expectedCount);
+    assert.equal(page.detail(name).props.children[0], 'mcpDetail');
     assert.ok(!descendants(card).some(node => ['power-dsh-skill-origin', 'power-dsh-skill-card-meta'].includes(node.props.className)));
-    assert.ok(!descendants(toggle).some(node => node.props.role === 'switch'));
     if (name !== 'unknown-server') {
       assert.equal(main.props.children[1].props.role, 'switch');
       assert.equal(page.control(name).props['aria-labelledby'], title.props.id);
@@ -351,8 +327,7 @@ test('MCP cards preserve full-name tooltips, accessible disclosure controls and 
     assert.ok(reason.props.children.includes(expected));
     const title = descendants(card).find(node => node.props.id === card.props['aria-labelledby']);
     assert.equal(title.props['aria-describedby'], reason.props.id);
-    page.toggle(name).props.onClick();
-    assert.equal(page.toggle(name).props['aria-expanded'], true, 'read-only status does not block reading tools');
+    assert.equal(page.detail(name).props['aria-describedby'], reason.props.id, 'The detail action carries the read-only reason.');
     if (name !== 'unknown-server') {
       assert.equal(page.control(name).props['aria-describedby'], reason.props.id);
       assert.equal(page.control(name).props.disabled, true);
@@ -363,50 +338,35 @@ test('MCP cards preserve full-name tooltips, accessible disclosure controls and 
   app.unmount();
 });
 
-test('MCP tool disclosures show complete individual names, localized counts and a static empty state', async () => {
-  const tools = ['generate_image', 'generation_result', 'tool_with_a_very_long_name_that_must_remain_complete_after_expansion', ...Array.from({ length: 10 }, (_, index) => `full_tool_name_${index}`)];
-  for (const [language, empty, count, label] of [['en', 'No loaded tools', `${tools.length} tools`, 'Tools'], ['zh', '暂无已加载工具', `${tools.length} 个工具`, '工具']]) {
+test('MCP cards show localized tool counts and leave the full tool list to the detail dialog', async () => {
+  const tools = ['generate_image', 'generation_result', 'tool_with_a_very_long_name_that_must_remain_complete', ...Array.from({ length: 10 }, (_, index) => `full_tool_name_${index}`)];
+  for (const [language, count, single] of [['en', `${tools.length} tools`, '1 tool'], ['zh', `${tools.length} 个工具`, '1 个工具']]) {
     const app = await mount({ mcpCatalog: mcpCatalogFixture({ servers: [
       mcpFixture({ tools, origin: '@example/image-provider' }),
       mcpFixture({ id: 'include:single', name: 'single', tools: ['navigate'] }),
       mcpFixture({ id: 'include:empty', name: 'unloaded', tools: [] }),
     ] }) });
     const page = await mcpPage(app, language);
+    // The count is plain text in the last row; there is no button, region or chevron.
     assert.equal(page.summary('browser').props.children[0], count);
-    assert.equal(page.summary('single').props.children[0], language === 'en' ? '1 tool' : '1 个工具');
-    const placeholder = () => descendants(page.row('unloaded')).find(node => node.props.className === 'power-dsh-mcp-card-placeholder');
-    assert.equal(placeholder().props.children[0], empty);
-    assert.equal(placeholder().props['data-state'], 'empty');
-    assert.equal(page.toggle('browser').props['aria-expanded'], false);
-    assert.equal(page.toggle('unloaded'), undefined);
-    assert.equal(descendants(page.tools('browser')).filter(node => node.type === 'li').length, 0);
-    const reads = app.mcpReads.length;
-    page.toggle('browser').props.onClick();
-    const region = page.tools('browser');
-    assert.equal(region.props.hidden, false);
-    const list = descendants(region).find(node => node.type === 'ul');
-    assert.equal(list.props['aria-label'], label);
-    const names = descendants(list).filter(node => node.props.className === 'power-dsh-mcp-tool-name');
-    assert.deepEqual(names.map(node => node.props.children[0]), tools);
-    assert.ok(names.every(node => node.type === 'li'));
-    assert.ok(!descendants(region).some(node => node.type === 'native-tooltip-fixture'));
-    assert.equal(page.toggle('unloaded'), undefined);
-    assert.equal(page.tools('unloaded'), undefined);
-    const emptyHeader = page.row('unloaded').props.children.find(node => node?.props?.className === 'power-dsh-skill-card-content');
-    assert.equal(emptyHeader.props.onClick, undefined);
-    assert.equal(emptyHeader.props['data-expandable'], false);
-    assert.equal(placeholder().props.onClick, undefined);
-    page.toggle('browser').props.onClick();
-    assert.equal(page.tools('browser').props.hidden, true);
-    assert.equal(descendants(page.tools('browser')).filter(node => node.type === 'li').length, 0);
-    assert.equal(placeholder().props.children[0], empty);
-    assert.equal(app.mcpReads.length, reads);
+    assert.equal(page.summary('single').props.children[0], single);
+    assert.equal(page.summary('unloaded'), undefined, 'A server without tools shows no count.');
+    for (const name of ['browser', 'single', 'unloaded']) {
+      assert.equal(page.toggle(name), undefined);
+      assert.equal(page.tools(name), undefined);
+      const card = page.row(name);
+      assert.ok(!descendants(card).some(node => node.props.role === 'region'));
+      assert.ok(!descendants(card).some(node => node.type.name === 'SkillChevron'));
+    }
+    // The dialog is the only place that lists tool names.
+    const names = descendants(page.detail('browser')).filter(node => node.props.className === 'power-dsh-mcp-tool-name');
+    assert.deepEqual(names, []);
     assert.deepEqual(app.mcpWrites, []);
     app.unmount();
   }
 });
 
-test('disabled MCP cards hide all tool UI and collapse after status refresh even with cached tools', async () => {
+test('disabled MCP cards hide the tool count and never list cached tools', async () => {
   for (const language of ['en', 'zh']) {
     const servers = [
       mcpFixture({ id: 'include:empty', name: 'empty', enabled: false, tools: [], runtimeState: 'disabled', transport: 'stdio' }),
@@ -416,103 +376,78 @@ test('disabled MCP cards hide all tool UI and collapse after status refresh even
     const app = await mount({ mcpCatalog: mcpCatalogFixture({ servers }) });
     const page = await mcpPage(app, language);
     const header = name => page.row(name).props.children.find(node => node?.props?.className === 'power-dsh-skill-card-content');
-    const assertClosed = name => {
+    const assertOff = name => {
       assert.equal(page.control(name).props['aria-checked'], false);
-      assert.equal(page.summary(name), undefined);
+      assert.equal(page.summary(name), undefined, 'A disabled server shows no tool count.');
       assert.equal(page.toggle(name), undefined);
       assert.equal(page.tools(name), undefined);
-      assert.equal(page.row(name).props['data-open'], false);
-      assert.equal(header(name).props['data-expandable'], false);
+      assert.ok(!descendants(page.row(name)).some(node => node.props.className === 'power-dsh-mcp-tool-name'));
       assert.equal(header(name).props.onClick, undefined);
-      const placeholder = descendants(page.row(name)).find(node => node.props.className === 'power-dsh-mcp-card-placeholder');
-      assert.equal(placeholder.props['data-state'], 'disabled');
-      assert.equal(placeholder.props.children[0], language === 'en' ? 'No available tools' : '暂无可用工具');
-      assert.equal(placeholder.props.onClick, undefined);
-      assert.equal(placeholder.props['aria-hidden'], undefined);
       const status = descendants(page.row(name)).find(node => node.props.className === 'power-dsh-mcp-runtime');
       assert.equal(status.props.children[1], language === 'en' ? 'Disabled' : '已关闭');
       assert.equal(status.props.children[0].props.state, 'idle');
     };
-    assertClosed('empty');
-    assertClosed('cached');
+    assertOff('empty');
+    assertOff('cached');
     assert.ok(descendants(page.row('empty')).some(node => node.props.className === 'power-dsh-mcp-transport'));
-    page.toggle('browser').props.onClick();
-    assert.equal(page.tools('browser').props.hidden, false);
-    const staleToggle = page.toggle('browser').props.onClick;
+    assert.equal(page.summary('browser').props.children[0], language === 'en' ? '1 tool' : '1 个工具');
     app.setMcpServers(mcpCatalogFixture({ servers: servers.map(server => ({ ...server, enabled: false })) }));
     await app.reloadMcp();
-    assertClosed('browser');
-    staleToggle();
-    assertClosed('browser');
+    assertOff('browser');
     app.setMcpServers(mcpCatalogFixture({ servers }));
     await app.reloadMcp();
-    assert.equal(page.toggle('browser').props['aria-expanded'], true, 'a stale handler cannot change expansion while disabled');
     assert.equal(page.control('browser').props['aria-checked'], true);
+    assert.ok(page.summary('browser'), 'The count returns with the server.');
+    // A server with no loaded tools keeps its row but shows no count.
     app.setMcpServers(mcpCatalogFixture({ servers: servers.map(server => server.name === 'browser' ? { ...server, tools: [] } : server) }));
     await app.reloadMcp();
+    assert.equal(page.summary('browser'), undefined);
     assert.equal(page.toggle('browser'), undefined);
-    assert.equal(page.tools('browser'), undefined);
-    assert.equal(page.row('browser').props['data-open'], false);
-    assert.equal(header('browser').props.onClick, undefined);
-    staleToggle();
-    assert.equal(page.row('browser').props['data-open'], false);
-    const emptyState = header('browser').props.children.find(node => node?.props?.['data-state'] === 'empty');
-    assert.equal(emptyState.props.children[0], language === 'en' ? 'No loaded tools' : '暂无已加载工具');
+    assert.ok(page.detail('browser'), 'The detail action stays available without tools.');
     assert.deepEqual(app.mcpWrites, []);
     app.unmount();
   }
 });
 
-test('MCP header and button expansion ignore switch bubbling and survive search, group folding and refresh', async () => {
+test('MCP cards expose no expandable header and keep the detail action independent of the switch', async () => {
   const tools = ['generate_image', 'generation_result'];
   const app = await mount({ mcpCatalog: mcpCatalogFixture({ servers: [
     mcpFixture({ tools }), mcpFixture({ id: 'include:other', name: 'other', tools: ['search'] }),
   ] }) });
   const page = await mcpPage(app);
   const header = () => page.row('browser').props.children.find(node => node?.props?.className === 'power-dsh-skill-card-content');
-  const clickHeader = interactive => header().props.onClick({ target: { closest: () => interactive }, defaultPrevented: false });
-  clickHeader(null);
-  assert.equal(page.toggle('browser').props['aria-expanded'], true, 'clicking header text or blank space expands the card');
-  clickHeader(null);
-  assert.equal(page.toggle('browser').props['aria-expanded'], false);
-  header().props.onClick({ defaultPrevented: true });
-  assert.equal(page.toggle('browser').props['aria-expanded'], false);
-  page.toggle('browser').props.onClick();
-  clickHeader(page.toggle('browser'));
-  assert.equal(page.toggle('browser').props['aria-expanded'], true, 'the button click must not toggle twice when it bubbles');
-  assert.equal(page.toggle('other').props['aria-expanded'], false);
-  assert.equal(page.tools('browser').props.onClick, undefined);
-  assert.equal(page.row('browser').props.onClick, undefined, 'the expanded tool list stays outside the click handler');
-  await page.control('browser').props.onClick();
-  assert.deepEqual(app.mcpWrites, [{ id: 'include:browser', enabled: false }]);
+  // The card head is inert: no click handler, no disclosure, no expanded region.
   assert.equal(header().props.onClick, undefined);
+  assert.equal(header().props['data-expandable'], undefined);
   assert.equal(page.toggle('browser'), undefined);
   assert.equal(page.tools('browser'), undefined);
-  assert.equal(page.row('browser').props['data-open'], false);
+  assert.equal(page.row('browser').props['data-open'], undefined);
+  // The switch writes without opening anything, and the detail action does not toggle it.
   await page.control('browser').props.onClick();
-  assert.equal(page.toggle('browser').props['aria-expanded'], true);
-  assert.equal(page.toggle('other').props['aria-expanded'], false);
+  assert.deepEqual(app.mcpWrites, [{ id: 'include:browser', enabled: false }]);
+  assert.equal(page.summary('browser'), undefined, 'A closed server hides its count.');
+  page.detail('browser').props.onClick({ stopPropagation() {} });
+  assert.deepEqual(app.mcpWrites, [{ id: 'include:browser', enabled: false }], 'Opening details never changes the server.');
+  assert.ok(page.render().find(node => node.type === 'native-modal-fixture'));
+  await page.control('browser').props.onClick();
+  assert.equal(page.summary('browser').props.children[0], 'mcpToolCount');
+  // Tool-name search still finds the server; it never expands anything.
   const reads = app.mcpReads.length;
   page.search().props.onChange({ target: { value: 'GENERATION_RESULT' } });
   assert.ok(page.row('browser'));
   assert.equal(page.row('other'), undefined);
-  assert.equal(page.toggle('browser').props['aria-expanded'], true);
-  page.toggle('browser').props.onClick();
-  assert.equal(page.toggle('browser').props['aria-expanded'], false);
+  assert.equal(page.toggle('browser'), undefined);
   page.search().props.onChange({ target: { value: 'search' } });
   assert.ok(page.row('other'));
-  assert.equal(page.toggle('other').props['aria-expanded'], false, 'tool-name search must not expand a card');
+  assert.equal(page.row('browser'), undefined);
   page.search().props.onChange({ target: { value: '' } });
-  assert.equal(page.toggle('browser').props['aria-expanded'], false);
-  page.toggle('browser').props.onClick();
   page.group('user').props.onClick();
   assert.equal(page.row('browser'), undefined);
   page.group('user').props.onClick();
-  assert.equal(page.toggle('browser').props['aria-expanded'], true);
+  assert.ok(page.row('browser'));
   assert.equal(app.mcpReads.length, reads);
   await app.reloadMcp();
-  assert.equal(page.toggle('browser').props['aria-expanded'], true);
-  assert.equal(page.toggle('other').props['aria-expanded'], false);
+  assert.ok(page.summary('browser'));
   app.unmount();
 });
 
@@ -707,10 +642,12 @@ test('the MCP preference refreshes the Host mirror and shows rejection without e
 
 test('MCP codecs validate every public field and discard credential-bearing metadata', async () => {
   const app = await mount();
-  const descriptors = app.rpcDescriptors.filter(item => item.method === 'listMcpServers' || item.method === 'setMcpServerEnabled');
+  const descriptors = app.rpcDescriptors.filter(item => ['listMcpServers', 'readMcpServer', 'setMcpServerEnabled'].includes(item.method));
+  assert.deepEqual(Array.from(descriptors.find(item => item.method === 'readMcpServer').parameters, item => item.name), ['id']);
+  assert.deepEqual(Array.from(descriptors.find(item => item.method === 'readMcpServer').parameters, item => item.codec.typeSymbol), ['string']);
   assert.deepEqual(Array.from(descriptors.find(item => item.method === 'listMcpServers').parameters, item => item.name), []);
   assert.deepEqual(Array.from(descriptors.find(item => item.method === 'setMcpServerEnabled').parameters, item => item.name), ['id', 'enabled']);
-  for (const descriptor of descriptors) {
+  for (const descriptor of descriptors.filter(item => item.method !== 'readMcpServer')) {
     for (const parameter of descriptor.parameters) assert.throws(() => parameter.codec.create().parse(parameter.name === 'enabled' ? 'false' : false), /boolean|string/);
     const codec = descriptor.result.create();
     const tools = ['generate_image', 'generation_result'];
@@ -732,5 +669,286 @@ test('MCP codecs validate every public field and discard credential-bearing meta
       assert.throws(() => codec.parse({ ...mcpCatalogFixture(), ...invalid }), /Invalid MCP/);
     }
   }
+  app.unmount();
+});
+
+function textOf(node) {
+  if (node === null || node === undefined || node === false) return [];
+  if (typeof node === 'string' || typeof node === 'number') return [String(node)];
+  if (Array.isArray(node)) return node.flatMap(textOf);
+  if (typeof node !== 'object' || node.props?.hidden) return [];
+  return textOf(node.props?.children);
+}
+
+test('MCP detail reads one entry on demand, lists only declared fields and never changes the server', async () => {
+  // Exactly the fields `dsh-mcp-client@0.2.2-rc.1` accepts, minus the ones this entry left out.
+  const config = {
+    transport: 'stdio', serverName: 'browser', command: 'npx', argsHidden: true, cwd: '/work/tools',
+    envKeys: ['BROWSER_TOKEN'], headerKeys: [], expressions: [], urlQueryHidden: false,
+    reconnect: { enabled: true, initialDelayMs: 500, maxDelayMs: 30000, maxAttempts: 10 },
+  };
+  const app = await mount({ featureIds: ['mcp'], mcpCatalog: mcpCatalogFixture({ servers: [mcpFixture({ tools: ['navigate', 'snapshot'] })] }), mcpDetail: config });
+  const page = await mcpPage(app);
+  assert.equal(page.dialog(), undefined);
+  assert.equal(app.mcpDetailReads.length, 0, 'The page must not read configuration until asked.');
+  page.detail('browser').props.onClick({ stopPropagation() {} });
+  await new Promise(resolve => setImmediate(resolve));
+  const dialog = () => page.render().find(node => node.type === 'native-modal-fixture');
+  assert.ok(dialog());
+  assert.equal(dialog().props.title, 'mcpDetailTitle');
+  assert.equal(dialog().props.description, 'browser');
+  assert.equal(dialog().props.open, true);
+  const text = textOf(dialog());
+  for (const expected of ['mcpDetailTransport', 'mcpLocalType', 'mcpDetailRuntime', 'mcpRuntimeActive',
+    'npx', 'mcpDetailArgs', 'mcpDetailArgsHidden', '/work/tools', 'BROWSER_TOKEN', 'mcpDetailOn · mcpDetailReconnectInitial: 500 ms · mcpDetailReconnectMax: 30000 ms · mcpDetailReconnectAttempts: 10']) {
+    assert.ok(text.includes(expected), `Expected the dialog to show ${expected}`);
+  }
+  // The dialog keeps transport and runtime, but omits duplicate source/switch labels and unsupported fields.
+  for (const absent of ['mcpDetailSource', 'mcpDetailEnabled',
+    'mcpDetailToolTimeout', 'mcpDetailStartupTimeout', 'mcpDetailCloseTimeout',
+    'mcpDetailExpandTemplates', 'mcpDetailFailOnStartup', 'mcpDetailMaxInstruction']) {
+    assert.ok(!text.includes(absent), `The dialog must not list ${absent}`);
+  }
+  assert.equal(descendants(dialog()).filter(node => node.type === 'li').length, 2, 'Tool names are listed inside the dialog.');
+  assert.deepEqual(app.mcpDetailReads, [{ id: 'include:browser' }]);
+  assert.deepEqual(app.mcpWrites, []);
+  assert.equal(page.control('browser').props['aria-checked'], true);
+  // Closing is a view change only; the dialog unmounts and the row stays intact.
+  const close = descendants(dialog()).find(node => node.props['data-native-button']);
+  close.props.onClick();
+  assert.equal(page.dialog(), undefined);
+  assert.ok(page.row('browser'));
+  assert.deepEqual(app.mcpWrites, []);
+  app.unmount();
+});
+
+test('MCP detail preserves partial reconnect fields through the codec and renders no invented defaults', async () => {
+  for (const [reconnect, expected] of [
+    [{ enabled: true }, 'mcpDetailOn'],
+    [{ maxAttempts: 3 }, 'mcpDetailReconnectAttempts: 3'],
+    [{ enabled: false, initialDelayMs: 750 }, 'mcpDetailReconnectOff · mcpDetailReconnectInitial: 750 ms'],
+    [{ maxDelayMs: 9000 }, 'mcpDetailReconnectMax: 9000 ms'],
+    [{}, undefined],
+  ]) {
+    const config = { transport: 'stdio', envKeys: [], headerKeys: [], expressions: [], urlQueryHidden: false, reconnect };
+    const app = await mount({ featureIds: ['mcp'], mcpDetail: config });
+    const descriptor = app.rpcDescriptors.find(row => row.method === 'readMcpServer');
+    const codec = descriptor.result.create();
+    const parsed = codec.parse({ server: mcpFixture(), config: { ...config, reconnect: { ...reconnect, private: 'secret' } } });
+    assert.deepEqual(JSON.parse(JSON.stringify(parsed.config.reconnect)), reconnect);
+    for (const invalid of [{ enabled: 'true' }, { maxAttempts: '3' }, { maxDelayMs: Infinity }]) {
+      assert.throws(() => codec.parse({ server: mcpFixture(), config: { ...config, reconnect: invalid } }), /Invalid MCP reconnect/);
+    }
+    const page = await mcpPage(app);
+    page.detail('browser').props.onClick({ stopPropagation() {} });
+    await new Promise(resolve => setImmediate(resolve));
+    const row = descendants(page.dialog()).find(node => node.props.className === 'power-dsh-mcp-detail-row'
+      && textOf(node).includes('mcpDetailReconnect'));
+    if (expected === undefined) assert.equal(row, undefined);
+    else assert.deepEqual(textOf(row), ['mcpDetailReconnect', expected]);
+    app.unmount();
+  }
+});
+
+test('MCP detail shows the same fields whether the server is open or closed', async () => {
+  // One app per case: the fixture reuses hook slots across renders of one component.
+  const read = async (language, servers, name) => {
+    const app = await mount({ mcpCatalog: mcpCatalogFixture({ servers }), mcpDetail: {
+      transport: 'stdio', envKeys: [], headerKeys: [], expressions: [], urlQueryHidden: false } });
+    const page = await mcpPage(app, language);
+    const group = page.group('builtin');
+    if (group && group.props['aria-expanded'] === false) group.props.onClick();
+    page.detail(name).props.onClick({ stopPropagation() {} });
+    await new Promise(resolve => setImmediate(resolve));
+    const dialog = page.render().find(node => node.type === 'native-modal-fixture');
+    const rows = descendants(dialog).filter(node => node.props.className === 'power-dsh-mcp-detail-row')
+      .map(node => node.props.children[0].props.children[0]);
+    const text = textOf(dialog);
+    app.unmount();
+    return { rows, text };
+  };
+  const labels = {
+    en: { runtime: 'Runtime', running: 'Running', off: 'Disabled', noTools: 'No loaded tools', noAvailable: 'No available tools' },
+    zh: { runtime: '运行状态', running: '运行中', off: '已关闭', noTools: '暂无已加载工具', noAvailable: '暂无可用工具' },
+  };
+  for (const language of ['en', 'zh']) {
+    const label = labels[language];
+    const opened = await read(language, [mcpFixture({ id: 'include:on', name: 'on-server', tools: ['a'] })], 'on-server');
+    const closed = await read(language, [mcpFixture({ id: 'include:off', name: 'off-server', enabled: false, tools: ['a'], runtimeState: 'active' })], 'off-server');
+    // The field set is identical: opening a server must not change what the dialog lists.
+    assert.deepEqual(closed.rows, opened.rows);
+    assert.ok(opened.rows.includes(label.runtime));
+    // Only the runtime value differs: a closed server reads as closed, not as running.
+    assert.ok(opened.text.includes(label.running));
+    assert.ok(closed.text.includes(label.off));
+    assert.ok(!closed.text.includes(label.running), 'A closed server never reads as running.');
+    // The tool section stays, with the wording that fits the switch.
+    assert.ok(opened.text.includes(label.noTools) || opened.text.includes('a'));
+    assert.ok(closed.text.includes(label.noAvailable), 'A closed server has no available tools.');
+    assert.ok(!closed.text.includes('a'), 'Its cached tools are not listed.');
+  }
+});
+
+test('MCP action row keeps the detail button flush right with or without a tool count', async () => {
+  const app = await mount({ mcpCatalog: mcpCatalogFixture({ servers: [
+    mcpFixture({ id: 'include:with', name: 'with-tools', tools: ['a', 'b'] }),
+    mcpFixture({ id: 'include:without', name: 'no-tools', tools: [] }),
+    mcpFixture({ id: 'include:off', name: 'off-server', tools: ['cached'], enabled: false, runtimeState: 'disabled' }),
+  ] }) });
+  const page = await mcpPage(app);
+  const actions = name => page.row(name).props.children.find(node => node?.props?.className === 'power-dsh-skill-card-content')
+    .props.children.filter(Boolean).at(-1);
+  const parts = name => actions(name).props.children.filter(Boolean)
+    .map(node => node.props.className === 'power-dsh-mcp-tools-summary' ? 'count' : node.props['data-detail'] ? 'action' : 'other');
+  // The button is always the last child of the row, so it stays flush right.
+  assert.deepEqual(parts('with-tools'), ['count', 'action']);
+  assert.deepEqual(parts('no-tools'), ['action'], 'Without a count the row holds only the button.');
+  assert.deepEqual(parts('off-server'), ['action'], 'A closed server hides its cached count.');
+  assert.equal(actions('with-tools').props.children.filter(Boolean).at(-1).props['data-detail'], 'include:with');
+  assert.equal(actions('no-tools').props.children.filter(Boolean).at(-1).props['data-detail'], 'include:without');
+  assert.equal(page.summary('no-tools'), undefined);
+  assert.equal(page.summary('off-server'), undefined);
+  for (const name of ['with-tools', 'no-tools', 'off-server']) assert.ok(page.detail(name));
+  app.unmount();
+});
+
+test('MCP detail never renders a blank row when an older Host projects empty strings', async () => {
+  // A Host built before this projection returns '' for fields the entry never declared.
+  const app = await mount({
+    mcpCatalog: mcpCatalogFixture({ servers: [mcpFixture({ tools: ['web_search'] })] }),
+    mcpDetail: { transport: 'stdio', serverName: '', command: '', args: [], cwd: '', url: '',
+      envKeys: [], headerKeys: [], expressions: [], urlQueryHidden: false },
+  });
+  const page = await mcpPage(app);
+  page.detail('browser').props.onClick({ stopPropagation() {} });
+  await new Promise(resolve => setImmediate(resolve));
+  const dialog = page.render().find(node => node.type === 'native-modal-fixture');
+  const text = textOf(dialog);
+  for (const absent of ['mcpDetailCommand', 'mcpDetailCwd', 'mcpDetailUrl', 'mcpDetailEnv', 'mcpDetailHeaders', 'mcpDetailReconnect']) {
+    assert.ok(!text.includes(absent), `An empty value must not produce the ${absent} row`);
+  }
+  // Empty labels would show as a bare field name with nothing beside it.
+  const rows = descendants(dialog).filter(node => node.props.className === 'power-dsh-mcp-detail-row');
+  for (const row of rows) {
+    const value = descendants(row).find(node => node.props.className === 'power-dsh-mcp-detail-value');
+    assert.ok(value && textOf(value).some(entry => entry.trim() !== ''), 'Every rendered row carries a value.');
+  }
+  assert.ok(text.includes('mcpTools'), 'Only the tool section remains for an entry with no declared fields.');
+  app.unmount();
+});
+
+test('MCP detail falls back to declared transport and lists tools for an open server', async () => {
+  const app = await mount({
+    mcpCatalog: mcpCatalogFixture({ servers: [mcpFixture({ transport: 'unknown', tools: ['web_search'] })] }),
+    mcpDetail: { transport: 'streamable-http', envKeys: [], headerKeys: [], expressions: [], urlQueryHidden: false,
+      url: 'https://legacy:fixture-password@mcp.example.com/mcp/fixture-path?key=fixture-query#fixture-fragment',
+      args: ['--api-key', 'fixture-argument'] },
+  });
+  const page = await mcpPage(app);
+  page.detail('browser').props.onClick({ stopPropagation() {} });
+  await new Promise(resolve => setImmediate(resolve));
+  const dialog = page.render().find(node => node.type === 'native-modal-fixture');
+  const text = textOf(dialog);
+  assert.ok(text.includes('https://mcp.example.com'));
+  assert.ok(text.includes('mcpDetailUrlHiddenHint'));
+  assert.ok(text.includes('mcpDetailArgsHidden'));
+  assert.ok(!text.some(value => value.includes('fixture-') || value.includes('legacy:') || value.includes('--api-key')));
+  assert.ok(text.includes('mcpDetailTransport'));
+  assert.ok(text.includes('mcpHttpType'), 'Declared transport fills a missing catalog transport.');
+  assert.ok(text.includes('mcpDetailRuntime'));
+  for (const absent of ['mcpDetailEnabled', 'mcpDetailSource']) {
+    assert.ok(!text.includes(absent), `The dialog must not repeat ${absent}`);
+  }
+  assert.ok(text.includes('web_search'));
+  assert.deepEqual(app.mcpWrites, []);
+  app.unmount();
+});
+
+test('MCP detail reports an unreadable configuration and a stale entry without inventing values', async () => {
+  const app = await mount({
+    mcpCatalog: mcpCatalogFixture({ servers: [mcpFixture()] }),
+    mcpDetailReply: id => id === 'include:browser' ? { ok: true, value: { server: mcpFixture(), config: null } } : { ok: true, value: null },
+  });
+  const page = await mcpPage(app);
+  const dialog = () => page.render().find(node => node.type === 'native-modal-fixture');
+  page.detail('browser').props.onClick({ stopPropagation() {} });
+  await new Promise(resolve => setImmediate(resolve));
+  const text = textOf(dialog());
+  assert.ok(text.includes('mcpTools'), 'The dialog still shows the tool section.');
+  assert.ok(!text.some(value => value.includes('mcpDetailCommand')), 'No configuration row is invented.');
+  assert.ok(text.includes('navigate'));
+  app.unmount();
+
+  const missing = await mount({
+    featureIds: ['mcp'],
+    mcpCatalog: mcpCatalogFixture({ servers: [mcpFixture()] }),
+    mcpDetailReply: () => ({ ok: true, value: null }),
+  });
+  const missingPage = await mcpPage(missing);
+  missingPage.detail('browser').props.onClick({ stopPropagation() {} });
+  await new Promise(resolve => setImmediate(resolve));
+  const missingDialog = () => missingPage.render().find(node => node.type === 'native-modal-fixture');
+  assert.ok(descendants(missingDialog()).some(node => node.props.children.includes('mcpDetailMissing')));
+  const missingText = textOf(missingDialog());
+  for (const stale of ['navigate', 'mcpTools', 'mcpDetailTransport', 'mcpDetailRuntime']) {
+    assert.ok(!missingText.includes(stale), `A missing server must not display stale ${stale}.`);
+  }
+  assert.equal(missingDialog().props.description, 'browser', 'The trigger name still identifies the missing server.');
+  assert.deepEqual(missing.mcpWrites, []);
+  missing.unmount();
+});
+
+test('MCP detail failure stays inside the dialog and retries the same entry', async () => {
+  let attempt = 0;
+  const app = await mount({
+    mcpCatalog: mcpCatalogFixture({ servers: [mcpFixture()] }),
+    mcpDetailReply: () => {
+      attempt++;
+      return attempt === 1 ? { ok: false, error: { message: 'mcpMetadataLoadFailed' } } : { ok: true, value: { server: mcpFixture(), config: null } };
+    },
+  });
+  const page = await mcpPage(app);
+  page.detail('browser').props.onClick({ stopPropagation() {} });
+  await new Promise(resolve => setImmediate(resolve));
+  const dialog = () => page.render().find(node => node.type === 'native-modal-fixture');
+  const failure = descendants(dialog()).find(node => node.props['data-error-code'] === 'PD-MCP-DETAIL');
+  assert.ok(failure);
+  assert.ok(failure.props.children.includes('mcpMetadataLoadFailed'));
+  const retry = descendants(failure).find(node => node.props['data-native-button'] && node.props.children.includes('retry'));
+  retry.props.onClick();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.mcpDetailReads.length, 2);
+  assert.ok(!descendants(dialog()).some(node => node.props['data-error-code'] === 'PD-MCP-DETAIL'));
+  assert.deepEqual(app.mcpWrites, []);
+  app.unmount();
+});
+
+test('MCP detail ignores a late answer after closing and follows the latest request', async () => {
+  const pending = [];
+  const app = await mount({
+    mcpCatalog: mcpCatalogFixture({ servers: [mcpFixture(), mcpFixture({ id: 'include:files', name: 'files' })] }),
+    mcpDetailReply: id => new Promise(resolve => pending.push({ id, resolve })),
+  });
+  const page = await mcpPage(app);
+  page.detail('browser').props.onClick({ stopPropagation() {} });
+  const close = page.render().find(node => node.type === 'native-modal-fixture');
+  assert.ok(close);
+  // Closing before the answer arrives must discard that answer.
+  const buttons = descendants(close).filter(node => node.props['data-native-button']);
+  buttons.at(-1).props.onClick();
+  pending[0].resolve({ ok: true, value: { server: mcpFixture(), config: null } });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(page.dialog(), undefined);
+  // A second entry replaces the first request instead of interleaving answers.
+  page.detail('files').props.onClick({ stopPropagation() {} });
+  page.detail('browser').props.onClick({ stopPropagation() {} });
+  assert.deepEqual(pending.map(entry => entry.id), ['include:browser', 'include:files', 'include:browser']);
+  pending[1].resolve({ ok: true, value: { server: mcpFixture({ id: 'include:files', name: 'files' }), config: null } });
+  await new Promise(resolve => setImmediate(resolve));
+  pending[2].resolve({ ok: true, value: { server: mcpFixture(), config: null } });
+  await new Promise(resolve => setImmediate(resolve));
+  const dialog = () => page.render().find(node => node.type === 'native-modal-fixture');
+  assert.equal(dialog().props.description, 'browser');
+  assert.deepEqual(app.mcpWrites, []);
   app.unmount();
 });

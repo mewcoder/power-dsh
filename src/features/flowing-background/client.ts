@@ -43,7 +43,7 @@ function readImage(file: File): Promise<string> {
 
 export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironment) {
   const { React, h, Button, Tooltip, NativeIcon, observable, useSnapshot, errorFeedback } = runtime;
-  const { ctx, t, source } = env;
+  const { ctx, t, source, footerBusy } = env;
   let fault: { issue: AttachmentFailure; observedAt: string } | null = null;
   const attachment = observable(() => fault);
   // The wallpaper binary belongs to the Host profile; the Client only mirrors
@@ -191,9 +191,20 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     }
   };
   let panelCommit: Promise<boolean> | undefined;
+  let panelCommitRequested = false;
   const commitPanel = () => {
-    if (panelCommit) return panelCommit;
-    const task = savePanel();
+    if (panelCommit) {
+      panelCommitRequested = true;
+      return panelCommit;
+    }
+    const task = (async () => {
+      let saved: boolean;
+      do {
+        panelCommitRequested = false;
+        saved = await savePanel();
+      } while (saved && panelCommitRequested && active && panelState.open);
+      return saved;
+    })();
     panelCommit = task;
     void task.then(() => { if (panelCommit === task) panelCommit = undefined; });
     return task;
@@ -209,6 +220,31 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       if (panelState.open && (snapshot.status !== 'ready' || !snapshot.writable || snapshot.value?.flowingBackgroundEnabled !== true)) finishPanel();
     });
     return () => { off(); if (panelState.open) finishPanel(); };
+  });
+
+  // The panel is a fixed `shell.overlay` entry: it floats above the app but below
+  // a native modal layer, and it owns no modality of its own. Opening Settings -
+  // or any host dialog - while it is up would leave it stranded on top, so the
+  // panel commits its pending values and closes as soon as a modal layer appears.
+  // Host modals are identified by the `aria-modal` contract already used for the
+  // background layer; this panel deliberately does not set it. Only a closed ->
+  // open transition counts: opening the panel from the settings row closes that
+  // modal in the same batch, and that must not read as "a dialog appeared".
+  ctx?.effect?.(() => {
+    if (typeof document === 'undefined' || !document.body
+      || typeof MutationObserver !== 'function' || typeof document.querySelectorAll !== 'function') return;
+    const modalOpen = () => document.querySelectorAll('[aria-modal="true"]').length > 0;
+    let previous = modalOpen();
+    const observer = new MutationObserver(() => {
+      const open = modalOpen();
+      const appeared = open && !previous;
+      previous = open;
+      if (appeared && panelState.open) void closePanel();
+    });
+    observer.observe(document.body, {
+      childList: true, subtree: true, attributes: true, attributeFilter: ['aria-modal'],
+    });
+    return () => observer.disconnect();
   });
 
   function TuningPanel() {
@@ -308,62 +344,76 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       h('p', { id: description, className: 'power-dsh-background-panel-hint' }, t(descriptionKey)));
   }
   /**
-   * Short-sleeved tee from Tabler Icons (MIT), sized to the host icon metrics.
-   * Its glyph spans 18x17 of the 24-unit canvas, so a 22-unit viewBox renders it
-   * 13.1px wide - the host `trash-outline` glyph is 13.4px. The host draws its
-   * 16-unit icons at stroke 1, so a 22-unit viewBox needs 1 * 22/16 = 1.375 to
-   * land on the same 1px on screen; anything less reads visibly thinner.
+   * Short-sleeved tee drawn on the host's own 16-unit grid, so every straight
+   * run lands on a half unit and a 16px render stays crisp. Earlier versions
+   * scaled 24-unit Tabler artwork into a cropped viewBox, which put every edge
+   * on a fractional pixel: at 16px the antialiasing spread the 1.3px stroke
+   * across two grey pixels and the glyph read washed out.
+   *
+   * Geometry: body x 4.5-11.5, sleeves out to 1.5 and 14.5, hem at 13.5, collar
+   * a 3-unit arc. Stroke 1.3 is the host's medium weight; the resulting 14.3px
+   * ink width matches `trash-outline`'s 14.7px so the two sit as peers.
    */
   function ShirtIcon({ size = 16 }: IconProps) {
     return h('svg', {
-      width: size, height: size, viewBox: '1 1 22 22', fill: 'none',
-      stroke: 'currentColor', strokeWidth: 1.375, strokeLinecap: 'round', strokeLinejoin: 'round',
+      width: size, height: size, viewBox: '0 0 16 16', fill: 'none',
+      stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
       'aria-hidden': true, focusable: false,
     }, h('path', {
-      d: 'M15 4l6 2v5h-3v8a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-8H3V6l6-2a3 3 0 0 0 6 0',
+      d: 'M5.5 2.5 2 4 1.5 6.5 4.5 7.5 4.5 13.5 11.5 13.5 11.5 7.5 14.5 6.5 14 4 10.5 2.5A3 3 0 0 1 5.5 2.5Z',
     }));
   }
 
   /**
-   * Sidebar entry, shown when `showBackgroundShortcut` is on. It reuses the same
-   * panel as the settings row; `openPanel` still refuses when the form is not
-   * ready or writable, so the button reports why instead of opening an empty one.
+   * Sidebar entry, shown while `showBackgroundShortcut` is on, the background
+   * itself is enabled and the sidebar is expanded. Turning the background off
+   * removes the shortcut outright rather than leaving a dead button behind:
+   * there is nothing left to adjust. It reuses the same panel as the settings
+   * row; `openPanel` still refuses when the form is not ready or writable.
    */
-  function BackgroundShortcut({ t }: Pick<SlotProps, 't'>) {
+  function BackgroundShortcut({ wide, t }: Pick<SlotProps, 'wide' | 't'>) {
     const config = useSnapshot(source ?? EMPTY_SOURCE);
     const state = useSnapshot(panelStore);
-    // The appearance shortcut is fixed-positioned from its own seat; this button
-    // anchors to the same row so the pair reads as one control group, with the
-    // background entry on the left.
+    const busy = useSnapshot(footerBusy);
+    // Both entries are fixed-positioned from this shared footer seat. The
+    // appearance button is 32px wide with its left edge at `seat.right - 40`
+    // (its own seat measures the same right edge), so this button sits flush
+    // against it - `seat.right - 72` - with no gap. When the appearance entry
+    // is not rendered, this one takes that slot instead of reserving an empty
+    // 32px hole to its right.
     const seat = React.useRef<HTMLSpanElement | null>(null);
     const [left, setLeft] = React.useState<number | null>(null);
-    const visible = config.status === 'ready' && config.writable
+    const visible = wide && !busy && config.status === 'ready' && config.writable
+      && config.value?.flowingBackgroundEnabled === true
       && config.value?.showBackgroundShortcut === true;
     React.useLayoutEffect(() => {
       if (!visible || !seat.current) return;
       const element = seat.current;
       const measure = () => {
         const appearance = element.parentElement?.querySelector<HTMLElement>('.power-dsh-appearance-button');
-        const anchor = appearance ?? element;
-        // The appearance button is 32px wide and sits at `seat.right - 40`, so its
-        // left edge is `seat.right - 72`. Butt the two together with no gap; the
-        // 32px hit areas already keep their glyphs visually separated.
-        setLeft(Math.max(0, anchor.getBoundingClientRect().right - 72));
+        const right = element.getBoundingClientRect().right;
+        setLeft(Math.max(0, appearance ? right - 72 : right - 40));
       };
       measure();
       const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
       observer?.observe(element);
+      // The appearance entry mounts and unmounts with its own preference and the
+      // connection/update indicators; re-measure when the footer's seats change
+      // so the pair never drifts apart or overlaps.
+      const mutations = typeof MutationObserver === 'function' && element.parentElement
+        ? new MutationObserver(measure) : null;
+      mutations?.observe(element.parentElement!, { childList: true });
       window.addEventListener('resize', measure);
       window.visualViewport?.addEventListener('resize', measure);
       return () => {
         observer?.disconnect();
+        mutations?.disconnect();
         window.removeEventListener('resize', measure);
         window.visualViewport?.removeEventListener('resize', measure);
       };
-    }, [visible]);
+    }, [visible, config.value?.showThemeSwitcher]);
     if (!visible) return null;
-    const enabled = config.value?.flowingBackgroundEnabled === true;
-    const label = enabled ? t('flowingBackgroundTuneOpen') : t('flowingBackgroundEnabled');
+    const label = t('flowingBackgroundTuneOpen');
     return h(React.Fragment, null,
       h('style', null, settingsStyles + panelStyles),
       h('span', { className: 'power-dsh-background-seat', ref: seat },
@@ -534,10 +584,12 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     // `hidden` short-circuits `render` in the settings shell, so the main row is
     // replaced by a render contribution rather than hidden. The shortcut row is
     // returned here so it sits directly under the background switch instead of
-    // trailing every other feature's settings.
+    // trailing every other feature's settings. Like the sidebar button, it only
+    // exists while the background itself is on - turning the background off
+    // removes the entry outright instead of leaving an inert switch behind.
     return [
       { ...main, render: mainRow },
-      shortcutSetting,
+      { ...shortcutSetting, hidden: !enabled },
     ];
   }
 

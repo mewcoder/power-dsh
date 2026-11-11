@@ -1,4 +1,4 @@
-import type { SkillCatalog, McpCatalog, PersonalizationFile, SystemSoundsCatalog, SoundPlayback, RestartStatus, RestartAccepted, ArchiveCatalog, WallpaperAsset, WallpaperCleared, UsageSnapshot, ProjectCatalog } from './wire.ts';
+import type { SkillCatalog, SkillDetail, McpCatalog, McpServerDetail, PersonalizationFile, SystemSoundsCatalog, SoundPlayback, RestartStatus, RestartAccepted, ArchiveCatalog, WallpaperAsset, WallpaperCleared, UsageSnapshot, ProjectCatalog } from './wire.ts';
 
 /** Named Host operations, before the transport adds its result envelope. */
 export interface PowerDshMethods {
@@ -18,8 +18,10 @@ export interface PowerDshMethods {
   saveWallpaper(dataUrl: string, name: string): Promise<WallpaperAsset>;
   clearWallpaper(): Promise<WallpaperCleared>;
   listSkills(cwd: string, scope: string): Promise<SkillCatalog>;
+  readSkill(cwd: string, scope: string, name: string): Promise<SkillDetail | null>;
   setSkillEnabled(cwd: string, scope: string, name: string, enabled: boolean): Promise<SkillCatalog>;
   listMcpServers(): Promise<McpCatalog>;
+  readMcpServer(id: string): Promise<McpServerDetail | null>;
   setMcpServerEnabled(id: string, enabled: boolean): Promise<McpCatalog>;
   listArchivedSessions(): Promise<ArchiveCatalog>;
   restoreArchivedSession(sessionId: string): Promise<ArchiveCatalog>;

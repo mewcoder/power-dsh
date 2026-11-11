@@ -2,6 +2,7 @@ import { createRuntime } from '../shared/client/runtime.ts';
 import { createPreferenceSaver, createSettingsForm, preferenceSlot as registerPreferenceSlot } from '../shared/client/settings-form.ts';
 import { createSettingsPage } from '../shared/client/settings-shell.ts';
 import { createHeaderActions } from '../shared/client/sidebar-shell.ts';
+import { createFooterBusySource } from '../shared/client/footer-availability.ts';
 import type { ClientContext, ClientEnvironment, ClientFeatureSelection, IconProps, Listener, PageSlotProps, PreferenceKey, PublicPrimitives, ReactModule, SlotProps } from '../shared/client/types.ts';
 import { clientFeatures } from './client-features.ts';
 import { featureDictionaries } from './locales.ts';
@@ -43,12 +44,15 @@ export function createClient(React: ReactModule, primitives: PublicPrimitives, s
         const version = typeof rawVersion === 'string' && rawVersion.trim() ? rawVersion.trim() : null;
         const savePreference = createPreferenceSaver(ctx, form, t);
         const preferenceSlot: ClientEnvironment['preferenceSlot'] = (field, name, options, component) => registerPreferenceSlot(ctx, form, field, name, options, component);
+        let footerBusy: ClientEnvironment['footerBusy'] | undefined;
         const ids = new Set();
         const fields = new Set<PreferenceKey>();
         const features = [...selectedFeatures].sort((a, b) => a.definition.order - b.definition.order).map(({ definition, create }) => {
           if (ids.has(definition.id)) throw new Error(`Duplicate Client feature: ${definition.id}`);
           ids.add(definition.id);
-          const feature = create(runtime, { ctx, form, source, t, version, namespace, savePreference, preferenceSlot });
+          const feature = create(runtime, { ctx, form, source, t, version, namespace, savePreference, preferenceSlot,
+            get footerBusy() { return footerBusy ??= createFooterBusySource(ctx, runtime.observable); },
+          });
           for (const setting of feature.settings || []) {
             if (fields.has(setting.field)) throw new Error(`Duplicate Client setting: ${setting.field}`);
             if (!definition.keys.includes(setting.field)) throw new Error(`Unowned Client setting: ${setting.field}`);

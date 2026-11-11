@@ -25,6 +25,19 @@ export interface SkillCatalog {
   complete: boolean;
   skills: SkillRow[];
 }
+export interface SkillDetail {
+  name: string;
+  description: string;
+  /** Markdown body from `SKILL.md`; empty when the provider serves no body. */
+  content: string;
+  /** Native discovery source, kept verbatim so the dialog can name it. */
+  source: string;
+  path: string;
+  origin: string;
+  enabled: boolean;
+  modelInvocable: boolean;
+  userInvocable: boolean;
+}
 
 export type McpRuntimeState = 'pending' | 'loading' | 'active' | 'failed' | 'unloading' | 'inactive' | 'disabled' | 'unknown';
 export type McpTransport = 'stdio' | 'streamable-http' | 'unknown';
@@ -45,6 +58,35 @@ export interface McpServer {
 export interface McpCatalog {
   complete: boolean;
   servers: McpServer[];
+}
+/** Only explicitly declared reconnect fields; omitted values use the host's defaults. */
+export interface McpReconnectConfig {
+  enabled?: boolean;
+  initialDelayMs?: number;
+  maxDelayMs?: number;
+  maxAttempts?: number;
+}
+/** Read-only transport projection with no argument, environment, or header values. */
+export interface McpServerConfig {
+  transport: McpTransport;
+  /** Present only when the entry declares the field; defaults are not listed. */
+  serverName?: string;
+  command?: string;
+  argsHidden?: boolean;
+  cwd?: string;
+  url?: string;
+  envKeys: string[];
+  headerKeys: string[];
+  reconnect?: McpReconnectConfig;
+  /** Config fields supplied by a loader expression, so their value is not shown. */
+  expressions: string[];
+  /** The endpoint was omitted or contained parts outside the displayed origin. */
+  urlQueryHidden: boolean;
+}
+export interface McpServerDetail {
+  server: McpServer;
+  /** Null when the entry's configuration is not readable from this profile. */
+  config: McpServerConfig | null;
 }
 
 export interface PersonalizationFile {
@@ -107,6 +149,15 @@ export interface UsageDayRow {
   totalTokens: number;
   turnCount: number;
   toolCallCount: number;
+  /** Disjoint provider counters; the four parts sum to the day's total. */
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  /** Recorded assistant messages on this day, including those without usage. */
+  requestCount: number;
+  /** Completed step runtime clipped to this calendar day. */
+  activeMs: number;
 }
 export interface UsageModelRow {
   modelId: string;
@@ -120,6 +171,8 @@ export interface UsageDailyModelRow {
   modelId: string;
   provider: string;
   totalTokens: number;
+  /** Billed settlements attributed to this model on this day. */
+  requestCount: number;
 }
 export interface UsageSummary {
   totalTokens: number;
@@ -135,6 +188,17 @@ export interface UsageSummary {
   sessionCount: number;
   turnCount: number;
 }
+/** Usage card totals, with disjoint provider input counters. */
+export interface UsageCardSummary {
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  requestCount: number;
+  sessionCount: number;
+  activeMs: number;
+}
 export interface UsageSnapshot {
   /** Whether every readable session log was folded; false when some were skipped. */
   complete: boolean;
@@ -145,6 +209,8 @@ export interface UsageSnapshot {
   firstDate: string;
   lastDate: string;
   summary: UsageSummary;
+  /** Activity dates per main-session family, without identifiers; count each family once in a date range. */
+  sessionDays: string[][];
   /** Continuous daily series over the whole history, zero-filled for quiet days. */
   days: UsageDayRow[];
   /** Per-day totals for the models that appear in `models`, largest first. */

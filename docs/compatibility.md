@@ -72,10 +72,10 @@ DSH `0.2.2-rc.1` 安装包已核对会话行事件标记，作为有限 DOM 例�
 | 停用 Todo 工具 | [TodoPolicy](../src/features/todo-blocking/todo-policy.ts)的 ConfigEditor `entries()` / `edit()`、`agentPresets.compositionInventory()` 与全局 Plugin Manager | 模式声明读回、对新代际生效、旧 Agent 不受主动干预、待办历史保留、卸载写入保护 |
 | 停用 Plan 模式 | [PlanPolicy](../src/features/plan-blocking/plan-policy.ts)的 ConfigEditor `entries()` / `edit()`、`agentPresets.compositionInventory()` 与全局 Plugin Manager | 只匹配 Plan 模块、保留嵌套 group 和 section、对新模式代际生效、不干预旧 Agent、不移除历史卡片 |
 | 停用 Goal 模式 | [GoalPolicy](../src/features/goal-blocking/goal-policy.ts)的模式声明编辑、分模块数量与启停状态读回、全局 Plugin Manager | 仅目标命令与工具，不卸载目标服务或续跑驱动，不改已有目标状态，旧模式代际保留 |
-| 技能管理 | [SkillPolicy](../src/features/skills/skill-policy.ts)的 `skills.registerProvider()` / `snapshot()`、`agentPresets.serviceFor()` / `acquireScope()` / `compositionInventory()`、`createScope()`、`workspaceRegistry.list()` | provider 生命周期、用户与项目优先级、租约释放、模式服务隔离、导入项目字段 |
+| 技能管理 | [SkillPolicy](../src/features/skills/skill-policy.ts)的 `skills.registerProvider()` / `snapshot()`、`agentPresets.serviceFor()` / `acquireScope()` / `compositionInventory()`、`createScope()`、`workspaceRegistry.list()` | provider 生命周期、用户与工作区优先级、租约释放、模式服务隔离、导入工作区字段 |
 | MCP 目录与启停 | [McpPolicy](../src/features/mcp/mcp-policy.ts)与[McpProviders](../src/features/mcp/mcp-providers.ts)的 bundle rows、模式清单、Loader entries、Fiber、scope、原生 manager | `fiberPhase` / `fiberState` 含义、Fiber 数字状态映射、归属去重、工具作用域、配置修订与原生写后读回 |
-| 归档管理 | [ArchiveService](../src/features/archive/archive-service.ts)的 `workspaceController.follow()` / `unarchiveSession()`、`sessionQuery.readTitleSnapshots()` / `listSessions()`、`sessionPersistence.stat()` | 基线帧 `items` / `archivedSessionIds` 形状、工作区归属、标题/`updatedAt`/`createdAt`、`live` 判定、`stat().location.path` 定位与只删本会话产物、服务缺席降级 |
-| 项目管理 | [ProjectsService](../src/features/projects/projects-service.ts)的 `workspaceController.follow()` / `delete()`、`sessionController.list()` | 基线帧 `items[].{workspaceId,title,path,sessionIds}` 形状、登记顺序、`delete` 只删登记并保留目录与会话、`list().items[].updatedAt` 与侧栏同源、服务缺席降级 |
+| 归档管理 | [ArchiveService](../src/features/archive/archive-service.ts)的 `workspaceController.follow()` / `unarchiveSession()`、`sessionQuery.readTitleSnapshots()`、`sessionController.list()` | 基线帧 `items` / `archivedSessionIds` 形状、工作区归属、标题/`updatedAt`/`createdAt`、服务缺席降级；永久删除使用已核对的单代 JSONL 与原生写锁；自动归档队列检查当前核对至 0.2.2-rc.1 |
+| 工作区管理 | [ProjectsService](../src/features/projects/projects-service.ts)的 `workspaceController.follow()` / `delete()`、`sessionController.list()` | 基线帧 `items[].{workspaceId,title,path,sessionIds}` 形状、登记顺序、`delete` 只删登记并保留目录与会话、`list().items[].updatedAt` 与侧栏同源、服务缺席降级 |
 | 任务通知 | [通知投影](../src/features/notifications/notifications.ts)及 Host 注册、Client 的 `sessions.list` / `uiSession.sessionStatus` | 投影注册与释放、`turn/end` 原因、首次订阅基线、重连去重、提问与审批状态字段 |
 | 系统声音 | [SystemSounds](../src/features/notifications/system-sounds.ts)、`connection.isLoopback`、subprocess `resolveExecutable` / `spawn` 与托管句柄 | 本机识别、参数与取消语义、平台真实试听、远程界面不会在服务器播放 |
 | 全局指令 | `profileContext.home`、文件 RPC、宿主全局指令发现 | 正文落在同一个原生全局文件、冲突时不覆盖、禁用入口不改变正文及读取行为 |
@@ -89,7 +89,7 @@ DSH `0.2.2-rc.1` 安装包已核对会话行事件标记，作为有限 DOM 例�
 - [Menu 定位变更](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/upgrade-guide/v0.2.2-alpha.2/css-anchored-menus/guide.zh.md)涉及移除的定位导出与外部锚点参数；Mod 使用内联 `anchor`，未调用被移除的接口。不能据此把最低版本设为 `0.2.2-alpha.2`；公共组件的导出、props 和浏览器 CSS 支持仍需真实验证。
 - [版本检查规则变更](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/upgrade-guide/v0.2.1-alpha.3/plugin-engines-dsh/guide.zh.md)正文说明 `0.2.1-alpha.3` 仍忽略 `engines.dsh`，下一版本才优先读取。目标若覆盖这一时期，需单独核对宿主实际检查行为及所需 peer 声明，不能仅添加 engines 就认定旧版会正确阻止不兼容安装。指南所在目录不自动等于新行为的首次发行版本。
 
-源码核对已确认多项技能、preset、插件管理与 UI 接口在更旧版本中存在；本次通过旧版公开 `schemas()` / `get()` 解决 MCP 工具枚举差异，并用真实旧版执行器、投影和注入器验证。`0.2.0-rc.1` 与 `rc.2` 的 Menu 不支持 `minWidthFromAnchor`，项目下拉保持该版原生默认宽度，界面仍需验收；未借助内部字段或覆盖宿主样式补齐。此结论不代表每个接口的绝对首次版本，也不代替完整宿主验收。
+源码核对已确认多项技能、preset、插件管理与 UI 接口在更旧版本中存在；本次通过旧版公开 `schemas()` / `get()` 解决 MCP 工具枚举差异，并用真实旧版执行器、投影和注入器验证。`0.2.0-rc.1` 与 `rc.2` 的 Menu 不支持 `minWidthFromAnchor`，工作区下拉保持该版原生默认宽度，界面仍需验收；未借助内部字段或覆盖宿主样式补齐。此结论不代表每个接口的绝对首次版本，也不代替完整宿主验收。
 
 ## 需要优先验证的初始化行为
 
@@ -103,7 +103,7 @@ DSH `0.2.2-rc.1` 安装包已核对会话行事件标记，作为有限 DOM 例�
 
 1. **环境**：Mod 版本与最终提交、DSH 确切运行时版本、桌面壳或浏览器版本、操作系统、Node.js 版本、profile 类型及打包产物校验值。
 2. **冷启动与加载**：所有主开关关闭时安装、启动、刷新页面；核对原生 application、诊断、Client 注册和实际入口。服务缺席或 profile 组合不支持时记录实际错误。
-3. **功能与持久化**：逐个开启、操作、关闭，读回后端事实；修改后刷新与重启仍保持偏好。精简类在隔离环境核对全部目标与无关实例；技能区分全局和项目，MCP 区分可写项、只读项和运行状态。
+3. **功能与持久化**：逐个开启、操作、关闭，读回后端事实；修改后刷新与重启仍保持偏好。精简类在隔离环境核对全部目标与无关实例；技能区分全局和工作区，MCP 区分可写项、只读项和运行状态。
 4. **生命周期**：停用、重启用、卸载，核对监听、投影、作用域和播放进程释放；不能重复注册或丢失用户配置。
 5. **平台与界面**：仅把实际测试过的桌面系统、浏览器和本机/远程组合写为已验证；不能把 macOS 结果代替 Windows 标题栏、PowerShell 音效与系统通知验收。
 6. **升级**：验证旧 Mod → 新 Mod 的开关和停用技能名单是否保留；旧 DSH → 新 DSH 的加载与操作复测。旧 ID 设置回退及部分重装读回证据见[调查记录](compatibility-audit.md#安装与平台验证记录)；完整偏好自动迁移尚未验证，不能据源码改名或旧路径符号链接宣称升级验收通过。包名、设置命名空间或 RPC 变化时，通过原生管理机制核对旧安装来源、迁移结果与页面重载，不手工修改 profile。

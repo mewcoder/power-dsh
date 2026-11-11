@@ -152,6 +152,24 @@ test('directory and plugin origins survive a disabled-policy reload without copy
   } finally { await app.policy.close(); await restored?.policy.close(); }
 });
 
+test('skill detail returns null when its listed definition disappears, preserving genuine empty bodies', async () => {
+  const app = fixture();
+  const reads = [];
+  let definition;
+  app.policy.registry.get = async (name, options) => { reads.push({ name, options }); return definition; };
+  try {
+    assert.ok(row(await app.policy.list('', 'user')), 'Discovery still contains the summary.');
+    assert.equal(await app.policy.read('', 'user', 'review'), null);
+    assert.ok(row(await app.policy.list('', 'user')), 'A stale summary must not become an empty-body detail.');
+    assert.deepEqual(reads, [{ name: 'review', options: { scope: app.generation } }]);
+    definition = { ...app.native[0], content: '' };
+    const empty = await app.policy.read('', 'user', 'review');
+    assert.equal(empty.name, 'review');
+    assert.equal(empty.content, '', 'A valid provider definition may have an empty body.');
+    assert.deepEqual(app.writes, []);
+  } finally { await app.policy.close(); }
+});
+
 test('user view omits cwd before native discovery and retains a same-named personal skill', async () => {
   const app = fixture();
   try {

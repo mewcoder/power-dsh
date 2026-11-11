@@ -28,6 +28,7 @@ class Element {
   }
   get isConnected() { return this.tagName === 'body' || this.parentElement?.isConnected === true; }
   setAttribute(key, value) { this.attributes.set(key, value); }
+  removeAttribute(key) { this.attributes.delete(key); }
   hasAttribute(key) { return this.attributes.has(key); }
   matches(selector) {
     return selector.split(',').some(part => {
@@ -67,6 +68,7 @@ function fixture(layout = 'pI_x6G', sidebarName = 'hHd-Xa') {
   let stops = 0;
   const doc = { body, head, querySelectorAll: selector => [...head.querySelectorAll(selector), ...body.querySelectorAll(selector)],
     createElement: tag => new Element(tag) };
+  doc.querySelectorAll = selector => [...head.querySelectorAll(selector), ...body.querySelectorAll(selector)];
   const win = {
     getComputedStyle: node => ({ position: node.position, display: node.display,
       isolation: node.style.getPropertyValue('isolation') || 'auto' }),
@@ -109,6 +111,108 @@ function workspaceFixture(f, sidebarRoot, hash) {
   body.append(fade); root.append(body); sidebarRoot.append(root);
   return { sheet, root, body, fade };
 }
+
+test('a global panel keeps the sidebar artwork and restores only the centre column', () => {
+  const f = fixture();
+  const { target, sidebar, center, root } = f.makeFrame();
+  const dispose = f.watch();
+  assert.equal(f.statuses.at(-1), 'attached');
+  assert.ok(target.querySelector('.power-dsh-flowing-background'), 'The artwork is attached on the conversation.');
+  assert.equal(sidebar.style.getPropertyValue('background-color'), 'transparent');
+  assert.equal(center.style.getPropertyValue('background-color'), 'transparent');
+  assert.equal(root.style.getPropertyValue('background-color'), 'transparent');
+
+  // Plugin, usage and similar pages render as a global panel in the centre
+  // column. That page must read natively, but the sidebar keeps the artwork so
+  // the shell still looks continuous.
+  const panel = new Element('div', {}, 'Panel_root');
+  panel.setAttribute('data-global-panel', 'true');
+  center.append(panel);
+  f.flush();
+  assert.ok(target.querySelector('.power-dsh-flowing-background'), 'The artwork stays mounted for the sidebar.');
+  assert.equal(f.stops(), 0, 'The pattern keeps running.');
+  assert.equal(center.style.getPropertyValue('background-color'), 'var(--dsw-alias-bg-base)',
+    'Web and Linux centre columns need an explicit opaque fill because their native background is transparent.');
+  assert.equal(center.style.getPropertyValue('background-image'), 'none', 'The fill does not expose a previous background image.');
+  assert.equal(sidebar.style.getPropertyValue('background-color'), 'transparent', 'The sidebar still shows the artwork.');
+
+  panel.remove();
+  f.flush();
+  assert.equal(center.style.getPropertyValue('background-color'), 'transparent', 'Leaving the panel lets the artwork through again.');
+  assert.equal(f.starts.length, 1, 'The same artwork is reused, not rebuilt.');
+  dispose();
+});
+
+test('global panel fills restore the original transparent centre and preserve later writes', () => {
+  for (const laterWrite of [false, true]) {
+    const f = fixture();
+    const { target, center } = f.makeFrame();
+    center.style.setProperty('background-color', 'transparent', 'important');
+    center.style.setProperty('background-image', 'linear-gradient(red, blue)', '');
+    const panel = new Element('div', { 'data-global-panel': '' });
+    center.append(panel);
+    const dispose = f.watch();
+    assert.equal(center.style.getPropertyValue('background-color'), 'var(--dsw-alias-bg-base)');
+    assert.equal(center.style.getPropertyPriority('background-color'), 'important');
+    panel.remove();
+    f.flush();
+    assert.equal(center.style.getPropertyValue('background-color'), 'transparent');
+    center.append(panel);
+    f.flush();
+    assert.equal(center.style.getPropertyValue('background-color'), 'var(--dsw-alias-bg-base)');
+    assert.equal(f.starts.length, 1, 'Panel transitions keep the same artwork.');
+    if (laterWrite) center.style.setProperty('background-color', 'green', '');
+    dispose();
+    assert.equal(center.style.getPropertyValue('background-color'), laterWrite ? 'green' : 'transparent');
+    assert.equal(center.style.getPropertyPriority('background-color'), laterWrite ? '' : 'important');
+    assert.equal(center.style.getPropertyValue('background-image'), 'linear-gradient(red, blue)');
+    assert.equal(center.style.getPropertyPriority('background-image'), '');
+    assert.equal(target.querySelector('.power-dsh-flowing-background'), null);
+  }
+});
+
+test('panel transitions never take back background styles another owner wrote', () => {
+  const f = fixture();
+  const { center } = f.makeFrame();
+  const dispose = f.watch();
+  center.style.setProperty('background-color', 'green', '');
+  center.style.setProperty('background-image', 'linear-gradient(red, blue)', 'important');
+  const panel = new Element('div', { 'data-global-panel': '' });
+  center.append(panel);
+  f.flush();
+  assert.equal(center.style.getPropertyValue('background-color'), 'green');
+  assert.equal(center.style.getPropertyValue('background-image'), 'linear-gradient(red, blue)');
+  panel.remove();
+  f.flush();
+  dispose();
+  assert.equal(center.style.getPropertyValue('background-color'), 'green');
+  assert.equal(center.style.getPropertyPriority('background-color'), '');
+  assert.equal(center.style.getPropertyValue('background-image'), 'linear-gradient(red, blue)');
+  assert.equal(center.style.getPropertyPriority('background-image'), 'important');
+});
+
+test('a modal layer leaves the artwork alone because it paints its own surface', () => {
+  const f = fixture();
+  const { target, sidebar, root } = f.makeFrame();
+  const dispose = f.watch();
+  assert.ok(target.querySelector('.power-dsh-flowing-background'));
+
+  // Settings and confirmation dialogs are modal layers over the whole app with
+  // their own opaque panel and blurred mask; nothing needs to be torn down.
+  const overlay = new Element('div', {}, 'Settings_overlay');
+  overlay.setAttribute('aria-modal', 'true');
+  f.body.append(overlay);
+  f.flush();
+  assert.ok(target.querySelector('.power-dsh-flowing-background'), 'The artwork stays mounted under a modal layer.');
+  assert.equal(f.stops(), 0);
+  assert.equal(sidebar.style.getPropertyValue('background-color'), 'transparent');
+  assert.equal(root.style.getPropertyValue('background-color'), 'transparent');
+
+  overlay.remove();
+  f.flush();
+  assert.equal(f.starts.length, 1, 'No reattachment churn.');
+  dispose();
+});
 
 test('workspace list bottom fades use their own stylesheet mapping and restore on list replacement', () => {
   for (const hash of ['Gakraw', 'Kjh-qa', 'build_123']) {

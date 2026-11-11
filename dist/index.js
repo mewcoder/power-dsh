@@ -1,9 +1,11 @@
 import { TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import z from "@deepseek-ai/schemastery";
 import { spawn } from "node:child_process";
-import { access, lstat, mkdir, readFile, readdir, realpath, rename, rm, unlink, writeFile } from "node:fs/promises";
-import path, { basename, dirname, isAbsolute, join, resolve, win32 } from "node:path";
+import { access, lstat, mkdir, readFile, readdir, realpath, rename, unlink, writeFile } from "node:fs/promises";
+import path, { basename, dirname, isAbsolute, join, normalize, resolve, win32 } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { linkSync, lstatSync, mkdtempSync, readdirSync, renameSync, rmdirSync, unlinkSync } from "node:fs";
 import { defineTool } from "@deepseek-ai/dsh-tools";
 
 // \0rolldown/runtime.js
@@ -1319,6 +1321,46 @@ var SkillPolicy = class {
 	async list(cwd = "", scope = "") {
 		return this.readView(await this.context(cwd, scope));
 	}
+	/**
+	* Load one skill's body for the read-only detail dialog.
+	*
+	* The body is read through the same preset scope the catalog used, so a
+	* project copy resolves exactly as the listed row did. Nothing is cached,
+	* written, or kept after the response.
+	* @param cwd - project directory for the project scope; ignored for user scope.
+	* @param scope - `user` or `project`.
+	* @param name - skill name as the catalog lists it.
+	* @returns the skill with its Markdown body, or null when it is not listed.
+	*/
+	async read(cwd, scope, name) {
+		if (typeof name !== "string" || !NAME.test(name)) throw new TypeError("Invalid skill operation.");
+		const view = await this.context(cwd, scope);
+		const row = (await this.readView(view)).skills.find((skill) => skill.name === name);
+		if (!row) return null;
+		let content = "";
+		try {
+			const definition = await this.registry.get(name, this.lookup(view));
+			this.active();
+			if (definition === void 0) return null;
+			if (typeof definition?.content === "string") content = definition.content;
+		} catch (error) {
+			if (errorCode(error) === "INACTIVE_EFFECT") throw error;
+			this.active();
+			throw new Error("The skill body could not be read.");
+		}
+		this.active();
+		return {
+			name: row.name,
+			description: row.description,
+			content,
+			source: row.source,
+			path: row.path,
+			origin: row.origin,
+			enabled: row.enabled,
+			modelInvocable: row.modelInvocable,
+			userInvocable: row.userInvocable
+		};
+	}
 	async setEnabled(cwd, scope, name, enabled) {
 		if (typeof name !== "string" || !NAME.test(name) || typeof enabled !== "boolean") throw new TypeError("Invalid skill operation.");
 		const view = await this.context(cwd, scope);
@@ -1410,6 +1452,12 @@ const methods$11 = {
 			return this.skills.current.list(cwd, scope);
 		});
 	},
+	readSkill(cwd, scope, name) {
+		return this.run(() => {
+			if (!this.skills.current) throw new Error("DSH skill management is unavailable.");
+			return this.skills.current.read(cwd, scope, name);
+		});
+	},
 	setSkillEnabled(cwd, scope, name, enabled) {
 		return this.run(() => {
 			if (!this.skills.current) throw new Error("DSH skill management is unavailable.");
@@ -1463,7 +1511,37 @@ const skillCatalogCodec = {
 		};
 	} })
 };
-function skillRpc(method, fields) {
+const skillDetailCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#SkillDetail",
+	create: () => ({ parse(value) {
+		if (value === null) return null;
+		if (!isRecord$1(value) || !hasStrings(value, [
+			"name",
+			"description",
+			"content",
+			"source",
+			"path",
+			"origin"
+		]) || !hasBooleans(value, [
+			"enabled",
+			"modelInvocable",
+			"userInvocable"
+		])) throw new TypeError("Invalid skill detail");
+		return {
+			name: value.name,
+			description: value.description,
+			content: value.content,
+			source: value.source,
+			path: value.path,
+			origin: value.origin,
+			enabled: value.enabled,
+			modelInvocable: value.modelInvocable,
+			userInvocable: value.userInvocable
+		};
+	} })
+};
+function skillRpc(method, fields, result = skillCatalogCodec) {
 	return {
 		id: `power-dsh#powerDsh/${method}`,
 		service: "powerDsh",
@@ -1476,17 +1554,26 @@ function skillRpc(method, fields) {
 			source: "json",
 			codec: name === "enabled" ? booleanCodec : stringCodec
 		})),
-		result: skillCatalogCodec
+		result
 	};
 }
 const LIST_SKILLS_RPC = skillRpc("listSkills", ["cwd", "scope"]);
+const READ_SKILL_RPC = skillRpc("readSkill", [
+	"cwd",
+	"scope",
+	"name"
+], skillDetailCodec);
 const SET_SKILL_ENABLED_RPC = skillRpc("setSkillEnabled", [
 	"cwd",
 	"scope",
 	"name",
 	"enabled"
 ]);
-const rpc$11 = [LIST_SKILLS_RPC, SET_SKILL_ENABLED_RPC];
+const rpc$11 = [
+	LIST_SKILLS_RPC,
+	READ_SKILL_RPC,
+	SET_SKILL_ENABLED_RPC
+];
 
 // src/features/mcp/definition.ts
 const definition$12 = Object.freeze({
@@ -1500,6 +1587,226 @@ const definition$12 = Object.freeze({
 // src/features/mcp/config.ts
 var config_exports$12 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$12 });
 const configFields$12 = { mcpManagerEnabled: z.boolean().default(false).volatile() };
+
+// src/features/mcp/rpc.ts
+const serverCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#McpServer",
+	create: () => ({ parse(value) {
+		if (!isRecord$1(value) || !hasStrings(value, [
+			"id",
+			"name",
+			"source",
+			"origin",
+			"reason"
+		]) || !isOneOf(value.group, ["user", "builtin"]) || !isOneOf(value.transport, [
+			"stdio",
+			"streamable-http",
+			"unknown"
+		]) || !isOneOf(value.runtimeState, [
+			"pending",
+			"loading",
+			"active",
+			"failed",
+			"unloading",
+			"inactive",
+			"disabled",
+			"unknown"
+		]) || !isStringArray(value.tools) || !hasBooleans(value, [
+			"enabled",
+			"stateKnown",
+			"canToggle"
+		])) throw new TypeError("Invalid MCP entry");
+		return {
+			id: value.id,
+			name: value.name,
+			source: value.source,
+			origin: value.origin,
+			group: value.group,
+			enabled: value.enabled,
+			stateKnown: value.stateKnown,
+			runtimeState: value.runtimeState,
+			transport: value.transport,
+			canToggle: value.canToggle,
+			reason: value.reason,
+			tools: value.tools.slice()
+		};
+	} })
+};
+const mcpCatalogCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#McpCatalog",
+	create: () => ({ parse(value) {
+		if (!isRecord$1(value) || typeof value.complete !== "boolean" || !isArray(value.servers)) throw new TypeError("Invalid MCP catalog");
+		const servers = value.servers.map((row) => serverCodec.create().parse(row));
+		return {
+			complete: value.complete,
+			servers
+		};
+	} })
+};
+const optionalText = (value) => value === void 0 || typeof value === "string";
+/** Only the HTTP(S) origin is displayable: any other URL component can carry credentials. */
+function projectEndpoint(value) {
+	if (typeof value !== "string" || value === "") return { hidden: false };
+	try {
+		const parsed = new URL(value);
+		if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return { hidden: true };
+		return {
+			url: parsed.origin,
+			hidden: parsed.href !== `${parsed.origin}/` || /[?#]/.test(value)
+		};
+	} catch {
+		return { hidden: true };
+	}
+}
+const reconnectCodec = { parse(value) {
+	if (!isRecord$1(value) || !(value.enabled === void 0 || typeof value.enabled === "boolean")) throw new TypeError("Invalid MCP reconnect policy");
+	const config = {};
+	if (typeof value.enabled === "boolean") config.enabled = value.enabled;
+	for (const key of [
+		"initialDelayMs",
+		"maxDelayMs",
+		"maxAttempts"
+	]) {
+		const number = value[key];
+		if (number === void 0) continue;
+		if (typeof number !== "number" || !Number.isFinite(number)) throw new TypeError("Invalid MCP reconnect policy");
+		config[key] = number;
+	}
+	return config;
+} };
+const configCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#McpServerConfig",
+	create: () => ({ parse(value) {
+		if (!isRecord$1(value) || !isOneOf(value.transport, [
+			"stdio",
+			"streamable-http",
+			"unknown"
+		]) || !isStringArray(value.envKeys) || !isStringArray(value.headerKeys) || !isStringArray(value.expressions) || typeof value.urlQueryHidden !== "boolean" || !optionalText(value.serverName) || !optionalText(value.command) || !optionalText(value.cwd) || !optionalText(value.url) || !(value.argsHidden === void 0 || typeof value.argsHidden === "boolean") || !(value.reconnect === void 0 || isRecord$1(value.reconnect))) throw new TypeError("Invalid MCP configuration");
+		const endpoint = projectEndpoint(value.url);
+		const config = {
+			transport: value.transport,
+			envKeys: value.envKeys.slice(),
+			headerKeys: value.headerKeys.slice(),
+			expressions: value.expressions.slice(),
+			urlQueryHidden: value.urlQueryHidden || endpoint.hidden
+		};
+		if (typeof value.serverName === "string" && value.serverName) config.serverName = value.serverName;
+		if (typeof value.command === "string" && value.command) config.command = value.command;
+		if (value.argsHidden === true || isArray(value.args) && value.args.length > 0) config.argsHidden = true;
+		if (typeof value.cwd === "string" && value.cwd) config.cwd = value.cwd;
+		if (endpoint.url !== void 0) config.url = endpoint.url;
+		if (value.reconnect !== void 0) config.reconnect = reconnectCodec.parse(value.reconnect);
+		return config;
+	} })
+};
+const detailCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#McpServerDetail",
+	create: () => ({ parse(value) {
+		if (value === null) return null;
+		if (!isRecord$1(value) || !Object.hasOwn(value, "server") || !Object.hasOwn(value, "config")) throw new TypeError("Invalid MCP detail");
+		return {
+			server: serverCodec.create().parse(value.server),
+			config: value.config === null ? null : configCodec.create().parse(value.config)
+		};
+	} })
+};
+const parseMcpServerDetail = detailCodec.create().parse;
+function mcpRpc(method, fields, result) {
+	return {
+		id: `power-dsh#powerDsh/${method}`,
+		service: "powerDsh",
+		namespace: "powerDsh",
+		method,
+		invocation: { kind: "direct" },
+		parameters: fields.map((name) => ({
+			name,
+			wire: name,
+			source: "json",
+			codec: name === "enabled" ? booleanCodec : stringCodec
+		})),
+		result
+	};
+}
+const LIST_MCP_SERVERS_RPC = mcpRpc("listMcpServers", [], mcpCatalogCodec);
+const READ_MCP_SERVER_RPC = mcpRpc("readMcpServer", ["id"], detailCodec);
+const SET_MCP_SERVER_ENABLED_RPC = mcpRpc("setMcpServerEnabled", ["id", "enabled"], mcpCatalogCodec);
+const rpc$10 = [
+	LIST_MCP_SERVERS_RPC,
+	READ_MCP_SERVER_RPC,
+	SET_MCP_SERVER_ENABLED_RPC
+];
+
+// src/features/mcp/mcp-config.ts
+/** Loader serializes `!!js` values as this marker object before evaluation. */
+function isExpression(value) {
+	return isRecord$1(value) && Object.keys(value).length === 1 && typeof value.__jsExpr === "string";
+}
+function text(value) {
+	return typeof value === "string" && value !== "" ? value : void 0;
+}
+function reconnectOf(value) {
+	if (!isRecord$1(value)) return void 0;
+	const config = {};
+	if (typeof value.enabled === "boolean") config.enabled = value.enabled;
+	for (const key of [
+		"initialDelayMs",
+		"maxDelayMs",
+		"maxAttempts"
+	]) if (typeof value[key] === "number" && Number.isFinite(value[key])) config[key] = value[key];
+	return Object.keys(config).length > 0 ? config : void 0;
+}
+/**
+* Project one native MCP entry into the fields the detail dialog shows.
+*
+* Only fields the entry actually declares are reported, so the dialog never
+* lists defaults the user did not choose. `env` and `headers` keep key names
+* only, a `!!js` field reports its name instead of unresolved text, and the
+* endpoint and command parameters are reduced to an origin and a presence flag.
+* @param raw - the entry's configuration as the profile or preset declares it.
+* @param fallback - transport already confirmed by the catalog projection.
+* @returns the readable configuration, or null when nothing is declared.
+*/
+function projectMcpConfig(raw, fallback) {
+	if (!isRecord$1(raw)) return null;
+	const expressions = [];
+	const read = (field) => {
+		const value = raw[field];
+		if (isExpression(value)) {
+			expressions.push(field);
+			return;
+		}
+		return value;
+	};
+	const keysOf = (field) => {
+		const value = read(field);
+		return isRecord$1(value) ? Object.keys(value).sort() : [];
+	};
+	const transport = read("transport");
+	const endpointValue = projectEndpoint(read("url"));
+	const args = read("args");
+	const config = {
+		transport: isOneOf(transport, ["stdio", "streamable-http"]) ? transport : fallback,
+		envKeys: keysOf("env"),
+		headerKeys: keysOf("headers"),
+		expressions,
+		urlQueryHidden: endpointValue.hidden
+	};
+	const serverName = text(read("serverName"));
+	if (serverName !== void 0) config.serverName = serverName;
+	const command = text(read("command"));
+	if (command !== void 0) config.command = command;
+	if (Array.isArray(args) && args.length > 0) config.argsHidden = true;
+	const cwd = text(read("cwd"));
+	if (cwd !== void 0) config.cwd = cwd;
+	if (endpointValue.url !== void 0) config.url = endpointValue.url;
+	const reconnect = reconnectOf(read("reconnect"));
+	if (reconnect !== void 0) config.reconnect = reconnect;
+	return config;
+}
 
 // src/features/mcp/mcp-policy.ts
 const MCP_CLIENT$1 = "@deepseek-ai/dsh-mcp-client";
@@ -1685,6 +1992,35 @@ var McpPolicy = class {
 		return {
 			complete: presets !== null,
 			servers
+		};
+	}
+	/**
+	* Read one server's declared configuration for the detail dialog.
+	*
+	* The catalog row and its configuration are read in the same pass, so a
+	* stale id cannot pair a current row with another entry's configuration.
+	* @param id - projected server id from the catalog.
+	* @returns the row plus its display-only configuration, or null when absent.
+	*/
+	async read(id) {
+		if (!identifier$1(id)) throw new TypeError("mcpUnavailable");
+		this.ensureActive();
+		const catalog = await this.list();
+		this.ensureActive();
+		const server = catalog.servers.find((row) => row.id === id);
+		if (!server) return null;
+		const manager = await this.providerContext();
+		let raw;
+		try {
+			raw = server.source === "profile" || server.source.startsWith("preset:") ? manager?.declared(server.id) ?? null : manager?.configFor(server.id) ?? null;
+		} catch {
+			this.ensureActive();
+			throw failure$1("mcpMetadataLoadFailed");
+		}
+		this.ensureActive();
+		return {
+			server,
+			config: projectMcpConfig(raw, server.transport)
 		};
 	}
 	async setEnabled(id, enabled) {
@@ -1883,6 +2219,65 @@ var McpProviders = class {
 			}] : [];
 		});
 	}
+	/**
+	* Declared configuration for a manager or runtime instance, without resolving secrets.
+	* @param id - the projected server id (`manager:...` or `runtime:...`).
+	* @returns the entry configuration, or undefined when it cannot be confirmed.
+	*/
+	configFor(id) {
+		this.active();
+		if (id.startsWith("manager:")) {
+			const manager = this.ctx.get("mcpManager");
+			const target = this.managed().targets.find((row) => row.id === id);
+			if (!manager || !target) return void 0;
+			try {
+				const configs = manager.config.servers.get();
+				return Object.hasOwn(configs, target.name) ? configs[target.name] : void 0;
+			} catch {
+				return;
+			}
+		}
+		if (id.startsWith("runtime:")) {
+			const uid = Number(id.slice(8));
+			if (!Number.isSafeInteger(uid)) return void 0;
+			try {
+				const fiber = [...this.ctx.registry.get(this.native)?.fibers ?? []].find((row) => row.uid === uid);
+				return fiber?.effectiveConfig ?? fiber?.config ?? fiber?.rawConfig;
+			} catch {
+				return;
+			}
+		}
+	}
+	/**
+	* Declared configuration of one profile or preset MCP row.
+	* @param id - the projected server id (`<entryId>` or `preset:<presetId>:<rowId>`).
+	* @returns the declared config object, or undefined when no unique row matches.
+	*/
+	declared(id) {
+		this.active();
+		const preset = /^preset:([^:]+):(.+)$/.exec(id);
+		if (!preset) {
+			const matches = [...this.ctx.loader.entries()].filter((entry) => entry.id === id && entry.options.name === MCP_CLIENT);
+			return matches.length === 1 ? matches[0].options.config : void 0;
+		}
+		const [, presetId, rowId] = preset;
+		const owners = [...this.ctx.loader.entries()].filter((entry) => entry.options.name === "@deepseek-ai/dsh-agent-preset" && (entry.fiber?.effectiveConfig?.id ?? entry.fiber?.config?.id) === presetId);
+		if (owners.length !== 1) return void 0;
+		const found = [];
+		const walk = (rows) => {
+			if (!Array.isArray(rows)) return;
+			for (const row of rows) {
+				if (!isRecord$1(row)) continue;
+				if (row.group === true) {
+					walk(row.config);
+					continue;
+				}
+				if (row.name === MCP_CLIENT && row.id === rowId) found.push(row.config);
+			}
+		};
+		walk(owners[0].options.config?.plugins);
+		return found.length === 1 ? found[0] : void 0;
+	}
 	/** Read only the manager's exact native child instance, never its connection-status payload. */
 	managedMetadata(name, owner) {
 		const unknown = {
@@ -2080,82 +2475,13 @@ const methods$10 = {
 	listMcpServers() {
 		return this.run(() => this.mcp.list());
 	},
+	readMcpServer(id) {
+		return this.run(() => this.mcp.read(id));
+	},
 	setMcpServerEnabled(id, enabled) {
 		return this.run(() => this.mcp.setEnabled(id, enabled));
 	}
 };
-
-// src/features/mcp/rpc.ts
-const mcpCatalogCodec = {
-	mode: "strict",
-	typeSymbol: "power-dsh#McpCatalog",
-	create: () => ({ parse(value) {
-		if (!isRecord$1(value) || typeof value.complete !== "boolean" || !isArray(value.servers)) throw new TypeError("Invalid MCP catalog");
-		const servers = value.servers.map((row) => {
-			if (!isRecord$1(row) || !hasStrings(row, [
-				"id",
-				"name",
-				"source",
-				"origin",
-				"reason"
-			]) || !isOneOf(row.group, ["user", "builtin"]) || !isOneOf(row.transport, [
-				"stdio",
-				"streamable-http",
-				"unknown"
-			]) || !isOneOf(row.runtimeState, [
-				"pending",
-				"loading",
-				"active",
-				"failed",
-				"unloading",
-				"inactive",
-				"disabled",
-				"unknown"
-			]) || !isStringArray(row.tools) || !hasBooleans(row, [
-				"enabled",
-				"stateKnown",
-				"canToggle"
-			])) throw new TypeError("Invalid MCP entry");
-			return {
-				id: row.id,
-				name: row.name,
-				source: row.source,
-				origin: row.origin,
-				group: row.group,
-				enabled: row.enabled,
-				stateKnown: row.stateKnown,
-				runtimeState: row.runtimeState,
-				transport: row.transport,
-				canToggle: row.canToggle,
-				reason: row.reason,
-				tools: row.tools.slice()
-			};
-		});
-		return {
-			complete: value.complete,
-			servers
-		};
-	} })
-};
-function mcpRpc(method, fields) {
-	return {
-		id: `power-dsh#powerDsh/${method}`,
-		service: "powerDsh",
-		namespace: "powerDsh",
-		method,
-		invocation: { kind: "direct" },
-		parameters: fields.map((name) => ({
-			name,
-			wire: name,
-			source: "json",
-			codec: name === "enabled" ? booleanCodec : stringCodec
-		})),
-		result: mcpCatalogCodec
-	};
-}
-const LIST_MCP_SERVERS_RPC = mcpRpc("listMcpServers", []);
-const SET_MCP_SERVER_ENABLED_RPC = mcpRpc("setMcpServerEnabled", ["id", "enabled"]);
-const rpc$10 = [LIST_MCP_SERVERS_RPC, SET_MCP_SERVER_ENABLED_RPC];
 
 // src/features/account-blocking/definition.ts
 const definition$11 = Object.freeze({
@@ -3317,13 +3643,297 @@ const definition$2 = Object.freeze({
 	id: "archive",
 	category: "enhance",
 	order: 10,
-	keys: Object.freeze(["archiveManagerEnabled"]),
+	keys: Object.freeze([
+		"archiveManagerEnabled",
+		"autoArchiveDays",
+		"autoArchivedSessions"
+	]),
 	spec: "src/features/archive/spec.md"
 });
 
 // src/features/archive/config.ts
 var config_exports$2 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$2 });
-const configFields$2 = { archiveManagerEnabled: z.boolean().default(false).volatile() };
+const configFields$2 = {
+	archiveManagerEnabled: z.boolean().default(false).volatile(),
+	autoArchiveDays: z.number().default(0).volatile(),
+	autoArchivedSessions: z.array(z.string()).default([]).volatile()
+};
+
+// src/features/archive/auto-archive-policy.ts
+/** The saved threshold uses 0 for “never”; unsupported Hosts preserve the preference. */
+const DAY_MS$1 = 864e5;
+/** A display timestamp is only a shortlist. Eligibility requires an exact native projection. */
+function idleSince(createdAt, metadata) {
+	if (!isTimestamp(createdAt) || metadata === null || typeof metadata !== "object" || !("blank" in metadata) || metadata.blank !== false || !("lastPromptAt" in metadata) || !isTimestamp(metadata.lastPromptAt)) return void 0;
+	return Math.max(createdAt, metadata.lastPromptAt);
+}
+function isTimestamp(value) {
+	return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+const AUTO_ARCHIVE_DAYS = Object.freeze([
+	0,
+	7,
+	14,
+	30,
+	60,
+	90
+]);
+const AUTO_ARCHIVE_NEVER = 0;
+function normalizeDays(value) {
+	return typeof value === "number" && Number.isFinite(value) && AUTO_ARCHIVE_DAYS.includes(value) ? value : 0;
+}
+
+// \0@oxc-project+runtime@0.157.0/helpers/esm/usingCtx.js
+function _usingCtx() {
+	var r = "function" == typeof SuppressedError ? SuppressedError : function(r, e) {
+		var n = Error();
+		return n.name = "SuppressedError", n.error = r, n.suppressed = e, n;
+	}, e = {}, n = [];
+	function using(r, e) {
+		if (null != e) {
+			if (Object(e) !== e) throw new TypeError("using declarations can only be used with objects, functions, null, or undefined.");
+			if (r) var o = e[Symbol.asyncDispose || Symbol["for"]("Symbol.asyncDispose")];
+			if (void 0 === o && (o = e[Symbol.dispose || Symbol["for"]("Symbol.dispose")], r)) var t = o;
+			if ("function" != typeof o) throw new TypeError("Object is not disposable.");
+			t && (o = function o() {
+				try {
+					t.call(e);
+				} catch (r) {
+					return Promise.reject(r);
+				}
+			}), n.push({
+				v: e,
+				d: o,
+				a: r
+			});
+		} else r && n.push({
+			d: e,
+			a: r
+		});
+		return e;
+	}
+	return {
+		e,
+		u: using.bind(null, !1),
+		a: using.bind(null, !0),
+		d: function d() {
+			var o, t = this.e, s = 0;
+			function next() {
+				for (; o = n.pop();) try {
+					if (!o.a && 1 === s) return s = 0, n.push(o), Promise.resolve().then(next);
+					if (o.d) {
+						var r = o.d.call(o.v);
+						if (o.a) return s |= 2, Promise.resolve(r).then(next, err);
+					} else s |= 1;
+				} catch (r) {
+					return err(r);
+				}
+				if (1 === s) return t !== e ? Promise.reject(t) : Promise.resolve();
+				if (t !== e) throw t;
+			}
+			function err(n) {
+				return t = t !== e ? new r(n, t) : n, next();
+			}
+			return next();
+		}
+	};
+}
+
+// src/features/archive/auto-archive-host.ts
+const VERIFIED_RELEASE = "0.2.2-rc.1";
+const ACTIVITY = "workspace/session-activity";
+const skip = /* @__PURE__ */ new Error("autoArchiveCandidateChanged");
+function installAutoArchive(ctx, prefs, { owner = ctx, ensureActive } = {}) {
+	ctx.inject([
+		"workspaceRegistry",
+		"sessionController",
+		"sessionQuery",
+		"sessions",
+		"agents",
+		"configEditor",
+		"clientModules"
+	], (injected) => {
+		const child = injected;
+		const { workspaceRegistry: registry, sessionQuery: query, sessionController: controller, sessions, agents, configEditor } = child;
+		if (child.clientModules?.graph().release?.version !== VERIFIED_RELEASE || typeof child.waterfall !== "function" || typeof query?.observeSession !== "function" || typeof controller?.list !== "function" || typeof sessions?.get !== "function" || typeof agents?.get !== "function" || typeof registry?.archiveSession !== "function" || typeof registry.unarchiveSession !== "function" || typeof configEditor?.edit !== "function") return;
+		const lifetime = new AbortController();
+		const { signal } = lifetime;
+		const days = () => normalizeDays(prefs.autoArchiveDays.get());
+		const checkRunning = (expected) => {
+			if (signal.aborted || days() !== expected) throw skip;
+			ensureActive?.();
+		};
+		const free = (id) => !registry.archivedSessionIds.includes(id) && !registry.pinnedSessionIds.includes(id);
+		const running = (id) => {
+			const agent = agents.get(id);
+			return agent !== void 0 && "status" in agent && agent.status === "running";
+		};
+		let lastWarning;
+		const warn = (reason) => {
+			if (lastWarning === reason) return;
+			lastWarning = reason;
+			try {
+				child.logger?.warn(`PowerDSH auto archive: ${reason}`);
+			} catch {}
+		};
+		async function observe(id) {
+			try {
+				try {
+					var _usingCtx$1 = _usingCtx();
+					const observation = _usingCtx$1.u(await query.observeSession(id, { signal }));
+					const { header, source, cursor } = observation;
+					const activityAt = idleSince(header.createdAt, observation.projections?.values.sessionListMetadata);
+					const live = sessions.get(id);
+					if (activityAt === void 0 || header.id !== id || typeof header.cwd !== "string" || header.origin === "subagent" || (source === "live" ? live?.seq !== cursor + 1 : source !== "prepared" || live !== void 0)) return;
+					return {
+						activityAt,
+						cursor,
+						source,
+						live
+					};
+				} catch (_) {
+					_usingCtx$1.e = _;
+				} finally {
+					_usingCtx$1.d();
+				}
+			} catch {}
+		}
+		const ownArchive = new AsyncLocalStorage();
+		child.on(ACTIVITY, async ({ sessionId: id }, next) => {
+			const attempt = ownArchive.getStore();
+			if (attempt?.id !== id) return next();
+			checkRunning(attempt.days);
+			if (!free(id) || running(id)) throw skip;
+			const point = await observe(id);
+			if (!point || point.activityAt !== attempt.activityAt || point.activityAt > Date.now() - attempt.days * 864e5) throw skip;
+			const activity = await next();
+			checkRunning(attempt.days);
+			const live = sessions.get(id);
+			if (activity.length || !free(id) || running(id) || live !== point.live || live !== void 0 && live.seq !== point.cursor + 1) throw skip;
+			attempt.cursor = point.cursor;
+			return activity;
+		}, {
+			global: true,
+			prepend: true
+		});
+		async function archive(id, threshold, activityAt) {
+			const attempt = {
+				id,
+				days: threshold,
+				queued: false,
+				activityAt
+			};
+			let failed = false;
+			try {
+				await ownArchive.run(attempt, () => registry.archiveSession(id, { get stopActivity() {
+					if (!attempt.queued) {
+						checkRunning(threshold);
+						if (!free(id) || running(id)) throw skip;
+						attempt.queued = true;
+					}
+					return false;
+				} }));
+			} catch (error) {
+				if (error === skip) return;
+				failed = true;
+				if (!signal.aborted) warn("native archive failed");
+			}
+			if (!attempt.queued || !registry.archivedSessionIds.includes(id)) return;
+			const observed = await observe(id);
+			let conflict = failed || !observed || observed.cursor !== attempt.cursor || observed.activityAt !== activityAt || signal.aborted || days() !== threshold;
+			if (!conflict) try {
+				conflict = (await child.waterfall(ACTIVITY, { sessionId: id }, async () => [])).length > 0 || running(id);
+			} catch {
+				conflict = true;
+			}
+			if (!conflict) return;
+			try {
+				await registry.unarchiveSession(id);
+				if (registry.archivedSessionIds.includes(id)) warn("archive rollback could not be verified");
+			} catch {
+				warn("archive rollback failed");
+			}
+		}
+		async function scan(threshold) {
+			const cutoff = Date.now() - threshold * DAY_MS$1;
+			const { items } = await controller.list({}, signal);
+			for (const row of items) {
+				checkRunning(threshold);
+				const id = row.sessionId;
+				if (!id || !isTimestamp(row.updatedAt) || row.updatedAt > cutoff || !free(id) || running(id) || prefs.autoArchivedSessions.get().includes(id)) continue;
+				const point = await observe(id);
+				if (!point || point.activityAt > cutoff || !free(id) || running(id)) continue;
+				try {
+					await configEditor.edit(owner.fiber.entry, (raw) => {
+						checkRunning(threshold);
+						if (!free(id) || running(id)) throw skip;
+						const saved = raw.autoArchivedSessions ?? [];
+						const effective = prefs.autoArchivedSessions.get();
+						if (!Array.isArray(saved) || saved.some((value) => typeof value !== "string")) throw new Error("Invalid auto archive exclusions");
+						if (saved.includes(id) || effective.includes(id)) throw skip;
+						return {
+							...raw,
+							autoArchivedSessions: [.../* @__PURE__ */ new Set([
+								...saved,
+								...effective,
+								id
+							])]
+						};
+					});
+					checkRunning(threshold);
+					if (!prefs.autoArchivedSessions.get().includes(id)) {
+						warn("durable exclusion was not read back");
+						return;
+					}
+				} catch (error) {
+					if (error === skip) continue;
+					if (!signal.aborted) warn("durable exclusion could not be written");
+					return;
+				}
+				await archive(id, threshold, point.activityAt);
+			}
+		}
+		let lastDays = 0;
+		let task;
+		let rerun = false;
+		function tick() {
+			if (signal.aborted) return;
+			const threshold = lastDays = days();
+			if (!threshold) return;
+			if (task) {
+				rerun = true;
+				return;
+			}
+			task = scan(threshold).catch((error) => {
+				if (error !== skip && !signal.aborted) warn("candidate scan failed");
+			}).finally(() => {
+				task = void 0;
+				if (rerun) {
+					rerun = false;
+					tick();
+				}
+			});
+		}
+		const changed = () => {
+			if (days() !== lastDays) tick();
+		};
+		child.on("settings/document-updated", (namespace) => {
+			if (namespace === owner.fiber.entry.options.id) changed();
+		});
+		child.on("app-boot/config-reload", changed);
+		child.effect(() => {
+			const start = setTimeout(tick, 0);
+			const interval = setInterval(tick, DAY_MS$1);
+			start.unref?.();
+			interval.unref?.();
+			return () => {
+				lifetime.abort();
+				clearTimeout(start);
+				clearInterval(interval);
+			};
+		});
+	});
+}
 
 // src/features/archive/archive-catalog.ts
 /**
@@ -3368,15 +3978,15 @@ function buildArchiveCatalog(baseline, titles) {
 }
 
 // src/features/archive/archive-service.ts
-/**
-* Reads the archived set from the native Workspace stream, restores single
-* sessions through the native unarchive operation, and permanently removes a
-* known archived session's transcript artifact. Holds no preferences.
-*/
+const ACTIVITY_TTL_MS = 5e3;
+const JSONL_GENERATION = /^session(?:\.v[1-9][0-9]*)?\.jsonl(?:\.zstd)?$/u;
+const STAGE_PREFIX = ".power-dsh-delete-";
 var ArchiveService = class {
 	workspaceController = null;
 	sessionQuery = null;
-	sessionPersistence = null;
+	sessionController = null;
+	deleteAccess = null;
+	activityCache;
 	async list() {
 		const controller = this.workspaceController;
 		if (!controller || !this.sessionQuery) throw new Error("archiveUnavailable");
@@ -3396,62 +4006,79 @@ var ArchiveService = class {
 		await controller.unarchiveSession({ sessionId });
 		return this.list();
 	}
-	/**
-	* Permanently delete one archived session. Clears the archive marker first so
-	* the list reflects the intent, then removes the resolved transcript
-	* artifact. Refuses non-archived ids and sessions whose artifact path cannot
-	* be resolved.
-	*/
 	async delete(sessionId) {
-		const controller = this.workspaceController;
-		const persistence = this.sessionPersistence;
-		if (!controller || !this.sessionQuery) throw new Error("archiveUnavailable");
-		if (!persistence) throw new Error("archiveDeleteUnavailable");
 		if (!validSessionId(sessionId)) throw new Error("archiveInvalidSession");
+		const access = this.deleteAccess;
+		const controller = this.workspaceController;
+		if (access?.persistence.name !== "session-persistence-jsonl" || !controller || !this.sessionQuery) throw new Error("archiveDeleteUnavailable");
 		const abort = new AbortController();
+		let baseline;
 		try {
-			let baseline;
-			try {
-				baseline = await readBaseline$1(controller, abort.signal);
-			} catch {
-				throw new Error("archiveDeleteCheckFailed");
-			}
-			if (!baseline.archivedSessionIds.includes(sessionId)) throw new Error("archiveNotArchived");
-			let snapshot;
-			try {
-				snapshot = await persistence.stat(sessionId, { signal: abort.signal });
-			} catch {
-				throw new Error("archiveDeleteStatFailed");
-			}
-			const remaining = baseline.archivedSessionIds.filter((id) => id !== sessionId);
-			if (!snapshot) {
-				await controller.unarchiveSession({ sessionId }).catch(() => void 0);
-				const titles = await this.titlesFor(remaining, abort.signal).catch(() => /* @__PURE__ */ new Map());
-				return buildArchiveCatalog({
-					items: baseline.items,
-					archivedSessionIds: remaining
-				}, titles);
-			}
-			const artifact = snapshot.location?.path;
-			if (typeof artifact !== "string" || artifact.length === 0) throw new Error("archiveDeleteUnsupported");
-			try {
-				await controller.unarchiveSession({ sessionId });
-			} catch {
-				throw new Error("archiveDeleteUnarchiveFailed");
-			}
-			try {
-				await removeArtifact(artifact, sessionId);
-			} catch (error) {
-				throw error instanceof Error && error.message === "archiveDeleteUnsafe" ? error : /* @__PURE__ */ new Error("archiveDeleteRemoveFailed");
-			}
-			const titles = await this.titlesFor(remaining, abort.signal).catch(() => /* @__PURE__ */ new Map());
-			return buildArchiveCatalog({
-				items: baseline.items,
-				archivedSessionIds: remaining
-			}, titles);
+			baseline = await readBaseline$1(controller, abort.signal);
+		} catch {
+			throw new Error("archiveDeleteCheckFailed");
 		} finally {
 			abort.abort();
 		}
+		if (!baseline.archivedSessionIds.includes(sessionId)) throw new Error("archiveNotArchived");
+		const { persistence, registry, isLive } = access;
+		const check = () => {
+			if (this.deleteAccess !== access || this.workspaceController !== controller) throw new Error("archiveDeleteUnavailable");
+			if (!registry.archivedSessionIds.includes(sessionId)) throw new Error("archiveNotArchived");
+			if (isLive(sessionId)) throw new Error("archiveDeleteBusy");
+		};
+		check();
+		const before = await persistence.stat(sessionId).catch(() => {
+			throw new Error("archiveDeleteStatFailed");
+		});
+		const path = artifactPath(before, sessionId);
+		const identity = checkArtifact(path);
+		check();
+		const handle = await persistence.open(sessionId, "write").catch((error) => {
+			throw new Error(error instanceof Error && error.name === "SessionAlreadyOwnedError" ? "archiveDeleteBusy" : "archiveDeleteCheckFailed");
+		});
+		let deleted = false;
+		try {
+			const after = await persistence.stat(sessionId).catch(() => {
+				throw new Error("archiveDeleteStatFailed");
+			});
+			if (handle.header.id !== sessionId || artifactPath(after, sessionId) !== path || after?.revision !== before?.revision) throw new Error("archiveDeleteUnsafe");
+			const current = checkArtifact(path);
+			if (current.dev !== identity.dev || current.ino !== identity.ino || current.ctimeNs !== identity.ctimeNs) throw new Error("archiveDeleteUnsafe");
+			check();
+			const stage = stageArtifact(path);
+			try {
+				await controller.unarchiveSession({ sessionId });
+				if (this.deleteAccess !== access || this.workspaceController !== controller || registry.archivedSessionIds.includes(sessionId)) throw new Error("archiveDeleteUnarchiveFailed");
+				if (isLive(sessionId)) throw new Error("archiveDeleteBusy");
+			} catch {
+				restoreArtifact(path, stage);
+				throw new Error("archiveDeleteUnarchiveFailed");
+			}
+			try {
+				unlinkSync(stage.file);
+				deleted = true;
+			} catch {
+				restoreArtifact(path, stage);
+				throw new Error("archiveDeleteRemoveFailed");
+			} finally {
+				removeEmptyStage(stage.dir);
+			}
+		} finally {
+			try {
+				await handle.close();
+			} catch {
+				if (deleted) throw new Error("archiveDeleteReleaseFailed");
+			}
+		}
+		this.activityCache = void 0;
+		return this.list().catch(() => ({
+			...buildArchiveCatalog({
+				...baseline,
+				archivedSessionIds: baseline.archivedSessionIds.filter((id) => id !== sessionId)
+			}, /* @__PURE__ */ new Map()),
+			complete: false
+		}));
 	}
 	async titlesFor(ids, signal) {
 		const titles = /* @__PURE__ */ new Map();
@@ -3464,9 +4091,88 @@ var ArchiveService = class {
 			updatedAt: result.value.title?.updatedAt ?? 0,
 			createdAt: result.value.session.createdAt
 		});
+		const activity = await this.activity(signal);
+		for (const [sessionId, entry] of titles) {
+			const lastActive = activity.get(sessionId);
+			if (lastActive !== void 0) titles.set(sessionId, {
+				...entry,
+				updatedAt: lastActive
+			});
+		}
 		return titles;
 	}
+	/** Short-lived display cache; never used to admit a mutation. */
+	async activity(signal) {
+		const cached = this.activityCache;
+		if (cached !== void 0 && Date.now() - cached.at < ACTIVITY_TTL_MS) return cached.value;
+		const activity = /* @__PURE__ */ new Map();
+		const controller = this.sessionController;
+		if (!controller || typeof controller.list !== "function") return activity;
+		const { items } = await controller.list({}, signal).catch(() => ({ items: [] }));
+		for (const item of items) {
+			if (typeof item?.sessionId !== "string" || typeof item.updatedAt !== "number" || !Number.isFinite(item.updatedAt)) continue;
+			activity.set(item.sessionId, item.updatedAt);
+		}
+		this.activityCache = {
+			at: Date.now(),
+			value: activity
+		};
+		return activity;
+	}
 };
+function artifactPath(snapshot, sessionId) {
+	if (!snapshot || snapshot.formatStatus !== "current" || snapshot.location?.kind !== "jsonl" || typeof snapshot.revision !== "string") throw new Error("archiveDeleteUnsupported");
+	const { path } = snapshot.location;
+	if (snapshot.header.id !== sessionId || !isAbsolute(path) || normalize(path) !== path || basename(dirname(path)) !== sessionId || !JSONL_GENERATION.test(basename(path))) throw new Error("archiveDeleteUnsafe");
+	return path;
+}
+function checkArtifact(path) {
+	try {
+		const dir = dirname(path);
+		if (!lstatSync(dir).isDirectory() || !lstatSync(dirname(dir)).isDirectory()) throw new Error("unexpected directory");
+		const file = lstatSync(path, { bigint: true });
+		if (!file.isFile() || file.nlink !== 1n) throw new Error("unexpected transcript");
+		const lock = lstatSync(join(dir, "session.lock"), { throwIfNoEntry: false });
+		if (lock && (!lock.isFile() || lock.nlink !== 1 || lock.size !== 0)) throw new Error("unexpected writer lock");
+		const entries = readdirSync(dir);
+		if (entries.some((name) => name.startsWith(STAGE_PREFIX))) throw new Error("archiveDeleteRecoveryRequired");
+		if (entries.some((name) => name !== basename(path) && JSONL_GENERATION.test(name))) throw new Error("archiveDeleteUnsupported");
+		return file;
+	} catch (error) {
+		if (error instanceof Error && (error.message === "archiveDeleteUnsupported" || error.message === "archiveDeleteRecoveryRequired")) throw error;
+		throw new Error("archiveDeleteUnsafe");
+	}
+}
+function stageArtifact(path) {
+	let dir;
+	try {
+		dir = mkdtempSync(join(dirname(path), STAGE_PREFIX));
+		const file = join(dir, basename(path));
+		renameSync(path, file);
+		return {
+			dir,
+			file
+		};
+	} catch {
+		if (dir) removeEmptyStage(dir);
+		throw new Error("archiveDeleteRemoveFailed");
+	}
+}
+function restoreArtifact(path, stage) {
+	try {
+		linkSync(stage.file, path);
+		unlinkSync(stage.file);
+	} catch {
+		throw new Error("archiveDeleteRecoveryRequired");
+	} finally {
+		removeEmptyStage(stage.dir);
+	}
+}
+function removeEmptyStage(dir) {
+	try {
+		rmdirSync(dir);
+	} catch {}
+}
 function validSessionId(sessionId) {
 	return typeof sessionId === "string" && sessionId.length > 0 && sessionId.length <= 1024;
 }
@@ -3475,33 +4181,13 @@ async function readBaseline$1(controller, signal) {
 	for await (const frame of controller.follow(signal)) if ((frame.type === "baseline" || frame.type === "replace") && frame.value) return frame.value;
 	throw new Error("archiveUnavailable");
 }
-/**
-* Delete the session's own transcript directory when its path segment equals the
-* session id; otherwise delete only the resolved artifact file. Never follows a
-* symbolic link and never removes a shared parent directory.
-*/
-async function removeArtifact(artifactPath, sessionId) {
-	const directory = dirname(artifactPath);
-	if (basename(directory) === sessionId) {
-		const info = await lstat(directory).catch(() => null);
-		if (info?.isSymbolicLink()) throw new Error("archiveDeleteUnsafe");
-		if (info?.isDirectory()) {
-			await rm(directory, {
-				recursive: true,
-				force: true
-			});
-			return;
-		}
-	}
-	await rm(artifactPath, { force: true });
-}
 
 // src/features/archive/host.ts
 var host_exports$2 = /* @__PURE__ */ __exportAll({
 	createHost: () => createHost$2,
 	methods: () => methods$2
 });
-function createHost$2(ctx, _config, _options) {
+function createHost$2(ctx, config, options) {
 	const archive = new ArchiveService();
 	ctx.inject(["workspaceController", "sessionQuery"], (child) => {
 		archive.workspaceController = child.workspaceController ?? null;
@@ -3511,12 +4197,33 @@ function createHost$2(ctx, _config, _options) {
 			archive.sessionQuery = null;
 		});
 	});
-	ctx.inject(["sessionPersistence"], (child) => {
-		archive.sessionPersistence = child.sessionPersistence ?? null;
+	ctx.inject(["sessionController"], (child) => {
+		archive.sessionController = child.sessionController ?? null;
 		child.effect(() => () => {
-			archive.sessionPersistence = null;
+			archive.sessionController = null;
 		});
 	});
+	ctx.inject([
+		"workspaceRegistry",
+		"sessionPersistence",
+		"sessions",
+		"agents"
+	], (child) => {
+		const registry = child.workspaceRegistry;
+		const persistence = child.sessionPersistence;
+		const sessions = child.sessions;
+		if (!registry || !("archivedSessionIds" in registry) || typeof persistence?.open !== "function" || typeof sessions?.get !== "function") return;
+		const access = {
+			registry,
+			persistence,
+			isLive: (id) => sessions.get(id) !== void 0 || child.agents.get(id) !== void 0
+		};
+		archive.deleteAccess = access;
+		child.effect(() => () => {
+			if (archive.deleteAccess === access) archive.deleteAccess = null;
+		});
+	});
+	installAutoArchive(ctx, config, options);
 	return { archive };
 }
 const methods$2 = {
@@ -3610,6 +4317,42 @@ const configFields$1 = { usageStatsEnabled: z.boolean().default(false).volatile(
 
 // src/features/usage-stats/usage-fold.ts
 const DAY_MS = 864e5;
+function emptyDay(date) {
+	return {
+		date,
+		totalTokens: 0,
+		turnCount: 0,
+		toolCallCount: 0,
+		inputTokens: 0,
+		outputTokens: 0,
+		cacheReadTokens: 0,
+		cacheWriteTokens: 0,
+		requestCount: 0,
+		activeMs: 0
+	};
+}
+/** Split a recorded interval at reporting-zone midnights, including DST transitions. */
+function addRuntime(rows, start, end, toDay) {
+	let cursor = start;
+	while (cursor < end) {
+		const date = toDay(cursor);
+		let boundary = end;
+		if (toDay(end - 1) !== date) {
+			let low = cursor;
+			let high = end;
+			while (high - low > 1) {
+				const middle = Math.floor((low + high) / 2);
+				if (toDay(middle) === date) low = middle;
+				else high = middle;
+			}
+			boundary = high;
+		}
+		const row = rows.get(date) ?? emptyDay(date);
+		row.activeMs += boundary - cursor;
+		rows.set(date, row);
+		cursor = boundary;
+	}
+}
 /**
 * Bucket one instant into a `YYYY-MM-DD` day key in the requested zone.
 * Falls back to UTC when the runtime rejects the zone.
@@ -3644,38 +4387,69 @@ function isRecord(value) {
 function finite(value) {
 	return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
 }
-/** Provider-reported usage of one settled assistant message, when present. */
-function usageOf(event) {
-	if (event.type !== "assistant/message" || !isRecord(event.data)) return null;
-	const usage = event.data.usage;
-	if (!isRecord(usage)) return null;
-	const inputTokens = finite(usage.inputTokens);
-	const outputTokens = finite(usage.outputTokens);
-	const cacheReadTokens = finite(usage.cacheReadTokens);
-	const cacheWriteTokens = finite(usage.cacheWriteTokens);
-	const reported = finite(usage.totalTokens);
-	const derived = inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens;
-	const totalTokens = reported > 0 ? reported : derived;
-	if (totalTokens === 0) return null;
+function bucketsOf(raw) {
+	const inputTokens = finite(raw.inputTokens);
+	const outputTokens = finite(raw.outputTokens);
+	const cacheReadTokens = finite(raw.cacheReadTokens);
+	const cacheWriteTokens = finite(raw.cacheWriteTokens);
 	return {
 		inputTokens,
 		outputTokens,
 		cacheReadTokens,
 		cacheWriteTokens,
-		totalTokens
+		totalTokens: inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens
 	};
 }
-/** Provider and model that produced one assistant message, when declared. */
-function modelOf(event) {
-	if (event.type !== "assistant/message" || !isRecord(event.data)) return null;
-	const message = event.data.message;
-	if (!isRecord(message)) return null;
-	const source = message.source;
+/** The last usage sample embedded in a settlement stream; usage chunks are never packed. */
+function streamUsage(stream) {
+	if (!Array.isArray(stream)) return null;
+	for (let index = stream.length - 1; index >= 0; index--) {
+		const record = stream[index];
+		if (!isRecord(record) || record.type !== "chunk" || !isRecord(record.chunk)) continue;
+		if (record.chunk.type !== "usage" || !isRecord(record.chunk.usage)) continue;
+		return record.chunk.usage;
+	}
+	return null;
+}
+/**
+* Provider-reported usage of one durable Assistant settlement.
+*
+* A failed or cancelled attempt still billed tokens, so its embedded stream
+* sample counts too; the Host token meter folds both event types.
+*/
+function usageOf(event) {
+	if (event.type !== "assistant/message" && event.type !== "assistant/attempt") return null;
+	if (!isRecord(event.data)) return null;
+	if (isRecord(event.data.usage)) return bucketsOf(event.data.usage);
+	const sample = streamUsage(event.data.stream);
+	return sample === null ? null : bucketsOf(sample);
+}
+/** Turn and step that own one settlement; the Host replaces samples within the same slot. */
+function settlementOf(event) {
+	if (!isRecord(event.data)) return null;
+	const { turn, step } = event.data;
+	return typeof turn === "number" && Number.isFinite(turn) && typeof step === "number" && Number.isFinite(step) ? {
+		turn,
+		step
+	} : null;
+}
+function modelRoute(source) {
 	if (!isRecord(source) || typeof source.model !== "string" || !source.model) return null;
 	return {
 		provider: typeof source.provider === "string" ? source.provider : "",
 		modelId: source.model
 	};
+}
+/** Provider and model that produced one assistant message, when declared. */
+function modelOf(event) {
+	if (event.type !== "assistant/message" || !isRecord(event.data) || !isRecord(event.data.message)) return null;
+	return modelRoute(event.data.message.source);
+}
+/** Recovery closes an open step immediately before closing its turn at the same timestamp. */
+function isSyntheticStepEnd(stepEnd, next) {
+	if (next?.type !== "turn/end" || stepEnd.time !== next.time || !isRecord(next.data) || !isRecord(next.data.reason)) return false;
+	if (next.data.reason.kind !== "interrupted" && next.data.reason.kind !== "forked") return false;
+	return !isRecord(stepEnd.data) || stepEnd.data.turn === void 0 || stepEnd.data.turn === next.data.turn;
 }
 function timeOf(event) {
 	return typeof event.time === "number" && Number.isFinite(event.time) && event.time > 0 ? event.time : null;
@@ -3724,21 +4498,15 @@ function fillDays(rows, firstDate, lastDate) {
 	const days = [];
 	for (let offset = 0; offset <= total; offset++) {
 		const date = addDays(firstDate, offset);
-		days.push(known.get(date) ?? {
-			date,
-			totalTokens: 0,
-			turnCount: 0,
-			toolCallCount: 0
-		});
+		days.push(known.get(date) ?? emptyDay(date));
 	}
 	return days;
 }
 /**
-* Fold one session log into cacheable day and model aggregates.
+* Fold child-owned session events into cacheable day and model aggregates.
 *
-* Only provider-reported `assistant/message` usage counts toward tokens; the
-* fold never estimates. Turns and tool calls still count without usage so the
-* activity heatmap can show work a provider did not bill.
+* Only provider-reported usage from durable Assistant settlements counts.
+* Turns and tool calls are counted independently of usage.
 */
 function foldSession(session, toDay) {
 	const dayRows = /* @__PURE__ */ new Map();
@@ -3761,67 +4529,96 @@ function foldSession(session, toDay) {
 	};
 	const bump = (time, field) => {
 		const date = toDay(time);
-		const row = dayRows.get(date) ?? {
-			date,
-			totalTokens: 0,
-			turnCount: 0,
-			toolCallCount: 0
-		};
+		const row = dayRows.get(date) ?? emptyDay(date);
 		row[field] += 1;
 		dayRows.set(date, row);
+	};
+	let activeStart = null;
+	let requestRoute = null;
+	let slot = null;
+	const flushSlot = () => {
+		const settlement = slot;
+		slot = null;
+		if (!settlement || settlement.usage.totalTokens === 0) return;
+		const { time, usage, model: { provider, modelId } } = settlement;
+		const date = toDay(time);
+		const row = dayRows.get(date) ?? emptyDay(date);
+		for (const field of [
+			"totalTokens",
+			"inputTokens",
+			"outputTokens",
+			"cacheReadTokens",
+			"cacheWriteTokens"
+		]) {
+			row[field] += usage[field];
+			fold[field] += usage[field];
+		}
+		row.requestCount += 1;
+		dayRows.set(date, row);
+		fold.hasUsage = true;
+		const key = `${provider}\u0000${modelId}`;
+		const entry = modelRows.get(key) ?? {
+			modelId,
+			provider,
+			totalTokens: 0,
+			requestCount: 0
+		};
+		entry.totalTokens += usage.totalTokens;
+		entry.requestCount += 1;
+		modelRows.set(key, entry);
+		const dayKey = `${date}\u0000${key}`;
+		const daily = dailyModelRows.get(dayKey) ?? {
+			date,
+			modelId,
+			provider,
+			totalTokens: 0,
+			requestCount: 0
+		};
+		daily.totalTokens += usage.totalTokens;
+		daily.requestCount += 1;
+		dailyModelRows.set(dayKey, daily);
 	};
 	const observe = (time) => {
 		if (fold.firstTime === null || time < fold.firstTime) fold.firstTime = time;
 		if (fold.lastTime === null || time > fold.lastTime) fold.lastTime = time;
 	};
-	for (const event of session.events) {
+	for (const [index, event] of session.events.entries()) {
 		const time = timeOf(event);
 		if (time !== null) observe(time);
-		if (event.type === "assistant/message") {
+		if (event.type === "step/start") activeStart = time;
+		else if (event.type === "step/end") {
+			if (activeStart !== null && time !== null && time > activeStart && !isSyntheticStepEnd(event, session.events[index + 1])) addRuntime(dayRows, activeStart, time, toDay);
+			activeStart = null;
+		} else if (event.type === "turn/end" || event.type === "turn/start") {
+			activeStart = null;
+			if (event.type === "turn/start") {
+				fold.turnCount += 1;
+				if (time !== null) bump(time, "turnCount");
+			}
+		} else if (event.type === "request/context") {
+			const route = modelRoute(event.data);
+			requestRoute = route?.provider ? route : null;
+		} else if (event.type === "llm/retry-started") {
+			const retried = settlementOf(event);
+			if (retried && slot?.coords?.turn === retried.turn && slot.coords.step === retried.step) flushSlot();
+		} else if (event.type === "assistant/message" || event.type === "assistant/attempt") {
 			const usage = usageOf(event);
 			if (!usage || time === null) continue;
-			fold.hasUsage = true;
-			const date = toDay(time);
-			const row = dayRows.get(date) ?? {
-				date,
-				totalTokens: 0,
-				turnCount: 0,
-				toolCallCount: 0
+			const coords = settlementOf(event);
+			if (!coords || slot?.coords?.turn !== coords.turn || slot.coords.step !== coords.step) flushSlot();
+			slot = {
+				coords,
+				time,
+				usage,
+				model: modelOf(event) ?? requestRoute ?? {
+					provider: "",
+					modelId: ""
+				}
 			};
-			row.totalTokens += usage.totalTokens;
-			dayRows.set(date, row);
-			fold.totalTokens += usage.totalTokens;
-			fold.inputTokens += usage.inputTokens;
-			fold.outputTokens += usage.outputTokens;
-			fold.cacheReadTokens += usage.cacheReadTokens;
-			fold.cacheWriteTokens += usage.cacheWriteTokens;
-			const model = modelOf(event);
-			if (model) {
-				const key = `${model.provider}\u0000${model.modelId}`;
-				const entry = modelRows.get(key) ?? {
-					modelId: model.modelId,
-					provider: model.provider,
-					totalTokens: 0,
-					requestCount: 0
-				};
-				entry.totalTokens += usage.totalTokens;
-				entry.requestCount += 1;
-				modelRows.set(key, entry);
-				const dayKey = `${date}\u0000${key}`;
-				const daily = dailyModelRows.get(dayKey) ?? {
-					date,
-					modelId: model.modelId,
-					provider: model.provider,
-					totalTokens: 0
-				};
-				daily.totalTokens += usage.totalTokens;
-				dailyModelRows.set(dayKey, daily);
-			}
-		} else if (event.type === "turn/start") {
-			fold.turnCount += 1;
-			if (time !== null) bump(time, "turnCount");
+			if (!coords) flushSlot();
 		} else if (event.type === "tool/call" && time !== null) bump(time, "toolCallCount");
 	}
+	flushSlot();
 	if (fold.firstTime !== null && fold.lastTime !== null) {
 		const start = typeof session.createdAt === "number" && session.createdAt > 0 ? Math.min(session.createdAt, fold.firstTime) : fold.firstTime;
 		fold.longestSpanMs = Math.max(0, fold.lastTime - start);
@@ -3859,15 +4656,16 @@ function mergeUsage(input) {
 	let lastDate = "";
 	for (const session of input.sessions) {
 		for (const row of session.days) {
-			const target = dayRows.get(row.date) ?? {
-				date: row.date,
-				totalTokens: 0,
-				turnCount: 0,
-				toolCallCount: 0
-			};
+			const target = dayRows.get(row.date) ?? emptyDay(row.date);
 			target.totalTokens += row.totalTokens;
 			target.turnCount += row.turnCount;
 			target.toolCallCount += row.toolCallCount;
+			target.inputTokens += row.inputTokens;
+			target.outputTokens += row.outputTokens;
+			target.cacheReadTokens += row.cacheReadTokens;
+			target.cacheWriteTokens += row.cacheWriteTokens;
+			target.requestCount += row.requestCount;
+			target.activeMs += row.activeMs;
 			dayRows.set(row.date, target);
 		}
 		for (const model of session.models) {
@@ -3888,9 +4686,11 @@ function mergeUsage(input) {
 				date: daily.date,
 				modelId: daily.modelId,
 				provider: daily.provider,
-				totalTokens: 0
+				totalTokens: 0,
+				requestCount: 0
 			};
 			target.totalTokens += daily.totalTokens;
+			target.requestCount += daily.requestCount;
 			dailyModelRows.set(key, target);
 		}
 		summary.totalTokens += session.totalTokens;
@@ -3899,7 +4699,7 @@ function mergeUsage(input) {
 		summary.cacheReadTokens += session.cacheReadTokens;
 		summary.cacheWriteTokens += session.cacheWriteTokens;
 		summary.turnCount += session.turnCount;
-		if (session.hasUsage) summary.sessionCount += 1;
+		if (session.days.length > 0) summary.sessionCount += 1;
 		if (session.longestSpanMs > summary.longestSessionMs) summary.longestSessionMs = session.longestSpanMs;
 		if (session.firstTime !== null) {
 			const first = toDay(session.firstTime);
@@ -3923,6 +4723,7 @@ function mergeUsage(input) {
 		firstDate,
 		lastDate,
 		summary,
+		sessionDays: input.sessions.map((session) => session.days.map((row) => row.date)).filter((dates) => dates.length > 0),
 		days: fillDays(rows, firstDate, lastDate),
 		dailyModels: [...dailyModelRows.values()].sort((left, right) => left.date.localeCompare(right.date) || left.modelId.localeCompare(right.modelId)),
 		models: [...modelRows.values()].sort((left, right) => right.totalTokens - left.totalTokens || left.modelId.localeCompare(right.modelId))
@@ -3950,7 +4751,7 @@ var UsageService = class {
 		const zone = normalizeZone(timeZone);
 		const stored = await persistence.list({ signal });
 		signal?.throwIfAborted();
-		const folds = [];
+		const folds = /* @__PURE__ */ new Map();
 		let complete = true;
 		const queue = [...stored].sort((left, right) => left.header.createdAt - right.header.createdAt);
 		let cursor = 0;
@@ -3960,7 +4761,7 @@ var UsageService = class {
 				if (!entry) return;
 				signal?.throwIfAborted();
 				try {
-					folds.push(await this.fold(entry, zone, signal));
+					folds.set(entry.header.id, await this.fold(entry, zone, signal));
 				} catch (error) {
 					if (signal?.aborted) throw error;
 					complete = false;
@@ -3970,12 +4771,30 @@ var UsageService = class {
 		await Promise.all(Array.from({ length: Math.min(READ_CONCURRENCY, queue.length) }, worker));
 		signal?.throwIfAborted();
 		this.prune(new Set(stored.map((entry) => entry.header.id)));
-		return mergeUsage({
+		const snapshot = mergeUsage({
 			timeZone: zone,
 			complete,
 			generatedAt: Date.now(),
-			sessions: folds
+			sessions: [...folds.values()]
 		});
+		const entries = new Map(stored.map((entry) => [entry.header.id, entry]));
+		const families = /* @__PURE__ */ new Map();
+		for (const [id, fold] of folds) {
+			let root = entries.get(id);
+			const seen = /* @__PURE__ */ new Set([id]);
+			while (root.header.origin === "subagent" && root.header.parentSession) {
+				const parent = entries.get(root.header.parentSession);
+				if (!parent || seen.has(parent.header.id)) break;
+				seen.add(parent.header.id);
+				root = parent;
+			}
+			const dates = families.get(root.header.id) ?? /* @__PURE__ */ new Set();
+			for (const day of fold.days) dates.add(day.date);
+			families.set(root.header.id, dates);
+		}
+		snapshot.sessionDays = [...families.values()].filter((dates) => dates.size > 0).map((dates) => [...dates].sort());
+		snapshot.summary.sessionCount = snapshot.sessionDays.length;
+		return snapshot;
 	}
 	async fold(entry, zone, signal) {
 		const persistence = this.persistence;
@@ -3985,7 +4804,7 @@ var UsageService = class {
 		const handle = await persistence.open(entry.header.id, "read", { signal });
 		let events;
 		try {
-			events = (await handle.read(0, Number.MAX_SAFE_INTEGER, { signal })).events;
+			events = (await handle.read(handle.inheritedEventCount, Number.MAX_SAFE_INTEGER, { signal })).events;
 		} finally {
 			await handle.close().catch(() => void 0);
 		}
@@ -4049,6 +4868,11 @@ const usageSnapshotCodec = {
 			"firstDate",
 			"lastDate"
 		]) || !isRecord$1(value.summary) || !isArray(value.days) || !isArray(value.dailyModels) || !isArray(value.models)) throw new TypeError("Invalid usage snapshot");
+		if (!isArray(value.sessionDays)) throw new TypeError("Invalid usage sessions");
+		const sessionDays = value.sessionDays.map((dates) => {
+			if (!isArray(dates) || !dates.every((date) => typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date))) throw new TypeError("Invalid usage sessions");
+			return dates;
+		});
 		const summary = value.summary;
 		const fields = [
 			"totalTokens",
@@ -4070,13 +4894,36 @@ const usageSnapshotCodec = {
 			if (typeof count !== "number" || !Number.isFinite(count) || count < 0) throw new TypeError("Invalid usage summary");
 			counts[field] = count;
 		}
+		const dayFields = [
+			"totalTokens",
+			"turnCount",
+			"toolCallCount",
+			"inputTokens",
+			"outputTokens",
+			"cacheReadTokens",
+			"cacheWriteTokens",
+			"requestCount",
+			"activeMs"
+		];
 		const days = value.days.map((row) => {
-			if (!isRecord$1(row) || typeof row.date !== "string" || typeof row.totalTokens !== "number" || !Number.isFinite(row.totalTokens) || typeof row.turnCount !== "number" || typeof row.toolCallCount !== "number") throw new TypeError("Invalid usage day");
+			if (!isRecord$1(row) || typeof row.date !== "string") throw new TypeError("Invalid usage day");
+			const counts = {};
+			for (const field of dayFields) {
+				const count = row[field];
+				if (typeof count !== "number" || !Number.isFinite(count) || count < 0) throw new TypeError("Invalid usage day");
+				counts[field] = count;
+			}
 			return {
 				date: row.date,
-				totalTokens: row.totalTokens,
-				turnCount: row.turnCount,
-				toolCallCount: row.toolCallCount
+				totalTokens: counts.totalTokens,
+				turnCount: counts.turnCount,
+				toolCallCount: counts.toolCallCount,
+				inputTokens: counts.inputTokens,
+				outputTokens: counts.outputTokens,
+				cacheReadTokens: counts.cacheReadTokens,
+				cacheWriteTokens: counts.cacheWriteTokens,
+				requestCount: counts.requestCount,
+				activeMs: counts.activeMs
 			};
 		});
 		const dailyModels = value.dailyModels.map((row) => {
@@ -4084,12 +4931,13 @@ const usageSnapshotCodec = {
 				"date",
 				"modelId",
 				"provider"
-			]) || typeof row.totalTokens !== "number" || !Number.isFinite(row.totalTokens)) throw new TypeError("Invalid usage daily model");
+			]) || typeof row.totalTokens !== "number" || !Number.isFinite(row.totalTokens) || typeof row.requestCount !== "number" || !Number.isFinite(row.requestCount)) throw new TypeError("Invalid usage daily model");
 			return {
 				date: row.date,
 				modelId: row.modelId,
 				provider: row.provider,
-				totalTokens: row.totalTokens
+				totalTokens: row.totalTokens,
+				requestCount: row.requestCount
 			};
 		});
 		const models = value.models.map((row) => {
@@ -4110,7 +4958,8 @@ const usageSnapshotCodec = {
 			summary: counts,
 			days,
 			dailyModels,
-			models
+			models,
+			sessionDays
 		};
 	} })
 };
@@ -4435,8 +5284,10 @@ const MOD_RPC = composeRpc([
 	READ_PERSONALIZATION_RPC,
 	SAVE_PERSONALIZATION_RPC,
 	LIST_SKILLS_RPC,
+	READ_SKILL_RPC,
 	SET_SKILL_ENABLED_RPC,
 	LIST_MCP_SERVERS_RPC,
+	READ_MCP_SERVER_RPC,
 	SET_MCP_SERVER_ENABLED_RPC,
 	LIST_ARCHIVED_SESSIONS_RPC,
 	RESTORE_ARCHIVED_SESSION_RPC,

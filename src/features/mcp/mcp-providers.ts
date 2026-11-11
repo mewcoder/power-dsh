@@ -1,6 +1,6 @@
 import type { NativeContext, NativeFiber, NativePayload, LifecycleOptions } from '../../shared/host/native.ts';
 import type { McpServer, McpRuntimeState, McpTransport } from './rpc.ts';
-import { isOneOf } from '../../shared/types/protocol.ts';
+import { isOneOf, isRecord } from '../../shared/types/protocol.ts';
 export interface ConfiguredMcp { entryId: string; uid?: number; name: string; tools: string[]; runtimeState: McpRuntimeState; transport: McpTransport }
 interface ManagedTarget { id: string; name: string; namespace: string; owner: NativeFiber | undefined; enabled: boolean }
 const MCP_CLIENT = '@deepseek-ai/dsh-mcp-client';
@@ -126,6 +126,63 @@ export class McpProviders {
       const id = entry.fiber?.effectiveConfig?.id ?? entry.fiber?.config?.id;
       return identifier(id) && identifier(entry.id) ? [{ id, entryId: entry.id }] : [];
     });
+  }
+
+  /**
+   * Declared configuration for a manager or runtime instance, without resolving secrets.
+   * @param id - the projected server id (`manager:...` or `runtime:...`).
+   * @returns the entry configuration, or undefined when it cannot be confirmed.
+   */
+  configFor(id: string): unknown {
+    this.active();
+    if (id.startsWith('manager:')) {
+      const manager = this.ctx.get('mcpManager');
+      const target = this.managed().targets.find(row => row.id === id);
+      if (!manager || !target) return undefined;
+      try {
+        const configs = manager.config.servers.get();
+        return Object.hasOwn(configs, target.name) ? configs[target.name] : undefined;
+      } catch { return undefined; }
+    }
+    if (id.startsWith('runtime:')) {
+      const uid = Number(id.slice('runtime:'.length));
+      if (!Number.isSafeInteger(uid)) return undefined;
+      try {
+        const fiber = [...(this.ctx.registry.get(this.native)?.fibers ?? [])].find(row => row.uid === uid);
+        return fiber?.effectiveConfig ?? fiber?.config ?? fiber?.rawConfig;
+      } catch { return undefined; }
+    }
+    return undefined;
+  }
+
+  /**
+   * Declared configuration of one profile or preset MCP row.
+   * @param id - the projected server id (`<entryId>` or `preset:<presetId>:<rowId>`).
+   * @returns the declared config object, or undefined when no unique row matches.
+   */
+  declared(id: string): unknown {
+    this.active();
+    const preset = /^preset:([^:]+):(.+)$/.exec(id);
+    if (!preset) {
+      const matches = [...this.ctx.loader.entries()].filter(entry => entry.id === id && entry.options.name === MCP_CLIENT);
+      return matches.length === 1 ? matches[0].options.config : undefined;
+    }
+    const [, presetId, rowId] = preset;
+    const owners = [...this.ctx.loader.entries()].filter(entry => entry.options.name === '@deepseek-ai/dsh-agent-preset'
+      && (entry.fiber?.effectiveConfig?.id ?? entry.fiber?.config?.id) === presetId);
+    if (owners.length !== 1) return undefined;
+    const found: unknown[] = [];
+    // Composition rows flatten group rows, whose children live in `config`.
+    const walk = (rows: unknown): void => {
+      if (!Array.isArray(rows)) return;
+      for (const row of rows) {
+        if (!isRecord(row)) continue;
+        if (row.group === true) { walk(row.config); continue; }
+        if (row.name === MCP_CLIENT && row.id === rowId) found.push(row.config);
+      }
+    };
+    walk(owners[0].options.config?.plugins);
+    return found.length === 1 ? found[0] : undefined;
   }
 
   /** Read only the manager's exact native child instance, never its connection-status payload. */

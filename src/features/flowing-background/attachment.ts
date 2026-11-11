@@ -60,16 +60,31 @@ function nativeClasses(doc: Document): { classes: NativeClasses; failure?: never
 }
 
 /** Restore a declaration only while it still belongs to this attachment. */
-function change(element: HTMLElement, property: string, value: string, priority = 'important') {
+function ownStyle(element: HTMLElement, property: string, value: string, priority = 'important') {
   const before = element.style.getPropertyValue(property);
   const beforePriority = element.style.getPropertyPriority(property);
+  let owned = true;
+  const stillOwned = () => owned && element.style.getPropertyValue(property) === value
+    && element.style.getPropertyPriority(property) === priority;
   element.style.setProperty(property, value, priority);
-  return () => {
-    if (element.style.getPropertyValue(property) !== value
-      || element.style.getPropertyPriority(property) !== priority) return;
-    if (before) element.style.setProperty(property, before, beforePriority);
-    else element.style.removeProperty(property);
+  return {
+    update(next: string) {
+      if (!stillOwned()) { owned = false; return; }
+      if (next === value) return;
+      element.style.setProperty(property, next, priority);
+      value = next;
+    },
+    restore() {
+      if (!stillOwned()) return;
+      owned = false;
+      if (before) element.style.setProperty(property, before, beforePriority);
+      else element.style.removeProperty(property);
+    },
   };
+}
+
+function change(element: HTMLElement, property: string, value: string, priority = 'important') {
+  return ownStyle(element, property, value, priority).restore;
 }
 
 /** User-requested global preview: one canvas underneath the verified app frame. */
@@ -140,6 +155,17 @@ export function watchBackground(
     return { target };
   };
   const clear = () => { current?.dispose(); current = null; };
+  /**
+   * A global main panel (plugin manager, workspace, usage and similar) replaces
+   * the conversation in the centre column. The host marks it with
+   * `data-global-panel` on that column's panel wrapper. The artwork stays mounted
+   * so the sidebar keeps its background; only the centre returns to the native
+   * opaque surface so the page itself reads normally.
+   */
+  const centerHasGlobalPanel = (element: HTMLElement, names: NativeClasses) => {
+    const center = element.querySelector<HTMLElement>(`:scope > .${names.centerCol}`);
+    return center !== null && center.querySelector('[data-global-panel]') !== null;
+  };
   const sync = () => {
     if (disposed) return;
     const mapping = nativeClasses(doc);
@@ -163,7 +189,7 @@ export function watchBackground(
     failedTarget = null;
     clear();
     const restores: Array<() => void> = [];
-    const surfaces = new Map<HTMLElement, () => void>();
+    const surfaces = new Map<HTMLElement, { color: ReturnType<typeof ownStyle>; restoreImage(): void }>();
     const fades = new Map<HTMLElement, () => void>();
     const refresh = (names: NativeClasses) => {
       if (readAppearance) applyAppearance(layer, readAppearance());
@@ -196,23 +222,31 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
       }
       const drawer = target.hasAttribute('data-sidebar-drawer');
       const selectors = `.${names.sidebarCol}, .${names.centerCol}, .${names.sidebarRoot}`;
-      const next = new Set([...target.querySelectorAll<HTMLElement>(selectors)].filter(element =>
-        !drawer || !element.matches(`.${names.sidebarCol}, .${names.sidebarRoot}`)));
+      const next = new Map([...target.querySelectorAll<HTMLElement>(selectors)]
+        .filter(element => !drawer || !element.matches(`.${names.sidebarCol}, .${names.sidebarRoot}`))
+        .map(element => [element, 'transparent']));
+      // Web and Linux centre columns have no native fill of their own. Paint the
+      // theme base while a global panel is present, keeping the sidebar artwork.
+      if (centerHasGlobalPanel(target, names)) {
+        for (const element of next.keys()) {
+          if (element.matches(`.${names.centerCol}`)) next.set(element, 'var(--dsw-alias-bg-base)');
+        }
+      }
       for (const content of target.querySelectorAll<HTMLElement>('[data-conversation-content]')) {
         const root = content.parentElement;
         if (!root?.matches('[data-phase]')) continue;
-        next.add(root);
+        next.set(root, 'transparent');
         // The seat's bg-base fade otherwise paints a solid rectangle around the card.
-        for (const seat of content.querySelectorAll<HTMLElement>('[data-composer-seat][data-conversation-region="composer"]')) next.add(seat);
+        for (const seat of content.querySelectorAll<HTMLElement>('[data-composer-seat][data-conversation-region="composer"]')) next.set(seat, 'transparent');
       }
-      for (const [element, restore] of surfaces) {
-        if (!next.has(element)) { restore(); surfaces.delete(element); }
+      for (const [element, surface] of surfaces) {
+        if (!next.has(element)) { surface.restoreImage(); surface.color.restore(); surfaces.delete(element); }
       }
-      for (const element of next) {
-        if (surfaces.has(element)) continue;
-        const color = change(element, 'background-color', 'transparent');
-        const image = change(element, 'background-image', 'none');
-        surfaces.set(element, () => { image(); color(); });
+      for (const [element, value] of next) {
+        const surface = surfaces.get(element);
+        if (surface) surface.color.update(value);
+        else surfaces.set(element, { color: ownStyle(element, 'background-color', value),
+          restoreImage: change(element, 'background-image', 'none') });
       }
     };
     const layer = doc.createElement('div');
@@ -241,7 +275,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
     applyAppearance(layer, initial);
     const dispose = () => {
       stop(); layer.remove();
-      for (const restore of surfaces.values()) restore();
+      for (const surface of surfaces.values()) { surface.restoreImage(); surface.color.restore(); }
       surfaces.clear();
       for (const restore of fades.values()) restore();
       fades.clear();
@@ -269,7 +303,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
   const observer = new win.MutationObserver(sync);
   if (doc.head) observer.observe(doc.head, { childList: true, subtree: true, characterData: true });
   observer.observe(doc.body, { childList: true, subtree: true, attributes: true,
-    attributeFilter: ['data-phase', 'data-shell-overlay', 'data-shell-bottom', 'data-rightbar-col', 'data-sidebar-drawer', 'hidden', 'class', 'style'] });
+    attributeFilter: ['data-phase', 'data-global-panel', 'data-shell-overlay', 'data-shell-bottom', 'data-rightbar-col',
+      'data-sidebar-drawer', 'hidden', 'class', 'style'] });
   sync();
   const offAppearance = subscribeAppearance?.(() => {
     if (!disposed && current && readAppearance) applyAppearance(current.layer, readAppearance());

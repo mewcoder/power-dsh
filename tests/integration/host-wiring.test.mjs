@@ -27,6 +27,9 @@ async function fixture(t, { hostWorkspace = true, managedId = 'power-dsh' } = {}
       return () => { providers.delete(provider); controller.abort(); };
     },
     async snapshot(options) { lookups.push(options); return { skills: candidates, complete: true }; },
+    async get(name) {
+      return name === 'memory-skill' ? { ...candidates[0], content: '# Memory\n\nBody text.' } : undefined;
+    },
   };
   const writes = [];
   const values = {
@@ -58,9 +61,14 @@ async function fixture(t, { hostWorkspace = true, managedId = 'power-dsh' } = {}
   for (const [name, value] of Object.entries(values)) root.reflect.provide(name, value);
   if (hostWorkspace) root.reflect.provide('workspaceRegistry', { list: () => [{ path: '/memory-only/project', title: 'Memory project' }] });
   else root.reflect.provide('workspaces', { list: { getSnapshot: () => ({ items: [] }) } });
-  const config = { disabledSkills: { get: () => [] }, ...Object.fromEntries([
-    'blockDoubleClickRename', 'blockTodo', 'blockPlan', 'blockGoal', 'blockOfficialTelemetry', 'blockOfficialAccount', 'blockOfficialSearch', 'showVersion', 'showThemeSwitcher', 'showRefreshButton', 'showRestartButton',
-  ].map(field => [field, { get: () => false }])) };
+  const config = {
+    disabledSkills: { get: () => [] },
+    autoArchiveDays: { get: () => 0 },
+    autoArchivedSessions: { get: () => [] },
+    ...Object.fromEntries([
+      'blockDoubleClickRename', 'blockTodo', 'blockPlan', 'blockGoal', 'blockOfficialTelemetry', 'blockOfficialAccount', 'blockOfficialSearch', 'showVersion', 'showThemeSwitcher', 'showRefreshButton', 'showRestartButton',
+    ].map(field => [field, { get: () => false }])),
+  };
   function fixtureMod(ctx) {
     ctx.fiber.entry = { options: { id: managedId } };
     apply(ctx, config);
@@ -116,6 +124,14 @@ test('the actual Host injector starts skill management with workspaceRegistry an
   assert.equal(result.skills[0].name, 'memory-skill');
   assert.equal(result.skills[0].enabled, true);
   assert.ok(providers.size > 0);
+  // The body is read on demand through the same preset scope the catalog used.
+  const detail = await service.readSkill('', '', 'memory-skill');
+  assert.equal(detail.name, 'memory-skill');
+  assert.equal(detail.content, '# Memory\n\nBody text.');
+  assert.equal(detail.source, 'runtime');
+  assert.equal(detail.enabled, true);
+  assert.equal(await service.readSkill('', '', 'missing-skill'), null);
+  await assert.rejects(service.readSkill('', '', '../bad'), /Invalid skill operation/);
 });
 
 test('the Host MCP directory serves only global metadata without a workspace dependency', async t => {
@@ -124,6 +140,8 @@ test('the Host MCP directory serves only global metadata without a workspace dep
   const global = await service.listMcpServers();
   assert.deepEqual(global, { complete: true, servers: [] });
   await assert.rejects(service.setMcpServerEnabled('runtime:1', false), /mcpUnavailable/);
+  assert.equal(await service.readMcpServer('include:missing'), null);
+  await assert.rejects(service.readMcpServer(''), /mcpUnavailable/);
 });
 
 test('a Client-shaped workspaces service cannot satisfy the Host workspace dependency', async t => {
@@ -142,8 +160,8 @@ test('feature-owned RPC methods retain the invocation owner check through the ac
     ['setAccountBlocked', [true]], ['setTelemetryBlocked', [true]],
     ['setTodoBlocked', [true]], ['setPlanBlocked', [true]], ['setGoalBlocked', [true]], ['setSearchBlocked', [true]],
     ['readPersonalization', []], ['savePersonalization', ['text', 'revision']],
-    ['listSkills', ['', '']], ['setSkillEnabled', ['', '', 'review', false]],
-    ['listMcpServers', []], ['setMcpServerEnabled', ['server', false]],
+    ['listSkills', ['', '']], ['readSkill', ['', '', 'review']], ['setSkillEnabled', ['', '', 'review', false]],
+    ['listMcpServers', []], ['readMcpServer', ['include:browser']], ['setMcpServerEnabled', ['server', false]],
   ]) {
     await assert.rejects(async () => service[method](...args), /Only the profile owner can change Mod policies/, method);
   }
@@ -178,6 +196,8 @@ test('all feature configuration defaults and settings tool output requirements s
     flowingBackgroundOpacity: 100,
     flowingBackgroundBlur: 0,
     archiveManagerEnabled: false,
+    autoArchiveDays: 0,
+    autoArchivedSessions: [],
     projectManagerEnabled: false,
     usageStatsEnabled: false,
   };

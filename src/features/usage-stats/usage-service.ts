@@ -3,6 +3,8 @@ import { dayKeyFormatter, foldSession, mergeUsage, type SessionUsageFold, type U
 
 /** Structural view of one native session-persistence read handle. */
 export interface PersistenceHandleLike {
+  /** Exact number of ancestor events; excluded from this session's accounting. */
+  readonly inheritedEventCount: number;
   read(offset?: number, length?: number, options?: { signal?: AbortSignal }): Promise<{
     eventState: string;
     events: readonly unknown[];
@@ -11,7 +13,7 @@ export interface PersistenceHandleLike {
 }
 /** Structural view of one stored session's metadata. */
 export interface PersistenceSnapshotLike {
-  header: { id: string; createdAt: number; cwd?: string };
+  header: { id: string; createdAt: number; cwd?: string; origin?: 'subagent'; parentSession?: string };
   revision: string;
   location?: { kind: string; path: string };
 }
@@ -45,7 +47,7 @@ export class UsageService {
     const zone = normalizeZone(timeZone);
     const stored = await persistence.list({ signal });
     signal?.throwIfAborted();
-    const folds: SessionUsageFold[] = [];
+    const folds = new Map<string, SessionUsageFold>();
     let complete = true;
     const queue = [...stored].sort((left, right) => left.header.createdAt - right.header.createdAt);
     let cursor = 0;
@@ -55,7 +57,7 @@ export class UsageService {
         if (!entry) return;
         signal?.throwIfAborted();
         try {
-          folds.push(await this.fold(entry, zone, signal));
+          folds.set(entry.header.id, await this.fold(entry, zone, signal));
         } catch (error) {
           if (signal?.aborted) throw error;
           complete = false;
@@ -65,7 +67,25 @@ export class UsageService {
     await Promise.all(Array.from({ length: Math.min(READ_CONCURRENCY, queue.length) }, worker));
     signal?.throwIfAborted();
     this.prune(new Set(stored.map(entry => entry.header.id)));
-    return mergeUsage({ timeZone: zone, complete, generatedAt: Date.now(), sessions: folds });
+    const snapshot = mergeUsage({ timeZone: zone, complete, generatedAt: Date.now(), sessions: [...folds.values()] });
+    const entries = new Map(stored.map(entry => [entry.header.id, entry]));
+    const families = new Map<string, Set<string>>();
+    for (const [id, fold] of folds) {
+      let root = entries.get(id)!;
+      const seen = new Set([id]);
+      while (root.header.origin === 'subagent' && root.header.parentSession) {
+        const parent = entries.get(root.header.parentSession);
+        if (!parent || seen.has(parent.header.id)) break;
+        seen.add(parent.header.id);
+        root = parent;
+      }
+      const dates = families.get(root.header.id) ?? new Set<string>();
+      for (const day of fold.days) dates.add(day.date);
+      families.set(root.header.id, dates);
+    }
+    snapshot.sessionDays = [...families.values()].filter(dates => dates.size > 0).map(dates => [...dates].sort());
+    snapshot.summary.sessionCount = snapshot.sessionDays.length;
+    return snapshot;
   }
 
   private async fold(entry: PersistenceSnapshotLike, zone: string, signal?: AbortSignal): Promise<SessionUsageFold> {
@@ -76,7 +96,7 @@ export class UsageService {
     const handle = await persistence.open(entry.header.id, 'read', { signal });
     let events: readonly unknown[];
     try {
-      events = (await handle.read(0, Number.MAX_SAFE_INTEGER, { signal })).events;
+      events = (await handle.read(handle.inheritedEventCount, Number.MAX_SAFE_INTEGER, { signal })).events;
     } finally {
       await handle.close().catch(() => undefined);
     }

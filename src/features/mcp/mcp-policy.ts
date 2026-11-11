@@ -1,6 +1,8 @@
 import { errorMessage, type NativeContext, type NativePlugin, type NativePresets, type NativeComposition, type LifecycleOptions } from '../../shared/host/native.ts';
 import { isOneOf } from '../../shared/types/protocol.ts';
 import type { McpCatalog, McpServer, McpRuntimeState } from './rpc.ts';
+import type { McpServerDetail } from '../../shared/types/wire.ts';
+import { projectMcpConfig } from './mcp-config.ts';
 import type { McpProviders, ConfiguredMcp } from './mcp-providers.ts';
 type Bundle = Awaited<ReturnType<NativeContext['pluginManager']['listBundles']>>[number];
 const MCP_CLIENT = '@deepseek-ai/dsh-mcp-client';
@@ -153,6 +155,32 @@ export class McpPolicy {
     catch { this.ensureActive(); throw failure('mcpMetadataLoadFailed'); }
     this.ensureActive();
     return { complete: presets !== null, servers };
+  }
+
+  /**
+   * Read one server's declared configuration for the detail dialog.
+   *
+   * The catalog row and its configuration are read in the same pass, so a
+   * stale id cannot pair a current row with another entry's configuration.
+   * @param id - projected server id from the catalog.
+   * @returns the row plus its display-only configuration, or null when absent.
+   */
+  async read(id: string): Promise<McpServerDetail | null> {
+    if (!identifier(id)) throw new TypeError('mcpUnavailable');
+    this.ensureActive();
+    const catalog = await this.list();
+    this.ensureActive();
+    const server = catalog.servers.find(row => row.id === id);
+    if (!server) return null;
+    const manager = await this.providerContext();
+    let raw: unknown;
+    try {
+      raw = server.source === 'profile' || server.source.startsWith('preset:')
+        ? manager?.declared(server.id) ?? null
+        : manager?.configFor(server.id) ?? null;
+    } catch { this.ensureActive(); throw failure('mcpMetadataLoadFailed'); }
+    this.ensureActive();
+    return { server, config: projectMcpConfig(raw, server.transport) };
   }
 
   async setEnabled(id: string, enabled: boolean) {

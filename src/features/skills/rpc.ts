@@ -1,6 +1,6 @@
 import { isRecord, isArray, hasStrings, hasBooleans, isOneOf, type Codec, type RpcDescriptor } from '../../shared/types/protocol.ts';
-import type { SkillScope, SkillWorkspace, SkillRow, SkillEntry, SkillCatalog } from '../../shared/types/wire.ts';
-export type { SkillScope, SkillWorkspace, SkillRow, SkillEntry, SkillCatalog } from '../../shared/types/wire.ts';
+import type { SkillScope, SkillWorkspace, SkillRow, SkillEntry, SkillCatalog, SkillDetail } from '../../shared/types/wire.ts';
+export type { SkillScope, SkillWorkspace, SkillRow, SkillEntry, SkillCatalog, SkillDetail } from '../../shared/types/wire.ts';
 import { stringCodec, booleanCodec } from '../../shared/rpc/codecs.ts';
 
 const skillCatalogCodec: Codec<SkillCatalog> = {
@@ -21,16 +21,29 @@ const skillCatalogCodec: Codec<SkillCatalog> = {
     return { cwd: value.cwd, scope: value.scope, workspaces: value.workspaces.map(item => ({ path: item.path, title: item.title })), complete: value.complete, skills };
   } }),
 };
-function skillRpc<M extends string>(method: M, fields: string[]): RpcDescriptor<M, SkillCatalog> {
+const skillDetailCodec: Codec<SkillDetail | null> = {
+  mode: 'strict', typeSymbol: 'power-dsh#SkillDetail',
+  create: () => ({ parse(value) {
+    if (value === null) return null;
+    if (!isRecord(value) || !hasStrings(value, ['name', 'description', 'content', 'source', 'path', 'origin'])
+      || !hasBooleans(value, ['enabled', 'modelInvocable', 'userInvocable'])) throw new TypeError('Invalid skill detail');
+    return { name: value.name, description: value.description, content: value.content, source: value.source,
+      path: value.path, origin: value.origin, enabled: value.enabled,
+      modelInvocable: value.modelInvocable, userInvocable: value.userInvocable };
+  } }),
+};
+
+function skillRpc<M extends string>(method: M, fields: string[], result: Codec<unknown> = skillCatalogCodec): RpcDescriptor<M> {
   return {
     id: `power-dsh#powerDsh/${method}`,
     service: 'powerDsh', namespace: 'powerDsh', method,
     invocation: { kind: 'direct' },
     parameters: fields.map(name => ({ name, wire: name, source: 'json', codec: name === 'enabled' ? booleanCodec : stringCodec })),
-    result: skillCatalogCodec,
+    result,
   };
 }
 export const LIST_SKILLS_RPC = skillRpc('listSkills', ['cwd', 'scope']);
+export const READ_SKILL_RPC = skillRpc('readSkill', ['cwd', 'scope', 'name'], skillDetailCodec);
 export const SET_SKILL_ENABLED_RPC = skillRpc('setSkillEnabled', ['cwd', 'scope', 'name', 'enabled']);
 
-export const rpc = [LIST_SKILLS_RPC, SET_SKILL_ENABLED_RPC];
+export const rpc = [LIST_SKILLS_RPC, READ_SKILL_RPC, SET_SKILL_ENABLED_RPC];

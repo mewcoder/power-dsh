@@ -69,6 +69,9 @@ test('project sort switches between latest activity and the native registry orde
 test('project search matches the name or the directory and keeps the empty states apart', async () => {
   const app = await mount({ projectCatalog: catalog });
   const page = await projectsPage(app, 'en');
+  // The placeholder names exactly what the filter reads: workspace names and directories.
+  assert.equal(page.search().props.placeholder, 'Search workspaces');
+  assert.equal(page.search().props['aria-label'], 'Search workspaces');
   page.search().props.onChange({ target: { value: 'zcode' } });
   assert.ok(page.row('w2'));
   assert.ok(!page.row('w1'));
@@ -76,11 +79,11 @@ test('project search matches the name or the directory and keeps the empty state
   assert.ok(page.row('w3'));
   page.search().props.onChange({ target: { value: 'missing' } });
   assert.equal(page.render().filter(node => node.type === 'li').length, 0);
-  assert.ok(page.render().some(node => [node.props.children].flat(Infinity).includes('No matching projects')));
+  assert.ok(page.render().some(node => [node.props.children].flat(Infinity).includes('No matching workspaces')));
   app.setProjects(projectCatalogFixture({ projects: [] }));
   page.search().props.onChange({ target: { value: '' } });
   await app.reloadProjects();
-  assert.ok(page.render().some(node => [node.props.children].flat(Infinity).includes('No projects')));
+  assert.ok(page.render().some(node => [node.props.children].flat(Infinity).includes('No workspaces')));
   app.unmount();
 });
 
@@ -93,10 +96,10 @@ test('removing a project asks for confirmation with the native dialog and danger
   action.props.onClick();
   const dialog = page.render().find(node => node.type === 'native-modal-fixture');
   assert.ok(dialog, 'Removal is confirmed before touching the registry.');
-  assert.equal(dialog.props.title, 'Remove project?');
+  assert.equal(dialog.props.title, 'Remove workspace?');
   assert.ok(String(dialog.props.description).includes('power-dsh'));
   const buttons = descendants(dialog).filter(node => node.props['data-native-button']);
-  assert.deepEqual(buttons.map(node => [node.props.children].flat(Infinity).join('')), ['Cancel', 'Remove project']);
+  assert.deepEqual(buttons.map(node => [node.props.children].flat(Infinity).join('')), ['Cancel', 'Remove workspace']);
   assert.equal(buttons[1].props.variant, 'outline');
   buttons[1].props.onClick();
   await new Promise(resolve => setImmediate(resolve));
@@ -122,7 +125,7 @@ test('project load and remove failures stay recoverable and localized', async ()
   app.renderProjects('zh');
   await app.reloadProjects();
   const render = () => descendants(app.renderProjects('zh'));
-  assert.ok(render().some(node => [node.props.children].flat(Infinity).includes('项目管理暂不可用。')));
+  assert.ok(render().some(node => [node.props.children].flat(Infinity).includes('工作区管理暂不可用。')));
 
   const failing = await mount({ projectCatalog: catalog, localeLanguage: 'zh',
     projectReply: async () => ({ ok: false, error: { message: 'projectsNotFound' } }) });
@@ -132,7 +135,7 @@ test('project load and remove failures stay recoverable and localized', async ()
   buttons[1].props.onClick();
   await new Promise(resolve => setImmediate(resolve));
   const zh = descendants(failing.renderProjects('zh'));
-  assert.ok(zh.some(node => [node.props.children].flat(Infinity).includes('该项目已不存在。')));
+  assert.ok(zh.some(node => [node.props.children].flat(Infinity).includes('该工作区已不存在。')));
   assert.deepEqual(failing.projectWrites, [{ method: 'removeProject', workspaceId: 'w2' }]);
   app.unmount();
   failing.unmount();

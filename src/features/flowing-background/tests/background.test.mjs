@@ -171,6 +171,36 @@ test('closing saves the final drag and a failed preview save remains recoverable
   app.unmount();
 });
 
+test('adjustments made during a slow save are committed before the panel closes', async () => {
+  const writes = [];
+  let release;
+  const app = await mount({ featureIds: ['flowing-background'], formReply: (field, value) => {
+    writes.push({ field, value });
+    if (writes.length === 1) return new Promise(resolve => { release = resolve; });
+    return true;
+  } });
+  app.set({ flowingBackgroundEnabled: true });
+  await openTune(app);
+  const nodes = () => descendants(app.renderTunePanel());
+  const slider = () => nodes().find(node => node.props.id === 'power-dsh-tune-flowingBackgroundOpacity');
+  slider().props.onChange({ currentTarget: { value: '40' } });
+  const first = slider().props.onPointerUp();
+  await new Promise(setImmediate);
+  slider().props.onChange({ currentTarget: { value: '65' } });
+  const trailing = slider().props.onKeyUp({ key: 'ArrowRight' });
+  const closing = nodes().find(node => node.props.className === 'power-dsh-background-panel-close').props.onClick();
+  assert.equal(writes.length, 1, 'Saving remains serial while controls accept new input.');
+  release(true);
+  await Promise.all([first, trailing, closing]);
+  assert.equal(app.settingsValue().flowingBackgroundOpacity, 65, 'The final adjustment must survive closing.');
+  assert.deepEqual(writes, [
+    { field: 'flowingBackgroundOpacity', value: 40 },
+    { field: 'flowingBackgroundOpacity', value: 65 },
+  ]);
+  assert.equal(app.renderTunePanel(), null);
+  app.unmount();
+});
+
 test('disabling the background closes preview without reopening settings', async () => {
   const app = await mount();
   app.set({ flowingBackgroundEnabled: true });
@@ -182,6 +212,57 @@ test('disabling the background closes preview without reopening settings', async
   assert.equal(app.renderTunePanel(), null);
   assert.equal(app.settingsVisibility().open, false);
   assert.equal(app.entries.has('settings.launcher:power-dsh-background-return'), false);
+  app.unmount();
+});
+
+test('a host dialog appearing over the preview commits the pending values and closes the panel', async () => {
+  const app = await mount();
+  app.set({ flowingBackgroundEnabled: true });
+  app.selectSettingsTab('interface');
+  descendants(app.renderSettings()).find(node => node.props.id === 'settings-test-flowingBackgroundTune').props.onClick();
+  app.renderTunePanel();
+  const panel = () => descendants(app.renderTunePanel()).find(node => node.props.className === 'power-dsh-background-panel');
+  assert.ok(panel(), 'The preview is open.');
+  const opacity = () => descendants(app.renderTunePanel()).find(node => node.type === 'input'
+    && node.props.id === 'power-dsh-tune-flowingBackgroundOpacity');
+  opacity().props.onChange({ currentTarget: { value: '40' } });
+  assert.equal(opacity().props.value, 40, 'The new value is only a preview so far.');
+
+  // Opening Settings (or any host dialog) raises an aria-modal layer above the
+  // fixed preview; it must not stay stranded behind it.
+  app.setModalLayer(true);
+  await new Promise(setImmediate);
+  assert.equal(panel(), undefined, 'The preview closes when a host dialog appears.');
+  assert.equal(app.settingsProps().source.getSnapshot().value.flowingBackgroundOpacity, 40,
+    'The pending value is committed on the way out.');
+
+  // The panel stays closed after the dialog is dismissed.
+  app.setModalLayer(false);
+  await new Promise(setImmediate);
+  assert.equal(panel(), undefined, 'Dismissing the dialog does not resurrect the preview.');
+  app.unmount();
+});
+
+test('opening the preview from its settings row is not mistaken for a host dialog', async () => {
+  const app = await mount();
+  app.set({ flowingBackgroundEnabled: true });
+  app.selectSettingsTab('interface');
+  // The settings modal is up while its row is clicked and closes in the same
+  // action. Only a *new* modal layer may close the preview, so the departure of
+  // the settings dialog must leave the freshly opened preview alone.
+  app.setModalLayer(true);
+  descendants(app.renderSettings()).find(node => node.props.id === 'settings-test-flowingBackgroundTune').props.onClick();
+  app.renderTunePanel();
+  app.setModalLayer(false);
+  await new Promise(setImmediate);
+  assert.ok(descendants(app.renderTunePanel()).some(node => node.props.className === 'power-dsh-background-panel'),
+    'The preview stays open when the settings modal merely goes away.');
+
+  // A genuinely new dialog still closes it.
+  app.setModalLayer(true);
+  await new Promise(setImmediate);
+  assert.equal(descendants(app.renderTunePanel()).find(node => node.props.className === 'power-dsh-background-panel'), undefined,
+    'A later dialog still closes the preview.');
   app.unmount();
 });
 
@@ -576,5 +657,99 @@ test('the sidebar shortcut appears beside the appearance button only when enable
     'The sidebar entry opens the same panel as the settings row.');
   app.set({ showBackgroundShortcut: false });
   assert.equal(shortcut(), undefined, 'Turning it off removes the entry.');
+
+  // Turning the background itself off removes the shortcut even though its own
+  // preference is still on; re-enabling the background brings it back.
+  app.set({ showBackgroundShortcut: true });
+  assert.ok(shortcut());
+  app.set({ flowingBackgroundEnabled: false });
+  assert.equal(shortcut(), undefined, 'Disabling the background removes the shortcut.');
+  app.set({ flowingBackgroundEnabled: true });
+  assert.ok(shortcut(), 'The retained preference returns with the background.');
+  app.unmount();
+});
+
+test('footer shortcuts yield to connection status and remain hidden through recovery', async () => {
+  for (const showThemeSwitcher of [false, true]) {
+    const app = await mount({ featureIds: showThemeSwitcher
+      ? ['flowing-background', 'appearance-shortcut'] : ['flowing-background'] });
+    app.set({ flowingBackgroundEnabled: true, showBackgroundShortcut: true, showThemeSwitcher });
+    const shortcut = () => descendants(app.renderFooter()).find(node => node.props.className === 'power-dsh-background-shortcut');
+    assert.ok(shortcut());
+    assert.equal(app.connectionStateListeners.size, 1, 'Both shortcuts share one connection observer.');
+    app.setConnectionState('disconnected');
+    assert.equal(shortcut(), undefined, 'The native disconnected indicator owns the footer.');
+    app.setConnectionState('connecting');
+    assert.equal(shortcut(), undefined);
+    app.setConnectionState('connected');
+    assert.equal(shortcut(), undefined, 'The native recovery indicator remains visible after reconnect.');
+    const timer = [...app.timers.values()][0];
+    assert.equal(timer.ms, 3000);
+    app.setConnectionState('disconnected');
+    assert.equal(app.timers.size, 0, 'Another outage cancels the pending recovery.');
+    app.setConnectionState('connected');
+    [...app.timers.values()][0].fn();
+    assert.ok(shortcut(), 'The shortcut returns once native status has cleared.');
+    app.unmount();
+    assert.equal(app.connectionStateListeners.size, 0);
+    assert.equal(app.timers.size, 0);
+  }
+});
+
+test('footer shortcuts share native update availability and ignore stale initial status', async () => {
+  let listener;
+  let subscriptions = 0;
+  let removed = 0;
+  const status = Promise.withResolvers();
+  const app = await mount({ featureIds: ['flowing-background', 'appearance-shortcut'], updates: {
+    status: () => status.promise,
+    subscribe(fn) { subscriptions++; listener = fn; return () => { removed++; }; },
+  } });
+  app.set({ flowingBackgroundEnabled: true, showBackgroundShortcut: true, showThemeSwitcher: true });
+  const controls = () => descendants(app.renderFooter()).filter(node => ['power-dsh-background-shortcut', 'power-dsh-appearance-button'].includes(node.props.className));
+  assert.equal(controls().length, 0, 'Initial update status reserves the footer.');
+  assert.equal(subscriptions, 1, 'The shortcuts share a single desktop update subscription.');
+  listener({ phase: 'downloading' });
+  status.resolve({ phase: 'idle' });
+  await new Promise(setImmediate);
+  assert.equal(controls().length, 0, 'A stale idle response cannot cover the native download indicator.');
+  listener({ phase: 'idle' });
+  assert.equal(controls().length, 2);
+  listener({ phase: 'error' });
+  assert.equal(controls().length, 0, 'The native update retry action stays clickable.');
+  listener({ phase: 'idle' });
+  assert.equal(controls().length, 2, 'Both shortcuts return when the update indicator clears.');
+  app.unmount();
+  assert.equal(removed, 1);
+});
+
+test('the shortcut settings row appears only while the background is enabled', async () => {
+  const app = await mount();
+  const row = () => descendants(app.renderSettings()).find(node => node.props.role === 'switch'
+    && node.props.id === 'settings-test-showBackgroundShortcut');
+  app.selectSettingsTab('interface');
+  assert.equal(row(), undefined, 'The dependent row is absent while the background is off.');
+  app.set({ flowingBackgroundEnabled: true });
+  assert.ok(row(), 'Turning the background on reveals the shortcut row.');
+  app.set({ flowingBackgroundEnabled: false });
+  assert.equal(row(), undefined, 'Turning the background off hides the row again.');
+  app.unmount();
+});
+
+test('the sidebar shortcut sits flush to the appearance entry and keeps its slot when that entry is hidden', async () => {
+  const app = await mount();
+  app.set({ flowingBackgroundEnabled: true, showBackgroundShortcut: true });
+  const shortcut = () => descendants(app.renderFooter()).find(node => node.type === 'button'
+    && node.props.className === 'power-dsh-background-shortcut');
+  // Appearance entry off: the background button takes over its slot (280 - 40).
+  assert.equal(shortcut().props.style.left, 240);
+  app.set({ showThemeSwitcher: true });
+  assert.equal(shortcut().props.style.left, 208, 'Flush against the 32px appearance button with no gap.');
+  app.resize(320);
+  assert.equal(shortcut().props.style.left, 248, 'Stays anchored to the footer seat on resize.');
+  app.set({ showThemeSwitcher: false });
+  assert.equal(shortcut().props.style.left, 280, 'Falls back to the appearance slot after it is removed.');
+  assert.equal(descendants(app.renderFooter(false)).find(node => node.props.className === 'power-dsh-background-shortcut'),
+    undefined, 'The collapsed sidebar hides the fixed shortcut like the appearance entry.');
   app.unmount();
 });

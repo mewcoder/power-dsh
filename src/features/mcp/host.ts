@@ -31,6 +31,9 @@ export const methods = {
   listMcpServers() {
     return this.run(() => this.mcp.list());
   },
+  readMcpServer(id: string) {
+    return this.run(() => this.mcp.read(id));
+  },
   setMcpServerEnabled(id: string, enabled: boolean) {
     return this.run(() => this.mcp.setEnabled(id, enabled));
   },

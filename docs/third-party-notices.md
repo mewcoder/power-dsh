@@ -2,7 +2,7 @@
 
 ## DeepSeek Harness 原生插件目录布局
 
-[技能与 MCP 管理界面](../src/client.ts)的搜索、分组、卡片布局及技能页范围 Tab 适配自 DeepSeek Harness 原生内置插件页面，包含卡片展开、悬浮、焦点和底部分隔背景等视觉反馈。使用本插件独立 CSS 类及数据，保留原生主题 token 与尺寸，不运行时导入内部页面组件。项目选择和提示复用宿主公共 `Menu`、`Tooltip`；具体行为见[技能管理](../src/features/skills/spec.md)、[MCP 管理](../src/features/mcp/spec.md)与 [UI 规范](ui.md#技能与-mcp-管理列表)。未包含无关插件清单、模式选择或配置编辑逻辑。
+[技能与 MCP 管理界面](../src/client.ts)的搜索、分组、卡片布局及技能页范围 Tab 适配自 DeepSeek Harness 原生内置插件页面，包含卡片展开、悬浮、焦点和底部分隔背景等视觉反馈。使用本插件独立 CSS 类及数据，保留原生主题 token 与尺寸，不运行时导入内部页面组件。工作区选择和提示复用宿主公共 `Menu`、`Tooltip`；具体行为见[技能管理](../src/features/skills/spec.md)、[MCP 管理](../src/features/mcp/spec.md)与 [UI 规范](ui.md#技能与-mcp-管理列表)。未包含无关插件清单、模式选择或配置编辑逻辑。
 
 - [原生 Tab 样式](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-settings-plugins/src/client/PluginsSettingsSection.module.css)
 - [原生目录页面](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-settings-plugin-inventory/src/client/PluginInventorySettingsTab.tsx)
@@ -34,9 +34,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## 原生项目（Workspace）删除语义
+## 原生工作区（Workspace）删除语义
 
-[项目管理](../src/features/projects/spec.md)的移除操作只调用原生 `workspaceController.delete({ workspaceId })`，沿用 DSH `0.2.2-rc.1` 安装包 `@deepseek-ai/dsh-api-workspace-controller` 与官方提交 `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` 的 `packages/workspace/workspace`、`packages/client/ui-workspace` 已核对的语义：删除一条项目登记，保留目录与全部会话日志，会话回到「未分组」。确认框文案对照原生「删除工作区」的保留说明改写为本功能措辞，行内与确认按钮沿用上文原生危险按钮规格；没有复制其页面结构、组件或代码。
+[工作区管理](../src/features/projects/spec.md)的移除操作只调用原生 `workspaceController.delete({ workspaceId })`，沿用 DSH `0.2.2-rc.1` 安装包 `@deepseek-ai/dsh-api-workspace-controller` 与官方提交 `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` 的 `packages/workspace/workspace`、`packages/client/ui-workspace` 已核对的语义：删除一条工作区登记，保留目录与全部会话日志，会话回到「未分组」。确认框文案对照原生「删除工作区」的保留说明改写为本功能措辞，行内与确认按钮沿用上文原生危险按钮规格；没有复制其页面结构、组件或代码。
 
 - [原生 Workspace 控制器](https://github.com/deepseek-ai/deepseek-harness/tree/master/packages/api/workspace-controller/src)
 - [原生 Workspace 注册表](https://github.com/deepseek-ai/deepseek-harness/tree/master/packages/workspace/workspace/src)
@@ -45,7 +45,7 @@ SOFTWARE.
 
 ## 原生模型设置按钮规格
 
-[归档管理](../src/features/archive/spec.md)的行内「取消归档」「删除」按钮和删除确认框的危险按钮按用户提供的原生参照，对齐 DSH `0.2.2-rc.1` 安装包 `@deepseek-ai/dsh-client-ui-settings-models` 的 `ModelsSection.module.css` 中 `.rowActions .secondaryButton`、`.rowActions .dangerButton` 与 `.deleteConfirm` 的几何、描边、颜色和 hover token。仅在本插件自有 `power-dsh-archive-*` 类内复现数值，不导入其模块、不引用生成的 CSS 类名，也不复制页面结构或文案。
+[归档管理](../src/features/archive/spec.md)的「取消归档」按钮按用户提供的原生参照，对齐 DSH `0.2.2-rc.1` 安装包 `@deepseek-ai/dsh-client-ui-settings-models` 的 `ModelsSection.module.css` 中 `.rowActions .secondaryButton` 的几何、描边、颜色和 hover token。仅在本插件自有 `power-dsh-archive-*` 类内复现数值，不导入其模块、不引用生成的 CSS 类名，也不复制页面结构或文案。
 
 - [原生模型设置源码](https://github.com/deepseek-ai/deepseek-harness/tree/master/packages/client/ui-settings-models/src/client)
 - 对照发行包：`@deepseek-ai/dsh-client-ui-settings-models@0.2.2-rc.1`。
@@ -53,7 +53,7 @@ SOFTWARE.
 
 ## 技能与 MCP 来源研究
 
-接口研究依据 DSH `0.2.2-rc.1` 安装包的公开实现：`dsh-skill` 的分层目录、rank 与调用策略，`dsh-skill-filesystem` 的 cwd 与项目根语义，`dsh-scope` 的上下文所有权，以及 Plugin Manager、Settings、Loader、Cordis Registry / Fiber 和 preset composition。原生服务是否存在须按目标发行包核对；profile 条目清单不能证明没有 preset、Agent 或动态实例。现行行为和接口约束分别维护在[技能管理](../src/features/skills/spec.md)与[MCP 管理](../src/features/mcp/spec.md)，历史版本差异见[兼容性调查](compatibility-audit.md#官方发行标签的接口证据)。
+接口研究依据 DSH `0.2.2-rc.1` 安装包的公开实现：`dsh-skill` 的分层目录、rank 与调用策略，`dsh-skill-filesystem` 的 cwd 与工作区根语义，`dsh-scope` 的上下文所有权，以及 Plugin Manager、Settings、Loader、Cordis Registry / Fiber 和 preset composition。原生服务是否存在须按目标发行包核对；profile 条目清单不能证明没有 preset、Agent 或动态实例。现行行为和接口约束分别维护在[技能管理](../src/features/skills/spec.md)与[MCP 管理](../src/features/mcp/spec.md)，历史版本差异见[兼容性调查](compatibility-audit.md#官方发行标签的接口证据)。
 
 市场检索后的来源研究如下，仅借鉴入口组织、功能边界与状态语义，没有复制或改编实现代码：
 
@@ -133,25 +133,27 @@ Mod 使用已核对的 DSH `0.2.2-rc.1` 原生会话、交互及 subprocess 通�
 
 ## 归档管理插件参考
 
-[归档管理](../src/features/archive/spec.md)开发前从 [dsh-market](https://dshmarket.com/browse/) 检索并浅克隆 [MichengAI/dsh-archive-manager](https://github.com/MichengAI/dsh-archive-manager/tree/c2146d58cfb23066a2df26221bf78de4b4b0cc78)，提交 `c2146d58cfb23066a2df26221bf78de4b4b0cc78`，Apache-2.0。参考「按工作区分组 + 搜索 + 排序/项目筛选 + 取消归档 + 二次确认删除」的信息结构。其删除依赖私有 `locate()` 及内部记账/投影清理，本项目没有复制其代码或样式，改用公开 `sessionPersistence.stat().location.path` 定位转录产物并由 Host 文件系统删除，未采用其自动归档与保留时长。PowerDSH 的归档读取由 Host 侧 `workspaceController.follow` 基线配合 `sessionQuery.readTitleSnapshots` 完成，恢复走原生 `unarchiveSession`。
+[归档管理](../src/features/archive/spec.md)开发前从 [dsh-market](https://dshmarket.com/browse/) 检索并浅克隆 [MichengAI/dsh-archive-manager](https://github.com/MichengAI/dsh-archive-manager/tree/c2146d58cfb23066a2df26221bf78de4b4b0cc78)，提交 `c2146d58cfb23066a2df26221bf78de4b4b0cc78`，Apache-2.0。参考「按工作区分组 + 搜索 + 排序/工作区筛选 + 取消归档 + 二次确认删除」的信息结构。其删除依赖私有 `locate()` 及内部记账/投影清理，本项目没有复制其代码或样式，也未采用其永久删除、自动归档与保留时长。PowerDSH 的归档读取由 Host 侧 `workspaceController.follow` 基线配合 `sessionQuery.readTitleSnapshots` 完成，恢复走原生 `unarchiveSession`。
 
 ## 使用统计页面参考
 
-[使用统计](../src/features/usage-stats/spec.md)按用户要求参考本机 NCode（`~/code/ZCode`，Apache-2.0）的「使用统计」页面，同步提交 `a9fe401eede6e6e5e01be9048679c206fe6f02d9`，阅读 `packages/ui/src/settings/usage-stats/` 下的摘要条、热力图与趋势/占比图表组件。只借鉴信息层级与交互：顶部五项摘要、52 周活动热力图（每日/每周/累计）、范围切换、按模型的每日趋势与模型占比列表。本项目没有复制其代码、Tailwind 类、Recharts 图表、ZCode 专属配色变量或 agent 数据库协议；数据改为读取 DSH 公开 `sessionPersistence` 日志并自行折叠，图表用内联 SVG `polyline` 与自有 CSS 绘制，颜色取宿主主题 token，无新增依赖。
+[使用统计](../src/features/usage-stats/spec.md)按用户要求参考本机 NCode（`~/code/ZCode`，Apache-2.0）的「使用统计」页面，同步提交 `a9fe401eede6e6e5e01be9048679c206fe6f02d9`，阅读 `packages/ui/src/settings/usage-stats/` 下的摘要条、热力图与趋势/占比图表组件。只借鉴信息层级与交互：顶部五项摘要、52 周活动热力图、范围切换、按模型的每日趋势与模型占比列表。本项目没有复制其代码、Tailwind 类、Recharts 图表、ZCode 专属配色变量或 agent 数据库协议；数据改为读取 DSH 公开 `sessionPersistence` 日志并自行折叠，图表用内联 SVG 路径（趋势线为自实现的 Catmull-Rom 平滑曲线）与自有 CSS 绘制，颜色取宿主主题 token，无新增依赖；热力图按用户要求只保留按天分级，不沿用其每周／累计模式。
 
 - [NCode 仓库](https://github.com/mewcoder/NCode)，同步提交 `a9fe401eede6e6e5e01be9048679c206fe6f02d9`。
 - [Apache License 2.0](https://github.com/mewcoder/NCode/blob/main/LICENSE)。
 
+另按用户要求只读核对 [dsh-context](https://github.com/bowenliang123/dsh-context) 已安装的 0.82.1 包：输入三桶互斥、总 Token 按输入／缓存读写／输出四项合计、缓存率以缓存读取除以全部输入，主子会话归组、失败尝试计费样本与已完成步骤计时。祖先历史按原生句柄的精确继承切点排除，避免重复计量。另参考其自定义单月月历的两次点选、悬浮预览与起止区间交互；本项目自行实现键盘跨月导航并由公共 Modal 承载。只借鉴统计定义与交互，不复制其 Client 或 Host 代码、portal、样式、资产或生命周期时长算法，不引入该插件为依赖。本项目累计运行时长独立使用公开步骤事件并按所选范围裁剪，包含步骤内等待，不采用静默间隙推断。
+
 ## Lucide Puzzle、Sparkles 与 Cable
 
-[Mod 图标](../assets/icon.svg)与 Mod 设置导航使用 Lucide Puzzle；[技能与 MCP 设置导航](../src/client.ts)分别使用 Lucide Sparkles 和 Cable；[归档设置导航](../src/features/archive/client.ts)使用 Lucide Archive 与 Folder；[使用统计设置导航](../src/features/usage-stats/client.ts)使用 Lucide ChartColumn；[项目管理设置导航与行图标](../src/features/projects/client.ts)使用 Lucide FolderKanban 与 Folder。仅内联所需 SVG，不引入 Lucide 运行时依赖。图形使用约定见 [UI 规范](ui.md#logo-与图标)，独立 SVG 中也保留完整许可。
+[Mod 图标](../assets/icon.svg)与 Mod 设置导航使用 Lucide Puzzle；[技能与 MCP 设置导航](../src/client.ts)分别使用 Lucide Sparkles 和 Cable；[归档设置导航](../src/features/archive/client.ts)使用 Lucide Archive 与 Folder；[使用统计设置导航](../src/features/usage-stats/client.ts)使用 Lucide ChartColumn；[工作区管理设置导航与行图标](../src/features/projects/client.ts)使用 Lucide Folders 与 Folder。仅内联所需 SVG，不引入 Lucide 运行时依赖。图形使用约定见 [UI 规范](ui.md#logo-与图标)，独立 SVG 中也保留完整许可。
 
 - [Puzzle 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/puzzle.svg)
 - [Sparkles 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/sparkles.svg)
 - [Cable 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/cable.svg)
 - [Archive 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/archive.svg)
 - [Folder 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/folder.svg)
-- [FolderKanban 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/folder-kanban.svg)
+- [Folders 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/folders.svg)
 - [ChartColumn 图标源文件](https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/chart-column.svg)
 - [上游许可证](https://raw.githubusercontent.com/lucide-icons/lucide/main/LICENSE)
 - 获取日期：2026-11-07。

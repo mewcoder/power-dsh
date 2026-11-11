@@ -68,11 +68,18 @@ export function archiveCatalogFixture(overrides = {}) {
 }
 
 export function usageSnapshotFixture(overrides = {}) {
-  const days = overrides.days ?? [
-    { date: '2026-03-01', totalTokens: 100, turnCount: 2, toolCallCount: 1 },
-    { date: '2026-03-02', totalTokens: 0, turnCount: 0, toolCallCount: 0 },
-    { date: '2026-03-03', totalTokens: 400, turnCount: 3, toolCallCount: 5 },
-  ];
+  const day = (date, totalTokens, turnCount, toolCallCount, inputTokens, outputTokens, cacheReadTokens, requestCount, activeMs = 0) => ({
+    date, totalTokens, turnCount, toolCallCount, inputTokens, outputTokens,
+    cacheReadTokens, cacheWriteTokens: 0, requestCount, activeMs,
+  });
+  const days = (overrides.days ?? [
+    day('2026-03-01', 100, 2, 1, 80, 20, 0, 2, 1_800_000),
+    day('2026-03-02', 0, 0, 0, 0, 0, 0, 0, 0),
+    day('2026-03-03', 400, 3, 5, 300, 60, 40, 3, 3_600_000),
+  ]).map(row => ({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, requestCount: 0, activeMs: 0, ...row }));
+  const sessionDays = overrides.sessionDays ?? (days.some(row => row.totalTokens || row.turnCount || row.toolCallCount)
+    ? [days.filter(row => row.totalTokens || row.turnCount || row.toolCallCount).map(row => row.date)] : []);
+  const sum = (rows, field) => rows.reduce((total, row) => total + row[field], 0);
   return {
     complete: overrides.complete ?? true,
     generatedAt: Date.parse('2026-03-03T12:00:00.000Z'),
@@ -80,15 +87,17 @@ export function usageSnapshotFixture(overrides = {}) {
     firstDate: days[0]?.date ?? '',
     lastDate: days.at(-1)?.date ?? '',
     summary: {
-      totalTokens: 500, inputTokens: 400, outputTokens: 100, cacheReadTokens: 0, cacheWriteTokens: 0,
+      totalTokens: sum(days, 'totalTokens'), inputTokens: sum(days, 'inputTokens'), outputTokens: sum(days, 'outputTokens'),
+      cacheReadTokens: sum(days, 'cacheReadTokens'), cacheWriteTokens: sum(days, 'cacheWriteTokens'),
       peakDayTokens: 400, longestSessionMs: 3_720_000, currentStreakDays: 1, longestStreakDays: 2,
       activeDays: 2, sessionCount: 1, turnCount: 5, ...overrides.summary,
     },
     days,
+    sessionDays,
     dailyModels: overrides.dailyModels ?? [
-      { date: '2026-03-01', modelId: 'group/flash', provider: 'magpie', totalTokens: 100 },
-      { date: '2026-03-03', modelId: 'group/flash', provider: 'magpie', totalTokens: 300 },
-      { date: '2026-03-03', modelId: 'group/sol', provider: 'magpie', totalTokens: 100 },
+      { date: '2026-03-01', modelId: 'group/flash', provider: 'magpie', totalTokens: 100, requestCount: 1 },
+      { date: '2026-03-03', modelId: 'group/flash', provider: 'magpie', totalTokens: 300, requestCount: 2 },
+      { date: '2026-03-03', modelId: 'group/sol', provider: 'magpie', totalTokens: 100, requestCount: 1 },
     ],
     models: overrides.models ?? [
       { modelId: 'group/flash', provider: 'magpie', totalTokens: 400, requestCount: 3 },
@@ -97,7 +106,7 @@ export function usageSnapshotFixture(overrides = {}) {
   };
 }
 
-export async function mount({ featureIds, localeLanguage, restartStatus = { supported: true, running: false, error: '' }, restartReply, desktop = false, themeAvailable = true, updates, rpcError, rpcReply, formReply, formLoad, fileText = '', fileReply, fileReadError, wallpaper, wallpaperReply, wallpaperReadError, wallpaperClearError, skillCatalog, skillList, skillReply, skillReadError, mcpCatalog, mcpList, mcpReply, mcpReadError, archiveCatalog, archiveList, archiveReply, archiveReadError, usageSnapshot, usageList, usageReply, usageReadError, projectCatalog, projectList, projectReply, projectReadError, writable = true, reload = () => {}, windows = false, notificationPermission = 'granted', notificationRequest, notificationFailure = false, notificationServices = true, notificationsAvailable = true, localConnection = true, soundCatalog, soundReply, soundListError, modelDirectory, modelSelectReply, modelDirectoriesAvailable = true } = {}) {
+export async function mount({ featureIds, localeLanguage, restartStatus = { supported: true, running: false, error: '' }, restartReply, desktop = false, themeAvailable = true, updates, rpcError, rpcReply, formReply, formLoad, fileText = '', fileReply, fileReadError, wallpaper, wallpaperReply, wallpaperReadError, wallpaperClearError, skillCatalog, skillList, skillReply, skillReadError, skillDetail, skillDetailReply, skillDetailError, mcpCatalog, mcpList, mcpReply, mcpReadError, mcpDetail, mcpDetailReply, mcpDetailError, archiveCatalog, archiveList, archiveReply, archiveReadError, usageSnapshot, usageList, usageReply, usageReadError, projectCatalog, projectList, projectReply, projectReadError, writable = true, reload = () => {}, windows = false, notificationPermission = 'granted', notificationRequest, notificationFailure = false, notificationServices = true, notificationsAvailable = true, localConnection = true, soundCatalog, soundReply, soundListError, modelDirectory, modelSelectReply, modelDirectoriesAvailable = true } = {}) {
   let plugin;
   const nativeLauncher = { native: true };
   const entries = new Map([['settings.launcher:single', nativeLauncher]]);
@@ -145,6 +154,10 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   const intervals = new Map();
   let intervalId = 0;
   const chromeListeners = new Set();
+  // Modal layers a test declares as open; the real host marks every dialog with
+  // aria-modal="true", which the background panel watches to step aside.
+  let modalLayers = 0;
+  const bodyObservers = new Set();
   const menuResizeListeners = new Set();
   let menuRect = null;
   const menuElement = { getBoundingClientRect: () => menuRect };
@@ -176,12 +189,13 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   let observeCount = 0;
   let disconnectCount = 0;
   let edge = 280;
-  let settings = { status: 'ready', writable, value: { blockDoubleClickRename: false, notificationsEnabled: false, notificationSoundEnabled: true, notificationSound: 'default', blockTodo: false, blockPlan: false, blockGoal: false, showThemeSwitcher: false, personalizationEnabled: false, skillManagerEnabled: false, mcpManagerEnabled: false, globalPrompt: '', thinkingEffortGlyph: 'arc', flowingBackgroundKind: 'pattern', flowingBackgroundOpacity: 100, flowingBackgroundBlur: 0 } };
+  let settings = { status: 'ready', writable, value: { blockDoubleClickRename: false, notificationsEnabled: false, notificationSoundEnabled: true, notificationSound: 'default', blockTodo: false, blockPlan: false, blockGoal: false, showThemeSwitcher: false, personalizationEnabled: false, skillManagerEnabled: false, mcpManagerEnabled: false, globalPrompt: '', thinkingEffortGlyph: 'arc', flowingBackgroundKind: 'pattern', flowingBackgroundOpacity: 100, flowingBackgroundBlur: 0, autoArchiveDays: 0 } };
   let theme = { preference: 'system' };
   const calls = [];
   const rpcCalls = [];
   const fileWrites = [];
   const skillReads = [];
+  const skillDetailReads = [];
   const skillWrites = [];
   let skillValue = skillCatalog ?? catalogFixture();
   const skillView = (cwd, scope = 'user') => ({
@@ -192,6 +206,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     }),
   });
   const mcpReads = [];
+  const mcpDetailReads = [];
   const mcpWrites = [];
   let mcpValue = mcpCatalog ?? mcpCatalogFixture();
   const mcpView = () => ({ ...mcpValue });
@@ -258,7 +273,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   }
   function FakeModal(props) {
     return props.open ? { type: 'native-modal-fixture', props: { ...props, role: 'dialog', 'aria-modal': true,
-      children: [props.description, props.footer] } } : null;
+      children: [props.description, props.children, props.footer] } } : null;
   }
   function FakeButton(props) {
     return { type: 'button', props: { ...props, 'data-native-button': true } };
@@ -267,7 +282,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   const React = {
     Fragment: 'fragment',
     createElement(type, props, ...children) {
-      if (type === FakeModal) return FakeModal(props);
+      if (type === FakeModal) return FakeModal({ ...props, children });
       if (type === FakeButton) return FakeButton({ ...props, children });
       if (type === FakeMenu) return FakeMenu(props);
       if (type === FakeStateDot) return FakeStateDot({ ...props, children });
@@ -287,6 +302,14 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       }
       return first;
     },
+    useMemo(factory, deps) {
+      const id = cursor++;
+      const previous = hookStates[id];
+      if (previous && deps.every((value, index) => value === previous.deps[index])) return previous.value;
+      const value = factory();
+      hookStates[id] = { deps, value };
+      return value;
+    },
     useState(init) {
       const id = cursor++;
       if (!(id in hookStates)) hookStates[id] = typeof init === 'function' ? init() : init;
@@ -295,7 +318,15 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     },
     useRef(initial) {
       const id = cursor++;
-      return hookStates[id] ||= { current: initial ?? { getBoundingClientRect: () => ({ right: edge }) } };
+      return hookStates[id] ||= { current: initial ?? {
+        getBoundingClientRect: () => ({ right: edge }),
+        // Mirrors the real footer seat: the appearance entry is a sibling seat
+        // that only exists while its preference is on.
+        parentElement: {
+          querySelector: selector => selector === '.power-dsh-appearance-button'
+            && settings.value?.showThemeSwitcher === true ? { getBoundingClientRect: () => ({}) } : null,
+        },
+      } };
     },
     useLayoutEffect(fn, deps) {
       const id = cursor++;
@@ -305,7 +336,25 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       hookEffects[id] = { deps, dispose: fn() };
     },
   };
+  // The host marks dialogs with aria-modal="true"; the fixture exposes that
+  // contract so the background panel can observe it going from closed to open.
+  const documentStub = {
+    get hidden() { return documentHidden; },
+    hasFocus: () => documentFocused,
+    body: {},
+    documentElement: { hasAttribute: name => windows && name === 'data-windows-titlebar', getAttribute: () => windows ? 'win32' : desktop ? 'darwin' : null },
+    querySelector(selector) {
+      if (selector === '[aria-modal="true"]') return modalLayers > 0 ? menuElement : null;
+      assert.equal(selector, '[data-windows-menu]');
+      return menuRect ? menuElement : null;
+    },
+    querySelectorAll(selector) {
+      if (selector === '[aria-modal="true"]') return modalLayers > 0 ? [menuElement] : [];
+      return [];
+    },
+  };
   const context = vm.createContext({
+    URL,
     // Minimal reader so the wallpaper picker can be exercised without a real File API.
     FileReader: class {
       constructor() { this.result = null; this.onerror = null; this.onload = null; }
@@ -323,19 +372,15 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     },
     MutationObserver: class {
       constructor(callback) { this.callback = callback; }
-      observe() { chromeListeners.add(this.callback); }
-      disconnect() { chromeListeners.delete(this.callback); }
+      // Only observers watching the document root count as chrome geometry; the
+      // background panel watches the body for modal layers and must not register.
+      observe(target) {
+        if (target === documentStub.documentElement) chromeListeners.add(this.callback);
+        else if (target === documentStub.body) bodyObservers.add(this.callback);
+      }
+      disconnect() { chromeListeners.delete(this.callback); bodyObservers.delete(this.callback); }
     },
-    document: {
-      get hidden() { return documentHidden; },
-      hasFocus: () => documentFocused,
-      body: {},
-      documentElement: { hasAttribute: name => windows && name === 'data-windows-titlebar', getAttribute: () => windows ? 'win32' : desktop ? 'darwin' : null },
-      querySelector(selector) {
-        assert.equal(selector, '[data-windows-menu]');
-        return menuRect ? menuElement : null;
-      },
-    },
+    document: documentStub,
     window: {
       setTimeout(fn, ms) { timers.set(++timerId, { fn, ms }); return timerId; },
       clearTimeout(id) { timers.delete(id); },
@@ -427,6 +472,14 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
             if (mcpReadError) return { ok: false, error: { message: mcpReadError } };
             return { ok: true, value: mcpView() };
           }
+          if (descriptor.method === 'readMcpServer') {
+            const [serverId] = rpcArgs;
+            mcpDetailReads.push({ id: serverId });
+            if (mcpDetailReply) return mcpDetailReply(serverId);
+            if (mcpDetailError) return { ok: false, error: { message: mcpDetailError } };
+            const server = mcpView().servers.find(row => row.id === serverId);
+            return { ok: true, value: server ? { server, config: mcpDetail ?? null } : null };
+          }
           if (descriptor.method === 'setMcpServerEnabled') {
             const [id, targetEnabled] = rpcArgs;
             mcpWrites.push({ id, enabled: targetEnabled });
@@ -443,6 +496,18 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
             if (skillList) return skillList(blocked, revision);
             if (skillReadError) return { ok: false, error: { message: skillReadError } };
             return { ok: true, value: skillView(blocked, revision) };
+          }
+          if (descriptor.method === 'readSkill') {
+            const [, , skillName] = rpcArgs;
+            skillDetailReads.push({ name: skillName });
+            if (skillDetailReply) return skillDetailReply(skillName);
+            if (skillDetailError) return { ok: false, error: { message: skillDetailError } };
+            const row = skillView(blocked, revision).skills.find(skill => skill.name === skillName);
+            return { ok: true, value: row ? {
+              name: row.name, description: row.description, content: skillDetail?.content ?? 'Body of ' + row.name,
+              source: row.source, path: row.path, origin: row.origin, enabled: row.enabled,
+              modelInvocable: row.modelInvocable, userInvocable: row.userInvocable,
+            } : null };
           }
           if (descriptor.method === 'setSkillEnabled') {
             skillWrites.push({ cwd: blocked, scope: revision, name, enabled });
@@ -581,7 +646,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     setConnectionState(state) { connectionState = state; connectionStateListeners.forEach(fn => fn()); },
     timers,
     connectionStateListeners,
-    entries, calls, dictionaries, nativeLauncher, rpcCalls, rpcDescriptors, fileWrites, skillReads, skillWrites, mcpReads, mcpWrites, archiveReads, archiveWrites, projectReads, projectWrites, usageReads,
+    entries, calls, dictionaries, nativeLauncher, rpcCalls, rpcDescriptors, fileWrites, skillReads, skillDetailReads, skillWrites, mcpReads, mcpDetailReads, mcpWrites, archiveReads, archiveWrites, projectReads, projectWrites, usageReads,
     soundPlays, soundLists: () => soundLists,
     notifications,
     permissionRequests: () => permissionRequests,
@@ -702,6 +767,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       settings = { ...settings, value: { ...settings.value, ...patch } };
       listeners.forEach(fn => fn());
     },
+    settingsValue: () => settings.value,
     render(wide = true) {
       const entry = entries.get('sidebar.footer.action:power-dsh-footer');
       assert.ok(entry);
@@ -731,6 +797,11 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       assert.ok(wrapped, 'The actual footer must render the shared HeaderActions component.');
       renderComponent(wrapped);
       return renderComponent(wrapped);
+    },
+    setModalLayer(open) {
+      modalLayers = open ? 1 : 0;
+      // The background panel observes the body for modal layers.
+      bodyObservers.forEach(fn => fn());
     },
     setNativeMenu(rect) {
       menuRect = rect;
@@ -827,7 +898,9 @@ export async function skillsPage(app, scope = 'user') {
     assert.ok(item, `Expected an open project menu item for ${path}`);
     return item.props.onClick();
   };
-  return { render, row, control, search, select, tab, projectTrigger, projectMenu, chooseProject };
+  const detail = name => descendants(row(name)).find(node => node.props['data-detail'] === name);
+  const dialog = () => render().find(node => node.type === 'native-modal-fixture');
+  return { render, row, control, search, select, tab, projectTrigger, projectMenu, chooseProject, detail, dialog };
 }
 
 export async function mcpPage(app, language) {
@@ -844,7 +917,9 @@ export async function mcpPage(app, language) {
     : [node, ...(node.props?.children || []).flat().flatMap(includingHidden)];
   const tools = name => includingHidden(row(name)).find(node => node.props.className === 'power-dsh-mcp-tools');
   const summary = name => descendants(row(name)).find(node => node.props.className === 'power-dsh-mcp-tools-summary');
-  return { render, row, control, search, group, toggle, tools, summary };
+  const detail = name => descendants(row(name)).find(node => node.props.className === 'power-dsh-mcp-card-detail');
+  const dialog = () => render().find(node => node.type === 'native-modal-fixture');
+  return { render, row, control, search, group, toggle, tools, summary, detail, dialog };
 }
 
 export async function archivePage(app, language) {
@@ -857,7 +932,8 @@ export async function archivePage(app, language) {
   const row = sessionId => render().find(node => node.type === 'li' && node.props['data-archive'] === sessionId);
   const search = () => render().find(node => node.type === 'input' && node.props.type === 'search');
   const action = (sessionId, name) => descendants(row(sessionId)).find(node => node.type === 'button' && node.props[`data-${name}`] === sessionId);
-  return { render, group, row, search, action };
+  const expand = title => group(title).props.onClick();
+  return { render, group, row, search, action, expand };
 }
 
 export async function projectsPage(app, language) {

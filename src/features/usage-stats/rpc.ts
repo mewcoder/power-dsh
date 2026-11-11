@@ -1,6 +1,6 @@
 import { isRecord, isArray, hasStrings, type Codec, type RpcDescriptor } from '../../shared/types/protocol.ts';
 import type { UsageSnapshot } from '../../shared/types/wire.ts';
-export type { UsageSnapshot, UsageSummary, UsageDayRow, UsageDailyModelRow, UsageModelRow } from '../../shared/types/wire.ts';
+export type { UsageCardSummary, UsageSnapshot, UsageSummary, UsageDayRow, UsageDailyModelRow, UsageModelRow } from '../../shared/types/wire.ts';
 import { stringCodec } from '../../shared/rpc/codecs.ts';
 
 const usageSnapshotCodec: Codec<UsageSnapshot> = {
@@ -12,6 +12,13 @@ const usageSnapshotCodec: Codec<UsageSnapshot> = {
       || !isRecord(value.summary) || !isArray(value.days) || !isArray(value.dailyModels) || !isArray(value.models)) {
       throw new TypeError('Invalid usage snapshot');
     }
+    if (!isArray(value.sessionDays)) throw new TypeError('Invalid usage sessions');
+    const sessionDays = value.sessionDays.map(dates => {
+      if (!isArray(dates) || !dates.every(date => typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date))) {
+        throw new TypeError('Invalid usage sessions');
+      }
+      return dates as string[];
+    });
     const summary = value.summary;
     const fields = ['totalTokens', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens',
       'peakDayTokens', 'longestSessionMs', 'currentStreakDays', 'longestStreakDays', 'activeDays',
@@ -22,20 +29,32 @@ const usageSnapshotCodec: Codec<UsageSnapshot> = {
       if (typeof count !== 'number' || !Number.isFinite(count) || count < 0) throw new TypeError('Invalid usage summary');
       counts[field] = count;
     }
+    const dayFields = ['totalTokens', 'turnCount', 'toolCallCount', 'inputTokens', 'outputTokens',
+      'cacheReadTokens', 'cacheWriteTokens', 'requestCount', 'activeMs'] as const;
     const days = value.days.map(row => {
-      if (!isRecord(row) || typeof row.date !== 'string'
-        || typeof row.totalTokens !== 'number' || !Number.isFinite(row.totalTokens)
-        || typeof row.turnCount !== 'number' || typeof row.toolCallCount !== 'number') {
-        throw new TypeError('Invalid usage day');
+      if (!isRecord(row) || typeof row.date !== 'string') throw new TypeError('Invalid usage day');
+      const counts: Record<string, number> = {};
+      for (const field of dayFields) {
+        const count = row[field];
+        if (typeof count !== 'number' || !Number.isFinite(count) || count < 0) throw new TypeError('Invalid usage day');
+        counts[field] = count;
       }
-      return { date: row.date, totalTokens: row.totalTokens, turnCount: row.turnCount, toolCallCount: row.toolCallCount };
+      return {
+        date: row.date,
+        totalTokens: counts.totalTokens, turnCount: counts.turnCount, toolCallCount: counts.toolCallCount,
+        inputTokens: counts.inputTokens, outputTokens: counts.outputTokens,
+        cacheReadTokens: counts.cacheReadTokens, cacheWriteTokens: counts.cacheWriteTokens,
+        requestCount: counts.requestCount, activeMs: counts.activeMs,
+      };
     });
     const dailyModels = value.dailyModels.map(row => {
       if (!isRecord(row) || !hasStrings(row, ['date', 'modelId', 'provider'])
-        || typeof row.totalTokens !== 'number' || !Number.isFinite(row.totalTokens)) {
+        || typeof row.totalTokens !== 'number' || !Number.isFinite(row.totalTokens)
+        || typeof row.requestCount !== 'number' || !Number.isFinite(row.requestCount)) {
         throw new TypeError('Invalid usage daily model');
       }
-      return { date: row.date, modelId: row.modelId, provider: row.provider, totalTokens: row.totalTokens };
+      return { date: row.date, modelId: row.modelId, provider: row.provider,
+        totalTokens: row.totalTokens, requestCount: row.requestCount };
     });
     const models = value.models.map(row => {
       if (!isRecord(row) || !hasStrings(row, ['modelId', 'provider'])
@@ -48,7 +67,7 @@ const usageSnapshotCodec: Codec<UsageSnapshot> = {
     return {
       complete: value.complete, generatedAt: value.generatedAt, timeZone: value.timeZone,
       firstDate: value.firstDate, lastDate: value.lastDate, summary: counts as unknown as UsageSnapshot['summary'],
-      days, dailyModels, models,
+      days, dailyModels, models, sessionDays,
     };
   } }),
 };

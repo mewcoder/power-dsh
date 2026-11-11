@@ -424,3 +424,108 @@ test('native manager entries use their Settings control rather than the profile 
   app.policy.providers.setEnabled = async () => { throw new Error(SECRET); };
   await assert.rejects(app.policy.setEnabled(row.id, true), exactError('mcpChangeFailed'));
 });
+
+test('MCP detail reports only the fields an entry declares and never exposes credential values', async () => {
+  const app = fixture();
+  app.policy.providers = {
+    presetEntries: () => [],
+    configured: () => [],
+    list: () => ({ servers: [] }),
+    declared(id) {
+      if (id !== 'include:notes') return undefined;
+      return {
+        serverName: 'notes', transport: 'stdio', command: 'npx', args: ['-y', 'server', '--api-key', SECRET], cwd: '/work/notes',
+        env: { GITHUB_TOKEN: SECRET, OTHER: SECRET }, toolCallTimeoutMs: 60000,
+        reconnect: { enabled: true, initialDelayMs: 500, maxDelayMs: 30000, maxAttempts: 10 },
+      };
+    },
+  };
+  const detail = await app.policy.read('include:notes');
+  assert.equal(detail.server.id, 'include:notes');
+  // Defaults the entry did not write (toolCallTimeoutMs, failOnStartupError, ...) stay out.
+  assert.deepEqual(detail.config, {
+    transport: 'stdio', serverName: 'notes', command: 'npx', argsHidden: true, cwd: '/work/notes',
+    envKeys: ['GITHUB_TOKEN', 'OTHER'], headerKeys: [], expressions: [], urlQueryHidden: false,
+    reconnect: { enabled: true, initialDelayMs: 500, maxDelayMs: 30000, maxAttempts: 10 },
+  });
+  assert.ok(!JSON.stringify(detail).includes(SECRET));
+  assert.equal(await app.policy.read('include:missing'), null, 'An unknown id returns no row.');
+  assert.equal((await app.policy.read('include:files')).config, null, 'A row without declared configuration reports none.');
+  await assert.rejects(app.policy.read(''), /mcpUnavailable/);
+  assert.deepEqual(app.calls, []);
+});
+
+test('MCP detail hides expression fields and endpoint credentials while keeping key names', async () => {
+  const app = fixture();
+  app.policy.providers = {
+    presetEntries: () => [], configured: () => [], list: () => ({ servers: [] }),
+    declared: () => ({
+      serverName: 'web', transport: 'streamable-http',
+      url: 'https://mcp.example.com/mcp?token=' + SECRET + '#fragment',
+      headers: { Authorization: 'Bearer ' + SECRET },
+      command: { __jsExpr: 'process.env.SECRET' },
+      cwd: { __jsExpr: '1 + 1' },
+    }),
+  };
+  const detail = await app.policy.read('include:notes');
+  assert.equal(detail.config.url, 'https://mcp.example.com');
+  assert.equal(detail.config.urlQueryHidden, true);
+  assert.deepEqual(detail.config.headerKeys, ['Authorization']);
+  assert.deepEqual(detail.config.expressions, ['command', 'cwd']);
+  assert.equal(detail.config.command, undefined, 'An expression field reports its name, never its text.');
+  assert.equal(detail.config.cwd, undefined);
+  assert.ok(!JSON.stringify(detail).includes(SECRET));
+  app.policy.providers.declared = () => { throw new Error(SECRET); };
+  await assert.rejects(app.policy.read('include:notes'), exactError('mcpMetadataLoadFailed'));
+});
+
+test('MCP detail preserves partial declared reconnect policies without synthesizing defaults', async () => {
+  const app = fixture();
+  let reconnect;
+  app.policy.providers = {
+    presetEntries: () => [], configured: () => [], list: () => ({ servers: [] }),
+    declared: () => ({ transport: 'stdio', reconnect }),
+  };
+  for (const value of [{ enabled: true }, { maxAttempts: 3 }, { enabled: false, initialDelayMs: 750 }, { maxDelayMs: 9000 }]) {
+    reconnect = value;
+    assert.deepEqual((await app.policy.read('include:notes')).config.reconnect, value);
+  }
+  for (const value of [undefined, {}, { initialDelayMs: { __jsExpr: 'private' } }]) {
+    reconnect = value;
+    assert.equal((await app.policy.read('include:notes')).config.reconnect, undefined);
+  }
+  assert.deepEqual(app.calls, []);
+});
+
+test('MCP detail removes URL credentials and paths and omits unreadable endpoints', async () => {
+  const app = fixture();
+  let url;
+  app.policy.providers = {
+    presetEntries: () => [], configured: () => [], list: () => ({ servers: [] }),
+    declared: () => ({ transport: 'streamable-http', url }),
+  };
+  for (const value of [
+    `https://user:${SECRET}@mcp.example.com:8443/mcp`,
+    `https://${SECRET}@mcp.example.com:8443/mcp?token=${SECRET}#${SECRET}`,
+    `https://user%40host:${SECRET}%3Asecret@mcp.example.com:8443/mcp`,
+    `https://mcp.example.com:8443/mcp/${SECRET}`,
+  ]) {
+    url = value;
+    const detail = await app.policy.read('include:notes');
+    assert.equal(detail.config.url, 'https://mcp.example.com:8443');
+    assert.equal(detail.config.urlQueryHidden, true);
+    assert.ok(!JSON.stringify(detail).includes(SECRET));
+  }
+  for (const value of [`https://user:${SECRET}@[invalid/mcp`, `data:text/plain,${SECRET}`, `//user:${SECRET}@example.com/mcp`]) {
+    url = value;
+    const detail = await app.policy.read('include:notes');
+    assert.equal(detail.config.url, undefined);
+    assert.equal(detail.config.urlQueryHidden, true);
+    assert.ok(!JSON.stringify(detail).includes(SECRET));
+  }
+  url = 'http://mcp.example.com';
+  const safe = await app.policy.read('include:notes');
+  assert.equal(safe.config.url, url);
+  assert.equal(safe.config.urlQueryHidden, false);
+  assert.deepEqual(app.calls, []);
+});

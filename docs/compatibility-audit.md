@@ -35,7 +35,7 @@
 
 读取官方 Git 标签的不可变文件，没有切换参考 checkout，也没有构建或运行历史 DSH。表格只描述所查样本，不外推所有未检查版本。
 
-| 官方标签 | 提交 | `tools.definitions()` | `Fiber.effectiveConfig` | 项目菜单 `minWidthFromAnchor` |
+| 官方标签 | 提交 | `tools.definitions()` | `Fiber.effectiveConfig` | 工作区菜单 `minWidthFromAnchor` |
 | --- | --- | --- | --- | --- |
 | `dsh-v0.1.7-rc.2` | [477b4f4](https://github.com/deepseek-ai/deepseek-harness/tree/477b4f420553e8a52c2fbccc464d7561b239c443) | 无 | 无 | 无 |
 | `dsh-v0.2.0-rc.1` | [4878cda](https://github.com/deepseek-ai/deepseek-harness/tree/4878cdabd87d4041bdaff61d04c966883b9fd07a) | 无 | 无 | 无 |
@@ -125,7 +125,7 @@ npm run check:compat -- 0.2.2-alpha.2
 
 ## 下一步验收
 
-先在独立环境的最低基线 DSH `0.2.0-rc.1` 与较新目标 `0.2.1-rc.5` 中安装实际 tarball，验证默认关闭时冷启动、设置入口、各功能操作、持久化与卸载；再核对当前版本及目标平台。通过后正式声明最低支持版本，并核对 rc / alpha 范围匹配。旧版仅有 profile 声明、尚未解析配置的 MCP 仍能标记 pending；没有公开身份的纯动态实例在解析后再列出，不读取内部 `_config`。`0.2.0-rc.2` 的项目 Menu 不支持 `minWidthFromAnchor`，使用该版原生默认宽度，实际页面仍需复核。
+先在独立环境的最低基线 DSH `0.2.0-rc.1` 与较新目标 `0.2.1-rc.5` 中安装实际 tarball，验证默认关闭时冷启动、设置入口、各功能操作、持久化与卸载；再核对当前版本及目标平台。通过后正式声明最低支持版本，并核对 rc / alpha 范围匹配。旧版仅有 profile 声明、尚未解析配置的 MCP 仍能标记 pending；没有公开身份的纯动态实例在解析后再列出，不读取内部 `_config`。`0.2.0-rc.2` 的工作区 Menu 不支持 `minWidthFromAnchor`，使用该版原生默认宽度，实际页面仍需复核。
 
 ## 安装与平台验证记录
 

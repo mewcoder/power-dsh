@@ -1,5 +1,5 @@
-import { lstat, rm } from 'node:fs/promises';
-import { basename, dirname } from 'node:path';
+import { linkSync, lstatSync, mkdtempSync, readdirSync, renameSync, rmdirSync, unlinkSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, normalize } from 'node:path';
 import type { ArchiveCatalog } from '../../shared/types/wire.ts';
 import { buildArchiveCatalog, type ArchiveBaseline, type ArchiveTitleEntry } from './archive-catalog.ts';
 
@@ -18,23 +18,41 @@ export interface SessionQueryLike {
     | { sessionId: string; status: 'rejected'; reason: unknown }
   )[]>;
 }
-/** Structural view of the native session persistence service used for permanent deletion. */
-export interface SessionPersistenceLike {
-  stat(sessionId: string, options?: { signal?: AbortSignal }): Promise<{
-    header: { id: string; cwd?: string };
-    location?: { kind: string; path: string };
-  } | undefined>;
+/** Structural view of the native session list; its `updatedAt` is the sidebar's activity time. */
+export interface SessionControllerLike {
+  list(request: Record<string, never>, signal?: AbortSignal): Promise<{ items: readonly { sessionId: string; updatedAt: number }[] }>;
 }
+interface PersistenceSnapshot {
+  header: { id: string };
+  formatStatus?: string;
+  revision: string;
+  location?: { kind: string; path: string };
+}
+export interface SessionPersistenceLike {
+  readonly name: string;
+  stat(id: string): Promise<PersistenceSnapshot | undefined>;
+  open(id: string, access: 'write'): Promise<{ header: { id: string }; close(): Promise<void> }>;
+}
+export interface WorkspaceArchiveStateLike {
+  readonly archivedSessionIds: readonly string[];
+}
+interface DeleteAccess {
+  persistence: SessionPersistenceLike;
+  registry: WorkspaceArchiveStateLike;
+  isLive(id: string): boolean;
+}
+const ACTIVITY_TTL_MS = 5_000;
+// 0.2.2-rc.1 native generation basenames; older generations can become
+// visible if the current one disappears, so refuse such directories.
+const JSONL_GENERATION = /^session(?:\.v[1-9][0-9]*)?\.jsonl(?:\.zstd)?$/u;
+const STAGE_PREFIX = '.power-dsh-delete-';
 
-/**
- * Reads the archived set from the native Workspace stream, restores single
- * sessions through the native unarchive operation, and permanently removes a
- * known archived session's transcript artifact. Holds no preferences.
- */
 export class ArchiveService {
   workspaceController: WorkspaceControllerLike | null = null;
   sessionQuery: SessionQueryLike | null = null;
-  sessionPersistence: SessionPersistenceLike | null = null;
+  sessionController: SessionControllerLike | null = null;
+  deleteAccess: DeleteAccess | null = null;
+  private activityCache: { at: number; value: Map<string, number> } | undefined;
 
   async list(): Promise<ArchiveCatalog> {
     const controller = this.workspaceController;
@@ -57,61 +75,85 @@ export class ArchiveService {
     return this.list();
   }
 
-  /**
-   * Permanently delete one archived session. Clears the archive marker first so
-   * the list reflects the intent, then removes the resolved transcript
-   * artifact. Refuses non-archived ids and sessions whose artifact path cannot
-   * be resolved.
-   */
   async delete(sessionId: string): Promise<ArchiveCatalog> {
-    const controller = this.workspaceController;
-    const persistence = this.sessionPersistence;
-    if (!controller || !this.sessionQuery) throw new Error('archiveUnavailable');
-    if (!persistence) throw new Error('archiveDeleteUnavailable');
     if (!validSessionId(sessionId)) throw new Error('archiveInvalidSession');
+    const access = this.deleteAccess;
+    const controller = this.workspaceController;
+    if (access?.persistence.name !== 'session-persistence-jsonl' || !controller || !this.sessionQuery) {
+      throw new Error('archiveDeleteUnavailable');
+    }
     const abort = new AbortController();
+    let baseline: ArchiveBaseline;
     try {
-      let baseline: ArchiveBaseline;
-      try {
-        baseline = await readBaseline(controller, abort.signal);
-      } catch {
-        throw new Error('archiveDeleteCheckFailed');
-      }
-      if (!baseline.archivedSessionIds.includes(sessionId)) throw new Error('archiveNotArchived');
-      let snapshot: Awaited<ReturnType<SessionPersistenceLike['stat']>>;
-      try {
-        snapshot = await persistence.stat(sessionId, { signal: abort.signal });
-      } catch {
-        throw new Error('archiveDeleteStatFailed');
-      }
-      const remaining = baseline.archivedSessionIds.filter(id => id !== sessionId);
-      // Session already gone: just reconcile the archive marker and report.
-      if (!snapshot) {
-        await controller.unarchiveSession({ sessionId }).catch(() => undefined);
-        const titles = await this.titlesFor(remaining, abort.signal).catch(() => new Map<string, ArchiveTitleEntry>());
-        return buildArchiveCatalog({ items: baseline.items, archivedSessionIds: remaining }, titles);
-      }
-      const artifact = snapshot.location?.path;
-      // A live/pending session has no materialized artifact path; refuse rather
-      // than pretend success, so a running session is never silently "deleted".
-      if (typeof artifact !== 'string' || artifact.length === 0) throw new Error('archiveDeleteUnsupported');
-      try {
-        await controller.unarchiveSession({ sessionId });
-      } catch {
-        throw new Error('archiveDeleteUnarchiveFailed');
-      }
-      try {
-        await removeArtifact(artifact, sessionId);
-      } catch (error) {
-        throw error instanceof Error && error.message === 'archiveDeleteUnsafe' ? error : new Error('archiveDeleteRemoveFailed');
-      }
-      // Build the next catalog from the baseline we already have instead of a
-      // second follow, which could otherwise choke on a dangling session id.
-      const titles = await this.titlesFor(remaining, abort.signal).catch(() => new Map<string, ArchiveTitleEntry>());
-      return buildArchiveCatalog({ items: baseline.items, archivedSessionIds: remaining }, titles);
+      baseline = await readBaseline(controller, abort.signal);
+    } catch {
+      throw new Error('archiveDeleteCheckFailed');
     } finally {
       abort.abort();
     }
+    if (!baseline.archivedSessionIds.includes(sessionId)) throw new Error('archiveNotArchived');
+    const { persistence, registry, isLive } = access;
+    const check = () => {
+      if (this.deleteAccess !== access || this.workspaceController !== controller) throw new Error('archiveDeleteUnavailable');
+      if (!registry.archivedSessionIds.includes(sessionId)) throw new Error('archiveNotArchived');
+      if (isLive(sessionId)) throw new Error('archiveDeleteBusy');
+    };
+    check();
+    const before = await persistence.stat(sessionId).catch(() => { throw new Error('archiveDeleteStatFailed'); });
+    const path = artifactPath(before, sessionId);
+    const identity = checkArtifact(path);
+    check();
+    const handle = await persistence.open(sessionId, 'write').catch(error => {
+      throw new Error(error instanceof Error && error.name === 'SessionAlreadyOwnedError' ? 'archiveDeleteBusy' : 'archiveDeleteCheckFailed');
+    });
+    let deleted = false;
+    try {
+      const after = await persistence.stat(sessionId).catch(() => { throw new Error('archiveDeleteStatFailed'); });
+      if (handle.header.id !== sessionId || artifactPath(after, sessionId) !== path || after?.revision !== before?.revision) {
+        throw new Error('archiveDeleteUnsafe');
+      }
+      const current = checkArtifact(path);
+      if (current.dev !== identity.dev || current.ino !== identity.ino || current.ctimeNs !== identity.ctimeNs) {
+        throw new Error('archiveDeleteUnsafe');
+      }
+      // No await between the native marker check and making the file undiscoverable.
+      // Keep the directory (and its native lock inode) in place while staging.
+      check();
+      const stage = stageArtifact(path);
+      try {
+        await controller.unarchiveSession({ sessionId });
+        if (this.deleteAccess !== access || this.workspaceController !== controller || registry.archivedSessionIds.includes(sessionId)) {
+          throw new Error('archiveDeleteUnarchiveFailed');
+        }
+        if (isLive(sessionId)) throw new Error('archiveDeleteBusy');
+      } catch {
+        restoreArtifact(path, stage);
+        throw new Error('archiveDeleteUnarchiveFailed');
+      }
+      try {
+        unlinkSync(stage.file);
+        deleted = true;
+      } catch {
+        restoreArtifact(path, stage);
+        throw new Error('archiveDeleteRemoveFailed');
+      } finally {
+        removeEmptyStage(stage.dir);
+      }
+    } finally {
+      try {
+        await handle.close();
+      } catch {
+        // A lease release fault must not overwrite an earlier deletion failure.
+        if (deleted) throw new Error('archiveDeleteReleaseFailed');
+      }
+    }
+    this.activityCache = undefined;
+    // Deletion is already committed. If refresh fails, return a clearly partial
+    // view so the caller does not mistake a failed refresh for a failed deletion.
+    return this.list().catch(() => ({
+      ...buildArchiveCatalog({ ...baseline, archivedSessionIds: baseline.archivedSessionIds.filter(id => id !== sessionId) }, new Map()),
+      complete: false,
+    }));
   }
 
   private async titlesFor(ids: readonly string[], signal?: AbortSignal): Promise<Map<string, ArchiveTitleEntry>> {
@@ -124,13 +166,97 @@ export class ArchiveService {
       if (result.status === 'fulfilled') {
         titles.set(result.sessionId, {
           title: result.value.title?.title ?? '',
+          // The title event time is only a fallback: the native list dates a row
+          // by its last user activity, which `activity` supplies when present.
           updatedAt: result.value.title?.updatedAt ?? 0,
           createdAt: result.value.session.createdAt,
         });
       }
     }
+    const activity = await this.activity(signal);
+    for (const [sessionId, entry] of titles) {
+      const lastActive = activity.get(sessionId);
+      if (lastActive !== undefined) titles.set(sessionId, { ...entry, updatedAt: lastActive });
+    }
     return titles;
   }
+
+  /** Short-lived display cache; never used to admit a mutation. */
+  private async activity(signal?: AbortSignal) {
+    const cached = this.activityCache;
+    if (cached !== undefined && Date.now() - cached.at < ACTIVITY_TTL_MS) return cached.value;
+    const activity = new Map<string, number>();
+    const controller = this.sessionController;
+    if (!controller || typeof controller.list !== 'function') return activity;
+    // Activity only decorates rows; a failing list must not hide the archive.
+    const { items } = await controller.list({}, signal).catch(() => ({ items: [] }));
+    for (const item of items) {
+      if (typeof item?.sessionId !== 'string' || typeof item.updatedAt !== 'number' || !Number.isFinite(item.updatedAt)) continue;
+      activity.set(item.sessionId, item.updatedAt);
+    }
+    this.activityCache = { at: Date.now(), value: activity };
+    return activity;
+  }
+}
+
+function artifactPath(snapshot: PersistenceSnapshot | undefined, sessionId: string): string {
+  // A write-open can publish a migration. Only open an already-current artifact.
+  if (!snapshot || snapshot.formatStatus !== 'current' || snapshot.location?.kind !== 'jsonl' || typeof snapshot.revision !== 'string') {
+    throw new Error('archiveDeleteUnsupported');
+  }
+  const { path } = snapshot.location;
+  if (snapshot.header.id !== sessionId || !isAbsolute(path) || normalize(path) !== path
+    || basename(dirname(path)) !== sessionId || !JSONL_GENERATION.test(basename(path))) {
+    throw new Error('archiveDeleteUnsafe');
+  }
+  return path;
+}
+
+function checkArtifact(path: string) {
+  try {
+    const dir = dirname(path);
+    if (!lstatSync(dir).isDirectory() || !lstatSync(dirname(dir)).isDirectory()) throw new Error('unexpected directory');
+    const file = lstatSync(path, { bigint: true });
+    if (!file.isFile() || file.nlink !== 1n) throw new Error('unexpected transcript');
+    const lock = lstatSync(join(dir, 'session.lock'), { throwIfNoEntry: false });
+    if (lock && (!lock.isFile() || lock.nlink !== 1 || lock.size !== 0)) throw new Error('unexpected writer lock');
+    const entries = readdirSync(dir);
+    if (entries.some(name => name.startsWith(STAGE_PREFIX))) throw new Error('archiveDeleteRecoveryRequired');
+    if (entries.some(name => name !== basename(path) && JSONL_GENERATION.test(name))) throw new Error('archiveDeleteUnsupported');
+    return file;
+  } catch (error) {
+    if (error instanceof Error && (error.message === 'archiveDeleteUnsupported' || error.message === 'archiveDeleteRecoveryRequired')) throw error;
+    throw new Error('archiveDeleteUnsafe');
+  }
+}
+
+function stageArtifact(path: string) {
+  let dir: string | undefined;
+  try {
+    dir = mkdtempSync(join(dirname(path), STAGE_PREFIX));
+    const file = join(dir, basename(path));
+    renameSync(path, file);
+    return { dir, file };
+  } catch {
+    if (dir) removeEmptyStage(dir);
+    throw new Error('archiveDeleteRemoveFailed');
+  }
+}
+
+function restoreArtifact(path: string, stage: ReturnType<typeof stageArtifact>) {
+  try {
+    // Restore without overwriting a file that has appeared at the source path.
+    linkSync(stage.file, path);
+    unlinkSync(stage.file);
+  } catch {
+    throw new Error('archiveDeleteRecoveryRequired');
+  } finally {
+    removeEmptyStage(stage.dir);
+  }
+}
+
+function removeEmptyStage(dir: string) {
+  try { rmdirSync(dir); } catch { /* An empty directory left behind is harmless; never remove a nonempty one. */ }
 }
 
 function validSessionId(sessionId: unknown): sessionId is string {
@@ -143,22 +269,4 @@ async function readBaseline(controller: WorkspaceControllerLike, signal: AbortSi
     if ((frame.type === 'baseline' || frame.type === 'replace') && frame.value) return frame.value;
   }
   throw new Error('archiveUnavailable');
-}
-
-/**
- * Delete the session's own transcript directory when its path segment equals the
- * session id; otherwise delete only the resolved artifact file. Never follows a
- * symbolic link and never removes a shared parent directory.
- */
-export async function removeArtifact(artifactPath: string, sessionId: string): Promise<void> {
-  const directory = dirname(artifactPath);
-  if (basename(directory) === sessionId) {
-    const info = await lstat(directory).catch(() => null);
-    if (info?.isSymbolicLink()) throw new Error('archiveDeleteUnsafe');
-    if (info?.isDirectory()) {
-      await rm(directory, { recursive: true, force: true });
-      return;
-    }
-  }
-  await rm(artifactPath, { force: true });
 }

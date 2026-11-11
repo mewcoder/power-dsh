@@ -36,6 +36,8 @@ export interface Preferences {
   flowingBackgroundBlur: number;
   showBackgroundShortcut: boolean;
   archiveManagerEnabled: boolean;
+  autoArchiveDays: number;
+  autoArchivedSessions: string[];
   usageStatsEnabled: boolean;
   projectManagerEnabled: boolean;
 }
