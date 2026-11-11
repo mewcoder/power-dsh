@@ -49,6 +49,24 @@ test('project rows show name, directory, session count and last activity', async
   app.unmount();
 });
 
+test('project refresh uses compact loading feedback and keeps the current rows', async () => {
+  let pending = false;
+  let finish;
+  const app = await mount({ projectList: () => pending ? new Promise(resolve => { finish = resolve; }) : { ok: true, value: catalog } });
+  const page = await projectsPage(app, 'en');
+  pending = true;
+  const read = app.reloadProjects();
+  const loading = page.render().find(node => node.props.className === 'power-dsh-loading');
+  assert.equal(loading.props['data-compact'], true);
+  assert.ok(descendants(loading).some(node => node.type === 'native-state-dot-fixture' && node.props.state === 'ongoing'));
+  assert.ok(page.row('w1'));
+  assert.ok(page.row('w2'));
+  finish({ ok: true, value: catalog });
+  await read;
+  assert.ok(!page.render().some(node => node.props.className === 'power-dsh-loading'));
+  app.unmount();
+});
+
 test('project sort switches between latest activity and the native registry order', async () => {
   const app = await mount({ projectCatalog: catalog });
   const page = await projectsPage(app, 'en');

@@ -2,6 +2,30 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mcpFixture, mcpCatalogFixture, mount, button, descendants, mcpPage } from '../../../../tests/helpers/client-fixture.mjs';
 
+test('MCP loading uses shared feedback and keeps the previous catalog during a compact refresh', async () => {
+  let reply = Promise.withResolvers();
+  const app = await mount({ featureIds: ['mcp'], mcpList: () => reply.promise });
+  app.set({ mcpManagerEnabled: true });
+  const render = () => descendants(app.renderMcp());
+  const loading = () => render().find(node => node.props.className === 'power-dsh-loading');
+  assert.equal(loading().props.role, 'status');
+  assert.equal(loading().props['data-compact'], undefined);
+  assert.ok(descendants(loading()).some(node => node.type === 'native-state-dot-fixture' && node.props.state === 'ongoing'));
+  assert.ok(descendants(loading()).some(node => node.props.children.includes('loading')));
+  reply.resolve({ ok: true, value: mcpCatalogFixture() });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(loading(), undefined);
+  reply = Promise.withResolvers();
+  const refresh = app.reloadMcp();
+  assert.equal(loading().props['data-compact'], true);
+  assert.ok(render().some(node => node.props['data-mcp'] === 'include:browser'));
+  reply.resolve({ ok: true, value: mcpCatalogFixture() });
+  await refresh;
+  assert.equal(loading(), undefined);
+  assert.deepEqual(app.mcpWrites, []);
+  app.unmount();
+});
+
 test('the MCP preference owns a separate page and icon with independent lifecycle and no server changes', async () => {
   const app = await mount();
   const section = 'settings.section:power-dsh-mcp';
@@ -839,6 +863,36 @@ test('MCP detail never renders a blank row when an older Host projects empty str
   app.unmount();
 });
 
+test('an old backend hiding argument contents cannot present them as absent', async () => {
+  const app = await mount({ featureIds: ['mcp'],
+    mcpCatalog: mcpCatalogFixture({ servers: [mcpFixture()] }),
+    mcpDetail: { transport: 'stdio', argsHidden: true, envKeys: [], headerKeys: [], expressions: [], urlQueryHidden: false },
+  });
+  const page = await mcpPage(app);
+  page.detail('browser').props.onClick({ stopPropagation() {} });
+  await new Promise(resolve => setImmediate(resolve));
+  const text = textOf(page.dialog());
+  assert.ok(text.includes('mcpDetailOutdated'), 'The old response requires a backend restart.');
+  assert.ok(!text.includes('mcpDetailNone'), 'Hidden arguments do not mean an empty list.');
+  app.unmount();
+});
+
+test('unknown and expression-backed argument contents are never labelled None', async () => {
+  for (const expressions of [[], ['args']]) {
+    const app = await mount({ featureIds: ['mcp'],
+      mcpCatalog: mcpCatalogFixture({ servers: [mcpFixture()] }),
+      mcpDetail: { transport: 'stdio', envKeys: [], headerKeys: [], expressions, urlQueryHidden: false },
+    });
+    const page = await mcpPage(app);
+    page.detail('browser').props.onClick({ stopPropagation() {} });
+    await new Promise(resolve => setImmediate(resolve));
+    const text = textOf(page.dialog());
+    assert.ok(text.includes('mcpDetailUnknown'));
+    assert.ok(!text.includes('mcpDetailNone'));
+    app.unmount();
+  }
+});
+
 test('MCP detail falls back to declared transport and lists tools for an open server', async () => {
   const app = await mount({
     mcpCatalog: mcpCatalogFixture({ servers: [mcpFixture({ transport: 'unknown', tools: ['web_search'] })] }),
@@ -936,6 +990,11 @@ test('MCP detail ignores a late answer after closing and follows the latest requ
   page.detail('browser').props.onClick({ stopPropagation() {} });
   const close = page.render().find(node => node.type === 'native-modal-fixture');
   assert.ok(close);
+  const loading = descendants(close).find(node => node.props.className === 'power-dsh-loading');
+  assert.equal(loading.props.role, 'status');
+  assert.equal(loading.props['data-compact'], undefined);
+  assert.ok(descendants(loading).some(node => node.props.children.includes('mcpDetailLoading')));
+  assert.ok(descendants(loading).some(node => node.type === 'native-state-dot-fixture' && node.props.state === 'ongoing'));
   // Closing before the answer arrives must discard that answer.
   const buttons = descendants(close).filter(node => node.props['data-native-button']);
   buttons.at(-1).props.onClick();

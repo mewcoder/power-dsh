@@ -5,12 +5,12 @@ import type { ClientFeature, ClientFeatureDefinition, ClientRuntime, FormSnapsho
 interface SettingsPageProps extends PageSlotProps { source: SnapshotSource<FormSnapshot>; form: SettingsForm; version: string | null; savePreference: SavePreference; features: (ClientFeature & { definition: ClientFeatureDefinition })[]; }
 
 export function createSettingsPage(runtime: ClientRuntime) {
-  const { React, h, useSnapshot, useMounted, errorFeedback } = runtime;
+  const { React, h, useSnapshot, useMounted, loadingFeedback, errorFeedback } = runtime;
   function SettingsPage({ t, source, form, version, features, close }: SettingsPageProps) {
     const snapshot = useSnapshot(source);
     const [activeTab, setActiveTab] = React.useState('general');
-    const tabRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
     const tabs = ['general', 'interface', 'enhancements', 'simplify', 'other'].map(id => ({ id }));
+    const tabRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
     const [saving, setSaving] = React.useState<SavingSetting | null>(null);
     const [error, setError] = React.useState<SettingError | null>(null);
     const pending = React.useRef(false);
@@ -90,7 +90,8 @@ export function createSettingsPage(runtime: ClientRuntime) {
         h('h2', { className: 'power-dsh-title' }, t('title')),
         h('p', { className: 'power-dsh-description' }, t('description'))),
       notice && (noticeError ? errorFeedback({ t, message: notice, code: 'PD-SETTINGS-LOAD',
-        operation: 'settings.load', placement: 'page' }) : h('p', {
+        operation: 'settings.load', placement: 'page' }) : snapshot.status === 'loading'
+        ? loadingFeedback({ label: notice, compact: Boolean(snapshot.value) }) : h('p', {
         className: 'power-dsh-notice', role: 'status', 'data-tone': 'neutral',
       }, notice)),
       h('div', { className: 'power-dsh-tabs', role: 'tablist', 'aria-label': t('title') },

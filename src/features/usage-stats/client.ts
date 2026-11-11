@@ -30,10 +30,10 @@ interface UsagePageProps extends PageSlotProps {
   loadUsageStats(): Promise<void>;
 }
 
-/** Compact token count; the unit stays implicit so the strip reads as one figure. */
+/** Compact token counts use 万/亿 units, independent of the interface language. */
 export function formatTokens(value: number, locale: string): string {
   if (!Number.isFinite(value) || value <= 0) return '0';
-  return new Intl.NumberFormat(locale, {
+  return new Intl.NumberFormat(value >= 10_000 ? 'zh-CN' : locale, {
     notation: value >= 10_000 ? 'compact' : 'standard',
     maximumFractionDigits: value >= 10_000 ? 1 : 0,
   }).format(value);
@@ -203,7 +203,7 @@ export function smoothPath(points: readonly { x: number; y: number }[]): string 
 }
 
 export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironment) {
-  const { React, h, Tooltip, Modal, Button, NativeIcon, observable, useSnapshot, useMounted, errorFeedback } = runtime;
+  const { React, h, Tooltip, MenuSurface, Button, NativeIcon, StateDot, observable, useSnapshot, useMounted, loadingFeedback, errorFeedback } = runtime;
   const { ctx, t, savePreference, preferenceSlot, namespace } = env;
   const styles = shellStyles + featureStyles;
   // Lucide ChartColumn, ISC licensed; see docs/third-party-notices.md.
@@ -233,7 +233,9 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const data = snapshot.value;
     const [period, setPeriod] = React.useState<UsagePeriod>('today');
     const [range, setRange] = React.useState<UsageRange>('7d');
-    const [trendDate, setTrendDate] = React.useState('');
+    const [hiddenTrendModels, setHiddenTrendModels] = React.useState<ReadonlySet<string>>(() => new Set());
+    const [trendFocus, setTrendFocus] = React.useState('');
+    const trendPointRefs = React.useRef(new Map<string, HTMLSpanElement>());
     const [custom, setCustom] = React.useState<UsageWindow | null>(null);
     const [customOpen, setCustomOpen] = React.useState(false);
     const [draftStart, setDraftStart] = React.useState('');
@@ -241,6 +243,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const [calendarFocus, setCalendarFocus] = React.useState('');
     const [hoverDate, setHoverDate] = React.useState('');
     const calendarFocusRef = React.useRef<HTMLButtonElement | null>(null);
+    const customButtonRef = React.useRef<HTMLButtonElement | null>(null);
     const moveCalendarFocus = React.useRef(false);
     const mounted = useMounted();
     React.useEffect(() => {
@@ -348,32 +351,30 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       for (const row of trendModels) {
         if (row.modelId === model.modelId && row.provider === model.provider) byDate.set(row.date, row.totalTokens);
       }
-      return rangeRows.map((row, index) => ({
-        x: rangeRows.length <= 1 ? 0 : (index / (rangeRows.length - 1)) * 100,
-        y: trendMax > 0 ? 100 - ((byDate.get(row.date) ?? 0) / trendMax) * 100 : 100,
-      }));
+      return rangeRows.map((row, index) => {
+        const tokens = byDate.get(row.date) ?? 0;
+        return { date: row.date, tokens,
+          x: rangeRows.length <= 1 ? 0 : index / (rangeRows.length - 1) * 100,
+          y: trendMax > 0 ? 100 - tokens / trendMax * 100 : 100 };
+      });
     };
-    const inspectedIndex = Math.max(0, rangeRows.findIndex(row => row.date === trendDate) < 0
-      ? rangeRows.length - 1 : rangeRows.findIndex(row => row.date === trendDate));
-    const inspectedDate = rangeRows[inspectedIndex]?.date ?? today;
-    const inspectedX = rangeRows.length <= 1 ? 0 : inspectedIndex / (rangeRows.length - 1) * 100;
-    const trendLabel = [inspectedDate, ...topModels.map(model => {
-      const tokens = trendModels.find(row => row.date === inspectedDate && row.modelId === model.modelId && row.provider === model.provider)?.totalTokens ?? 0;
-      return t('usageTrendPoint').replace('{model}', () => model.modelId || t('usageUnknownModel'))
-        .replace('{tokens}', () => count(tokens));
-    })].join('\n');
-    function inspectTrend(event: import('react').PointerEvent<HTMLDivElement>) {
-      const { left, width } = event.currentTarget.getBoundingClientRect();
-      if (width <= 0 || rangeRows.length === 0) return;
-      const index = Math.max(0, Math.min(rangeRows.length - 1, Math.round((event.clientX - left) / width * (rangeRows.length - 1))));
-      setTrendDate(rangeRows[index]!.date);
-    }
-    function trendKey(event: import('react').KeyboardEvent<HTMLDivElement>) {
-      const offsets: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, Home: -inspectedIndex, End: rangeRows.length - 1 - inspectedIndex };
-      if (!(event.key in offsets) || rangeRows.length === 0) return;
+    const trendModelKey = (model: UsageModelRow) => JSON.stringify([model.provider, model.modelId]);
+    const trendSeries = topModels.map((model, colorIndex) => ({ model, colorIndex, points: seriesFor(model) }))
+      .filter(series => !hiddenTrendModels.has(trendModelKey(series.model)));
+    const pointKey = (model: UsageModelRow, date: string) => JSON.stringify([model.provider, model.modelId, date]);
+    const activeTrendPoint = trendSeries.some(series => series.points.some(point => pointKey(series.model, point.date) === trendFocus))
+      ? trendFocus : trendSeries[0] && rangeRows.length > 0 ? pointKey(trendSeries[0].model, rangeRows.at(-1)!.date) : '';
+    function trendKey(event: import('react').KeyboardEvent<HTMLSpanElement>, modelIndex: number, dateIndex: number) {
+      const moves: Record<string, [number, number]> = { ArrowLeft: [0, -1], ArrowRight: [0, 1],
+        ArrowUp: [-1, 0], ArrowDown: [1, 0], Home: [0, -dateIndex], End: [0, rangeRows.length - 1 - dateIndex] };
+      const move = moves[event.key];
+      if (!move) return;
       event.preventDefault();
-      const index = Math.max(0, Math.min(rangeRows.length - 1, inspectedIndex + offsets[event.key]!));
-      setTrendDate(rangeRows[index]!.date);
+      const series = trendSeries[Math.max(0, Math.min(trendSeries.length - 1, modelIndex + move[0]))]!;
+      const point = series.points[Math.max(0, Math.min(rangeRows.length - 1, dateIndex + move[1]))]!;
+      const key = pointKey(series.model, point.date);
+      setTrendFocus(key);
+      trendPointRefs.current.get(key)?.focus();
     }
     const axisLabels = rangeRows.filter((_, index) => rangeRows.length <= 7 || index % Math.ceil(rangeRows.length / 6) === 0 || index === rangeRows.length - 1);
     const periodModelRows = [...modelTotals.values()].sort((left, right) => right.totalTokens - left.totalTokens);
@@ -395,6 +396,12 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     // Empty history is a valid result; a date picker should not restrict choices to recorded days.
     const customValid = dayIndex(draftStart) !== null && dayIndex(draftEnd) !== null && draftStart <= draftEnd;
     const customId = `${React.useId()}-usage-period`;
+    const calendarAnchor = `--power-dsh-calendar-${customId.replaceAll(':', '')}`;
+    function closeCustom() {
+      if (!mounted.current) return;
+      setCustomOpen(false);
+      customButtonRef.current?.focus();
+    }
     const selectRange = (next: UsageRange) => { if (mounted.current && !busy) setRange(next); };
     function openCustom() {
       if (!mounted.current || busy) return;
@@ -455,7 +462,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         h('button', { type: 'button', className: 'power-dsh-usage-calendar-day', 'data-calendar-day': date,
           id: `${customId}-${date}`, 'aria-label': date, 'aria-current': date === today ? 'date' : undefined,
           'data-outside': date.slice(0, 7) !== visibleMonth, 'data-endpoint': endpoint,
-          'data-modal-autofocus': date === visibleDate || undefined, tabIndex: date === visibleDate ? 0 : -1,
+          tabIndex: date === visibleDate ? 0 : -1,
           ref: date === visibleDate ? (node: HTMLButtonElement | null): void => { calendarFocusRef.current = node; } : undefined,
           onClick: () => pickDay(date), onKeyDown: (event: import('react').KeyboardEvent<HTMLButtonElement>) => calendarKey(event, date),
           onMouseEnter: () => { if (draftStart && !draftEnd) setHoverDate(date); },
@@ -468,30 +475,25 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     }, h('svg', { width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', strokeWidth: 1.3,
       strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, focusable: false },
       h('path', { d: direction === -1 ? 'm10 4-4 4 4 4' : 'm6 4 4 4-4 4' })));
-    const customDialog = customOpen ? h(Modal, {
-      open: true, onClose: () => { if (mounted.current) setCustomOpen(false); },
-      title: t('usageCustomTitle'), closeLabel: t('close'), className: 'power-dsh-usage-custom',
-      footer: h(React.Fragment, null,
-        h(Button, { variant: 'outline', onClick: () => { if (mounted.current) setCustomOpen(false); } }, t('cancel')),
-        h(Button, { variant: 'primary', disabled: !customValid,
-          onClick: () => {
-            if (!mounted.current || !customValid) return;
-            setCustom({ start: draftStart, end: draftEnd });
-            setPeriod('custom');
-            setCustomOpen(false);
-          } }, t('usageCustomApply'))),
+    const customPopover = customOpen ? h(MenuSurface, {
+      id: customId, popover: 'auto', role: 'dialog', 'aria-label': t('usageCustomTitle'),
+      className: 'power-dsh-usage-custom', style: { positionAnchor: calendarAnchor },
+      ref: (node: HTMLDivElement | null): void => {
+        if (!node || node.matches(':popover-open')) return;
+        node.showPopover();
+        calendarFocusRef.current?.focus();
+      },
+      onKeyDownCapture: (event: import('react').KeyboardEvent<HTMLDivElement>) => {
+        if (event.key !== 'Escape' || event.nativeEvent.isComposing || event.keyCode === 229
+          || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+        event.preventDefault();
+        event.stopPropagation();
+        closeCustom();
+      },
+      onToggle: (event: import('react').SyntheticEvent<HTMLDivElement, ToggleEvent>) => {
+        if (event.nativeEvent.newState === 'closed' && mounted.current) setCustomOpen(false);
+      },
     },
-    h('div', { className: 'power-dsh-usage-custom-shortcuts', role: 'group', 'aria-label': t('usageCustomShortcuts') },
-      ...(['d7', 'd30'] as const).map(option => {
-        const selected = periodWindow(option, today)!;
-        return h('button', { key: option, type: 'button', className: 'power-dsh-usage-custom-shortcut',
-          'data-period-shortcut': option, 'aria-pressed': draftStart === selected.start && draftEnd === selected.end,
-          onClick: () => {
-            if (!mounted.current) return;
-            setDraftStart(selected.start); setDraftEnd(selected.end); setCalendarFocus(selected.end); setHoverDate('');
-          },
-        }, t(PERIOD_LABELS[option]));
-      })),
     h('div', { className: 'power-dsh-usage-calendar-selection' },
       h('div', null, h('span', { className: 'power-dsh-usage-calendar-field-label' }, t('usageCustomStart')),
         h('span', { 'data-calendar-start': true }, draftStart || '—')),
@@ -504,7 +506,28 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       h('div', { role: 'row', className: 'power-dsh-usage-calendar-week' },
         ...weekdayLabels.map((label, index) => h('span', { key: index, role: 'columnheader', className: 'power-dsh-usage-calendar-weekday' }, label))),
       ...calendarRows),
-    h('p', { role: 'status', className: 'power-dsh-usage-calendar-hint' }, t(draftStart && !draftEnd ? 'usageSelectEnd' : 'usageSelectStart'))) : null;
+    h('p', { role: 'status', className: 'power-dsh-usage-calendar-hint' }, t(draftStart && !draftEnd ? 'usageSelectEnd' : 'usageSelectStart')),
+    h('div', { className: 'power-dsh-usage-custom-footer' },
+      h('div', { className: 'power-dsh-usage-custom-shortcuts', role: 'group', 'aria-label': t('usageCustomShortcuts') },
+        ...(['d7', 'd30'] as const).map(option => {
+          const selected = periodWindow(option, today)!;
+          return h('button', { key: option, type: 'button', className: 'power-dsh-usage-custom-shortcut',
+            'data-period-shortcut': option, 'aria-pressed': draftStart === selected.start && draftEnd === selected.end,
+            onClick: () => {
+              if (!mounted.current) return;
+              setDraftStart(selected.start); setDraftEnd(selected.end); setCalendarFocus(selected.end); setHoverDate('');
+            },
+          }, t(PERIOD_LABELS[option]));
+        })),
+      h('div', { className: 'power-dsh-usage-custom-actions' },
+      h(Button, { variant: 'ghost', size: 'sm', onClick: closeCustom }, t('cancel')),
+      h(Button, { variant: 'primary', size: 'sm', disabled: !customValid,
+        onClick: () => {
+          if (!mounted.current || !customValid) return;
+          setCustom({ start: draftStart, end: draftEnd });
+          setPeriod('custom');
+          closeCustom();
+        } }, t('usageCustomApply'))))) : null;
 
     return h('section', { className: 'power-dsh-page power-dsh-usage-page', 'aria-label': t('usageTab') },
       h('style', null, styles),
@@ -515,7 +538,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
           h(Tooltip, { label: t('usageRefresh'), side: 'top', portal: true },
             h(Button, { variant: 'ghost', size: 'sm', className: 'power-dsh-usage-refresh',
               'aria-label': t('usageRefresh'), disabled: busy, 'aria-busy': busy,
-              onClick: () => { void loadUsageStats(); } }, h(NativeIcon, { glyph: 'refresh-outline' }))))),
+              onClick: () => { void loadUsageStats(); } }, busy && data ? h(StateDot, { state: 'ongoing' }) : h(NativeIcon, { glyph: 'refresh-outline', size: 14 }))))),
       h('div', { className: 'power-dsh-usage-period', role: 'group', 'aria-label': t('usagePeriodTitle') },
         h('div', { className: 'power-dsh-usage-period-presets' },
           ...(['today', 'week', 'month', 'all', 'custom'] as const).map(option => h('button', {
@@ -523,9 +546,14 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             'aria-pressed': period === option, disabled: busy,
             'aria-haspopup': option === 'custom' ? 'dialog' : undefined,
             'aria-expanded': option === 'custom' ? customOpen : undefined,
-            onClick: () => {
+            'aria-controls': option === 'custom' && customOpen ? customId : undefined,
+            popovertarget: option === 'custom' ? customId : undefined,
+            style: option === 'custom' ? { anchorName: calendarAnchor } : undefined,
+            ref: option === 'custom' ? (node: HTMLButtonElement | null): void => { customButtonRef.current = node; } : undefined,
+            onClick: (event: import('react').MouseEvent<HTMLButtonElement>) => {
+              if (option === 'custom') event.preventDefault();
               if (!mounted.current || busy) return;
-              if (option === 'custom') openCustom(); else setPeriod(option);
+              if (option === 'custom') { if (customOpen) closeCustom(); else openCustom(); } else setPeriod(option);
             },
           },
           option === 'custom' && h('svg', { width: 14, height: 14, viewBox: '0 0 16 16', fill: 'none',
@@ -537,11 +565,10 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         period === 'custom' && h('span', { className: 'power-dsh-usage-period-dates-label', title: rangeLabel }, rangeLabel)),
       snapshot.status === 'error' && errorFeedback({ t, message: t(snapshot.error || 'usageLoadFailed'),
         code: 'PD-USAGE-LOAD', operation: 'readUsageStats', placement: 'page', retry: loadUsageStats, disabled: busy }),
-      busy && !data && h('p', { className: 'power-dsh-notice', role: 'status' }, t('usageLoading')),
+      busy && !data && loadingFeedback({ label: t('usageLoading') }),
       data && !data.complete && h('p', { className: 'power-dsh-notice', role: 'status' }, t('usagePartial')),
       data && h('div', { className: 'power-dsh-usage-body' },
         h('section', { className: 'power-dsh-usage-group', 'aria-label': t('usageGroupRange') },
-          h('h2', { className: 'power-dsh-usage-group-title' }, t('usageGroupRange')),
         h('section', { className: 'power-dsh-usage-summary', 'aria-label': t('usageSummaryTitle') },
           ...metrics.map(metric => h('div', { key: metric.key, className: 'power-dsh-usage-metric', 'data-metric': metric.key },
             metric.hint ? h(Tooltip, { label: metric.hint, side: 'top', portal: true, delayMs: 0, maxWidth: 360 },
@@ -556,7 +583,6 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
               ? h('ul', { className: 'power-dsh-usage-models' }, ...modelRows)
               : h('p', { className: 'power-dsh-usage-empty' }, t('usageEmpty')))),
         h('section', { className: 'power-dsh-usage-group', 'aria-label': t('usageGroupHistory') },
-          h('h2', { className: 'power-dsh-usage-group-title' }, t('usageGroupHistory')),
         h('section', { className: 'power-dsh-usage-card' },
           h('div', { className: 'power-dsh-usage-card-head' },
             h('h3', { className: 'power-dsh-usage-card-title' }, t('usageTokenActivity'))),
@@ -596,27 +622,47 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
                 onClick: () => selectRange(option),
               }, t(option === '7d' ? 'usageRange7d' : 'usageRange30d')))),
             h('div', { className: 'power-dsh-usage-legend' },
-              ...topModels.map(model => h('span', { key: `${model.provider}/${model.modelId}`, className: 'power-dsh-usage-legend-item' },
+              ...topModels.map(model => h('button', { key: trendModelKey(model), type: 'button', className: 'power-dsh-usage-legend-item',
+                'aria-pressed': !hiddenTrendModels.has(trendModelKey(model)),
+                onClick: () => {
+                  if (!mounted.current) return;
+                  const key = trendModelKey(model);
+                  setHiddenTrendModels(previous => {
+                    const next = new Set(previous);
+                    if (next.has(key)) next.delete(key); else next.add(key);
+                    return next;
+                  });
+                },
+              },
                 h('span', { className: 'power-dsh-usage-legend-dot', 'data-model': topModels.indexOf(model) }),
                 model.modelId || t('usageUnknownModel'))))),
           trendMax > 0
             ? h('div', { className: 'power-dsh-usage-chart' },
-              h(Tooltip, { label: trendLabel, side: 'top', portal: true, delayMs: 0, maxWidth: 360 },
-                h('div', { className: 'power-dsh-usage-chart-plot', tabIndex: 0, role: 'group',
-                  'aria-label': t('usageTrendTitle'), onPointerMove: inspectTrend, onKeyDown: trendKey },
-              h('svg', { className: 'power-dsh-usage-chart-svg', viewBox: '0 0 100 100', preserveAspectRatio: 'none', role: 'img', 'aria-label': t('usageTrendTitle') },
-                h('line', { x1: 0, y1: 100, x2: 100, y2: 100, className: 'power-dsh-usage-chart-axis' }),
-                ...topModels.map(model => h('path', {
-                  key: `${model.provider}/${model.modelId}`, d: smoothPath(seriesFor(model)),
-                  className: 'power-dsh-usage-chart-line', 'data-model': topModels.indexOf(model),
-                  fill: 'none', vectorEffect: 'non-scaling-stroke',
-                })),
-                h('line', { x1: inspectedX, y1: 0, x2: inspectedX, y2: 100,
-                  className: 'power-dsh-usage-chart-guide', vectorEffect: 'non-scaling-stroke', 'aria-hidden': true })))),
+              h('div', { className: 'power-dsh-usage-chart-plot', role: 'group', 'aria-label': t('usageTrendTitle') },
+                h('svg', { className: 'power-dsh-usage-chart-svg', viewBox: '0 0 100 100', preserveAspectRatio: 'none', role: 'img', 'aria-label': t('usageTrendTitle') },
+                  h('line', { x1: 0, y1: 100, x2: 100, y2: 100, className: 'power-dsh-usage-chart-axis' }),
+                  ...trendSeries.map(({ model, points, colorIndex }) => h('path', {
+                    key: `${model.provider}/${model.modelId}`, d: smoothPath(points),
+                    className: 'power-dsh-usage-chart-line', 'data-model': colorIndex,
+                    fill: 'none', vectorEffect: 'non-scaling-stroke',
+                  }))),
+                ...trendSeries.flatMap(({ model, points, colorIndex }, modelIndex) => points.map((point, dateIndex) => {
+                  const key = pointKey(model, point.date);
+                  const label = `${point.date}\n${t('usageTrendPoint')
+                    .replace('{model}', () => model.modelId || t('usageUnknownModel'))
+                    .replace('{tokens}', () => formatTokens(point.tokens, locale))}`;
+                  return h(Tooltip, { key, label, side: 'top', portal: true, delayMs: 0, maxWidth: 360 },
+                    h('span', { className: 'power-dsh-usage-chart-point', role: 'img', 'aria-label': label,
+                      'data-model': colorIndex, 'data-trend-model': model.modelId, 'data-trend-date': point.date,
+                      style: { left: `${point.x}%`, top: `${point.y}%` }, tabIndex: key === activeTrendPoint ? 0 : -1,
+                      onFocus: () => setTrendFocus(key), onKeyDown: (event: import('react').KeyboardEvent<HTMLSpanElement>) => trendKey(event, modelIndex, dateIndex),
+                      ref: (node: HTMLSpanElement | null): void => { if (node) trendPointRefs.current.set(key, node); else trendPointRefs.current.delete(key); },
+                    }, h('span', { className: 'power-dsh-usage-chart-point-dot', 'aria-hidden': true })));
+                }))),
               h('div', { className: 'power-dsh-usage-chart-axis-labels' },
                 ...axisLabels.map(row => h('span', { key: row.date, className: 'power-dsh-usage-chart-axis-label' }, row.date.slice(5).replace('-', '/')))))
             : h('p', { className: 'power-dsh-usage-empty' }, t('usageChartEmpty'))))),
-      customDialog);
+      customPopover);
 
   }
 
@@ -628,7 +674,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
 
   const loadUsageStats = async () => {
     const current = ++generation;
-    if (usage.status !== 'ready') { usage = { ...usage, status: 'loading', error: '' }; usageSource.notify(); }
+    usage = { ...usage, status: 'loading', error: '' };
+    usageSource.notify();
     try {
       const result = await ctx.remote.powerDsh.readUsageStats(browserZone());
       if (!active || current !== generation) return;

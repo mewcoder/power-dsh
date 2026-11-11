@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { watchBackground } from '../attachment.ts';
-import { createClientFeature } from '../client.ts';
+import { watchBackground } from '../../../shared/client/background/attachment.ts';
+import { presentFailure } from '../diagnostics.ts';
 import { locales } from '../locales.ts';
-import { createRuntime } from '../../../shared/client/runtime.ts';
 
 // Verifies DOM ownership and rollback; this fixture does not render pixels.
 class Element {
@@ -529,87 +528,50 @@ test('missing, hidden, ambiguous or unsupported frames never get a foreground fa
   }
 });
 
-test('the shell controller renders nothing and reports layout feedback until recovery', () => {
+test('shared attachment reports layout faults and recovers without an independent flow controller', () => {
   const f = fixture();
-  let component;
-  let effect;
-  const React = { createElement: (type, props) => ({ type, props }), useLayoutEffect: fn => { effect = fn; },
-    useSyncExternalStore: (_subscribe, get) => get() };
-  const feature = createClientFeature(createRuntime(React, {}), {
-    namespace: 'test', t: key => key,
-    preferenceSlot: (_field, _slot, _options, view) => { component = view; },
-  });
-  assert.equal(component({}).type(), null);
-  const previousDoc = globalThis.document;
-  const previousWin = globalThis.window;
-  globalThis.document = f.doc; globalThis.window = f.win;
-  const settings = enabled => feature.useSettings({ snapshot: { value: { flowingBackgroundEnabled: enabled } } })[0];
-  try {
-    const dispose = effect();
-    const first = settings(true).failure;
-    assert.equal(first.code, 'PD-BACKGROUND-LAYOUT');
-    assert.equal(first.operation, 'flowing-background.attach');
-    assert.equal(first.context.stage, 'frame (flowingBackgroundStageFrame)');
-    assert.equal(first.context.check, 'app-frame');
-    assert.equal(first.context.result, 'missing (flowingBackgroundResultMissing)');
-    assert.equal(first.context.expected, '1 visible frame');
-    assert.equal(first.context.actual, '0');
-    assert.equal(first.context.state, 'flowingBackgroundStatePreserved');
-    assert.equal(first.context.recovery, 'flowingBackgroundRecoveryWait');
-    f.flush();
-    assert.equal(settings(true).failure.observedAt, first.observedAt);
-    const originalStyles = f.layoutStyle.textContent;
-    f.layoutStyle.textContent += '.other_frame{}'; f.flush();
-    assert.equal(settings(true).failure.context.check, 'layout.frame');
-    assert.equal(settings(true).failure.context.actual, '2');
-    assert.equal(settings(true).failure.context.recovery, 'flowingBackgroundRecoveryUpdate');
-    f.layoutStyle.textContent += '.third_frame{}'; f.flush();
-    assert.equal(settings(true).failure.context.actual, '3', 'Updated counts must replace the prior diagnostic.');
-    f.layoutStyle.textContent = originalStyles; f.flush();
-    assert.equal(settings(true).error, undefined, 'A runtime fault is not a settings-save error.');
-    dispose();
-    assert.equal(settings(true).failure.code, 'PD-BACKGROUND-LAYOUT');
-    assert.equal(settings(false).failure, undefined);
-    f.makeFrame();
-    const disposeNext = effect();
-    assert.equal(settings(true).failure, undefined);
-    disposeNext();
-    assert.equal(f.observers.size, 0);
-  } finally {
-    if (previousDoc === undefined) delete globalThis.document; else globalThis.document = previousDoc;
-    if (previousWin === undefined) delete globalThis.window; else globalThis.window = previousWin;
-  }
+  const dispose = f.watch();
+  const feedback = () => presentFailure(f.reports.at(-1), '2026-11-11T06:55:00.000Z', key => key);
+  const first = feedback();
+  assert.equal(first.code, 'PD-BACKGROUND-LAYOUT');
+  assert.equal(first.context.stage, 'frame (flowingBackgroundStageFrame)');
+  assert.equal(first.context.check, 'app-frame');
+  assert.equal(first.context.result, 'missing (flowingBackgroundResultMissing)');
+  assert.equal(first.context.expected, '1 visible frame');
+  assert.equal(first.context.actual, '0');
+  assert.equal(first.context.state, 'flowingBackgroundStatePreserved');
+  assert.equal(first.context.recovery, 'flowingBackgroundRecoveryWait');
+  const originalStyles = f.layoutStyle.textContent;
+  f.layoutStyle.textContent += '.other_frame{}'; f.flush();
+  assert.equal(feedback().context.check, 'layout.frame');
+  assert.equal(feedback().context.actual, '2');
+  assert.equal(feedback().context.recovery, 'flowingBackgroundRecoveryUpdate');
+  f.layoutStyle.textContent += '.third_frame{}'; f.flush();
+  assert.equal(feedback().context.actual, '3', 'Updated counts replace the prior fault evidence.');
+  f.layoutStyle.textContent = originalStyles;
+  f.makeFrame(); f.flush();
+  assert.equal(f.statuses.at(-1), 'attached', 'A valid target recovers the same watcher.');
+  assert.equal(f.starts.length, 1);
+  dispose();
+  assert.equal(f.observers.size, 0);
 });
 
 test('background summaries and recovery guidance are bilingual while diagnostic identifiers stay stable', () => {
-  const previousDoc = globalThis.document;
-  const previousWin = globalThis.window;
-  try {
-    for (const language of ['en', 'zh']) {
-      const f = fixture(); f.makeFrame(); f.layoutStyle.remove();
-      globalThis.document = f.doc; globalThis.window = f.win;
-      let component, effect;
-      const React = { createElement: (type, props) => ({ type, props }), useLayoutEffect: fn => { effect = fn; },
-        useSyncExternalStore: (_subscribe, get) => get() };
-      const feature = createClientFeature(createRuntime(React, {}), { namespace: 'test',
-        t: key => locales[language][key], preferenceSlot: (_field, _slot, _options, view) => { component = view; } });
-      component({}).type();
-      const dispose = effect();
-      const current = () => feature.useSettings({ snapshot: { value: { flowingBackgroundEnabled: true } } })[0].failure;
-      assert.ok(current().message.includes(locales[language].flowingBackgroundStylesMissing));
-      assert.equal(current().context.check, 'layout.stylesheet');
-      assert.ok(current().context.stage.startsWith('styles ('));
-      assert.equal(current().context.recovery, locales[language].flowingBackgroundRecoveryWait);
-      f.head.append(f.layoutStyle);
-      f.layoutStyle.textContent += '.other_frame{}'; f.flush();
-      assert.ok(current().message.includes(locales[language].flowingBackgroundStylesAmbiguous));
-      assert.equal(current().context.recovery, locales[language].flowingBackgroundRecoveryUpdate);
-      assert.equal(current().context.actual, '2');
-      dispose();
-    }
-  } finally {
-    if (previousDoc === undefined) delete globalThis.document; else globalThis.document = previousDoc;
-    if (previousWin === undefined) delete globalThis.window; else globalThis.window = previousWin;
+  for (const language of ['en', 'zh']) {
+    const f = fixture(); f.makeFrame(); f.layoutStyle.remove();
+    const dispose = f.watch();
+    const current = () => presentFailure(f.reports.at(-1), '2026-11-11T06:55:00.000Z', key => locales[language][key]);
+    assert.ok(current().message.includes(locales[language].flowingBackgroundStylesMissing));
+    assert.equal(current().context.check, 'layout.stylesheet');
+    assert.ok(current().context.stage.startsWith('styles ('));
+    assert.equal(current().context.recovery, locales[language].flowingBackgroundRecoveryWait);
+    f.head.append(f.layoutStyle);
+    f.layoutStyle.textContent += '.other_frame{}'; f.flush();
+    assert.ok(current().message.includes(locales[language].flowingBackgroundStylesAmbiguous));
+    assert.equal(current().context.recovery, locales[language].flowingBackgroundRecoveryUpdate);
+    assert.equal(current().context.actual, '2');
+    dispose();
+    assert.equal(f.observers.size, 0);
   }
 });
 
@@ -678,6 +640,12 @@ test('live appearance notifications restyle the same artwork and release their s
   for (const property of ['position', 'inset', 'width', 'height']) {
     assert.equal(canvas.style.getPropertyValue(property), '', 'Blur preserves the original canvas framing.');
   }
+  appearance = { opacity: 0, blur: 40 };
+  notify();
+  assert.equal(layer.style.getPropertyValue('opacity'), '0');
+  assert.equal(canvas.style.getPropertyValue('filter'), 'blur(40px)', 'Flow retains its existing blur range and opacity semantics.');
+  assert.equal(layer.querySelector('.power-dsh-wallpaper-veil'), null);
+  for (const property of ['position', 'inset', 'width', 'height']) assert.equal(canvas.style.getPropertyValue(property), '');
   appearance = { opacity: 100, blur: 0 };
   notify();
   assert.equal(layer.style.getPropertyValue('opacity'), '');
@@ -727,21 +695,24 @@ test('a wallpaper layer uses a cover image and never starts the GPU frame chain'
   const layer = f.body.querySelector('.power-dsh-flowing-background');
   assert.ok(layer);
   assert.equal(layer.attributes.get('data-kind'), 'wallpaper');
-  assert.equal(layer.style.getPropertyValue('opacity'), '0.8');
+  assert.equal(layer.style.getPropertyValue('opacity'), '', 'Visibility mixes with theme color rather than fading the whole layer.');
+  const veil = layer.querySelector('.power-dsh-wallpaper-veil');
+  assert.equal(veil.style.getPropertyValue('opacity'), '0.2');
   const image = layer.children.find(child => child.tagName === 'img');
   assert.ok(image, 'The wallpaper renders as an image');
   assert.equal(image.attributes.get('alt'), '', 'The decorative image stays out of the accessibility tree');
   assert.equal(image.attributes.get('draggable'), 'false');
   assert.equal(image.style.getPropertyValue('filter'), 'blur(8px)');
-  for (const property of ['position', 'inset', 'width', 'height']) {
-    assert.equal(image.style.getPropertyValue(property), '', 'Blur cannot enlarge the cover box.');
-  }
+  assert.equal(image.style.getPropertyValue('position'), 'absolute');
+  assert.equal(image.style.getPropertyValue('inset'), '-24px');
+  assert.equal(image.style.getPropertyValue('width'), 'calc(100% + 48px)');
+  assert.equal(image.style.getPropertyValue('height'), 'calc(100% + 48px)');
   assert.equal(layer.children.some(child => child.tagName === 'canvas'), false);
   assert.equal(starts.length, 0, 'No WebGL chain is created for a static wallpaper');
   dispose();
 });
 
-test('wallpaper blur preserves image framing across the full range and clears old padding', () => {
+test('wallpaper blur overscans only media by three radii and clears geometry at zero', () => {
   const f = fixture();
   f.makeFrame();
   let appearance = { opacity: 100, blur: 999, wallpaper: { dataUrl: 'data:image/png;base64,AAAA', name: 'sky.png' } };
@@ -752,20 +723,49 @@ test('wallpaper blur preserves image framing across the full range and clears ol
   const layer = f.body.querySelector('.power-dsh-flowing-background');
   const image = layer.children.find(child => child.tagName === 'img');
   const frame = layer.parentElement;
-  // Simulate an existing layer with geometry left by the previous blur behavior.
-  image.style.setProperty('position', 'absolute');
-  image.style.setProperty('inset', '-120px');
-  image.style.setProperty('width', 'calc(100% + 240px)');
-  image.style.setProperty('height', 'calc(100% + 240px)');
-  for (const blur of [999, 40, 16, 8, 0]) {
+  for (const blur of [999, 20, 16, 8, 0, -1, NaN]) {
     appearance = { ...appearance, blur };
     notify();
-    assert.equal(image.style.getPropertyValue('filter'), blur ? `blur(${Math.min(40, blur)}px)` : '');
+    const radius = Number.isFinite(blur) ? Math.max(0, Math.min(20, blur)) : 0;
+    assert.equal(image.style.getPropertyValue('filter'), radius ? `blur(${radius}px)` : '');
     assert.equal(layer.children.find(child => child.tagName === 'img'), image);
-    for (const property of ['position', 'inset', 'width', 'height']) {
-      assert.equal(image.style.getPropertyValue(property), '', 'Changing blur never scales or repositions the image.');
+    assert.equal(image.style.getPropertyValue('position'), radius ? 'absolute' : '');
+    assert.equal(image.style.getPropertyValue('inset'), radius ? `-${3 * radius}px` : '');
+    for (const property of ['width', 'height']) {
+      assert.equal(image.style.getPropertyValue(property), radius ? `calc(100% + ${6 * radius}px)` : '');
     }
-    for (const property of ['filter', 'inset', 'width', 'height']) assert.equal(frame.style.getPropertyValue(property), '');
+    for (const element of [layer, frame, layer.querySelector('.power-dsh-wallpaper-veil')]) {
+      for (const property of ['filter', 'inset', 'width', 'height']) assert.equal(element.style.getPropertyValue(property), '');
+    }
+  }
+  dispose();
+});
+
+test('wallpaper zero visibility fully veils the image and suspends blur without changing the saved value', () => {
+  const f = fixture();
+  const { card } = f.makeFrame();
+  let appearance = { opacity: 65, blur: 12, wallpaper: { dataUrl: 'data:image/png;base64,AAAA', name: 'sky.png' } };
+  let notify;
+  const dispose = watchBackground(() => {}, f.doc, f.win, () => {
+    throw new Error('A wallpaper must not start an animated fallback.');
+  }, appearance, () => appearance, listener => { notify = listener; return () => {}; });
+  const layer = f.body.querySelector('.power-dsh-flowing-background');
+  const image = layer.querySelector('.power-dsh-artwork');
+  const veil = layer.querySelector('.power-dsh-wallpaper-veil');
+  for (const opacity of [0, 100, 25, -10, 150, 0, 65]) {
+    appearance = { ...appearance, opacity };
+    notify();
+    const bounded = Math.max(0, Math.min(100, opacity));
+    assert.equal(veil.style.getPropertyValue('opacity'), String((100 - bounded) / 100));
+    assert.equal(layer.style.getPropertyValue('opacity'), '');
+    assert.equal(appearance.blur, 12, 'Rendering never rewrites the stored blur preference.');
+    assert.equal(image.style.getPropertyValue('filter'), bounded ? 'blur(12px)' : '');
+    assert.equal(image.style.getPropertyValue('inset'), bounded ? '-36px' : '');
+    assert.equal(image.style.getPropertyValue('width'), bounded ? 'calc(100% + 72px)' : '');
+    assert.equal(image.style.getPropertyValue('height'), bounded ? 'calc(100% + 72px)' : '');
+    assert.equal(layer.querySelector('.power-dsh-artwork'), image, 'Restyling preserves the asset.');
+    assert.equal(card.style.getPropertyValue('background-color'), 'white');
+    assert.equal(card.style.getPropertyValue('filter'), '');
   }
   dispose();
 });

@@ -72,6 +72,7 @@ export interface McpServerConfig {
   /** Present only when the entry declares the field; defaults are not listed. */
   serverName?: string;
   command?: string;
+  /** An empty list confirms no arguments; omission means their contents are unknown. */
   args?: string[];
   cwd?: string;
   url?: string;

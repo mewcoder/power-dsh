@@ -35,6 +35,10 @@ interface Preferences {
   flowingBackgroundOpacity: number;
   flowingBackgroundBlur: number;
   showBackgroundShortcut: boolean;
+  wallpaperEnabled?: boolean;
+  wallpaperSelection?: string;
+  wallpaperVisibility?: number;
+  wallpaperBlur?: number;
   archiveManagerEnabled: boolean;
   autoArchiveDays: number;
   autoArchivedSessions: string[];
@@ -60,7 +64,7 @@ type SettingsOutput = Pick<Preferences, SettingsParameter> & {
   version: string | null;
   telemetry: TelemetryStatus;
 };
-type FeatureId = 'version-display' | 'appearance-shortcut' | 'refresh-button' | 'restart-button' | 'notifications' | 'personalization' | 'skills' | 'mcp' | 'account-blocking' | 'search-blocking' | 'telemetry-blocking' | 'todo-blocking' | 'plan-blocking' | 'goal-blocking' | 'double-click-rename' | 'thinking-effort' | 'flowing-background' | 'archive' | 'usage-stats' | 'projects';
+type FeatureId = 'version-display' | 'appearance-shortcut' | 'refresh-button' | 'restart-button' | 'notifications' | 'personalization' | 'skills' | 'mcp' | 'account-blocking' | 'search-blocking' | 'telemetry-blocking' | 'todo-blocking' | 'plan-blocking' | 'goal-blocking' | 'double-click-rename' | 'thinking-effort' | 'flowing-background' | 'archive' | 'usage-stats' | 'projects' | 'wallpaper';
 type FeatureCategory = 'general' | 'interface' | 'enhance' | 'simplify' | 'other';
 interface FeatureDefinition {
   readonly id: FeatureId;
@@ -139,6 +143,7 @@ interface McpServerConfig {
   /** Present only when the entry declares the field; defaults are not listed. */
   serverName?: string;
   command?: string;
+  /** An empty list confirms no arguments; omission means their contents are unknown. */
   args?: string[];
   cwd?: string;
   url?: string;

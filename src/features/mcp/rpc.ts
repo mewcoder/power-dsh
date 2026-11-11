@@ -68,6 +68,7 @@ const configCodec: Codec<McpServerConfig> = {
       || !optionalText(value.serverName) || !optionalText(value.command) || !optionalText(value.cwd)
       || !optionalText(value.url) || !(value.args === undefined || isStringArray(value.args))
       || !(value.reconnect === undefined || isRecord(value.reconnect))) throw new TypeError('Invalid MCP configuration');
+    if (value.argsHidden === true && value.args === undefined) throw new TypeError('mcpDetailOutdated');
     const endpoint = projectEndpoint(value.url);
     const config: McpServerConfig = {
       transport: value.transport,

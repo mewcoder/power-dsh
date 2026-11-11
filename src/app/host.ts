@@ -10,7 +10,7 @@ import type * as McpFeature from '../features/mcp/host.ts';
 import type * as NotificationsFeature from '../features/notifications/host.ts';
 import type * as RestartFeature from '../features/restart-button/host.ts';
 import type * as ArchiveFeature from '../features/archive/host.ts';
-import type * as BackgroundFeature from '../features/flowing-background/host.ts';
+import type * as BackgroundFeature from '../features/wallpaper/host.ts';
 import type * as UsageFeature from '../features/usage-stats/host.ts';
 import { NativeRemoteService, type NativeContext } from '../shared/host/native.ts';
 import type { HostFeature } from '../shared/host/feature.ts';

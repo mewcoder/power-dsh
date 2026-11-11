@@ -29,7 +29,8 @@ export async function buildArtifacts({ check = false, clientOnly = false } = {})
             for (const id of Object.keys(chunk.modules)) {
               if (id.startsWith('\0')) continue; // Bundler-owned virtual helpers have no host capability.
               const name = path.relative(root, id).replaceAll(path.sep, '/');
-              assert.ok(name.startsWith('src/'), `Client must use repository modules and the native factory: ${name}`);
+              assert.ok(name.startsWith('src/') || /^assets\/wallpapers\/[a-z0-9-]+\.json$/.test(name),
+                `Client must use repository modules, local wallpaper data and the native factory: ${name}`);
               assert.doesNotMatch(name, /(?:^|\/)(?:host|config)\.ts$|\/shared\/host\/|\/tests\//,
                 `Host or test code reached the Client bundle: ${name}`);
               clientInputs.add(name);

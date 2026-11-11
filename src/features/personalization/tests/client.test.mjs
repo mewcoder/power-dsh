@@ -26,10 +26,13 @@ test('personalization loading and read-only notices remain before the editor wit
       app.set({ personalizationEnabled: true });
       if (state === 'readOnly') await personalization(app);
       const view = descendants(app.renderPersonalization());
-      const notice = view.find(node => node.props.className === 'power-dsh-notice');
-      assert.ok(notice.props.children.includes(state));
+      const notice = view.find(node => node.props.className === (state === 'loading' ? 'power-dsh-loading' : 'power-dsh-notice'));
+      assert.ok(descendants(notice).some(node => node.props.children.includes(state)));
       assert.equal(notice.props.role, 'status');
-      assert.equal(notice.props['data-tone'], 'neutral');
+      if (state === 'loading') {
+        assert.equal(notice.props['data-compact'], undefined);
+        assert.ok(descendants(notice).some(node => node.type === 'native-state-dot-fixture' && node.props.state === 'ongoing'));
+      } else assert.equal(notice.props['data-tone'], 'neutral');
       assert.ok(view.indexOf(notice) < view.indexOf(view.find(node => node.type === 'textarea')));
     } finally { app.unmount(); }
   });

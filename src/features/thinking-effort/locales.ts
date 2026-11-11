@@ -22,7 +22,7 @@ export const locales = {
     "effortSwitchTo": "点击切换到",
     "effortSwitchFailed": "无法切换推理等级，请重试。",
     "thinkingEffortGlyph": "推理等级切换按钮样式",
-    "thinkingEffortGlyphDescription": "设置模型选择旁的快捷切换按钮外观。",
+    "thinkingEffortGlyphDescription": "设置模型选择旁的快捷切换按钮外观",
     "glyphSignal": "信号格",
     "glyphArc": "仪表盘"
   }

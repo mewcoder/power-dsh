@@ -2,6 +2,41 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { skillFixture, catalogFixture, mount, button, descendants, skillsPage } from '../../../../tests/helpers/client-fixture.mjs';
 
+test('skill loading keeps the previous catalog only for a compact refresh in the same context', async () => {
+  let reply = Promise.withResolvers();
+  const detailReply = Promise.withResolvers();
+  const app = await mount({ featureIds: ['skills'], skillList: () => reply.promise, skillDetailReply: () => detailReply.promise });
+  app.set({ skillManagerEnabled: true });
+  const render = () => descendants(app.renderSkills());
+  const loading = () => render().find(node => node.props.className === 'power-dsh-loading');
+  assert.equal(loading().props.role, 'status');
+  assert.equal(loading().props['data-compact'], undefined);
+  assert.ok(descendants(loading()).some(node => node.type === 'native-state-dot-fixture' && node.props.state === 'ongoing'));
+  reply.resolve({ ok: true, value: catalogFixture() });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(loading(), undefined);
+  reply = Promise.withResolvers();
+  const refresh = app.reloadSkills();
+  assert.equal(loading().props['data-compact'], true);
+  assert.ok(render().some(node => node.props['data-skill'] === 'code-review'));
+  reply.resolve({ ok: true, value: catalogFixture() });
+  await refresh;
+  render().find(node => node.props['data-detail'] === 'code-review').props.onClick({ currentTarget: null });
+  const detailLoading = loading();
+  assert.equal(detailLoading.props['data-compact'], undefined);
+  assert.ok(descendants(detailLoading).some(node => node.props.children.includes('skillDetailLoading')));
+  render().find(node => node.type === 'native-modal-fixture').props.onClose();
+  reply = Promise.withResolvers();
+  const changeContext = app.reloadSkills('/work/a', 'project');
+  assert.equal(loading().props['data-compact'], undefined);
+  assert.ok(!render().some(node => node.props['data-skill'] === 'code-review'));
+  reply.resolve({ ok: true, value: catalogFixture({ cwd: '/work/a', scope: 'project' }) });
+  await changeContext;
+  assert.equal(loading(), undefined);
+  assert.deepEqual(app.skillWrites, []);
+  app.unmount();
+});
+
 test('the skill management switch controls only its own native page and icon and cleans subscriptions', async () => {
   const app = await mount();
   const section = 'settings.section:power-dsh-skills';
@@ -100,6 +135,32 @@ test('skill management requests real scopes, keeps full hover text and searches 
   assert.equal(page.select('skillPreset'), undefined);
   page.search().props.onChange({ target: { value: '文案' } });
   assert.ok(page.row('project-style'));
+  assert.deepEqual(app.skillWrites, []);
+  app.unmount();
+});
+
+test('a catalog with only built-in skills starts expanded and respects later manual collapse', async () => {
+  const app = await mount({ skillCatalog: catalogFixture({ skills: [
+    skillFixture({ name: 'bundled-skill', source: 'bundled' }),
+    skillFixture({ name: 'runtime-skill', source: 'runtime' }),
+  ] }) });
+  const page = await skillsPage(app);
+  const group = () => page.render().find(node => node.props.id === 'settings-test-group-preinstalled');
+  assert.equal(group().props['aria-expanded'], true);
+  assert.ok(page.row('bundled-skill'));
+  assert.ok(page.row('runtime-skill'));
+  assert.ok(!page.render().some(node => node.props.id === 'settings-test-group-personal'));
+  group().props.onClick();
+  assert.equal(group().props['aria-expanded'], false);
+  assert.equal(page.row('bundled-skill'), undefined);
+  await app.reloadSkills();
+  assert.equal(group().props['aria-expanded'], false, 'Refreshing does not override an explicit collapse.');
+  page.search().props.onChange({ target: { value: 'bundled-skill' } });
+  assert.ok(page.row('bundled-skill'));
+  page.search().props.onChange({ target: { value: '' } });
+  assert.equal(group().props['aria-expanded'], false, 'Clearing search restores the manual choice.');
+  group().props.onClick();
+  assert.ok(page.row('runtime-skill'));
   assert.deepEqual(app.skillWrites, []);
   app.unmount();
 });
@@ -417,7 +478,7 @@ test('skill detail reads the body on demand and shows description, metadata and 
   const body = descendants(page.dialog()).find(node => node.props.className === 'power-dsh-skill-detail-markdown');
   assert.equal(descendants(page.dialog()).find(node => node.props.className === 'power-dsh-skill-detail-body').props.tabIndex, 0, 'The entire reading area can be scrolled with the keyboard.');
   const labels = descendants(page.dialog()).filter(node => node.type === 'dt').flatMap(node => node.props.children);
-  assert.deepEqual(labels, ['skillDetailDescription', 'skillDetailPath']);
+  assert.deepEqual(labels, ['skillDetailPath', 'skillDetailDescription']);
   const order = descendants(page.dialog()).find(node => node.props.className === 'power-dsh-skill-detail-body')
     .props.children.filter(Boolean).map(node => node.props.className);
   assert.deepEqual(order, ['power-dsh-skill-detail-list', 'power-dsh-skill-detail-markdown']);

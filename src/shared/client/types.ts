@@ -31,6 +31,7 @@ export interface PublicPrimitives {
     labels: { code: { copyLabel: string; copiedLabel: string }; footnotes: string };
   }>;
   Menu: ReactTypes.ComponentType<MenuProps>;
+  MenuSurface: ReactTypes.ComponentType<ReactTypes.HTMLAttributes<HTMLDivElement> & ReactTypes.RefAttributes<HTMLDivElement> & { compact?: boolean; popover?: 'auto' | 'manual'; onToggle?: (event: ReactTypes.SyntheticEvent<HTMLDivElement, ToggleEvent>) => void }>;
   Tooltip: ReactTypes.ComponentType<TooltipProps>;
   StateDot: ReactTypes.ComponentType<{ state: StateDotState }>;
   Modal: ReactTypes.ComponentType<ModalProps>;
@@ -42,6 +43,7 @@ export interface ClientRuntime extends PublicPrimitives {
   useSnapshot<T>(source: SnapshotSource<T>): T;
   useMounted(): ReactTypes.MutableRefObject<boolean>;
   NativeIcon: ReactTypes.ComponentType<{ glyph: string; size?: number }>;
+  loadingFeedback(props: { label: string; compact?: boolean }): ReactTypes.ReactElement;
   errorFeedback(props: import('./error-feedback.ts').ErrorFeedbackProps): ReactTypes.ReactElement;
 }
 

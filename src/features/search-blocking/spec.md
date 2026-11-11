@@ -2,7 +2,7 @@
 
 模块 id：`search-blocking`；主开关 `blockOfficialSearch` 默认 `false`。模块的[定义](definition.ts)、[配置](config.ts)、[Client](client.ts)与[行为测试](tests/)在本目录维护。
 
-入口：**设置 → PowerDSH → 精简 → 停用官方搜索**，默认关闭，通过 `blockOfficialSearch` 独立持久化。说明：「关闭内置 WebSearch，保留 WebFetch。」[停用官方登录与模型接入](../account-blocking/spec.md)继续使用已有 `blockOfficialAccount`，两个开关互不联动。
+入口：**设置 → PowerDSH → 精简 → 停用官方搜索**，默认关闭，通过 `blockOfficialSearch` 独立持久化。说明为「关闭内置 WebSearch，保留 WebFetch」。[停用官方登录与模型接入](../account-blocking/spec.md)继续使用已有 `blockOfficialAccount`，两个开关互不联动。
 
 ## 范围与行为
 

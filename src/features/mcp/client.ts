@@ -12,7 +12,7 @@ const runtimeDots = { pending: 'ongoing', loading: 'ongoing', unloading: 'ongoin
 const milliseconds = (value: number) => `${String(value)} ms`;
 
 export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironment) {
-  const { React, h, Tooltip, StateDot, Modal, Button, observable, useSnapshot, useMounted, errorFeedback } = runtime;
+  const { React, h, Tooltip, StateDot, Modal, Button, observable, useSnapshot, useMounted, errorFeedback, loadingFeedback } = runtime;
   const { ctx, form, source, t, savePreference, preferenceSlot, namespace } = env;
   const styles = shellStyles + catalogStyles + featureStyles;
   const { SkillSearchIcon, SkillChevron } = createCatalogUI(runtime);
@@ -209,7 +209,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         className: 'power-dsh-mcp-detail', description: server?.name ?? catalogServer?.name ?? current.id,
         footer: h(Button, { variant: 'outline', 'data-modal-autofocus': true, onClick: closeDetail }, t('close')),
       },
-      current.status === 'loading' && h('p', { className: 'power-dsh-notice', role: 'status' }, t('mcpDetailLoading')),
+      current.status === 'loading' && loadingFeedback({ label: t('mcpDetailLoading') }),
       current.status === 'error' && errorFeedback({ t, message: current.error, code: 'PD-MCP-DETAIL',
         operation: 'readMcpServer', retry: () => { if (server) void openDetail(server, detailTrigger.current); } }),
       current.status === 'ready' && current.value === null
@@ -219,8 +219,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         label('mcpDetailTransport', transportLabel),
         label('mcpDetailRuntime', runtimeLabel),
         config?.command && label('mcpDetailCommand', h('code', { className: 'power-dsh-mcp-detail-code' }, config.command)),
-        label('mcpDetailArgs', config?.args?.length
-          ? h('code', { className: 'power-dsh-mcp-detail-code' },
+        label('mcpDetailArgs', !config || !config.args || config.expressions.includes('args') ? t('mcpDetailUnknown')
+          : config.args?.length ? h('code', { className: 'power-dsh-mcp-detail-code' },
             config.args.map(arg => /[\s"'\\]/.test(arg) || arg === '' ? JSON.stringify(arg) : arg).join(' '))
           : t('mcpDetailNone')),
         config?.cwd && label('mcpDetailCwd', h('code', { className: 'power-dsh-mcp-detail-code' }, config.cwd)),
@@ -249,7 +249,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       h('header', null,
         h('h2', { className: 'power-dsh-title' }, t('mcpTab')),
         h('p', { className: 'power-dsh-description' }, t('mcpDescription'))),
-      snapshot.status === 'loading' && h('p', { className: 'power-dsh-notice', role: 'status' }, t('loading')),
+      snapshot.status === 'loading' && loadingFeedback({ label: t('loading'), ...(catalog ? { compact: true } : {}) }),
       snapshot.error && errorFeedback({ t, message: snapshot.error, code: 'PD-MCP-LOAD',
         operation: 'listMcpServers', placement: 'page', retry: () => loadMcpServers(), disabled: busy }),
       h('div', { className: 'power-dsh-skill-panel' },
@@ -282,7 +282,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     'mcpLoadFailed', 'mcpProviderInitFailed', 'mcpPluginsLoadFailed', 'mcpBundlesLoadFailed',
     'mcpPresetsLoadFailed', 'mcpProvidersLoadFailed', 'mcpMetadataLoadFailed',
     'mcpChangeFailed', 'mcpRestartRequired', 'mcpChangeOverridden', 'mcpChangeUncertain', 'mcpUnavailable',
-    'mcpDetailFailed',
+    'mcpDetailFailed', 'mcpDetailOutdated',
   ].includes(message ?? '') ? message! : fallback);
   const mirrorMcpCatalog = (value: McpCatalog) => {
     mcpCatalog = { status: 'ready', value, error: '', saving: null };

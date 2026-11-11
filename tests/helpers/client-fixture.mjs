@@ -150,6 +150,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   }
   const resizeListeners = new Set();
   const focusListeners = new Set();
+  const blurListeners = new Set();
   const doubleClickListeners = new Set();
   const intervals = new Map();
   let intervalId = 0;
@@ -278,20 +279,30 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     return props.open ? { type: 'native-modal-fixture', props: { ...props, role: 'dialog', 'aria-modal': true,
       children: [props.description, props.children, props.footer] } } : null;
   }
+  function FakeMenuSurface(props) {
+    let open = false;
+    props.ref?.({ matches: () => open, showPopover() { open = true; } });
+    return { type: 'native-menu-surface-fixture', props };
+  }
   function FakeButton(props) {
     return { type: 'button', props: { ...props, 'data-native-button': true } };
   }
   let focusedElementId = null;
+  let filePickerOpens = 0;
   const React = {
     Fragment: 'fragment',
     createElement(type, props, ...children) {
       if (type === FakeModal) return FakeModal({ ...props, children });
+      if (type === FakeMenuSurface) return FakeMenuSurface({ ...props, children });
       if (type === FakeButton) return FakeButton({ ...props, children });
       if (type === FakeMenu) return FakeMenu(props);
       if (type === FakeStateDot) return FakeStateDot({ ...props, children });
       if (type === FakeTooltip) return FakeTooltip({ ...props, children });
       if (type === FakeMarkdownText) return FakeMarkdownText(props);
       if (typeof props?.ref === 'function') props.ref({ focus() { focusedElementId = props.id; } });
+      if (type === 'input' && props?.type === 'file' && props.ref && typeof props.ref === 'object') {
+        props.ref.current = { click() { filePickerOpens++; } };
+      }
       return { type, props: { ...props, children } };
     },
     useId: () => 'settings-test',
@@ -398,16 +409,16 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       clearInterval(id) { intervals.delete(id); },
       addEventListener(name, fn, capture) {
         if (name === 'dblclick') assert.equal(capture, true, 'Block before the native React title handler.');
-        (name === 'focus' ? focusListeners : name === 'dblclick' ? doubleClickListeners : resizeListeners).add(fn);
+        (name === 'focus' ? focusListeners : name === 'blur' ? blurListeners : name === 'dblclick' ? doubleClickListeners : resizeListeners).add(fn);
       },
       removeEventListener(name, fn, capture) {
         if (name === 'dblclick') assert.equal(capture, true);
-        (name === 'focus' ? focusListeners : name === 'dblclick' ? doubleClickListeners : resizeListeners).delete(fn);
+        (name === 'focus' ? focusListeners : name === 'blur' ? blurListeners : name === 'dblclick' ? doubleClickListeners : resizeListeners).delete(fn);
       },
       __ModuleLoader__: { load(value) { plugin = value.factory(specifier => {
         if (specifier === 'react') return React;
         assert.equal(specifier, '@deepseek-ai/dsh-client-ui-primitives');
-        return { Menu: FakeMenu, Tooltip: FakeTooltip, StateDot: FakeStateDot, Modal: FakeModal, Button: FakeButton, MarkdownText: FakeMarkdownText };
+        return { Menu: FakeMenu, MenuSurface: FakeMenuSurface, Tooltip: FakeTooltip, StateDot: FakeStateDot, Modal: FakeModal, Button: FakeButton, MarkdownText: FakeMarkdownText };
       }); } },
     },
   });
@@ -415,7 +426,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   if (featureIds) {
     vm.runInContext(await getCompositionBundle(), context);
     const { createClient, clientFeatures } = context.PowerDshComposition;
-    plugin = createClient(React, { Menu: FakeMenu, Tooltip: FakeTooltip, StateDot: FakeStateDot, Modal: FakeModal, Button: FakeButton, MarkdownText: FakeMarkdownText },
+    plugin = createClient(React, { Menu: FakeMenu, MenuSurface: FakeMenuSurface, Tooltip: FakeTooltip, StateDot: FakeStateDot, Modal: FakeModal, Button: FakeButton, MarkdownText: FakeMarkdownText },
       clientFeatures.filter(feature => featureIds.includes(feature.definition.id)));
   }
   const form = {
@@ -713,6 +724,9 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     reloadUsage() {
       return app.usageProps().loadUsageStats();
     },
+    renderComponent, disposeComponent,
+    blur() { blurListeners.forEach(fn => fn()); },
+    blurSubscriptions: () => blurListeners.size,
     focus() { focusListeners.forEach(fn => fn()); },
     focusSubscriptions: () => focusListeners.size,
     doubleClickListeners,
@@ -728,6 +742,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     tickIntervals: () => Promise.all([...intervals.values()].map(timer => timer.fn())),
     setFile(text) { fileText = text; fileVersion++; },
     wallpaperWrites,
+    filePickerOpens: () => filePickerOpens,
     settingsVisibility: () => ({ open: settingsOpen, closes: settingsCloses, opens: settingsOpens }),
     renderTunePanel() {
       const entry = entries.get('shell.overlay:power-dsh-background-tune');

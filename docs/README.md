@@ -19,16 +19,17 @@
 
 ## 功能规格（Spec）
 
-每项用户功能的唯一主 Spec 与实现、文案和行为测试位于同一特性目录。维护要求见[功能 Spec 规范](feature-spec.md)，模块归属与索引由仓库检查核对。下表按「通用」「界面」「管理」「精简」「其他」顺序列出，分类范围与关联设置见[分类 Tab](ui.md#分类-tab)。
+每项用户功能的唯一主 Spec 与实现、文案和行为测试位于同一特性目录。维护要求见[功能 Spec 规范](feature-spec.md)，模块归属与索引由仓库检查核对。下表汇总各功能；界面顺序为「通用」「界面」「管理」「精简」「其他」，默认通用，分类范围与关联设置见[分类 Tab](ui.md#分类-tab)。
 
 | 功能 | 主要职责 |
 | --- | --- |
+| [壁纸](../src/features/wallpaper/spec.md) | 界面首行「开启自定义壁纸」、原生设置左侧壁纸入口（全局指令上方）、四项缩略图选择、自定义图片卡片底部操作、共享可见度／模糊、拖动预览与提交、Host 存储校验及旧背景兼容 |
 | [任务通知](../src/features/notifications/spec.md) | 事件触发、权限、前台抑制与系统提示音 |
 | [界面刷新](../src/features/refresh-button/spec.md) | 原生页面重载、状态边界与按钮显隐 |
 | [重启应用](../src/features/restart-button/spec.md) | macOS 打包桌面端的设置入口、确认、退出与同路径重开，以及平台和验收限制 |
 | [快捷推理等级切换](../src/features/thinking-effort/spec.md) | 模型选择右侧的信号格／仪表盘切换、档位序列、读回与失败边界 |
 | [外观快捷切换](../src/features/appearance-shortcut/spec.md) | 原生主题同步、按钮定位与生命周期 |
-| [自定义背景](../src/features/flowing-background/spec.md) | 单一开关、弹窗内选择官网流动图案或自定义壁纸、Host 侧壁纸存储与校验、背景不透明度与模糊调节、全局连续画布、受控结构表面适配、样式恢复与 GPU 生命周期 |
+| [退役流动背景兼容与挂载授权](../src/features/flowing-background/spec.md) | 五个隐藏旧键的无 UI 兼容、公共结构表面适配边界及既有流动图案算法依据；现行入口归壁纸 |
 | [显示版本号](../src/features/version-display/spec.md) | 宿主版本展示、桌面更新入口与侧栏定位 |
 | [技能管理](../src/features/skills/spec.md) | 全局与工作区来源、仅对 DSH 生效的启停与共享文件保护 |
 | [MCP 管理](../src/features/mcp/spec.md) | 全局服务器、原生启停、运行状态与工具列表 |

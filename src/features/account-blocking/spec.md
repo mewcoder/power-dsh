@@ -2,7 +2,7 @@
 
 模块 id：`account-blocking`；主开关 `blockOfficialAccount` 默认 `false`。模块的[定义](definition.ts)、[配置](config.ts)、[Client](client.ts)与[行为测试](tests/)在本目录维护。
 
-入口：**设置 → PowerDSH → 精简 → 停用官方登录与模型接入**，默认关闭。说明：「停用官方登录、账号界面及内置模型接入。」配置键仍为 `blockOfficialAccount`，保留已有偏好。
+入口：**设置 → PowerDSH → 精简 → 停用官方登录与模型接入**，默认关闭。说明为「停用官方登录、账号界面及内置模型接入」。配置键仍为 `blockOfficialAccount`，保留已有偏好。
 
 本开关不控制搜索或网页抓取；搜索由独立的[停用官方搜索](../search-blocking/spec.md)开关控制。
 

@@ -20,7 +20,7 @@ interface ProjectsPageProps extends PageSlotProps {
 }
 
 export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironment) {
-  const { React, h, Menu, Modal, Button, Tooltip, observable, useSnapshot, useMounted, errorFeedback } = runtime;
+  const { React, h, Menu, Modal, Button, Tooltip, observable, useSnapshot, useMounted, loadingFeedback, errorFeedback } = runtime;
   const { ctx, t, savePreference, preferenceSlot, namespace } = env;
   const styles = shellStyles + catalogStyles + featureStyles;
   const { SkillSearchIcon } = createCatalogUI(runtime);
@@ -145,7 +145,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       h('header', null,
         h('h2', { className: 'power-dsh-title' }, t('projectsTab')),
         h('p', { className: 'power-dsh-description' }, t('projectsDescription'))),
-      snapshot.status === 'loading' && h('p', { className: 'power-dsh-notice', role: 'status' }, t('loading')),
+      snapshot.status === 'loading' && loadingFeedback({ label: t('loading'), compact: Boolean(catalog) }),
       snapshot.status === 'error' && errorFeedback({ t, message: snapshot.error || t('projectsLoadFailed'),
         code: 'PD-PROJECTS-LOAD', operation: 'listProjects', placement: 'page', retry: loadProjects, disabled: busy }),
       h('div', { className: 'power-dsh-skill-panel' },
@@ -157,14 +157,14 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
           })),
           select('sort', t('projectsSortLabel'), sortBy, sortOptions,
             value => { if (mounted.current) setSortBy(value as ProjectSort); })),
-        catalog && snapshot.status === 'ready' && rows.length > 0 && h('div', { className: 'power-dsh-projects-table', role: 'table', 'aria-label': t('projectsTab') },
+        catalog && (snapshot.status === 'ready' || snapshot.status === 'loading') && rows.length > 0 && h('div', { className: 'power-dsh-projects-table', role: 'table', 'aria-label': t('projectsTab') },
           h('div', { className: 'power-dsh-projects-head', role: 'row' },
             h('span', { className: 'power-dsh-projects-cell power-dsh-projects-main', role: 'columnheader' }, t('projectsColumnProject')),
             h('span', { className: 'power-dsh-projects-cell power-dsh-projects-sessions', role: 'columnheader' }, t('projectsColumnSessions')),
             h('span', { className: 'power-dsh-projects-cell power-dsh-projects-activity', role: 'columnheader' }, t('projectsColumnActivity')),
             h('span', { className: 'power-dsh-projects-cell power-dsh-projects-actions', role: 'columnheader' }, h('span', { className: 'power-dsh-projects-sr-only' }, t('projectsRemove')))),
           h('ul', { className: 'power-dsh-projects-rows', role: 'rowgroup' }, rows.map(renderRow))),
-        catalog && snapshot.status === 'ready' && rows.length === 0
+        catalog && (snapshot.status === 'ready' || snapshot.status === 'loading') && rows.length === 0
           && h('p', { className: 'power-dsh-skill-empty' }, t(query ? 'projectsNoMatches' : 'projectsEmpty'))),
       error && !(catalog?.projects ?? []).some(row => row.workspaceId === error.id)
         && errorFeedback({ t, message: error.message, code: 'PD-PROJECTS-ACTION', operation: 'removeProject', placement: 'page' }),
@@ -188,7 +188,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
 
   const loadProjects = async () => {
     const current = ++generation;
-    if (projects.status !== 'ready') { projects = { ...projects, status: 'loading', error: '' }; projectsSource.notify(); }
+    projects = { ...projects, status: 'loading', error: '' };
+    projectsSource.notify();
     try {
       const result = await ctx.remote.powerDsh.listProjects();
       if (!active || current !== generation) return;
@@ -213,7 +214,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   };
 
   preferenceSlot('projectManagerEnabled', 'settings.section', {
-    id: 'power-dsh-projects', order: 54.5, locale: namespace, label: () => t('projectsTab'),
+    id: 'power-dsh-projects', order: 54, locale: namespace, label: () => t('projectsTab'),
   }, (props: PageSlotProps) => h(ProjectsPage, { ...props, projectsSource, loadProjects, removeProject }));
   preferenceSlot('projectManagerEnabled', 'settings.section.icon', { id: 'power-dsh-projects' }, ProjectsIcon);
   return {

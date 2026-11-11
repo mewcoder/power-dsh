@@ -35,6 +35,10 @@ export interface Preferences {
   flowingBackgroundOpacity: number;
   flowingBackgroundBlur: number;
   showBackgroundShortcut: boolean;
+  wallpaperEnabled?: boolean;
+  wallpaperSelection?: string;
+  wallpaperVisibility?: number;
+  wallpaperBlur?: number;
   archiveManagerEnabled: boolean;
   autoArchiveDays: number;
   autoArchivedSessions: string[];

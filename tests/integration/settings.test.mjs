@@ -14,12 +14,15 @@ test('page feedback appears before settings controls and distinguishes failures 
       app.setFormStatus(state.status);
       const view = descendants(app.renderSettings());
       const notices = view.filter(node => state.role === 'alert'
-         ? node.props['data-error-code'] === 'PD-SETTINGS-LOAD' : node.props.className === 'power-dsh-notice');
+         ? node.props['data-error-code'] === 'PD-SETTINGS-LOAD'
+          : node.props.className === (state.status === 'loading' ? 'power-dsh-loading' : 'power-dsh-notice'));
       assert.equal(notices.length, 1);
       const [notice] = notices;
-      assert.ok(notice.props.children.includes(state.message));
+      assert.ok(descendants(notice).flatMap(node => node.props.children).includes(state.message));
       assert.equal(notice.props.role, state.role);
-      assert.equal(notice.props['data-tone'], state.tone);
+      if (state.status === 'loading') {
+        assert.equal(descendants(notice).filter(node => node.type === 'native-state-dot-fixture' && node.props.state === 'ongoing').length, 1);
+      } else assert.equal(notice.props['data-tone'], state.tone);
       assert.ok(view.indexOf(view.find(node => node.type === 'header')) < view.indexOf(notice));
       assert.ok(view.indexOf(notice) < view.indexOf(view.find(node => node.props.role === 'tablist')));
       assert.ok(view.indexOf(notice) < view.indexOf(view.find(node => node.props.role === 'tabpanel')));
@@ -105,21 +108,24 @@ test('settings route policy changes to their explicit injected Host methods', as
   app.unmount();
 });
 
-test('settings group every switch under five panels and default to General', async () => {
+test('settings default to General with custom wallpaper first in Interface', async () => {
   const app = await mount({ desktop: true });
-  // Dependent rows follow their parent switch: the notification sound row needs
-  // notifications on, and the background shortcut row needs the background on.
+  // The notification sound row follows its parent notification switch.
   app.set({ notificationsEnabled: true, flowingBackgroundEnabled: true });
   const groups = {
     general: ['notificationsEnabled', 'notificationSoundEnabled'],
-    interface: ['showThinkingEffortSwitcher', 'showThemeSwitcher', 'flowingBackgroundEnabled', 'showBackgroundShortcut', 'showVersion'],
-    enhancements: ['skillManagerEnabled', 'mcpManagerEnabled', 'personalizationEnabled', 'archiveManagerEnabled', 'projectManagerEnabled', 'usageStatsEnabled'],
+    interface: ['wallpaperEnabled', 'showThinkingEffortSwitcher', 'showThemeSwitcher', 'showVersion'],
+    enhancements: ['skillManagerEnabled', 'mcpManagerEnabled', 'personalizationEnabled', 'projectManagerEnabled', 'archiveManagerEnabled', 'usageStatsEnabled'],
     simplify: ['blockOfficialAccount', 'blockOfficialSearch', 'blockOfficialTelemetry', 'blockTodo', 'blockPlan', 'blockGoal'],
     other: ['showRefreshButton', 'showRestartButton', 'blockDoubleClickRename'],
   };
+  const firstTabs = descendants(app.renderSettings()).filter(node => node.props.role === 'tab');
+  assert.equal(firstTabs[0].props.id, 'settings-test-tab-general');
+  assert.equal(firstTabs[0].props['aria-selected'], true);
+  assert.equal(app.entries.has('settings.section:power-dsh-wallpaper'), true);
   const fields = [];
   for (const [id, expected] of Object.entries(groups)) {
-    if (id !== 'general') app.selectSettingsTab(id);
+    app.selectSettingsTab(id);
     const view = descendants(app.renderSettings());
     const tabs = view.filter(node => node.props.role === 'tab');
     assert.deepEqual(tabs.map(tab => tab.props.children[0]), ['generalTab', 'interfaceTab', 'enhancementsTab', 'simplifyTab', 'otherTab']);
@@ -141,7 +147,7 @@ test('settings group every switch under five panels and default to General', asy
     fields.push(...actual);
     assert.ok(!view.some(node => node.type === 'textarea'));
   }
-  assert.equal(new Set(fields).size, 22);
+  assert.equal(new Set(fields).size, 21);
   app.unmount();
 });
 

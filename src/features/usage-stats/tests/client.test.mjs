@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { descendants, mount as mountClient, usageSnapshotFixture } from '../../../../tests/helpers/client-fixture.mjs';
-import { smoothPath } from '../client.ts';
+import { smoothPath, formatTokens } from '../client.ts';
 import { styles } from '../styles.ts';
 
 // Exercise the current source via the fixture's in-memory composition bundle.
@@ -49,6 +49,33 @@ test('the usage switch owns its own page and icon without extra subscriptions', 
   app.unmount();
   assert.equal(app.focusSubscriptions(), 0);
   assert.deepEqual(app.usageReads, []);
+});
+
+test('initial loading uses one shared indicator and refresh keeps statistics while the button spins', async () => {
+  const replies = [];
+  const app = await mount({ usageList: () => new Promise(resolve => replies.push(resolve)) });
+  app.set({ usageStatsEnabled: true });
+  const render = () => descendants(app.renderUsage('en'));
+  const refresh = () => render().find(node => node.props.className === 'power-dsh-usage-refresh');
+  const values = () => render().filter(node => node.props.className === 'power-dsh-usage-metric-value').map(node => node.props.children.join(''));
+  const initial = render();
+  assert.equal(initial.filter(node => node.props.className === 'power-dsh-loading').length, 1);
+  assert.equal(initial.filter(node => node.type === 'native-state-dot-fixture' && node.props.state === 'ongoing').length, 1);
+  replies[0]({ ok: true, value: usageSnapshotFixture() });
+  await new Promise(resolve => setImmediate(resolve));
+  const before = values();
+  refresh().props.onClick();
+  assert.equal(refresh().props.disabled, true);
+  assert.equal(refresh().props['aria-busy'], true);
+  assert.equal(descendants(refresh()).filter(node => node.type === 'native-state-dot-fixture').length, 1);
+  assert.equal(render().filter(node => node.props.className === 'power-dsh-loading').length, 0);
+  assert.deepEqual(values(), before);
+  replies[1]({ ok: false, error: { message: 'usageLoadFailed' } });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(refresh().props.disabled, false);
+  assert.deepEqual(values(), before);
+  assert.ok(render().some(node => node.props['data-error-code'] === 'PD-USAGE-LOAD'));
+  app.unmount();
 });
 
 test('the page reads the browser zone once and renders the lifetime summary', async () => {
@@ -203,15 +230,16 @@ test('the trend keeps its own 7/30-day zoom regardless of the page period', asyn
   app.unmount();
 });
 
-test('the page groups the filtered sections apart from the full-history ones', async () => {
+test('the page separates range and history statistics without redundant visible group headings', async () => {
   const app = await mount({ usageSnapshot: usageSnapshotFixture() });
   const page = await usagePage(app);
   const groups = page.render().filter(node => node.props.className === 'power-dsh-usage-group');
   assert.equal(groups.length, 2, 'The page separates range-bound sections from history-wide ones.');
+  assert.ok(groups.every(group => !descendants(group).some(node => node.type === 'h2')), 'The extra group heading rows are omitted.');
   const contents = groups.map(group => {
     const nodes = descendants(group);
     return {
-      title: [nodes.find(node => node.props.className === 'power-dsh-usage-group-title').props.children].flat(Infinity).join(''),
+      title: group.props['aria-label'],
       cards: nodes.filter(node => node.props.className === 'power-dsh-usage-metric').length,
       models: nodes.some(node => node.props.className === 'power-dsh-usage-models'),
       heatmap: nodes.some(node => node.props.className === 'power-dsh-usage-heatmap'),
@@ -239,6 +267,45 @@ test('the model list follows the page period while the trend keeps its own zoom'
   assert.deepEqual(all, ['400', '100'], 'All sums the whole history, including the earlier day.');
   assert.equal(page.render().filter(node => node.props['data-range']).length, 2,
     'The trend keeps its own 7/30-day control.');
+  app.unmount();
+});
+
+test('legend buttons toggle only their model curve and points, preserving colors and other statistics', async () => {
+  const app = await mount({ usageSnapshot: usageSnapshotFixture() });
+  const page = await usagePage(app);
+  const legend = name => page.render().find(node => node.props.className === 'power-dsh-usage-legend-item'
+    && node.props.children.includes(name));
+  const lines = () => page.render().filter(node => node.props.className === 'power-dsh-usage-chart-line');
+  const points = () => page.render().filter(node => node.props.className === 'power-dsh-usage-chart-point');
+  const metrics = () => page.render().filter(node => node.props.className === 'power-dsh-usage-metric-value')
+    .map(node => node.props.children.join(''));
+  const originalMetrics = metrics();
+  const originalModelRows = page.render().filter(node => node.props.className === 'power-dsh-usage-model').length;
+  const originalSecondLine = lines()[1].props.d;
+  const reads = app.usageReads.length;
+  assert.equal(legend('group/flash').type, 'button');
+  assert.equal(legend('group/flash').props['aria-pressed'], true);
+  legend('group/flash').props.onClick();
+  assert.equal(legend('group/flash').props['aria-pressed'], false);
+  assert.equal(lines().length, 1);
+  assert.equal(lines()[0].props['data-model'], 1, 'The remaining model keeps its color.');
+  assert.equal(lines()[0].props.d, originalSecondLine, 'Hiding a model does not move the other curve.');
+  assert.ok(points().every(node => node.props['data-trend-model'] === 'group/sol'));
+  assert.equal(points().filter(node => node.props.tabIndex === 0).length, 1);
+  legend('group/sol').props.onClick();
+  assert.equal(lines().length, 0);
+  assert.equal(points().length, 0);
+  assert.ok(page.render().some(node => node.props.className === 'power-dsh-usage-chart-svg'), 'All hidden keeps the plot and its legend available.');
+  legend('group/flash').props.onClick();
+  assert.equal(legend('group/flash').props['aria-pressed'], true);
+  assert.equal(lines().length, 1);
+  assert.equal(lines()[0].props['data-model'], 0);
+  page.render().find(node => node.props['data-range'] === '30d').props.onClick();
+  assert.equal(legend('group/sol').props['aria-pressed'], false, 'The selection survives changing the time range.');
+  assert.equal(points().length, 30);
+  assert.deepEqual(metrics(), originalMetrics);
+  assert.equal(page.render().filter(node => node.props.className === 'power-dsh-usage-model').length, originalModelRows);
+  assert.equal(app.usageReads.length, reads, 'Visibility changes do not reread logs.');
   app.unmount();
 });
 
@@ -299,13 +366,14 @@ test('load failures stay recoverable and incomplete reads are labelled', async (
 async function selector(app, language = 'en') {
   const page = await usagePage(app, language, false);
   const period = id => page.render().find(node => node.props['data-period'] === id);
-  const dialog = () => page.render().find(node => node.type === 'native-modal-fixture');
+  const dialog = () => page.render().find(node => node.type === 'native-menu-surface-fixture');
+  const close = () => dialog().props.onToggle({ nativeEvent: { newState: 'closed' } });
   const shortcut = id => page.render().find(node => node.props['data-period-shortcut'] === id);
   const apply = () => page.render().find(node => node.props['data-native-button'] && node.props.variant === 'primary');
   const range = () => ['data-calendar-start', 'data-calendar-end'].map(key => page.render().find(node => node.props[key]).props.children.join(''));
   const day = date => page.render().find(node => node.props['data-calendar-day'] === date);
   const navigate = direction => page.render().find(node => node.props['data-calendar-month'] === direction).props.onClick();
-  return { ...page, period, dialog, shortcut, apply, range, day, navigate };
+  return { ...page, period, dialog, close, shortcut, apply, range, day, navigate };
 }
 
 test('the time selector has five calendar choices with local midnight bounds', async () => {
@@ -323,12 +391,32 @@ test('the time selector has five calendar choices with local midnight bounds', a
     ['all', ['2026-03-01', '2026-03-04']],
   ]) {
     page.period(id).props.onClick();
-    page.period('custom').props.onClick();
+    page.period('custom').props.onClick({ preventDefault() {} });
     assert.deepEqual(page.range(), bounds, id);
     assert.equal(page.period(id).props['aria-pressed'], true);
-    page.dialog().props.onClose();
+    page.close();
   }
   assert.equal(app.usageReads.length, reads);
+  app.unmount();
+});
+
+test('the calendar popover closes locally with Escape and discards its draft', async () => {
+  const app = await mount();
+  const page = await selector(app);
+  page.period('custom').props.onClick({ preventDefault() {} });
+  page.shortcut('d30').props.onClick();
+  let prevented = false;
+  let stopped = false;
+  page.dialog().props.onKeyDownCapture({ key: 'Escape', nativeEvent: { isComposing: false },
+    preventDefault() { prevented = true; }, stopPropagation() { stopped = true; } });
+  assert.equal(prevented, true);
+  assert.equal(stopped, true, 'Escape stays within the calendar instead of reaching the settings shell.');
+  assert.equal(page.dialog(), undefined);
+  assert.equal(page.period('today').props['aria-pressed'], true);
+  page.period('custom').props.onClick({ preventDefault() {} });
+  assert.deepEqual(page.range(), ['2026-03-03', '2026-03-03']);
+  page.period('custom').props.onClick({ preventDefault() {} });
+  assert.equal(page.dialog(), undefined, 'The trigger also toggles the popover closed.');
   app.unmount();
 });
 
@@ -336,7 +424,7 @@ test('calendar shortcuts fill a draft and cancel preserves the current selection
   const app = await mount();
   const page = await selector(app);
   const cells = page.cells().length;
-  page.period('custom').props.onClick();
+  page.period('custom').props.onClick({ preventDefault() {} });
   for (const [id, bounds] of [
     ['d7', ['2026-02-25', '2026-03-03']],
     ['d30', ['2026-02-02', '2026-03-03']],
@@ -345,15 +433,15 @@ test('calendar shortcuts fill a draft and cancel preserves the current selection
     assert.deepEqual(page.range(), bounds);
     assert.equal(page.period('today').props['aria-pressed'], true);
   }
-  page.dialog().props.onClose();
-  page.period('custom').props.onClick();
+  page.close();
+  page.period('custom').props.onClick({ preventDefault() {} });
   assert.deepEqual(page.range(), ['2026-03-03', '2026-03-03']);
   page.shortcut('d7').props.onClick();
   page.apply().props.onClick();
   assert.equal(page.dialog(), undefined);
   assert.equal(page.period('custom').props['aria-pressed'], true);
   assert.equal(page.cells().length, cells);
-  page.period('custom').props.onClick();
+  page.period('custom').props.onClick({ preventDefault() {} });
   assert.deepEqual(page.range(), ['2026-02-25', '2026-03-03']);
   app.unmount();
 });
@@ -361,7 +449,7 @@ test('calendar shortcuts fill a draft and cancel preserves the current selection
 test('the range calendar previews, reverses and completes date selections without native date inputs', async () => {
   const app = await mount();
   const page = await selector(app);
-  page.period('custom').props.onClick();
+  page.period('custom').props.onClick({ preventDefault() {} });
   assert.equal(descendants(page.dialog()).filter(node => node.type === 'input').length, 0);
   page.day('2026-03-05').props.onClick();
   assert.equal(page.apply().props.disabled, true, 'The first click requires an end date.');
@@ -382,7 +470,7 @@ test('the range calendar previews, reverses and completes date selections withou
 test('the range calendar selects across months and supports keyboard navigation with one tab stop', async () => {
   const app = await mount();
   const page = await selector(app);
-  page.period('custom').props.onClick();
+  page.period('custom').props.onClick({ preventDefault() {} });
   const key = (date, key) => {
     let prevented = false;
     page.day(date).props.onKeyDown({ key, preventDefault() { prevented = true; } });
@@ -405,8 +493,13 @@ test('the calendar stays usable with empty history in both languages', async () 
   for (const language of ['zh', 'en']) {
     const app = await mount({ usageSnapshot: usageSnapshotFixture({ days: [], models: [], dailyModels: [] }) });
     const page = await selector(app, language);
-    page.period('custom').props.onClick();
-    assert.equal(page.dialog().props.title, language === 'zh' ? '自定义时间范围' : 'Custom range');
+    page.period('custom').props.onClick({ preventDefault() {} });
+    assert.equal(page.dialog().props['aria-label'], language === 'zh' ? '自定义时间范围' : 'Custom range');
+    assert.equal(page.dialog().props.popover, 'auto');
+    assert.equal(page.dialog().props['aria-modal'], undefined);
+    assert.equal(page.period('custom').props['aria-controls'], page.dialog().props.id);
+    assert.equal(page.period('custom').props.style.anchorName, page.dialog().props.style.positionAnchor);
+    assert.ok(!page.render().some(node => node.type === 'native-modal-fixture'), 'The calendar does not open a centered modal.');
     page.shortcut('d7').props.onClick();
     assert.deepEqual(page.range(), ['2026-02-25', '2026-03-03']);
     assert.equal(page.apply().props.disabled, false);
@@ -426,7 +519,7 @@ test('the three cards follow calendar ranges and count each session once across 
   assert.deepEqual(values(), ['400', '40', '2']);
   page.period('all').props.onClick();
   assert.deepEqual(values(), ['500', '40', '3']);
-  page.period('custom').props.onClick();
+  page.period('custom').props.onClick({ preventDefault() {} });
   page.day('2026-03-01').props.onClick();
   page.day('2026-03-01').props.onClick();
   page.apply().props.onClick();
@@ -459,39 +552,56 @@ test('cache hit rate includes cache writes in input and empty cards remain numer
   }
 });
 
-test('trend hover and keyboard inspection show exact daily model tokens across zooms', async () => {
+test('each trend point shows only its own date and model, with keyboard navigation across points', async () => {
   for (const language of ['en', 'zh']) {
     const app = await mount({ usageSnapshot: usageSnapshotFixture() });
     const page = await usagePage(app, language);
-    const plot = () => page.render().find(node => node.props.className === 'power-dsh-usage-chart-plot');
-    const tip = () => page.render().find(node => node.type === 'native-tooltip-fixture'
-      && node.props.children?.some(child => child?.props?.className === 'power-dsh-usage-chart-plot')).props;
-    const hover = clientX => plot().props.onPointerMove({ clientX, currentTarget: { getBoundingClientRect: () => ({ left: 100, width: 600 }) } });
-    const key = key => plot().props.onKeyDown({ key, preventDefault() {} });
+    const points = () => page.render().filter(node => node.props.className === 'power-dsh-usage-chart-point');
+    const point = (model, date) => points().find(node => node.props['data-trend-model'] === model && node.props['data-trend-date'] === date);
+    const tip = (model, date) => page.render().find(node => node.type === 'native-tooltip-fixture'
+      && node.props.children?.some(child => child?.props?.['data-trend-model'] === model && child.props['data-trend-date'] === date)).props;
+    const focused = () => points().find(node => node.props.tabIndex === 0);
+    const key = key => focused().props.onKeyDown({ key, preventDefault() {} });
     const reads = app.usageReads.length;
-    assert.equal(plot().props.tabIndex, 0);
-    hover(700);
-    assert.ok(tip().label.startsWith('2026-03-03\n'));
-    assert.ok(tip().label.includes(language === 'en' ? 'group/flash: 300 tokens' : 'group/flash：300 Token'));
-    assert.ok(tip().label.includes(language === 'en' ? 'group/sol: 100 tokens' : 'group/sol：100 Token'));
-    assert.equal(tip().portal, true, 'The tooltip escapes the clipped plot.');
+    assert.equal(points().length, 14);
+    assert.equal(points().filter(node => node.props.tabIndex === 0).length, 1);
+    assert.equal(tip('group/flash', '2026-03-03').label, language === 'en'
+      ? '2026-03-03\ngroup/flash: 300 tokens' : '2026-03-03\ngroup/flash：300 Token');
+    assert.equal(tip('group/sol', '2026-03-03').label, language === 'en'
+      ? '2026-03-03\ngroup/sol: 100 tokens' : '2026-03-03\ngroup/sol：100 Token');
+    assert.equal(tip('group/sol', '2026-03-03').portal, true);
+    assert.ok(!page.render().some(node => node.type === 'native-tooltip-fixture'
+      && node.props.children?.some(child => child?.props?.className === 'power-dsh-usage-chart-plot')),
+    'The empty plot area does not trigger a combined tooltip.');
+    point('group/sol', '2026-03-03').props.onFocus();
     key('ArrowLeft');
-    assert.ok(tip().label.startsWith('2026-03-02\n'));
-    assert.ok(tip().label.includes(language === 'en' ? 'group/flash: 0 tokens' : 'group/flash：0 Token'));
+    assert.equal(focused().props['data-trend-date'], '2026-03-02');
+    assert.equal(focused().props['data-trend-model'], 'group/sol');
+    assert.ok(tip('group/sol', '2026-03-02').label.endsWith(language === 'en' ? '0 tokens' : '0 Token'));
+    key('ArrowUp');
+    assert.equal(focused().props['data-trend-model'], 'group/flash');
     key('Home');
-    assert.ok(tip().label.startsWith('2026-02-25\n'));
+    assert.equal(focused().props['data-trend-date'], '2026-02-25');
     key('End');
-    assert.ok(tip().label.startsWith('2026-03-03\n'));
-    hover(500);
-    assert.ok(tip().label.startsWith('2026-03-01\n'));
-    assert.ok(tip().label.includes(language === 'en' ? 'group/flash: 100 tokens' : 'group/flash：100 Token'));
+    assert.equal(focused().props['data-trend-date'], '2026-03-03');
     page.render().find(node => node.props['data-range'] === '30d').props.onClick();
-    hover(-100);
-    assert.ok(tip().label.startsWith('2026-02-02\n'), 'The left edge uses the current 30-day window.');
-    hover(900);
-    assert.ok(tip().label.startsWith('2026-03-03\n'), 'Pointer positions clamp to the plotted dates.');
-    assert.equal(app.usageReads.length, reads, 'Inspecting cached points does not reread logs.');
+    assert.equal(points().length, 60);
+    assert.equal(points().filter(node => node.props.tabIndex === 0).length, 1);
+    key('Home');
+    assert.equal(focused().props['data-trend-date'], '2026-02-02');
+    assert.equal(app.usageReads.length, reads);
     app.unmount();
+  }
+});
+
+test('token counts use 万 and 亿 across interface languages', () => {
+  for (const language of ['en', 'zh']) {
+    assert.equal(formatTokens(999, language), '999');
+    assert.equal(formatTokens(10_000, language), '1万');
+    assert.equal(formatTokens(12_345, language), '1.2万');
+    assert.equal(formatTokens(1_000_000, language), '100万');
+    assert.equal(formatTokens(100_000_000, language), '1亿');
+    assert.equal(formatTokens(125_000_000, language), '1.3亿');
   }
 });
 

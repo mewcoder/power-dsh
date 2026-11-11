@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { McpPolicy } from '../mcp-policy.ts';
 import { OperationQueue } from '../../../shared/host/operation-queue.ts';
+import { projectMcpConfig } from '../mcp-config.ts';
 
 const MCP_CLIENT = '@deepseek-ai/dsh-mcp-client';
 const SECRET = 'never-expose-this-credential';
@@ -477,6 +478,17 @@ test('MCP detail hides expression fields and endpoint credentials while keeping 
   assert.ok(!JSON.stringify(detail).includes(SECRET));
   app.policy.providers.declared = () => { throw new Error(SECRET); };
   await assert.rejects(app.policy.read('include:notes'), exactError('mcpMetadataLoadFailed'));
+});
+
+test('MCP arguments distinguish a confirmed empty list from unreadable expressions', () => {
+  assert.deepEqual(projectMcpConfig({ command: 'npx' }, 'stdio').args, []);
+  assert.deepEqual(projectMcpConfig({ args: [] }, 'stdio').args, []);
+  assert.equal(projectMcpConfig({ __jsExpr: 'process.env.PRIVATE_CONFIG' }, 'stdio'), null);
+  assert.deepEqual(projectMcpConfig({ args: ['-y', '@example/server'] }, 'stdio').args, ['-y', '@example/server']);
+  const expression = projectMcpConfig({ args: { __jsExpr: 'process.env.PRIVATE_ARGS' } }, 'stdio');
+  assert.equal(expression.args, undefined);
+  assert.deepEqual(expression.expressions, ['args']);
+  assert.throws(() => projectMcpConfig({ args: [false] }, 'stdio'), /mcpMetadataLoadFailed/);
 });
 
 test('MCP detail preserves partial declared reconnect policies without synthesizing defaults', async () => {

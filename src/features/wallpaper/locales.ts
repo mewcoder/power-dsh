@@ -1,0 +1,33 @@
+import type { Locales } from '../../shared/client/types.ts';
+export const locales = {
+  en: {
+    wallpaperTab: 'Wallpaper',
+    wallpaperSelect: 'Choose wallpaper',
+    wallpaperPreset_none: 'None', wallpaperPreset_flow: 'Homepage flow', wallpaperPreset_seaside: 'Big fat fish', wallpaperPreset_custom: 'Custom',
+    wallpaperEnabled: 'Enable custom wallpaper', wallpaperDescription: 'Choose a preset or custom wallpaper for the interface',
+    wallpaperPageDescription: 'Choose a wallpaper and adjust visibility and blur',
+    wallpaperImage: 'Wallpaper', wallpaperChoose: 'Choose image', wallpaperReplace: 'Replace', wallpaperRemove: 'Remove',
+    wallpaperEmpty: 'No wallpaper', wallpaperFormats: 'PNG / JPEG / WebP · Max 25 MB',
+    wallpaperVisibility: 'Wallpaper visibility', wallpaperVisibilityHint: '0% hides the wallpaper; 100% shows it fully',
+    wallpaperBlur: 'Wallpaper blur', wallpaperBlurHint: 'Blur only the wallpaper; 0px turns blur off',
+    wallpaperPreviewUnavailable: 'Settings could not be hidden for preview. You can still adjust and save the wallpaper.',
+    wallpaperReadFailed: 'The saved wallpaper could not be read', wallpaperSaveFailed: 'The wallpaper could not be saved',
+    wallpaperUnsupported: 'Choose a PNG, JPEG or WebP image', wallpaperTooLarge: 'The image must be no larger than 25 MB',
+    wallpaperLayoutFailed: 'The wallpaper could not be displayed; turn it off and on to retry or reload the interface',
+  },
+  zh: {
+    wallpaperTab: '壁纸',
+    wallpaperSelect: '选择壁纸',
+    wallpaperPreset_none: '无壁纸', wallpaperPreset_flow: '官网流动', wallpaperPreset_seaside: '大肥鱼', wallpaperPreset_custom: '自定义',
+    wallpaperEnabled: '开启自定义壁纸', wallpaperDescription: '为界面选择预制或自定义壁纸',
+    wallpaperPageDescription: '选择壁纸并调节可见度与模糊',
+    wallpaperImage: '壁纸', wallpaperChoose: '选择图片', wallpaperReplace: '更换', wallpaperRemove: '移除',
+    wallpaperEmpty: '未设置壁纸', wallpaperFormats: 'PNG / JPEG / WebP · 最大 25 MB',
+    wallpaperVisibility: '壁纸可见度', wallpaperVisibilityHint: '0% 隐藏壁纸，100% 完全显示壁纸',
+    wallpaperBlur: '壁纸模糊', wallpaperBlurHint: '仅模糊壁纸，0px 为关闭',
+    wallpaperPreviewUnavailable: '暂时无法隐藏设置进行预览，仍可调节并保存壁纸。',
+    wallpaperReadFailed: '无法读取已保存的壁纸', wallpaperSaveFailed: '壁纸保存失败',
+    wallpaperUnsupported: '请选择 PNG、JPEG 或 WebP 图片', wallpaperTooLarge: '图片不能超过 25 MB',
+    wallpaperLayoutFailed: '壁纸未能显示，可关闭后重新开启重试，或重新加载界面',
+  },
+} satisfies Locales;

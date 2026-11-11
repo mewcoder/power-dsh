@@ -34,7 +34,7 @@ function reconnectOf(value: unknown): McpReconnectConfig | undefined {
  * @returns the readable configuration, or null when nothing is declared.
  */
 export function projectMcpConfig(raw: unknown, fallback: McpTransport): McpServerConfig | null {
-  if (!isRecord(raw)) return null;
+  if (!isRecord(raw) || isExpression(raw)) return null;
   const expressions: string[] = [];
   const read = (field: string): unknown => {
     const value = raw[field];
@@ -59,7 +59,10 @@ export function projectMcpConfig(raw: unknown, fallback: McpTransport): McpServe
   if (serverName !== undefined) config.serverName = serverName;
   const command = text(read('command'));
   if (command !== undefined) config.command = command;
-  if (Array.isArray(args) && args.length > 0) config.args = redactMcpArgs(args.filter((arg): arg is string => typeof arg === 'string'));
+  if (Array.isArray(args)) {
+    if (!args.every((arg): arg is string => typeof arg === 'string')) throw new TypeError('mcpMetadataLoadFailed');
+    config.args = redactMcpArgs(args);
+  } else if (args === undefined && !expressions.includes('args')) config.args = [];
   const cwd = text(read('cwd'));
   if (cwd !== undefined) config.cwd = cwd;
   if (endpointValue.url !== undefined) config.url = endpointValue.url;

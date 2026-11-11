@@ -12,7 +12,7 @@ import { LIST_MCP_SERVERS_RPC, READ_MCP_SERVER_RPC, SET_MCP_SERVER_ENABLED_RPC }
 import { LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC } from '../features/notifications/rpc.ts';
 import { RESTART_STATUS_RPC, RESTART_APP_RPC } from '../features/restart-button/rpc.ts';
 import { LIST_ARCHIVED_SESSIONS_RPC, RESTORE_ARCHIVED_SESSION_RPC, DELETE_ARCHIVED_SESSION_RPC } from '../features/archive/rpc.ts';
-import { READ_WALLPAPER_RPC, SAVE_WALLPAPER_RPC, CLEAR_WALLPAPER_RPC } from '../features/flowing-background/rpc.ts';
+import { READ_WALLPAPER_RPC, SAVE_WALLPAPER_RPC, CLEAR_WALLPAPER_RPC } from '../features/wallpaper/rpc.ts';
 import { LIST_PROJECTS_RPC, REMOVE_PROJECT_RPC } from '../features/projects/rpc.ts';
 import { READ_USAGE_STATS_RPC } from '../features/usage-stats/rpc.ts';
 

@@ -1,5 +1,5 @@
 import type { SettingFailure, Translate } from '../../shared/client/types.ts';
-import type { AttachmentFailure } from './attachment.ts';
+import type { AttachmentFailure } from '../../shared/client/background/attachment.ts';
 import type { locales } from './locales.ts';
 
 type MessageKey = keyof typeof locales.en;

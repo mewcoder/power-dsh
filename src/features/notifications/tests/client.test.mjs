@@ -65,7 +65,7 @@ test('system sound menu saves a native choice, previews it once, and sends one s
   app.set({ notificationsEnabled: true });
   await loadedSoundSettings(app);
   const settingRows = () => descendants(app.renderSettings()).filter(node => node.props.className === 'power-dsh-setting-row');
-  assert.equal(settingRows().length, 3, 'General on Web contains notifications and its sound controls; refresh and unsupported restart live elsewhere or stay hidden.');
+  assert.equal(settingRows().length, 3, 'General contains notifications and its sound controls.');
   const menu = () => descendants(app.renderSettings()).find(node => node.type === 'native-menu-fixture' && node.props.items?.some(item => item.id === 'mac:Ping.aiff'));
   soundControl(app, 'select').props.onClick();
   assert.equal(menu().props.open, true);

@@ -62,7 +62,10 @@ import { locales as thinkingEffortLocales } from '../features/thinking-effort/lo
 import { createClientFeature as flowingBackground } from '../features/flowing-background/client.ts';
 import { definition as flowingBackgroundDefinition } from '../features/flowing-background/definition.ts';
 import { locales as flowingBackgroundLocales } from '../features/flowing-background/locales.ts';
-import { rpc as flowingBackgroundRpc } from '../features/flowing-background/rpc.ts';
+import { createClientFeature as wallpaper } from '../features/wallpaper/client.ts';
+import { definition as wallpaperDefinition } from '../features/wallpaper/definition.ts';
+import { locales as wallpaperLocales } from '../features/wallpaper/locales.ts';
+import { rpc as wallpaperRpc } from '../features/wallpaper/rpc.ts';
 import { createClientFeature as archive } from '../features/archive/client.ts';
 import { definition as archiveDefinition } from '../features/archive/definition.ts';
 import { locales as archiveLocales } from '../features/archive/locales.ts';
@@ -93,7 +96,8 @@ export const clientFeatures: ClientFeatureSelection[] = [
   { definition: goalBlockingDefinition, create: goalBlocking, locales: goalBlockingLocales, rpc: goalBlockingRpc },
   { definition: doubleClickRenameDefinition, create: doubleClickRename, locales: doubleClickRenameLocales, rpc: [] },
   { definition: thinkingEffortDefinition, create: thinkingEffort, locales: thinkingEffortLocales, rpc: [] },
-  { definition: flowingBackgroundDefinition, create: flowingBackground, locales: flowingBackgroundLocales, rpc: flowingBackgroundRpc },
+  { definition: flowingBackgroundDefinition, create: flowingBackground, locales: flowingBackgroundLocales, rpc: [] },
+  { definition: wallpaperDefinition, create: wallpaper, locales: wallpaperLocales, rpc: wallpaperRpc },
   { definition: archiveDefinition, create: archive, locales: archiveLocales, rpc: archiveRpc },
   { definition: usageStatsDefinition, create: usageStats, locales: usageStatsLocales, rpc: usageStatsRpc },
   { definition: projectsDefinition, create: projects, locales: projectsLocales, rpc: projectsRpc },

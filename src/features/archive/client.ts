@@ -28,7 +28,7 @@ interface ArchivePageProps extends PageSlotProps {
 }
 
 export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironment) {
-  const { React, h, Menu, Modal, Button, NativeIcon, Tooltip, observable, useSnapshot, useMounted, errorFeedback } = runtime;
+  const { React, h, Menu, Modal, Button, NativeIcon, Tooltip, observable, useSnapshot, useMounted, loadingFeedback, errorFeedback } = runtime;
   const { ctx, t, savePreference, preferenceSlot, namespace } = env;
   const styles = shellStyles + catalogStyles + featureStyles;
   const { SkillSearchIcon, SkillChevron } = createCatalogUI(runtime);
@@ -293,7 +293,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
              disabled: disabled || snapshot.refreshing, onClick: () => openConfirmation('all'),
            }, t('archiveDeleteAll')))),
       autoArchiveCard,
-      snapshot.status === 'loading' && h('p', { className: 'power-dsh-notice', role: 'status' }, t('loading')),
+      (snapshot.status === 'loading' || snapshot.refreshing) && loadingFeedback({ label: t('loading'), compact: Boolean(catalog) }),
       catalog?.complete === false && snapshot.status === 'ready' && errorFeedback({ t, message: t('archiveRefreshRequired'),
         code: 'PD-ARCHIVE-REFRESH', operation: 'listArchivedSessions', placement: 'page', retry: loadArchivedSessions, disabled: busy }),
       snapshot.status === 'error' && errorFeedback({ t, message: snapshot.error || t('archiveLoadFailed'),
@@ -397,7 +397,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     return failure;
   };
   preferenceSlot('archiveManagerEnabled', 'settings.section', {
-    id: 'power-dsh-archive', order: 54, locale: namespace, label: () => t('archiveTab'),
+    id: 'power-dsh-archive', order: 54.5, locale: namespace, label: () => t('archiveTab'),
   }, (props: PageSlotProps) => h(ArchivePage, { ...props, archiveSource, settingsSource: env.source, savePreference,
     loadArchivedSessions, restoreArchivedSession, deleteArchivedSessions }));
   preferenceSlot('archiveManagerEnabled', 'settings.section.icon', { id: 'power-dsh-archive' }, ArchiveIcon);

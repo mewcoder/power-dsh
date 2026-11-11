@@ -6,7 +6,7 @@ import { styles as featureStyles } from './styles.ts';
 interface PersonalizationPageProps extends PageSlotProps { source: SnapshotSource<FormSnapshot>; instructionsSource: SnapshotSource<FeatureState<PersonalizationFile>>; loadInstructions(): Promise<void>; saveInstructions(text: string, revision: string): Promise<void>; }
 
 export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironment) {
-  const { React, h, observable, useSnapshot, useMounted, errorFeedback } = runtime;
+  const { React, h, observable, useSnapshot, useMounted, errorFeedback, loadingFeedback } = runtime;
   const { ctx, source, t, savePreference, preferenceSlot, namespace } = env;
   const styles = shellStyles + featureStyles;
   function PersonalizationIcon({ size = 16 }: IconProps) {
@@ -35,6 +35,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const ready = snapshot.status === 'ready' && instructions.status === 'ready';
     const disabled = !ready || !snapshot.writable || saving || !snapshot.value?.personalizationEnabled;
     const noticeError = Boolean(instructions.error) || snapshot.status === 'unavailable' || instructions.status === 'error';
+    const noticeLoading = !instructions.error && snapshot.status !== 'unavailable' && !ready
+      && (snapshot.status === 'loading' || instructions.status === 'loading');
     const notice = instructions.error || (snapshot.status === 'unavailable' ? t('unavailable')
       : !ready ? t(snapshot.status === 'loading' || instructions.status === 'loading' ? 'loading' : 'unavailable')
       : !snapshot.writable ? t('readOnly') : null);
@@ -66,7 +68,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         h('p', { id: `${id}-prompt-description`, className: 'power-dsh-description' },
           settingsPath && t('settingsLocation').replace('{path}', () => settingsPath))),
       notice && (noticeError ? errorFeedback({ t, message: notice, code: 'PD-PERSONALIZATION-LOAD',
-        operation: 'readPersonalization', placement: 'page', retry: loadInstructions }) : h('p', {
+        operation: 'readPersonalization', placement: 'page', retry: loadInstructions }) : noticeLoading
+        ? loadingFeedback({ label: t('loading'), ...(instructions.value ? { compact: true } : {}) }) : h('p', {
         className: 'power-dsh-notice', role: 'status', 'data-tone': 'neutral',
       }, notice)),
       h('div', { className: 'power-dsh-prompt-editor' },

@@ -60,6 +60,12 @@ test('each Client feature can be omitted without removing another feature settin
   complete.unmount();
   for (const omitted of clientFeatures) await t.test(omitted.definition.id, async () => {
     const app = await mount({ desktop: true, featureIds: featureIds.filter(id => id !== omitted.definition.id) });
+    const initialTabs = descendants(app.renderSettings()).filter(node => node.props.role === 'tab');
+    assert.deepEqual(initialTabs.map(tab => tab.props.id),
+      ['general', 'interface', 'enhancements', 'simplify', 'other'].map(id => `settings-test-tab-${id}`));
+    assert.equal(initialTabs.find(tab => tab.props['aria-selected']).props.id, 'settings-test-tab-general');
+    assert.equal(app.entries.has('settings.section:power-dsh-wallpaper'), false);
+    assert.equal(app.entries.has('settings.section.icon:power-dsh-wallpaper'), false);
     app.set(enabledPreferences);
     const controls = [];
     for (const tab of ['general', 'interface', 'enhancements', 'simplify', 'other']) {
@@ -76,7 +82,7 @@ test('each Client feature can be omitted without removing another feature settin
     }
     if (omitted.definition.id === 'notifications') assert.equal(app.notificationSubscriptions(), 0);
     if (omitted.definition.id === 'double-click-rename') assert.equal(app.doubleClickListeners.size, 0);
-    for (const id of ['personalization', 'skills', 'mcp']) {
+    for (const id of ['personalization', 'skills', 'mcp', 'wallpaper']) {
       assert.equal(app.entries.has(`settings.section:power-dsh-${id}`), omitted.definition.id !== id);
       assert.equal(app.entries.has(`settings.section.icon:power-dsh-${id}`), omitted.definition.id !== id);
     }

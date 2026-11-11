@@ -95,25 +95,35 @@ export interface BackgroundAppearance {
   wallpaper?: { dataUrl: string; name: string } | null;
 }
 
-/** Apply opacity and frosted blur to an owned layer without re-attaching it. */
+/** Restyle only owned media; wallpaper mixes with the current theme beneath a veil. */
 export function applyAppearance(layer: HTMLElement, appearance: Pick<BackgroundAppearance, 'opacity' | 'blur'>) {
-  const alpha = Math.min(100, Math.max(0, Number.isFinite(appearance.opacity) ? appearance.opacity : 100)) / 100;
-  const opacity = alpha < 1 ? String(alpha) : '';
+  const visibility = Math.min(100, Math.max(0, Number.isFinite(appearance.opacity) ? appearance.opacity : 100));
+  const alpha = visibility / 100;
+  const wallpaper = layer.matches('[data-kind="wallpaper"]');
+  const opacity = !wallpaper && alpha < 1 ? String(alpha) : '';
   if (layer.style.getPropertyValue('opacity') !== opacity) {
     if (opacity) layer.style.setProperty('opacity', opacity);
     else layer.style.removeProperty('opacity');
   }
-  const blur = Math.min(40, Math.max(0, Number.isFinite(appearance.blur) ? appearance.blur : 0));
+  const veil = layer.querySelector<HTMLElement>('.power-dsh-wallpaper-veil');
+  if (veil) {
+    const veilOpacity = String((100 - visibility) / 100);
+    if (veil.style.getPropertyValue('opacity') !== veilOpacity) veil.style.setProperty('opacity', veilOpacity);
+  }
+  const savedBlur = Math.min(wallpaper ? 20 : 40, Math.max(0, Number.isFinite(appearance.blur) ? appearance.blur : 0));
+  // A hidden wallpaper retains its saved blur but does no actual filter work.
+  const blur = wallpaper && alpha === 0 ? 0 : savedBlur;
   const artwork = layer.querySelector<HTMLElement>('.power-dsh-artwork');
   if (!artwork) return;
-  // Blur changes sharpness only. Expanding a cover image's box also zooms and
-  // crops the image, so keep its original geometry and clear legacy overscan.
+  // Wallpaper may crop slightly as its media expands by three radii before
+  // clipping. The flowing pattern retains its original geometry at every blur.
+  const overscan = wallpaper && blur > 0 ? 3 * blur : 0;
   const declarations = {
     filter: blur > 0 ? `blur(${blur}px)` : '',
-    position: '',
-    inset: '',
-    width: '',
-    height: '',
+    position: overscan ? 'absolute' : '',
+    inset: overscan ? `-${overscan}px` : '',
+    width: overscan ? `calc(100% + ${2 * overscan}px)` : '',
+    height: overscan ? `calc(100% + ${2 * overscan}px)` : '',
   };
   for (const [property, value] of Object.entries(declarations)) {
     if (artwork.style.getPropertyValue(property) === value) continue;
@@ -266,7 +276,9 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
       image.setAttribute('alt', '');
       image.setAttribute('draggable', 'false');
       image.src = wallpaper.dataUrl;
-      layer.append(sheet, image);
+      const veil = doc.createElement('div');
+      veil.className = 'power-dsh-wallpaper-veil';
+      layer.append(sheet, image, veil);
     } else {
       canvas = doc.createElement('canvas');
       canvas.className = 'power-dsh-artwork';

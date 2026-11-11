@@ -22,12 +22,12 @@ export const styles = `
 /* One scrollable reading area keeps the full description and rendered body together. */
 .power-dsh-skill-detail { width:min(560px,100%); }
 .power-dsh-skill-detail .power-dsh-skill-detail-body { display:flex; flex-direction:column; gap:16px; min-width:0; max-height:min(60vh,560px); overflow:auto; padding-right:4px; }
-.power-dsh-skill-detail .power-dsh-skill-detail-description { margin:0; color:var(--dsw-alias-label-secondary); font-size:13px; line-height:20px; white-space:pre-wrap; overflow-wrap:anywhere; }
+.power-dsh-skill-detail .power-dsh-skill-detail-description { margin:0; font-size:13px; line-height:20px; white-space:pre-wrap; overflow-wrap:anywhere; }
 .power-dsh-skill-detail .power-dsh-skill-detail-list { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:baseline; gap:6px 16px; margin:0; }
 .power-dsh-skill-detail .power-dsh-skill-detail-row { display:contents; }
 .power-dsh-skill-detail .power-dsh-skill-detail-label { color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; white-space:nowrap; }
-.power-dsh-skill-detail .power-dsh-skill-detail-value { min-width:0; margin:0; color:var(--dsw-alias-label-primary); font-size:12px; line-height:18px; overflow-wrap:anywhere; }
-.power-dsh-skill-detail .power-dsh-skill-detail-code { font-family:var(--ds-font-family-code); font-size:12px; line-height:18px; white-space:pre-wrap; overflow-wrap:anywhere; }
+.power-dsh-skill-detail .power-dsh-skill-detail-value { min-width:0; margin:0; color:var(--dsw-alias-label-secondary); font-size:12px; line-height:18px; overflow-wrap:anywhere; }
+.power-dsh-skill-detail .power-dsh-skill-detail-code { color:inherit; font-family:var(--ds-font-family-code); font-size:12px; line-height:18px; white-space:pre-wrap; overflow-wrap:anywhere; }
 .power-dsh-skill-detail .power-dsh-skill-detail-markdown { min-width:0; padding-top:16px; border-top:.5px solid var(--dsw-alias-border-l2); user-select:text; }
 .power-dsh-skill-detail .power-dsh-skill-detail-body:focus-visible { outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:-2px; }
 .power-dsh-skill-detail .power-dsh-skill-detail-empty { margin:0; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }

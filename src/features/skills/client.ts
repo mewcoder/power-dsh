@@ -9,7 +9,7 @@ interface SkillsState extends FeatureState<SkillCatalog> { cwd: string; scope: S
 interface SkillsPageProps extends PageSlotProps { source: SnapshotSource<FormSnapshot>; skillsSource: SnapshotSource<SkillsState>; loadSkills(cwd?: string, scope?: SkillScope): Promise<void>; setSkillEnabled(name: string, enabled: boolean): Promise<void>; readSkill(name: string): Promise<SkillDetail | null>; }
 
 export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironment) {
-  const { React, h, Menu, Modal, Button, Tooltip, MarkdownText, observable, useSnapshot, useMounted, errorFeedback } = runtime;
+  const { React, h, Menu, Modal, Button, Tooltip, MarkdownText, observable, useSnapshot, useMounted, errorFeedback, loadingFeedback } = runtime;
   const { ctx, form, source, t, savePreference, preferenceSlot, namespace } = env;
   const styles = shellStyles + catalogStyles + featureStyles;
   const { SkillSearchIcon, SkillChevron } = createCatalogUI(runtime);
@@ -43,7 +43,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const [projectMenuOpen, setProjectMenuOpen] = React.useState(false);
     const [query, setQuery] = React.useState('');
     const [error, setError] = React.useState<{ name: string; message: string } | null>(null);
-    const [groupsOpen, setGroupsOpen] = React.useState({ preinstalled: false, personal: true });
+    const [groupsOpen, setGroupsOpen] = React.useState<Partial<Record<'preinstalled' | 'personal', boolean>>>({});
     const [detail, setDetail] = React.useState<{ name: string; status: 'loading' | 'ready' | 'error'; value: SkillDetail | null; error: string } | null>(null);
     const mounted = useMounted();
     const pending = React.useRef(false);
@@ -64,6 +64,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const displaySource = (skill: SkillEntry) => scope === 'user'
       ? ['runtime', 'plugin', 'bundled'].includes(skill.source) || skill.source.startsWith('bundled-') ? 'skillBundledSource' : 'skillPersonalSource'
       : skillSource(skill.source);
+    const hasPersonalSkills = (catalog?.skills ?? []).some(skill => displaySource(skill) !== 'skillBundledSource');
     const needle = query.trim().toLocaleLowerCase();
     const rows = (catalog?.skills ?? []).filter(skill =>
       `${skill.name} ${skill.description} ${skill.origin} ${sourceLabel(displaySource(skill))}`.toLocaleLowerCase().includes(needle));
@@ -209,14 +210,14 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         className: 'power-dsh-skill-detail', description: skill?.name ?? current.name,
         footer: h(Button, { variant: 'outline', 'data-modal-autofocus': true, onClick: closeDetail }, t('close')),
       },
-      current.status === 'loading' && h('p', { className: 'power-dsh-notice', role: 'status' }, t('skillDetailLoading')),
+      current.status === 'loading' && loadingFeedback({ label: t('skillDetailLoading') }),
       current.status === 'error' && errorFeedback({ t, message: current.error, code: 'PD-SKILLS-DETAIL',
         operation: 'readSkill', retry: () => { const row = (catalog?.skills ?? []).find(candidate => candidate.name === current.name); if (row) void openDetail(row); } }),
       current.status === 'ready' && skill === null && h('p', { className: 'power-dsh-notice', role: 'status' }, t('skillDetailMissing')),
       current.status === 'ready' && skill && h('div', { className: 'power-dsh-skill-detail-body', tabIndex: 0 },
         (skill.description || skill.path) && h('dl', { className: 'power-dsh-skill-detail-list' },
-          skill.description && label('skillDetailDescription', h('p', { className: 'power-dsh-skill-detail-description' }, skill.description)),
-          skill.path && label('skillDetailPath', h('code', { className: 'power-dsh-skill-detail-code' }, skill.path))),
+          skill.path && label('skillDetailPath', h('code', { className: 'power-dsh-skill-detail-code' }, skill.path)),
+          skill.description && label('skillDetailDescription', h('p', { className: 'power-dsh-skill-detail-description' }, skill.description))),
         skill.content
           ? h('div', { className: 'power-dsh-skill-detail-markdown' }, h(MarkdownText, {
             text: skill.content, variant: 'compact', omitHtml: true,
@@ -226,14 +227,15 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     };
     const renderGroup = (group: 'preinstalled' | 'personal', label: string, selectedRows: SkillEntry[]) => {
       if (selectedRows.length === 0) return null;
-      const open = Boolean(needle) || groupsOpen[group];
+      const defaultOpen = group === 'personal' || !hasPersonalSkills;
+      const open = Boolean(needle) || (groupsOpen[group] ?? defaultOpen);
       const titleId = `${id}-group-${group}`;
       return h('section', { key: group, className: 'power-dsh-skill-group', 'aria-labelledby': titleId },
         h('div', { className: 'power-dsh-skill-group-header' },
           h('button', {
             id: titleId, type: 'button', className: 'power-dsh-skill-group-toggle',
             'aria-expanded': open, 'aria-controls': `${titleId}-body`,
-            onClick: () => { if (!needle) setGroupsOpen(current => ({ ...current, [group]: !current[group] })); },
+            onClick: () => { if (!needle) setGroupsOpen(current => ({ ...current, [group]: !(current[group] ?? defaultOpen) })); },
           }, h(SkillChevron), h('span', { className: 'power-dsh-skill-group-title' }, t(label)))),
         h('p', { className: 'power-dsh-skill-group-description' }, t(group === 'preinstalled' ? 'skillPreinstalledDescription' : 'skillPersonalDescription')),
         open && h('div', { id: `${titleId}-body`, className: 'power-dsh-skill-group-body' },
@@ -244,7 +246,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       h('header', null,
         h('h2', { className: 'power-dsh-title' }, t('skillsTab')),
         h('p', { className: 'power-dsh-description' }, t('skillsDescription'))),
-      snapshot.status === 'loading' && h('p', { className: 'power-dsh-notice', role: 'status' }, t('loading')),
+      snapshot.status === 'loading' && loadingFeedback({ label: t('loading'), ...(catalog ? { compact: true } : {}) }),
       snapshot.error && errorFeedback({ t, message: snapshot.error, code: 'PD-SKILLS-LOAD',
         operation: 'listSkills', placement: 'page', retry: () => loadSkills(), disabled: busy }),
       h('div', { className: 'power-dsh-skill-navigation' },
