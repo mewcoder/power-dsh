@@ -36,7 +36,7 @@
 
 owner-only RPC 为 `listMcpServers()`、`readMcpServer(id)` 与 `setMcpServerEnabled(id, enabled)`，共用 Mod 操作队列。目录响应为 `{ complete, servers }`，不含 scope、cwd 或 workspaces。服务器只返回白名单字段：id、名称、真实来源、用户／内置分组、enabled、配置状态是否明确、`runtimeState`、`transport`（仅 `stdio/streamable-http/unknown`）、能否操作、安全原因代码及 `tools: string[]`。类型只读取原生配置中已确认的传输标量，未知时省略标签，不从名称、工具、命令或 URL 推断；配置内容仍不进入响应。工具名优先读取原生 `tools.definitions(scope)`；旧版没有该接口时，从公开 `tools.schemas(scope)` 只提取名称，再通过 `tools.get(name, scope)` 与父作用域真实定义的对象身份比较，排除继承工具并保留当前作用域的同名覆盖。两条路径均遵守宿主作用域与限制，只对应已确认服务器的 MCP 命名空间，不额外调用 MCP 的 `listTools`。旧宿主投影 schema 时会读取当前作用域所有可见工具的描述与参数，Mod 不保存或返回这些字段；执行回调不读取、不调用。投影抛错时报告加载失败，不吞为零工具。响应仅传显示所需的注册短名，不传完整工具定义、描述、参数或回调。来源元数据继续用于分类和搜索，不作为卡片底部标签。不传 command/args、env、headers、URL、原始配置或原始诊断。Host 与 Client 均校验白名单；过期响应不得覆盖新结果，写入期间拒绝重复操作，失败后重新读取实际状态。
 
-`readMcpServer(id)` 只服务详情弹窗，返回 `{ server, config }`，其中 `server` 与目录同一份白名单字段，`config` 为 `null` 或该条目的只读配置投影：`transport`、`envKeys`、`headerKeys`、`expressions`、`urlQueryHidden`，以及仅在条目声明时出现的 `serverName`、`command`、`argsHidden`、`cwd`、`url` 与 `reconnect`。`env`／`headers` 只传键名，永不传值；`args` 可含凭据，不传任何参数值，仅在有参数时标记 `argsHidden`。`url` 按 HTTP／HTTPS URL 解析后仅返回 origin（协议、主机及端口），去掉用户名、密码、路径、查询串与片段；隐藏这些部分时把 `urlQueryHidden` 置为 true；地址无法解析或协议不受支持时省略地址并保留隐藏提示；写成 Loader `!!js` 表达式的字段不求值、不返回原文，只把字段名放进 `expressions`。profile 与模式条目从 Loader 条目声明读取，管理器与动态实例只读已解析配置；找不到唯一来源时 `config` 为 `null`，不猜配置。id 为空或非法时抛 `mcpUnavailable`，目录中已不存在该条目时返回 `null`。读取不写入、不启停、不连接服务器，也不改变目录快照。
+`readMcpServer(id)` 只服务详情弹窗，返回 `{ server, config }`，其中 `server` 与目录同一份白名单字段，`config` 为 `null` 或该条目的只读配置投影：`transport`、`envKeys`、`headerKeys`、`expressions`、`urlQueryHidden`，以及仅在条目声明时出现的 `serverName`、`command`、`args`、`cwd`、`url` 与 `reconnect`。`env`／`headers` 只传键名，永不传值；`args` 保留普通参数及顺序，只把已识别敏感字段的值替换为 `[REDACTED]`：支持 Token、API Key、密码等名称的独立值与等号形式、环境赋值、认证头和 URL 凭据。任意脚本或未命名的位置参数不做语义推断；规则不保证识别所有自定义凭据。Host 投影和 Client 解码共用同一规则。参数行始终展示，有参数时显示内容，没有参数时显示「无」，不显示旧版隐藏／后端未提供参数的解释。`url` 按 HTTP／HTTPS URL 解析后仅返回 origin（协议、主机及端口），去掉用户名、密码、路径、查询串与片段；隐藏这些部分时把 `urlQueryHidden` 置为 true；地址无法解析或协议不受支持时省略地址并保留隐藏提示；写成 Loader `!!js` 表达式的字段不求值、不返回原文，只把字段名放进 `expressions`。profile 与模式条目从 Loader 条目声明读取，管理器与动态实例只读已解析配置；找不到唯一来源时 `config` 为 `null`，不猜配置。id 为空或非法时抛 `mcpUnavailable`，目录中已不存在该条目时返回 `null`。读取不写入、不启停、不连接服务器，也不改变目录快照。
 
 加载失败按初始化、插件清单、Bundle 清单、模式清单、运行实例/工具、条目元数据六个环节返回固定错误键，页面提供双语说明和对应的 `MCP-INIT/PLUGINS/BUNDLES/PRESETS/PROVIDERS/METADATA` 标识及重试入口。卸载或代际失效仍报告不可用。未知 RPC、网络及响应校验错误保留通用加载失败提示；所有提示不包含原始异常、路径、配置或凭据，失败不表示未配置或零工具。
 
@@ -53,7 +53,7 @@ owner-only RPC 为 `listMcpServers()`、`readMcpServer(id)` 与 `setMcpServerEna
 | 调用方式 | 总是 | 「本地」／`Local` 或 `HTTP`，目录类型未知时回退显式配置，仍未知时显示「不可用」 |
 | 运行状态 | 总是 | 本地化生命周期状态，未知时显示「不可用」；明确关闭时显示「已关闭」 |
 | 命令 | 条目声明 `command` 时 | 等宽字体，只显示可执行命令 |
-| 命令参数 | 条目声明非空 `args` 时 | 仅提示参数可能包含凭据，已隐藏 |
+| 命令参数 | 总是 | 有参数时等宽显示，敏感值为 `[REDACTED]`；含空格等字符的参数加引号区分边界；没有参数时显示「无」 |
 | 工作目录 | 条目声明 `cwd` 时 | 等宽字体，允许换行 |
 | 地址 | 条目声明可解析的 HTTP／HTTPS `url` 时 | 等宽字体，只显示协议、主机和端口 |
 | 地址详情 | 地址有未展示部分或无法安全解析时 | 说明只展示协议、主机和端口；无法安全解析的地址不显示 |

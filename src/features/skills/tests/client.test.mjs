@@ -415,11 +415,12 @@ test('skill detail reads the body on demand and shows description, metadata and 
   }
   assert.ok(!text.includes('skillDetailHeading'), 'The body carries no heading of its own.');
   const body = descendants(page.dialog()).find(node => node.props.className === 'power-dsh-skill-detail-markdown');
-  assert.equal(body.props.tabIndex, 0, 'The body takes keyboard focus so it can be scrolled and copied.');
-  // The description sits between the metadata list and the body.
+  assert.equal(descendants(page.dialog()).find(node => node.props.className === 'power-dsh-skill-detail-body').props.tabIndex, 0, 'The entire reading area can be scrolled with the keyboard.');
+  const labels = descendants(page.dialog()).filter(node => node.type === 'dt').flatMap(node => node.props.children);
+  assert.deepEqual(labels, ['skillDetailDescription', 'skillDetailPath']);
   const order = descendants(page.dialog()).find(node => node.props.className === 'power-dsh-skill-detail-body')
     .props.children.filter(Boolean).map(node => node.props.className);
-  assert.deepEqual(order, ['power-dsh-skill-detail-list', 'power-dsh-skill-detail-description', 'power-dsh-skill-detail-markdown']);
+  assert.deepEqual(order, ['power-dsh-skill-detail-list', 'power-dsh-skill-detail-markdown']);
   assert.deepEqual(app.skillDetailReads, [{ name: 'code-review' }]);
   assert.deepEqual(app.skillWrites, []);
   // Closing is a view change only.
@@ -429,28 +430,30 @@ test('skill detail reads the body on demand and shows description, metadata and 
   app.unmount();
 });
 
-test('skill detail shows the Markdown source with HTML comments removed', async () => {
-  const content = '<!-- Derived from example. Licensed under Apache-2.0. -->\n\n# Electron App Automation\n\n1. **Launch** the app\n2. **Connect** to CDP\n\n\n\n## Notes\n\n- keep `code` as written';
-  const app = await mount({ skillCatalog: catalogFixture({ skills: [skillFixture()] }), skillDetail: { content } });
+test('skill detail delegates document formatting and HTML omission to the public Markdown renderer', async () => {
+  const content = '<!-- Licence notice -->\n\n# Review\n\n1. **Check** boundary cases\n\n```js\nconst n = 1;\n```';
+  const description = 'A complete description.\nIt can span several lines without being cut off.';
+  const app = await mount({ skillCatalog: catalogFixture({ skills: [skillFixture({ description })] }), skillDetail: { content } });
   const page = await skillsPage(app);
   page.detail('code-review').props.onClick({ currentTarget: null });
   await new Promise(resolve => setImmediate(resolve));
-  const body = descendants(page.dialog()).find(node => node.props.className === 'power-dsh-skill-detail-markdown');
-  // Plain Markdown text: no renderer, no dependency on a host component.
-  assert.equal(body.type, 'pre');
-  const text = body.props.children[0];
-  assert.ok(!text.includes('<!--'), 'HTML comments are stripped from the reader.');
-  assert.ok(!text.includes('Derived from example'), 'The comment body is not shown.');
-  // Everything else stays byte-for-byte: the source of truth is what the skill loads.
-  for (const kept of ['# Electron App Automation', '1. **Launch** the app', '2. **Connect** to CDP', '## Notes', '- keep `code` as written']) {
-    assert.ok(text.includes(kept), `Expected the body to keep ${kept}`);
-  }
-  assert.ok(!text.includes('\n\n\n'), 'Runs of blank lines collapse to one.');
-  assert.equal(body.props.tabIndex, 0);
+  const nodes = descendants(page.dialog());
+  const reader = nodes.find(node => node.type === 'native-markdown-fixture');
+  assert.ok(reader, 'Use the same public renderer as native document content.');
+  assert.equal(reader.props.text, content, 'Pass the complete document to the renderer.');
+  assert.equal(reader.props.omitHtml, true);
+  assert.equal(reader.props.variant, 'compact');
+  assert.equal(reader.props.labels.code.copyLabel, 'skillCopyCode');
+  assert.equal(reader.props.labels.code.copiedLabel, 'skillCopiedCode');
+  assert.equal(reader.props.labels.footnotes, 'skillFootnotes');
+  const intro = nodes.find(node => node.props.className === 'power-dsh-skill-detail-description');
+  assert.equal(intro.props.children[0], description);
+  assert.equal(intro.props.title, undefined, 'The full introduction is visible without hover.');
+  assert.ok(!nodes.some(node => node.type === 'pre'), 'The document is not presented as one code block.');
   app.unmount();
 });
 
-test('skill detail keeps only the path and hides a skill without one', async () => {
+test('skill detail omits a missing path while retaining the labelled description', async () => {
   const app = await mount({ skillCatalog: catalogFixture({ skills: [
     skillFixture({ name: 'with-path', path: '/work/.agents/skills/with-path/SKILL.md' }),
     skillFixture({ name: 'no-path', path: '' }),
@@ -466,8 +469,8 @@ test('skill detail keeps only the path and hides a skill without one', async () 
   const page2 = await skillsPage(second);
   page2.detail('no-path').props.onClick({ currentTarget: null });
   await new Promise(resolve => setImmediate(resolve));
-  // No metadata list at all when there is no path to show.
-  assert.equal(descendants(page2.dialog()).find(node => node.props.className === 'power-dsh-skill-detail-list'), undefined);
+  const labels = descendants(page2.dialog()).filter(node => node.type === 'dt').flatMap(node => node.props.children);
+  assert.deepEqual(labels, ['skillDetailDescription']);
   assert.deepEqual(second.skillWrites, []);
   second.unmount();
 });

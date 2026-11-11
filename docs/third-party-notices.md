@@ -137,7 +137,7 @@ Mod 使用已核对的 DSH `0.2.2-rc.1` 原生会话、交互及 subprocess 通�
 
 ## 使用统计页面参考
 
-[使用统计](../src/features/usage-stats/spec.md)按用户要求参考本机 NCode（`~/code/ZCode`，Apache-2.0）的「使用统计」页面，同步提交 `a9fe401eede6e6e5e01be9048679c206fe6f02d9`，阅读 `packages/ui/src/settings/usage-stats/` 下的摘要条、热力图与趋势/占比图表组件。只借鉴信息层级与交互：顶部五项摘要、52 周活动热力图、范围切换、按模型的每日趋势与模型占比列表。本项目没有复制其代码、Tailwind 类、Recharts 图表、ZCode 专属配色变量或 agent 数据库协议；数据改为读取 DSH 公开 `sessionPersistence` 日志并自行折叠，图表用内联 SVG 路径（趋势线为自实现的 Catmull-Rom 平滑曲线）与自有 CSS 绘制，颜色取宿主主题 token，无新增依赖；热力图按用户要求只保留按天分级，不沿用其每周／累计模式。
+[使用统计](../src/features/usage-stats/spec.md)按用户要求参考本机 NCode（`~/code/ZCode`，Apache-2.0）的「使用统计」页面，同步提交 `a9fe401eede6e6e5e01be9048679c206fe6f02d9`，阅读 `packages/ui/src/settings/usage-stats/` 下的摘要条、热力图与趋势/占比图表组件。只借鉴信息层级与交互：顶部五项摘要、52 周活动热力图、范围切换、按模型的每日趋势与模型占比列表。本项目没有复制其代码、Tailwind 类、Recharts 图表、ZCode 专属配色变量或 agent 数据库协议；数据改为读取 DSH 公开 `sessionPersistence` 日志并自行折叠，图表用内联 SVG 路径（趋势线为自实现、控制点受相邻数据范围约束的三次贝塞尔曲线）与自有 CSS 绘制，颜色取宿主主题 token，无新增依赖；热力图按用户要求只保留按天分级，不沿用其每周／累计模式。
 
 - [NCode 仓库](https://github.com/mewcoder/NCode)，同步提交 `a9fe401eede6e6e5e01be9048679c206fe6f02d9`。
 - [Apache License 2.0](https://github.com/mewcoder/NCode/blob/main/LICENSE)。

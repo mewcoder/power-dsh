@@ -1,6 +1,7 @@
 import type { McpReconnectConfig, McpServerConfig, McpTransport } from '../../shared/types/wire.ts';
 import { isRecord, isOneOf } from '../../shared/types/protocol.ts';
 import { projectEndpoint } from './rpc.ts';
+import { redactMcpArgs } from './mcp-args.ts';
 
 /** Loader serializes `!!js` values as this marker object before evaluation. */
 function isExpression(value: unknown): value is { __jsExpr: string } {
@@ -27,7 +28,7 @@ function reconnectOf(value: unknown): McpReconnectConfig | undefined {
  * Only fields the entry actually declares are reported, so the dialog never
  * lists defaults the user did not choose. `env` and `headers` keep key names
  * only, a `!!js` field reports its name instead of unresolved text, and the
- * endpoint and command parameters are reduced to an origin and a presence flag.
+ * endpoint is reduced to its origin; argument credential fields are masked.
  * @param raw - the entry's configuration as the profile or preset declares it.
  * @param fallback - transport already confirmed by the catalog projection.
  * @returns the readable configuration, or null when nothing is declared.
@@ -58,7 +59,7 @@ export function projectMcpConfig(raw: unknown, fallback: McpTransport): McpServe
   if (serverName !== undefined) config.serverName = serverName;
   const command = text(read('command'));
   if (command !== undefined) config.command = command;
-  if (Array.isArray(args) && args.length > 0) config.argsHidden = true;
+  if (Array.isArray(args) && args.length > 0) config.args = redactMcpArgs(args.filter((arg): arg is string => typeof arg === 'string'));
   const cwd = text(read('cwd'));
   if (cwd !== undefined) config.cwd = cwd;
   if (endpointValue.url !== undefined) config.url = endpointValue.url;

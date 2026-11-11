@@ -26,6 +26,10 @@ export interface ModalProps {
 }
 export type StateDotState = 'ongoing' | 'done' | 'error' | 'idle' | 'warning';
 export interface PublicPrimitives {
+  MarkdownText: ReactTypes.ComponentType<{
+    text: string; variant?: 'body' | 'compact'; omitHtml?: boolean;
+    labels: { code: { copyLabel: string; copiedLabel: string }; footnotes: string };
+  }>;
   Menu: ReactTypes.ComponentType<MenuProps>;
   Tooltip: ReactTypes.ComponentType<TooltipProps>;
   StateDot: ReactTypes.ComponentType<{ state: StateDotState }>;

@@ -1588,6 +1588,55 @@ const definition$12 = Object.freeze({
 var config_exports$12 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$12 });
 const configFields$12 = { mcpManagerEnabled: z.boolean().default(false).volatile() };
 
+// src/features/mcp/mcp-args.ts
+/** Preserve argument order and ordinary values while masking recognized credential fields. */
+function redactMcpArgs(args) {
+	let hideNext = false;
+	return args.map((argument) => {
+		if (hideNext) {
+			hideNext = false;
+			return REDACTED;
+		}
+		const assignment = argument.match(/^([^=\s]+)=(.*)$/s);
+		if (assignment && sensitive(assignment[1])) return `${assignment[1]}=${REDACTED}`;
+		if (/^-/.test(argument) && sensitive(argument)) {
+			hideNext = true;
+			return argument;
+		}
+		const prefix = assignment ? `${assignment[1]}=` : "";
+		const value = assignment ? assignment[2] : argument;
+		const pair = value.match(/^(.*?\b([\w-]+)\s*[:=]\s*)(.+)$/s);
+		if (pair && sensitive(pair[2])) return `${prefix}${pair[1]}${REDACTED}`;
+		return prefix + value.replace(/https?:\/\/[^\s"']+/gi, (address) => {
+			try {
+				const url = new URL(address);
+				let changed = false;
+				if (url.username || url.password) {
+					url.username = REDACTED;
+					url.password = "";
+					changed = true;
+				}
+				for (const key of new Set(url.searchParams.keys())) if (sensitive(key)) {
+					url.searchParams.set(key, REDACTED);
+					changed = true;
+				}
+				if (url.hash && sensitive(url.hash.slice(1).split("=")[0])) {
+					url.hash = `${url.hash.slice(1).split("=")[0]}=${REDACTED}`;
+					changed = true;
+				}
+				return changed ? url.href.replaceAll("%5BREDACTED%5D", REDACTED) : address;
+			} catch {
+				return REDACTED;
+			}
+		});
+	});
+}
+const REDACTED = "[REDACTED]";
+function sensitive(name) {
+	const field = name.replace(/([a-z])([A-Z])/g, "$1_$2");
+	return /(?:^|[-_])(?:key|api[-_]?key|access[-_]?key|token|password|passwd|secret|authorization|credential|cookie)$/i.test(field);
+}
+
 // src/features/mcp/rpc.ts
 const serverCodec = {
 	mode: "strict",
@@ -1684,7 +1733,7 @@ const configCodec = {
 			"stdio",
 			"streamable-http",
 			"unknown"
-		]) || !isStringArray(value.envKeys) || !isStringArray(value.headerKeys) || !isStringArray(value.expressions) || typeof value.urlQueryHidden !== "boolean" || !optionalText(value.serverName) || !optionalText(value.command) || !optionalText(value.cwd) || !optionalText(value.url) || !(value.argsHidden === void 0 || typeof value.argsHidden === "boolean") || !(value.reconnect === void 0 || isRecord$1(value.reconnect))) throw new TypeError("Invalid MCP configuration");
+		]) || !isStringArray(value.envKeys) || !isStringArray(value.headerKeys) || !isStringArray(value.expressions) || typeof value.urlQueryHidden !== "boolean" || !optionalText(value.serverName) || !optionalText(value.command) || !optionalText(value.cwd) || !optionalText(value.url) || !(value.args === void 0 || isStringArray(value.args)) || !(value.reconnect === void 0 || isRecord$1(value.reconnect))) throw new TypeError("Invalid MCP configuration");
 		const endpoint = projectEndpoint(value.url);
 		const config = {
 			transport: value.transport,
@@ -1695,7 +1744,7 @@ const configCodec = {
 		};
 		if (typeof value.serverName === "string" && value.serverName) config.serverName = value.serverName;
 		if (typeof value.command === "string" && value.command) config.command = value.command;
-		if (value.argsHidden === true || isArray(value.args) && value.args.length > 0) config.argsHidden = true;
+		if (isStringArray(value.args)) config.args = redactMcpArgs(value.args);
 		if (typeof value.cwd === "string" && value.cwd) config.cwd = value.cwd;
 		if (endpoint.url !== void 0) config.url = endpoint.url;
 		if (value.reconnect !== void 0) config.reconnect = reconnectCodec.parse(value.reconnect);
@@ -1765,7 +1814,7 @@ function reconnectOf(value) {
 * Only fields the entry actually declares are reported, so the dialog never
 * lists defaults the user did not choose. `env` and `headers` keep key names
 * only, a `!!js` field reports its name instead of unresolved text, and the
-* endpoint and command parameters are reduced to an origin and a presence flag.
+* endpoint is reduced to its origin; argument credential fields are masked.
 * @param raw - the entry's configuration as the profile or preset declares it.
 * @param fallback - transport already confirmed by the catalog projection.
 * @returns the readable configuration, or null when nothing is declared.
@@ -1799,7 +1848,7 @@ function projectMcpConfig(raw, fallback) {
 	if (serverName !== void 0) config.serverName = serverName;
 	const command = text(read("command"));
 	if (command !== void 0) config.command = command;
-	if (Array.isArray(args) && args.length > 0) config.argsHidden = true;
+	if (Array.isArray(args) && args.length > 0) config.args = redactMcpArgs(args.filter((arg) => typeof arg === "string"));
 	const cwd = text(read("cwd"));
 	if (cwd !== void 0) config.cwd = cwd;
 	if (endpointValue.url !== void 0) config.url = endpointValue.url;

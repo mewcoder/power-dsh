@@ -1103,6 +1103,55 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		};
 	}
 
+// src/features/mcp/mcp-args.ts
+/** Preserve argument order and ordinary values while masking recognized credential fields. */
+	function redactMcpArgs(args) {
+		let hideNext = false;
+		return args.map((argument) => {
+			if (hideNext) {
+				hideNext = false;
+				return REDACTED;
+			}
+			const assignment = argument.match(/^([^=\s]+)=(.*)$/s);
+			if (assignment && sensitive(assignment[1])) return `${assignment[1]}=${REDACTED}`;
+			if (/^-/.test(argument) && sensitive(argument)) {
+				hideNext = true;
+				return argument;
+			}
+			const prefix = assignment ? `${assignment[1]}=` : "";
+			const value = assignment ? assignment[2] : argument;
+			const pair = value.match(/^(.*?\b([\w-]+)\s*[:=]\s*)(.+)$/s);
+			if (pair && sensitive(pair[2])) return `${prefix}${pair[1]}${REDACTED}`;
+			return prefix + value.replace(/https?:\/\/[^\s"']+/gi, (address) => {
+				try {
+					const url = new URL(address);
+					let changed = false;
+					if (url.username || url.password) {
+						url.username = REDACTED;
+						url.password = "";
+						changed = true;
+					}
+					for (const key of new Set(url.searchParams.keys())) if (sensitive(key)) {
+						url.searchParams.set(key, REDACTED);
+						changed = true;
+					}
+					if (url.hash && sensitive(url.hash.slice(1).split("=")[0])) {
+						url.hash = `${url.hash.slice(1).split("=")[0]}=${REDACTED}`;
+						changed = true;
+					}
+					return changed ? url.href.replaceAll("%5BREDACTED%5D", REDACTED) : address;
+				} catch {
+					return REDACTED;
+				}
+			});
+		});
+	}
+	const REDACTED = "[REDACTED]";
+	function sensitive(name) {
+		const field = name.replace(/([a-z])([A-Z])/g, "$1_$2");
+		return /(?:^|[-_])(?:key|api[-_]?key|access[-_]?key|token|password|passwd|secret|authorization|credential|cookie)$/i.test(field);
+	}
+
 // src/features/mcp/rpc.ts
 	const serverCodec = {
 		mode: "strict",
@@ -1199,7 +1248,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				"stdio",
 				"streamable-http",
 				"unknown"
-			]) || !isStringArray(value.envKeys) || !isStringArray(value.headerKeys) || !isStringArray(value.expressions) || typeof value.urlQueryHidden !== "boolean" || !optionalText(value.serverName) || !optionalText(value.command) || !optionalText(value.cwd) || !optionalText(value.url) || !(value.argsHidden === void 0 || typeof value.argsHidden === "boolean") || !(value.reconnect === void 0 || isRecord(value.reconnect))) throw new TypeError("Invalid MCP configuration");
+			]) || !isStringArray(value.envKeys) || !isStringArray(value.headerKeys) || !isStringArray(value.expressions) || typeof value.urlQueryHidden !== "boolean" || !optionalText(value.serverName) || !optionalText(value.command) || !optionalText(value.cwd) || !optionalText(value.url) || !(value.args === void 0 || isStringArray(value.args)) || !(value.reconnect === void 0 || isRecord(value.reconnect))) throw new TypeError("Invalid MCP configuration");
 			const endpoint = projectEndpoint(value.url);
 			const config = {
 				transport: value.transport,
@@ -1210,7 +1259,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			};
 			if (typeof value.serverName === "string" && value.serverName) config.serverName = value.serverName;
 			if (typeof value.command === "string" && value.command) config.command = value.command;
-			if (value.argsHidden === true || isArray(value.args) && value.args.length > 0) config.argsHidden = true;
+			if (isStringArray(value.args)) config.args = redactMcpArgs(value.args);
 			if (typeof value.cwd === "string" && value.cwd) config.cwd = value.cwd;
 			if (endpoint.url !== void 0) config.url = endpoint.url;
 			if (value.reconnect !== void 0) config.reconnect = reconnectCodec.parse(value.reconnect);
@@ -1605,7 +1654,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				}), current.status === "ready" && current.value === null && h("p", {
 					className: "power-dsh-notice",
 					role: "status"
-				}, t("mcpDetailMissing")), server && current.status === "ready" && h("dl", { className: "power-dsh-mcp-detail-list" }, label("mcpDetailTransport", transportLabel), label("mcpDetailRuntime", runtimeLabel), config?.command && label("mcpDetailCommand", h("code", { className: "power-dsh-mcp-detail-code" }, config.command)), config?.argsHidden && label("mcpDetailArgs", t("mcpDetailArgsHidden")), config?.cwd && label("mcpDetailCwd", h("code", { className: "power-dsh-mcp-detail-code" }, config.cwd)), config?.url && label("mcpDetailUrl", h("code", { className: "power-dsh-mcp-detail-code" }, config.url)), config?.urlQueryHidden === true && label("mcpDetailUrlHidden", t("mcpDetailUrlHiddenHint")), (config?.envKeys.length ?? 0) > 0 && label("mcpDetailEnv", h("span", { className: "power-dsh-mcp-detail-keys" }, config.envKeys.map((key) => h("code", {
+				}, t("mcpDetailMissing")), server && current.status === "ready" && h("dl", { className: "power-dsh-mcp-detail-list" }, label("mcpDetailTransport", transportLabel), label("mcpDetailRuntime", runtimeLabel), config?.command && label("mcpDetailCommand", h("code", { className: "power-dsh-mcp-detail-code" }, config.command)), label("mcpDetailArgs", config?.args?.length ? h("code", { className: "power-dsh-mcp-detail-code" }, config.args.map((arg) => /[\s"'\\]/.test(arg) || arg === "" ? JSON.stringify(arg) : arg).join(" ")) : t("mcpDetailNone")), config?.cwd && label("mcpDetailCwd", h("code", { className: "power-dsh-mcp-detail-code" }, config.cwd)), config?.url && label("mcpDetailUrl", h("code", { className: "power-dsh-mcp-detail-code" }, config.url)), config?.urlQueryHidden === true && label("mcpDetailUrlHidden", t("mcpDetailUrlHiddenHint")), (config?.envKeys.length ?? 0) > 0 && label("mcpDetailEnv", h("span", { className: "power-dsh-mcp-detail-keys" }, config.envKeys.map((key) => h("code", {
 					key,
 					className: "power-dsh-mcp-detail-key"
 				}, key)))), (config?.headerKeys.length ?? 0) > 0 && label("mcpDetailHeaders", h("span", { className: "power-dsh-mcp-detail-keys" }, config.headerKeys.map((key) => h("code", {
@@ -1870,7 +1919,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"mcpDetailMissing": "This server is no longer in the MCP list.",
 			"mcpDetailCommand": "Command",
 			"mcpDetailArgs": "Arguments",
-			"mcpDetailArgsHidden": "Hidden because they may contain credentials.",
+			"mcpDetailNone": "None",
 			"mcpDetailCwd": "Working directory",
 			"mcpDetailUrl": "URL",
 			"mcpDetailUrlHidden": "Endpoint details",
@@ -1950,7 +1999,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"mcpDetailMissing": "此服务器已不在 MCP 列表中。",
 			"mcpDetailCommand": "命令",
 			"mcpDetailArgs": "命令参数",
-			"mcpDetailArgsHidden": "参数可能包含凭据，已隐藏。",
+			"mcpDetailNone": "无",
 			"mcpDetailCwd": "工作目录",
 			"mcpDetailUrl": "地址",
 			"mcpDetailUrlHidden": "地址详情",
@@ -3202,25 +3251,24 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 .power-dsh-skills-page .power-dsh-skill-card-detail:active { background:var(--dsw-alias-interactive-bg-hover-solid); }
 @media (hover:hover) { .power-dsh-skills-page .power-dsh-skill-card-detail:hover { background:var(--dsw-alias-interactive-bg-hover-solid); } }
 .power-dsh-skills-page .power-dsh-skill-card-detail:focus-visible { outline:none; box-shadow:0 0 0 2px var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); }
-/* Read-only reader: description, a short metadata list, then the SKILL.md body. */
+/* One scrollable reading area keeps the full description and rendered body together. */
 .power-dsh-skill-detail { width:min(560px,100%); }
-.power-dsh-skill-detail .power-dsh-skill-detail-body { display:flex; flex-direction:column; gap:12px; }
-/* Two lines by default: the description introduces the body, it is not the subject. */
-.power-dsh-skill-detail .power-dsh-skill-detail-description { display:-webkit-box; overflow:hidden; margin:12px 0 0; color:var(--dsw-alias-label-secondary); font-size:13px; line-height:20px; overflow-wrap:anywhere; -webkit-box-orient:vertical; -webkit-line-clamp:2; text-wrap:pretty; }
+.power-dsh-skill-detail .power-dsh-skill-detail-body { display:flex; flex-direction:column; gap:16px; min-width:0; max-height:min(60vh,560px); overflow:auto; padding-right:4px; }
+.power-dsh-skill-detail .power-dsh-skill-detail-description { margin:0; color:var(--dsw-alias-label-secondary); font-size:13px; line-height:20px; white-space:pre-wrap; overflow-wrap:anywhere; }
 .power-dsh-skill-detail .power-dsh-skill-detail-list { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:baseline; gap:6px 16px; margin:0; }
 .power-dsh-skill-detail .power-dsh-skill-detail-row { display:contents; }
 .power-dsh-skill-detail .power-dsh-skill-detail-label { color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; white-space:nowrap; }
 .power-dsh-skill-detail .power-dsh-skill-detail-value { min-width:0; margin:0; color:var(--dsw-alias-label-primary); font-size:12px; line-height:18px; overflow-wrap:anywhere; }
 .power-dsh-skill-detail .power-dsh-skill-detail-code { font-family:var(--ds-font-family-code); font-size:12px; line-height:18px; white-space:pre-wrap; overflow-wrap:anywhere; }
-.power-dsh-skill-detail .power-dsh-skill-detail-markdown { box-sizing:border-box; margin:12px 0 0; padding:10px 12px; max-height:min(48vh,420px); overflow:auto; border-radius:var(--dsw-radius-md); background:var(--dsw-alias-bg-module-platform); color:var(--dsw-alias-label-primary); font-family:var(--ds-font-family-code); font-size:12px; line-height:18px; white-space:pre-wrap; overflow-wrap:anywhere; user-select:text; }
-.power-dsh-skill-detail .power-dsh-skill-detail-markdown:focus-visible { outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:-2px; }
+.power-dsh-skill-detail .power-dsh-skill-detail-markdown { min-width:0; padding-top:16px; border-top:.5px solid var(--dsw-alias-border-l2); user-select:text; }
+.power-dsh-skill-detail .power-dsh-skill-detail-body:focus-visible { outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:-2px; }
 .power-dsh-skill-detail .power-dsh-skill-detail-empty { margin:0; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
 .power-dsh-skill-detail .power-dsh-notice { margin:0; color:var(--dsw-alias-label-tertiary); font-size:13px; line-height:20px; }
 `;
 
 // src/features/skills/client.ts
 	function createClientFeature$10(runtime, env) {
-		const { React, h, Menu, Modal, Button, Tooltip, observable, useSnapshot, useMounted, errorFeedback } = runtime;
+		const { React, h, Menu, Modal, Button, Tooltip, MarkdownText, observable, useSnapshot, useMounted, errorFeedback } = runtime;
 		const { ctx, form, source, t, savePreference, preferenceSlot, namespace } = env;
 		const styles = styles$13 + styles$10 + styles$6;
 		const { SkillSearchIcon, SkillChevron } = createCatalogUI(runtime);
@@ -3468,7 +3516,6 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					}
 				}, t("skillDetail")))));
 			};
-			const bodyText = (content) => content.replace(/<!--[\s\S]*?-->/g, "").replace(/\n{3,}/g, "\n\n").trim();
 			async function openDetail(skill) {
 				if (!mounted.current) return;
 				detailGeneration.current++;
@@ -3538,13 +3585,21 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				}), current.status === "ready" && skill === null && h("p", {
 					className: "power-dsh-notice",
 					role: "status"
-				}, t("skillDetailMissing")), current.status === "ready" && skill && h("div", { className: "power-dsh-skill-detail-body" }, skill.path && h("dl", { className: "power-dsh-skill-detail-list" }, label("skillDetailPath", h("code", { className: "power-dsh-skill-detail-code" }, skill.path))), skill.description && h("p", {
-					className: "power-dsh-skill-detail-description",
-					title: skill.description
-				}, skill.description), skill.content ? h("pre", {
-					className: "power-dsh-skill-detail-markdown",
+				}, t("skillDetailMissing")), current.status === "ready" && skill && h("div", {
+					className: "power-dsh-skill-detail-body",
 					tabIndex: 0
-				}, bodyText(skill.content)) : h("p", { className: "power-dsh-skill-detail-empty" }, t("skillDetailNoContent"))));
+				}, (skill.description || skill.path) && h("dl", { className: "power-dsh-skill-detail-list" }, skill.description && label("skillDetailDescription", h("p", { className: "power-dsh-skill-detail-description" }, skill.description)), skill.path && label("skillDetailPath", h("code", { className: "power-dsh-skill-detail-code" }, skill.path))), skill.content ? h("div", { className: "power-dsh-skill-detail-markdown" }, h(MarkdownText, {
+					text: skill.content,
+					variant: "compact",
+					omitHtml: true,
+					labels: {
+						code: {
+							copyLabel: t("skillCopyCode"),
+							copiedLabel: t("skillCopiedCode")
+						},
+						footnotes: t("skillFootnotes")
+					}
+				})) : h("p", { className: "power-dsh-skill-detail-empty" }, t("skillDetailNoContent"))));
 			};
 			const renderGroup = (group, label, selectedRows) => {
 				if (selectedRows.length === 0) return null;
@@ -3790,7 +3845,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"skillDetailLoading": "Reading the skill…",
 			"skillDetailFailed": "Could not read this skill. Please try again.",
 			"skillDetailNoContent": "This skill has no instruction body.",
-			"skillDetailPath": "Path"
+			"skillDetailDescription": "Description",
+			"skillDetailPath": "Path",
+			"skillCopyCode": "Copy code",
+			"skillCopiedCode": "Copied",
+			"skillFootnotes": "Footnotes"
 		},
 		"zh": {
 			"skillManagerEnabled": "技能管理",
@@ -3828,7 +3887,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"skillDetailLoading": "正在读取技能…",
 			"skillDetailFailed": "无法读取此技能，请重试。",
 			"skillDetailNoContent": "此技能没有正文内容。",
-			"skillDetailPath": "路径"
+			"skillDetailDescription": "描述",
+			"skillDetailPath": "路径",
+			"skillCopyCode": "复制代码",
+			"skillCopiedCode": "已复制",
+			"skillFootnotes": "脚注"
 		}
 	};
 
@@ -5844,7 +5907,11 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			const control = "power-dsh-background-kind";
 			const choose = (next) => {
 				if (disabled || !panelState.open || panelState.saving || panelState.kind === next) return;
-				publishPanel({ kind: next });
+				publishPanel(next === "pattern" ? {
+					kind: next,
+					opacity: 100,
+					blur: 0
+				} : { kind: next });
 				if (next === "wallpaper" && wallpaper.status === "idle") loadWallpaper();
 			};
 			return h("fieldset", { className: "power-dsh-background-panel-section power-dsh-background-kind" }, h("legend", { className: "power-dsh-background-panel-section-title" }, t("flowingBackgroundKind")), h("div", { className: "power-dsh-background-options" }, ...KINDS.map((kind) => h("label", {
@@ -7327,6 +7394,10 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 .power-dsh-usage-page .power-dsh-usage-metric-detail > span { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .power-dsh-usage-page .power-dsh-usage-card { display:flex; flex-direction:column; gap:14px; padding:14px 16px; border:.5px solid var(--dsw-alias-settings-card-stroke); border-radius:var(--dsw-radius-xl); background:var(--dsw-alias-settings-card-fill); }
 .power-dsh-usage-page .power-dsh-usage-card-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
+.power-dsh-usage-page .power-dsh-usage-trend-head { display:grid; grid-template-columns:minmax(0,1fr) auto; }
+.power-dsh-usage-page .power-dsh-usage-trend-head > .power-dsh-usage-tabs { justify-self:end; white-space:nowrap; }
+.power-dsh-usage-page .power-dsh-usage-trend-head > .power-dsh-usage-legend { grid-column:1 / -1; }
+.power-dsh-usage-page .power-dsh-usage-trend-head > .power-dsh-usage-legend:empty { display:none; }
 .power-dsh-usage-page .power-dsh-usage-card-note { color:var(--dsw-alias-label-tertiary); font-size:11px; line-height:18px; }
 .power-dsh-usage-page .power-dsh-usage-card-title { margin:0; color:var(--dsw-alias-label-primary); font-size:13px; font-weight:500; line-height:20px; }
 .power-dsh-usage-page .power-dsh-usage-section-title { margin:0; color:var(--dsw-alias-label-primary); font-size:13px; font-weight:500; line-height:20px; }
@@ -7360,7 +7431,12 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 .power-dsh-usage-page .power-dsh-usage-legend-dot[data-model], .power-dsh-usage-page .power-dsh-usage-model-bar-fill[data-model] { background:var(--power-dsh-model-color); }
 .power-dsh-usage-page .power-dsh-usage-chart-line { stroke:var(--power-dsh-model-color); stroke-width:1.5; stroke-linejoin:round; stroke-linecap:round; fill:none; }
 .power-dsh-usage-page .power-dsh-usage-chart { display:flex; flex-direction:column; gap:6px; min-width:0; }
-.power-dsh-usage-page .power-dsh-usage-chart-svg { display:block; width:100%; height:180px; overflow:visible; }
+.power-dsh-usage-page .power-dsh-usage-chart-svg { display:block; width:100%; height:180px; overflow:hidden; }
+.power-dsh-usage-page .power-dsh-usage-chart-plot { min-width:0; }
+.power-dsh-usage-page .power-dsh-usage-chart-plot:focus-visible { outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
+.power-dsh-usage-page .power-dsh-usage-chart-guide { display:none; stroke:var(--dsw-alias-label-tertiary); stroke-width:1; stroke-dasharray:3 3; pointer-events:none; }
+.power-dsh-usage-page .power-dsh-usage-chart-plot:hover .power-dsh-usage-chart-guide,
+.power-dsh-usage-page .power-dsh-usage-chart-plot:focus-visible .power-dsh-usage-chart-guide { display:block; }
 .power-dsh-usage-page .power-dsh-usage-chart-axis { stroke:var(--dsw-alias-border-l2); stroke-width:1; vector-effect:non-scaling-stroke; }
 .power-dsh-usage-page .power-dsh-usage-chart-axis-labels { display:flex; justify-content:space-between; gap:4px; min-width:0; }
 .power-dsh-usage-page .power-dsh-usage-chart-axis-label { min-width:0; overflow:hidden; color:var(--dsw-alias-label-tertiary); font-size:10px; line-height:14px; white-space:nowrap; }
@@ -7378,7 +7454,9 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 .power-dsh-usage-page .power-dsh-usage-model-bar { grid-area:bar; display:block; height:3px; border-radius:999px; background:color-mix(in srgb,var(--dsw-alias-label-tertiary) 14%,transparent); overflow:hidden; }
 .power-dsh-usage-page .power-dsh-usage-model-bar-fill { display:block; height:100%; border-radius:999px; }
 .power-dsh-usage-page .power-dsh-usage-empty { margin:0; padding:24px 0; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; text-align:center; }
-.power-dsh-usage-page .power-dsh-usage-actions { display:flex; justify-content:flex-end; }
+.power-dsh-usage-page .power-dsh-usage-description-row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.power-dsh-usage-page .power-dsh-usage-description-row > .power-dsh-description { min-width:0; }
+.power-dsh-usage-page .power-dsh-usage-refresh { flex:none; width:28px; height:28px; padding:0; }
 @media (prefers-reduced-motion:no-preference) {
   .power-dsh-usage-page .power-dsh-usage-tab { transition:background-color 120ms ease,color 120ms ease; }
 }
@@ -7635,8 +7713,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		}));
 	}
 	/**
-	* A Catmull-Rom curve through the series, drawn with cubic Béziers.
-	* Smoothing keeps a seven-day series readable instead of a sawtooth.
+	* Cubic Béziers through the series with controls bounded by each adjacent pair.
+	* Bounds prevent smoothing from inventing negative usage or overshooting peaks.
 	*/
 	function smoothPath(points) {
 		if (points.length === 0) return "";
@@ -7649,20 +7727,21 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			const current = points[index];
 			const next = points[index + 1];
 			const after = points[index + 2] ?? next;
+			const bound = (value, start, end) => Math.max(Math.min(start, end), Math.min(Math.max(start, end), value));
 			const control1 = {
-				x: current.x + (next.x - previous.x) / 6,
-				y: current.y + (next.y - previous.y) / 6
+				x: bound(current.x + (next.x - previous.x) / 6, current.x, next.x),
+				y: bound(current.y + (next.y - previous.y) / 6, current.y, next.y)
 			};
 			const control2 = {
-				x: next.x - (after.x - current.x) / 6,
-				y: next.y - (after.y - current.y) / 6
+				x: bound(next.x - (after.x - current.x) / 6, current.x, next.x),
+				y: bound(next.y - (after.y - current.y) / 6, current.y, next.y)
 			};
 			path += ` C ${round(control1.x)} ${round(control1.y)} ${round(control2.x)} ${round(control2.y)} ${round(next.x)} ${round(next.y)}`;
 		}
 		return path;
 	}
 	function createClientFeature$1(runtime, env) {
-		const { React, h, Tooltip, Modal, Button, observable, useSnapshot, useMounted, errorFeedback } = runtime;
+		const { React, h, Tooltip, Modal, Button, NativeIcon, observable, useSnapshot, useMounted, errorFeedback } = runtime;
 		const { ctx, t, savePreference, preferenceSlot, namespace } = env;
 		const styles = styles$13 + styles$1;
 		function UsageIcon({ size = 16 }) {
@@ -7695,6 +7774,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			const data = snapshot.value;
 			const [period, setPeriod] = React.useState("today");
 			const [range, setRange] = React.useState("7d");
+			const [trendDate, setTrendDate] = React.useState("");
 			const [custom, setCustom] = React.useState(null);
 			const [customOpen, setCustomOpen] = React.useState(false);
 			const [draftStart, setDraftStart] = React.useState("");
@@ -7831,6 +7911,31 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 					y: trendMax > 0 ? 100 - (byDate.get(row.date) ?? 0) / trendMax * 100 : 100
 				}));
 			};
+			const inspectedIndex = Math.max(0, rangeRows.findIndex((row) => row.date === trendDate) < 0 ? rangeRows.length - 1 : rangeRows.findIndex((row) => row.date === trendDate));
+			const inspectedDate = rangeRows[inspectedIndex]?.date ?? today;
+			const inspectedX = rangeRows.length <= 1 ? 0 : inspectedIndex / (rangeRows.length - 1) * 100;
+			const trendLabel = [inspectedDate, ...topModels.map((model) => {
+				const tokens = trendModels.find((row) => row.date === inspectedDate && row.modelId === model.modelId && row.provider === model.provider)?.totalTokens ?? 0;
+				return t("usageTrendPoint").replace("{model}", () => model.modelId || t("usageUnknownModel")).replace("{tokens}", () => count(tokens));
+			})].join("\n");
+			function inspectTrend(event) {
+				const { left, width } = event.currentTarget.getBoundingClientRect();
+				if (width <= 0 || rangeRows.length === 0) return;
+				const index = Math.max(0, Math.min(rangeRows.length - 1, Math.round((event.clientX - left) / width * (rangeRows.length - 1))));
+				setTrendDate(rangeRows[index].date);
+			}
+			function trendKey(event) {
+				const offsets = {
+					ArrowLeft: -1,
+					ArrowRight: 1,
+					Home: -inspectedIndex,
+					End: rangeRows.length - 1 - inspectedIndex
+				};
+				if (!(event.key in offsets) || rangeRows.length === 0) return;
+				event.preventDefault();
+				const index = Math.max(0, Math.min(rangeRows.length - 1, inspectedIndex + offsets[event.key]));
+				setTrendDate(rangeRows[index].date);
+			}
 			const axisLabels = rangeRows.filter((_, index) => rangeRows.length <= 7 || index % Math.ceil(rangeRows.length / 6) === 0 || index === rangeRows.length - 1);
 			const periodModelRows = [...modelTotals.values()].sort((left, right) => right.totalTokens - left.totalTokens);
 			const modelTotal = periodModelRows.reduce((sum, model) => sum + model.totalTokens, 0);
@@ -8049,7 +8154,21 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			return h("section", {
 				className: "power-dsh-page power-dsh-usage-page",
 				"aria-label": t("usageTab")
-			}, h("style", null, styles), h("header", null, h("h2", { className: "power-dsh-title" }, t("usageTab")), h("p", { className: "power-dsh-description" }, t("usagePageDescription"))), h("div", {
+			}, h("style", null, styles), h("header", null, h("h2", { className: "power-dsh-title" }, t("usageTab")), h("div", { className: "power-dsh-usage-description-row" }, h("p", { className: "power-dsh-description" }, t("usagePageDescription")), h(Tooltip, {
+				label: t("usageRefresh"),
+				side: "top",
+				portal: true
+			}, h(Button, {
+				variant: "ghost",
+				size: "sm",
+				className: "power-dsh-usage-refresh",
+				"aria-label": t("usageRefresh"),
+				disabled: busy,
+				"aria-busy": busy,
+				onClick: () => {
+					loadUsageStats();
+				}
+			}, h(NativeIcon, { glyph: "refresh-outline" }))))), h("div", {
 				className: "power-dsh-usage-period",
 				role: "group",
 				"aria-label": t("usagePeriodTitle")
@@ -8182,7 +8301,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				key: label.key,
 				className: "power-dsh-usage-heatmap-month",
 				style: { gridColumn: `${label.start + 1} / span ${label.span}` }
-			}, label.label)))), h("section", { className: "power-dsh-usage-card" }, h("div", { className: "power-dsh-usage-card-head" }, h("h3", { className: "power-dsh-usage-card-title" }, t("usageTrendTitle")), h("div", {
+			}, label.label)))), h("section", { className: "power-dsh-usage-card" }, h("div", { className: "power-dsh-usage-card-head power-dsh-usage-trend-head" }, h("h3", { className: "power-dsh-usage-card-title" }, t("usageTrendTitle")), h("div", {
 				className: "power-dsh-usage-tabs",
 				role: "tablist",
 				"aria-label": t("usageRangeTitle")
@@ -8201,7 +8320,20 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			}, h("span", {
 				className: "power-dsh-usage-legend-dot",
 				"data-model": topModels.indexOf(model)
-			}), model.modelId || t("usageUnknownModel"))))), trendMax > 0 ? h("div", { className: "power-dsh-usage-chart" }, h("svg", {
+			}), model.modelId || t("usageUnknownModel"))))), trendMax > 0 ? h("div", { className: "power-dsh-usage-chart" }, h(Tooltip, {
+				label: trendLabel,
+				side: "top",
+				portal: true,
+				delayMs: 0,
+				maxWidth: 360
+			}, h("div", {
+				className: "power-dsh-usage-chart-plot",
+				tabIndex: 0,
+				role: "group",
+				"aria-label": t("usageTrendTitle"),
+				onPointerMove: inspectTrend,
+				onKeyDown: trendKey
+			}, h("svg", {
 				className: "power-dsh-usage-chart-svg",
 				viewBox: "0 0 100 100",
 				preserveAspectRatio: "none",
@@ -8220,18 +8352,18 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				"data-model": topModels.indexOf(model),
 				fill: "none",
 				vectorEffect: "non-scaling-stroke"
-			}))), h("div", { className: "power-dsh-usage-chart-axis-labels" }, ...axisLabels.map((row) => h("span", {
+			})), h("line", {
+				x1: inspectedX,
+				y1: 0,
+				x2: inspectedX,
+				y2: 100,
+				className: "power-dsh-usage-chart-guide",
+				vectorEffect: "non-scaling-stroke",
+				"aria-hidden": true
+			})))), h("div", { className: "power-dsh-usage-chart-axis-labels" }, ...axisLabels.map((row) => h("span", {
 				key: row.date,
 				className: "power-dsh-usage-chart-axis-label"
-			}, row.date.slice(5).replace("-", "/"))))) : h("p", { className: "power-dsh-usage-empty" }, t("usageChartEmpty")))), h("div", { className: "power-dsh-usage-actions" }, h(Button, {
-				variant: "outline",
-				size: "sm",
-				disabled: busy,
-				"aria-busy": busy,
-				onClick: () => {
-					loadUsageStats();
-				}
-			}, t("usageRefresh")))), customDialog);
+			}, row.date.slice(5).replace("-", "/"))))) : h("p", { className: "power-dsh-usage-empty" }, t("usageChartEmpty"))))), customDialog);
 		}
 		let active = true;
 		let usage = {
@@ -8367,7 +8499,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			"usageCustomEnd": "End date",
 			"usageCustomApply": "Apply",
 			"usageCustomInvalid": "Enter valid dates with the start on or before the end.",
-			"usageTrendTitle": "Daily token trend",
+			"usageTrendTitle": "Token trend",
+			"usageTrendPoint": "{model}: {tokens} tokens",
 			"usageModelTitle": "Model usage",
 			"usageModelRequests": "{count} requests",
 			"usageModelShare": "{rate}",
@@ -8438,7 +8571,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			"usageCustomEnd": "结束日期",
 			"usageCustomApply": "应用",
 			"usageCustomInvalid": "请填写有效日期，开始日期不能晚于结束日期。",
-			"usageTrendTitle": "每日 Token 趋势图",
+			"usageTrendTitle": "Token 趋势图",
+			"usageTrendPoint": "{model}：{tokens} Token",
 			"usageModelTitle": "模型用量",
 			"usageModelRequests": "{count} 次请求",
 			"usageModelShare": "{rate}",

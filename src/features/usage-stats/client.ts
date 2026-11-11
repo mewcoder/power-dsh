@@ -173,8 +173,8 @@ export function monthLabels(
 }
 
 /**
- * A Catmull-Rom curve through the series, drawn with cubic Béziers.
- * Smoothing keeps a seven-day series readable instead of a sawtooth.
+ * Cubic Béziers through the series with controls bounded by each adjacent pair.
+ * Bounds prevent smoothing from inventing negative usage or overshooting peaks.
  */
 export function smoothPath(points: readonly { x: number; y: number }[]): string {
   if (points.length === 0) return '';
@@ -187,16 +187,23 @@ export function smoothPath(points: readonly { x: number; y: number }[]): string 
     const current = points[index]!;
     const next = points[index + 1]!;
     const after = points[index + 2] ?? next;
-    // A sixth of the neighbouring span is the standard Catmull-Rom to Bézier conversion.
-    const control1 = { x: current.x + (next.x - previous.x) / 6, y: current.y + (next.y - previous.y) / 6 };
-    const control2 = { x: next.x - (after.x - current.x) / 6, y: next.y - (after.y - current.y) / 6 };
+    // Keep all controls inside the segment's endpoint bounds, including flat zero spans.
+    const bound = (value: number, start: number, end: number) => Math.max(Math.min(start, end), Math.min(Math.max(start, end), value));
+    const control1 = {
+      x: bound(current.x + (next.x - previous.x) / 6, current.x, next.x),
+      y: bound(current.y + (next.y - previous.y) / 6, current.y, next.y),
+    };
+    const control2 = {
+      x: bound(next.x - (after.x - current.x) / 6, current.x, next.x),
+      y: bound(next.y - (after.y - current.y) / 6, current.y, next.y),
+    };
     path += ` C ${round(control1.x)} ${round(control1.y)} ${round(control2.x)} ${round(control2.y)} ${round(next.x)} ${round(next.y)}`;
   }
   return path;
 }
 
 export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironment) {
-  const { React, h, Tooltip, Modal, Button, observable, useSnapshot, useMounted, errorFeedback } = runtime;
+  const { React, h, Tooltip, Modal, Button, NativeIcon, observable, useSnapshot, useMounted, errorFeedback } = runtime;
   const { ctx, t, savePreference, preferenceSlot, namespace } = env;
   const styles = shellStyles + featureStyles;
   // Lucide ChartColumn, ISC licensed; see docs/third-party-notices.md.
@@ -226,6 +233,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const data = snapshot.value;
     const [period, setPeriod] = React.useState<UsagePeriod>('today');
     const [range, setRange] = React.useState<UsageRange>('7d');
+    const [trendDate, setTrendDate] = React.useState('');
     const [custom, setCustom] = React.useState<UsageWindow | null>(null);
     const [customOpen, setCustomOpen] = React.useState(false);
     const [draftStart, setDraftStart] = React.useState('');
@@ -345,6 +353,28 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         y: trendMax > 0 ? 100 - ((byDate.get(row.date) ?? 0) / trendMax) * 100 : 100,
       }));
     };
+    const inspectedIndex = Math.max(0, rangeRows.findIndex(row => row.date === trendDate) < 0
+      ? rangeRows.length - 1 : rangeRows.findIndex(row => row.date === trendDate));
+    const inspectedDate = rangeRows[inspectedIndex]?.date ?? today;
+    const inspectedX = rangeRows.length <= 1 ? 0 : inspectedIndex / (rangeRows.length - 1) * 100;
+    const trendLabel = [inspectedDate, ...topModels.map(model => {
+      const tokens = trendModels.find(row => row.date === inspectedDate && row.modelId === model.modelId && row.provider === model.provider)?.totalTokens ?? 0;
+      return t('usageTrendPoint').replace('{model}', () => model.modelId || t('usageUnknownModel'))
+        .replace('{tokens}', () => count(tokens));
+    })].join('\n');
+    function inspectTrend(event: import('react').PointerEvent<HTMLDivElement>) {
+      const { left, width } = event.currentTarget.getBoundingClientRect();
+      if (width <= 0 || rangeRows.length === 0) return;
+      const index = Math.max(0, Math.min(rangeRows.length - 1, Math.round((event.clientX - left) / width * (rangeRows.length - 1))));
+      setTrendDate(rangeRows[index]!.date);
+    }
+    function trendKey(event: import('react').KeyboardEvent<HTMLDivElement>) {
+      const offsets: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, Home: -inspectedIndex, End: rangeRows.length - 1 - inspectedIndex };
+      if (!(event.key in offsets) || rangeRows.length === 0) return;
+      event.preventDefault();
+      const index = Math.max(0, Math.min(rangeRows.length - 1, inspectedIndex + offsets[event.key]!));
+      setTrendDate(rangeRows[index]!.date);
+    }
     const axisLabels = rangeRows.filter((_, index) => rangeRows.length <= 7 || index % Math.ceil(rangeRows.length / 6) === 0 || index === rangeRows.length - 1);
     const periodModelRows = [...modelTotals.values()].sort((left, right) => right.totalTokens - left.totalTokens);
     const modelTotal = periodModelRows.reduce((sum, model) => sum + model.totalTokens, 0);
@@ -480,7 +510,12 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       h('style', null, styles),
       h('header', null,
         h('h2', { className: 'power-dsh-title' }, t('usageTab')),
-        h('p', { className: 'power-dsh-description' }, t('usagePageDescription'))),
+        h('div', { className: 'power-dsh-usage-description-row' },
+          h('p', { className: 'power-dsh-description' }, t('usagePageDescription')),
+          h(Tooltip, { label: t('usageRefresh'), side: 'top', portal: true },
+            h(Button, { variant: 'ghost', size: 'sm', className: 'power-dsh-usage-refresh',
+              'aria-label': t('usageRefresh'), disabled: busy, 'aria-busy': busy,
+              onClick: () => { void loadUsageStats(); } }, h(NativeIcon, { glyph: 'refresh-outline' }))))),
       h('div', { className: 'power-dsh-usage-period', role: 'group', 'aria-label': t('usagePeriodTitle') },
         h('div', { className: 'power-dsh-usage-period-presets' },
           ...(['today', 'week', 'month', 'all', 'custom'] as const).map(option => h('button', {
@@ -552,7 +587,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             ...labels.map(label => h('span', { key: label.key, className: 'power-dsh-usage-heatmap-month',
               style: { gridColumn: `${label.start + 1} / span ${label.span}` } }, label.label)))),
         h('section', { className: 'power-dsh-usage-card' },
-          h('div', { className: 'power-dsh-usage-card-head' },
+          h('div', { className: 'power-dsh-usage-card-head power-dsh-usage-trend-head' },
             h('h3', { className: 'power-dsh-usage-card-title' }, t('usageTrendTitle')),
             h('div', { className: 'power-dsh-usage-tabs', role: 'tablist', 'aria-label': t('usageRangeTitle') },
               ...(['7d', '30d'] as const).map(option => h('button', {
@@ -566,19 +601,21 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
                 model.modelId || t('usageUnknownModel'))))),
           trendMax > 0
             ? h('div', { className: 'power-dsh-usage-chart' },
+              h(Tooltip, { label: trendLabel, side: 'top', portal: true, delayMs: 0, maxWidth: 360 },
+                h('div', { className: 'power-dsh-usage-chart-plot', tabIndex: 0, role: 'group',
+                  'aria-label': t('usageTrendTitle'), onPointerMove: inspectTrend, onKeyDown: trendKey },
               h('svg', { className: 'power-dsh-usage-chart-svg', viewBox: '0 0 100 100', preserveAspectRatio: 'none', role: 'img', 'aria-label': t('usageTrendTitle') },
                 h('line', { x1: 0, y1: 100, x2: 100, y2: 100, className: 'power-dsh-usage-chart-axis' }),
                 ...topModels.map(model => h('path', {
                   key: `${model.provider}/${model.modelId}`, d: smoothPath(seriesFor(model)),
                   className: 'power-dsh-usage-chart-line', 'data-model': topModels.indexOf(model),
                   fill: 'none', vectorEffect: 'non-scaling-stroke',
-                }))),
+                })),
+                h('line', { x1: inspectedX, y1: 0, x2: inspectedX, y2: 100,
+                  className: 'power-dsh-usage-chart-guide', vectorEffect: 'non-scaling-stroke', 'aria-hidden': true })))),
               h('div', { className: 'power-dsh-usage-chart-axis-labels' },
                 ...axisLabels.map(row => h('span', { key: row.date, className: 'power-dsh-usage-chart-axis-label' }, row.date.slice(5).replace('-', '/')))))
-            : h('p', { className: 'power-dsh-usage-empty' }, t('usageChartEmpty')))),
-        h('div', { className: 'power-dsh-usage-actions' },
-          h(Button, { variant: 'outline', size: 'sm', disabled: busy, 'aria-busy': busy, onClick: () => { void loadUsageStats(); } },
-            t('usageRefresh')))),
+            : h('p', { className: 'power-dsh-usage-empty' }, t('usageChartEmpty'))))),
       customDialog);
 
   }

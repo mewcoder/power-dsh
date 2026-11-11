@@ -36,7 +36,11 @@ export const locales = {
     "skillDetailLoading": "Reading the skill…",
     "skillDetailFailed": "Could not read this skill. Please try again.",
     "skillDetailNoContent": "This skill has no instruction body.",
+    "skillDetailDescription": "Description",
     "skillDetailPath": "Path",
+    "skillCopyCode": "Copy code",
+    "skillCopiedCode": "Copied",
+    "skillFootnotes": "Footnotes",
   },
   "zh": {
     "skillManagerEnabled": "技能管理",
@@ -74,6 +78,10 @@ export const locales = {
     "skillDetailLoading": "正在读取技能…",
     "skillDetailFailed": "无法读取此技能，请重试。",
     "skillDetailNoContent": "此技能没有正文内容。",
+    "skillDetailDescription": "描述",
     "skillDetailPath": "路径",
+    "skillCopyCode": "复制代码",
+    "skillCopiedCode": "已复制",
+    "skillFootnotes": "脚注",
   }
 } satisfies Locales;

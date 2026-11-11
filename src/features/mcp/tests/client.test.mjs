@@ -683,7 +683,7 @@ function textOf(node) {
 test('MCP detail reads one entry on demand, lists only declared fields and never changes the server', async () => {
   // Exactly the fields `dsh-mcp-client@0.2.2-rc.1` accepts, minus the ones this entry left out.
   const config = {
-    transport: 'stdio', serverName: 'browser', command: 'npx', argsHidden: true, cwd: '/work/tools',
+    transport: 'stdio', serverName: 'browser', command: 'npx', args: ['-y', '@example/browser', '--path', '/work/my project'], cwd: '/work/tools',
     envKeys: ['BROWSER_TOKEN'], headerKeys: [], expressions: [], urlQueryHidden: false,
     reconnect: { enabled: true, initialDelayMs: 500, maxDelayMs: 30000, maxAttempts: 10 },
   };
@@ -700,7 +700,7 @@ test('MCP detail reads one entry on demand, lists only declared fields and never
   assert.equal(dialog().props.open, true);
   const text = textOf(dialog());
   for (const expected of ['mcpDetailTransport', 'mcpLocalType', 'mcpDetailRuntime', 'mcpRuntimeActive',
-    'npx', 'mcpDetailArgs', 'mcpDetailArgsHidden', '/work/tools', 'BROWSER_TOKEN', 'mcpDetailOn · mcpDetailReconnectInitial: 500 ms · mcpDetailReconnectMax: 30000 ms · mcpDetailReconnectAttempts: 10']) {
+    'npx', 'mcpDetailArgs', '-y @example/browser --path "/work/my project"', '/work/tools', 'BROWSER_TOKEN', 'mcpDetailOn · mcpDetailReconnectInitial: 500 ms · mcpDetailReconnectMax: 30000 ms · mcpDetailReconnectAttempts: 10']) {
     assert.ok(text.includes(expected), `Expected the dialog to show ${expected}`);
   }
   // The dialog keeps transport and runtime, but omits duplicate source/switch labels and unsupported fields.
@@ -827,6 +827,8 @@ test('MCP detail never renders a blank row when an older Host projects empty str
   for (const absent of ['mcpDetailCommand', 'mcpDetailCwd', 'mcpDetailUrl', 'mcpDetailEnv', 'mcpDetailHeaders', 'mcpDetailReconnect']) {
     assert.ok(!text.includes(absent), `An empty value must not produce the ${absent} row`);
   }
+  assert.ok(text.includes('mcpDetailArgs'));
+  assert.ok(text.includes('mcpDetailNone'), 'An empty argument list explicitly displays None.');
   // Empty labels would show as a bare field name with nothing beside it.
   const rows = descendants(dialog).filter(node => node.props.className === 'power-dsh-mcp-detail-row');
   for (const row of rows) {
@@ -851,8 +853,9 @@ test('MCP detail falls back to declared transport and lists tools for an open se
   const text = textOf(dialog);
   assert.ok(text.includes('https://mcp.example.com'));
   assert.ok(text.includes('mcpDetailUrlHiddenHint'));
-  assert.ok(text.includes('mcpDetailArgsHidden'));
-  assert.ok(!text.some(value => value.includes('fixture-') || value.includes('legacy:') || value.includes('--api-key')));
+  assert.ok(text.includes('--api-key [REDACTED]'));
+  assert.ok(!text.includes('mcpDetailArgsHidden'));
+  assert.ok(!text.some(value => value.includes('fixture-') || value.includes('legacy:')));
   assert.ok(text.includes('mcpDetailTransport'));
   assert.ok(text.includes('mcpHttpType'), 'Declared transport fills a missing catalog transport.');
   assert.ok(text.includes('mcpDetailRuntime'));

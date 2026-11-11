@@ -9,7 +9,7 @@ interface SkillsState extends FeatureState<SkillCatalog> { cwd: string; scope: S
 interface SkillsPageProps extends PageSlotProps { source: SnapshotSource<FormSnapshot>; skillsSource: SnapshotSource<SkillsState>; loadSkills(cwd?: string, scope?: SkillScope): Promise<void>; setSkillEnabled(name: string, enabled: boolean): Promise<void>; readSkill(name: string): Promise<SkillDetail | null>; }
 
 export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironment) {
-  const { React, h, Menu, Modal, Button, Tooltip, observable, useSnapshot, useMounted, errorFeedback } = runtime;
+  const { React, h, Menu, Modal, Button, Tooltip, MarkdownText, observable, useSnapshot, useMounted, errorFeedback } = runtime;
   const { ctx, form, source, t, savePreference, preferenceSlot, namespace } = env;
   const styles = shellStyles + catalogStyles + featureStyles;
   const { SkillSearchIcon, SkillChevron } = createCatalogUI(runtime);
@@ -177,9 +177,6 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
               },
             }, t('skillDetail')))));
     };
-    // Show the file as written, minus HTML comments: they are licence and provenance
-    // notices, and leaving them inline buries the instructions that follow.
-    const bodyText = (content: string) => content.replace(/<!--[\s\S]*?-->/g, '').replace(/\n{3,}/g, '\n\n').trim();
     // Opening loads the skill body once; a stale answer never replaces a newer dialog.
     async function openDetail(skill: SkillEntry) {
       if (!mounted.current) return;
@@ -216,17 +213,15 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       current.status === 'error' && errorFeedback({ t, message: current.error, code: 'PD-SKILLS-DETAIL',
         operation: 'readSkill', retry: () => { const row = (catalog?.skills ?? []).find(candidate => candidate.name === current.name); if (row) void openDetail(row); } }),
       current.status === 'ready' && skill === null && h('p', { className: 'power-dsh-notice', role: 'status' }, t('skillDetailMissing')),
-      current.status === 'ready' && skill && h('div', { className: 'power-dsh-skill-detail-body' },
-        // Path is the one fact the card cannot show; the switch already states enablement.
-        skill.path && h('dl', { className: 'power-dsh-skill-detail-list' },
-          label('skillDetailPath', h('code', { className: 'power-dsh-skill-detail-code' }, skill.path))),
-        // The description introduces the body, so it sits between metadata and content.
-        skill.description && h('p', { className: 'power-dsh-skill-detail-description', title: skill.description }, skill.description),
-        // The body needs no heading: it is the dialog's main content. It stays plain
-        // Markdown text — the source of truth, with no renderer that could drift from
-        // the host or drop parts of the file.
+      current.status === 'ready' && skill && h('div', { className: 'power-dsh-skill-detail-body', tabIndex: 0 },
+        (skill.description || skill.path) && h('dl', { className: 'power-dsh-skill-detail-list' },
+          skill.description && label('skillDetailDescription', h('p', { className: 'power-dsh-skill-detail-description' }, skill.description)),
+          skill.path && label('skillDetailPath', h('code', { className: 'power-dsh-skill-detail-code' }, skill.path))),
         skill.content
-          ? h('pre', { className: 'power-dsh-skill-detail-markdown', tabIndex: 0 }, bodyText(skill.content))
+          ? h('div', { className: 'power-dsh-skill-detail-markdown' }, h(MarkdownText, {
+            text: skill.content, variant: 'compact', omitHtml: true,
+            labels: { code: { copyLabel: t('skillCopyCode'), copiedLabel: t('skillCopiedCode') }, footnotes: t('skillFootnotes') },
+          }))
           : h('p', { className: 'power-dsh-skill-detail-empty' }, t('skillDetailNoContent'))));
     };
     const renderGroup = (group: 'preinstalled' | 'personal', label: string, selectedRows: SkillEntry[]) => {

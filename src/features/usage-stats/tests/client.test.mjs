@@ -18,7 +18,8 @@ async function usagePage(app, language = 'en', fullHistory = true) {
   const cells = () => render().filter(node => node.props.className === 'power-dsh-usage-heatmap-cell'
     && node.props['data-has-usage'] !== undefined);
   const tooltips = () => render().filter(node => node.type === 'native-tooltip-fixture'
-    && node.props.label?.includes('tokens'));
+    && node.props.label?.includes('tokens')
+    && node.props.children?.some(child => child?.props?.className === 'power-dsh-usage-heatmap-cell'));
   // Existing chart cases inspect the full history; the selector itself defaults to Today.
   if (fullHistory) render().find(node => node.props['data-period'] === 'all').props.onClick();
   return { render, tabs, tab, cells, tooltips };
@@ -458,6 +459,42 @@ test('cache hit rate includes cache writes in input and empty cards remain numer
   }
 });
 
+test('trend hover and keyboard inspection show exact daily model tokens across zooms', async () => {
+  for (const language of ['en', 'zh']) {
+    const app = await mount({ usageSnapshot: usageSnapshotFixture() });
+    const page = await usagePage(app, language);
+    const plot = () => page.render().find(node => node.props.className === 'power-dsh-usage-chart-plot');
+    const tip = () => page.render().find(node => node.type === 'native-tooltip-fixture'
+      && node.props.children?.some(child => child?.props?.className === 'power-dsh-usage-chart-plot')).props;
+    const hover = clientX => plot().props.onPointerMove({ clientX, currentTarget: { getBoundingClientRect: () => ({ left: 100, width: 600 }) } });
+    const key = key => plot().props.onKeyDown({ key, preventDefault() {} });
+    const reads = app.usageReads.length;
+    assert.equal(plot().props.tabIndex, 0);
+    hover(700);
+    assert.ok(tip().label.startsWith('2026-03-03\n'));
+    assert.ok(tip().label.includes(language === 'en' ? 'group/flash: 300 tokens' : 'group/flash：300 Token'));
+    assert.ok(tip().label.includes(language === 'en' ? 'group/sol: 100 tokens' : 'group/sol：100 Token'));
+    assert.equal(tip().portal, true, 'The tooltip escapes the clipped plot.');
+    key('ArrowLeft');
+    assert.ok(tip().label.startsWith('2026-03-02\n'));
+    assert.ok(tip().label.includes(language === 'en' ? 'group/flash: 0 tokens' : 'group/flash：0 Token'));
+    key('Home');
+    assert.ok(tip().label.startsWith('2026-02-25\n'));
+    key('End');
+    assert.ok(tip().label.startsWith('2026-03-03\n'));
+    hover(500);
+    assert.ok(tip().label.startsWith('2026-03-01\n'));
+    assert.ok(tip().label.includes(language === 'en' ? 'group/flash: 100 tokens' : 'group/flash：100 Token'));
+    page.render().find(node => node.props['data-range'] === '30d').props.onClick();
+    hover(-100);
+    assert.ok(tip().label.startsWith('2026-02-02\n'), 'The left edge uses the current 30-day window.');
+    hover(900);
+    assert.ok(tip().label.startsWith('2026-03-03\n'), 'Pointer positions clamp to the plotted dates.');
+    assert.equal(app.usageReads.length, reads, 'Inspecting cached points does not reread logs.');
+    app.unmount();
+  }
+});
+
 test('the trend curve passes through every point and smooths the segments between them', () => {
   const points = [{ x: 0, y: 80 }, { x: 50, y: 20 }, { x: 100, y: 70 }];
   const path = smoothPath(points);
@@ -466,4 +503,25 @@ test('the trend curve passes through every point and smooths the segments betwee
   assert.ok(path.endsWith('100 70'), 'The curve ends on the last day.');
   assert.equal(smoothPath([{ x: 0, y: 50 }]), 'M 0 50', 'A single point stays a move command.');
   assert.equal(smoothPath([]), '', 'No points draw nothing.');
+});
+
+test('smoothed zero spans and isolated peaks stay inside their data bounds', () => {
+  for (const values of [[100, 100, 0, 100, 100], [0, 0, 100, 0, 0], [60, 20, 100, 0, 30]]) {
+    const points = values.map((y, index) => ({ x: index * 25, y }));
+    const segments = smoothPath(points).split(' C ').slice(1);
+    segments.forEach((segment, index) => {
+      const [x1, y1, x2, y2, x3, y3] = segment.split(' ').map(Number);
+      const start = points[index];
+      const end = points[index + 1];
+      for (let sample = 0; sample <= 40; sample++) {
+        const t = sample / 40;
+        const at = (a, b, c, d) => (1 - t) ** 3 * a + 3 * (1 - t) ** 2 * t * b + 3 * (1 - t) * t ** 2 * c + t ** 3 * d;
+        const x = at(start.x, x1, x2, x3);
+        const y = at(start.y, y1, y2, y3);
+        assert.ok(x >= start.x - 0.001 && x <= end.x + 0.001);
+        assert.ok(y >= Math.min(start.y, end.y) - 0.001 && y <= Math.max(start.y, end.y) + 0.001,
+          `The curve must not invent a peak or cross zero: ${values}, segment ${index}, y=${y}`);
+      }
+    });
+  }
 });

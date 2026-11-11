@@ -219,7 +219,10 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         label('mcpDetailTransport', transportLabel),
         label('mcpDetailRuntime', runtimeLabel),
         config?.command && label('mcpDetailCommand', h('code', { className: 'power-dsh-mcp-detail-code' }, config.command)),
-        config?.argsHidden && label('mcpDetailArgs', t('mcpDetailArgsHidden')),
+        label('mcpDetailArgs', config?.args?.length
+          ? h('code', { className: 'power-dsh-mcp-detail-code' },
+            config.args.map(arg => /[\s"'\\]/.test(arg) || arg === '' ? JSON.stringify(arg) : arg).join(' '))
+          : t('mcpDetailNone')),
         config?.cwd && label('mcpDetailCwd', h('code', { className: 'power-dsh-mcp-detail-code' }, config.cwd)),
         config?.url && label('mcpDetailUrl', h('code', { className: 'power-dsh-mcp-detail-code' }, config.url)),
         config?.urlQueryHidden === true && label('mcpDetailUrlHidden', t('mcpDetailUrlHiddenHint')),

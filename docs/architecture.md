@@ -51,7 +51,7 @@ DSH `0.2.2-rc.1` 的原生 logger 提供内存缓冲与 exporter；插件安装�
 
 ## MCP 详情
 
-[MCP 管理](../src/features/mcp/spec.md)的详情弹窗经单一 owner-only RPC `readMcpServer(id)` 读取：Host 在[策略](../src/features/mcp/mcp-policy.ts)中同一次读取里取目录行与声明配置，[投影](../src/features/mcp/mcp-config.ts)只保留条目实际声明的白名单字段（不补宿主默认值，也不含目标宿主没有的字段），`env`／`headers` 仅传键名，`args` 仅标记有无参数，`url` 解析为 HTTP／HTTPS URL 后只返回协议、主机和端口；无法安全解析或协议不受支持时不返回地址，Loader `!!js` 表达式只记录字段名、不求值。profile 与模式条目读 Loader 条目声明，管理器与动态实例读已解析配置；来源不唯一时返回空配置。读取不写入、不启停、不连接服务器，也不改变目录快照。Client 仅在点击时请求，关闭后丢弃迟到响应。
+[MCP 管理](../src/features/mcp/spec.md)的详情弹窗经单一 owner-only RPC `readMcpServer(id)` 读取：Host 在[策略](../src/features/mcp/mcp-policy.ts)中同一次读取里取目录行与声明配置，[投影](../src/features/mcp/mcp-config.ts)只保留条目实际声明的白名单字段（不补宿主默认值，也不含目标宿主没有的字段），`env`／`headers` 仅传键名，`args` 保留普通参数、遮蔽已识别的敏感字段值，`url` 解析为 HTTP／HTTPS URL 后只返回协议、主机和端口；无法安全解析或协议不受支持时不返回地址，Loader `!!js` 表达式只记录字段名、不求值。profile 与模式条目读 Loader 条目声明，管理器与动态实例读已解析配置；来源不唯一时返回空配置。读取不写入、不启停、不连接服务器，也不改变目录快照。Client 仅在点击时请求，关闭后丢弃迟到响应。
 
 ## 使用统计
 

@@ -1,6 +1,7 @@
 import { isRecord, isArray, isStringArray, hasStrings, hasBooleans, isOneOf, type Codec, type RpcDescriptor } from '../../shared/types/protocol.ts';
 import type { McpRuntimeState, McpTransport, McpServer, McpCatalog, McpReconnectConfig, McpServerConfig, McpServerDetail } from '../../shared/types/wire.ts';
 export type { McpRuntimeState, McpTransport, McpServer, McpCatalog, McpServerConfig, McpServerDetail } from '../../shared/types/wire.ts';
+import { redactMcpArgs } from './mcp-args.ts';
 import { stringCodec, booleanCodec } from '../../shared/rpc/codecs.ts';
 
 const serverCodec: Codec<McpServer> = {
@@ -65,7 +66,7 @@ const configCodec: Codec<McpServerConfig> = {
       || !isStringArray(value.envKeys) || !isStringArray(value.headerKeys)
       || !isStringArray(value.expressions) || typeof value.urlQueryHidden !== 'boolean'
       || !optionalText(value.serverName) || !optionalText(value.command) || !optionalText(value.cwd)
-      || !optionalText(value.url) || !(value.argsHidden === undefined || typeof value.argsHidden === 'boolean')
+      || !optionalText(value.url) || !(value.args === undefined || isStringArray(value.args))
       || !(value.reconnect === undefined || isRecord(value.reconnect))) throw new TypeError('Invalid MCP configuration');
     const endpoint = projectEndpoint(value.url);
     const config: McpServerConfig = {
@@ -77,7 +78,7 @@ const configCodec: Codec<McpServerConfig> = {
     };
     if (typeof value.serverName === 'string' && value.serverName) config.serverName = value.serverName;
     if (typeof value.command === 'string' && value.command) config.command = value.command;
-    if (value.argsHidden === true || (isArray(value.args) && value.args.length > 0)) config.argsHidden = true;
+    if (isStringArray(value.args)) config.args = redactMcpArgs(value.args);
     if (typeof value.cwd === 'string' && value.cwd) config.cwd = value.cwd;
     if (endpoint.url !== undefined) config.url = endpoint.url;
     if (value.reconnect !== undefined) config.reconnect = reconnectCodec.parse(value.reconnect);

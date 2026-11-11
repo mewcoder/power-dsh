@@ -503,7 +503,7 @@ test('the panel switches the background type and saves it on close', async () =>
   app.unmount();
 });
 
-test('appearance is tunable for the built-in flow as well as a wallpaper', async () => {
+test('switching to the built-in flow previews and saves full opacity with no blur', async () => {
   const app = await mount({ wallpaper: { name: 'sky.png', mime: 'image/png', bytes: 4, dataUrl: PNG } });
   app.set({ flowingBackgroundEnabled: true, flowingBackgroundKind: 'wallpaper', flowingBackgroundOpacity: 40, flowingBackgroundBlur: 16 });
   await openTune(app);
@@ -514,10 +514,15 @@ test('appearance is tunable for the built-in flow as well as a wallpaper', async
   await chooseKind(app, 'pattern');
   assert.equal(descendants(app.renderTunePanel()).some(node => node.type === 'input' && node.props.type === 'file'), false,
     'Switching to the built-in flow hides the picker immediately.');
+  assert.equal(slider().props.value, 100, 'The reset is immediately visible in the preview.');
+  assert.equal(descendants(app.renderTunePanel()).find(node => node.props.id === 'power-dsh-tune-flowingBackgroundBlur').props.value, 0);
+  assert.equal(app.settingsValue().flowingBackgroundOpacity, 40, 'Switching only previews until committed.');
+  assert.equal(app.settingsValue().flowingBackgroundBlur, 16);
   await slider().props.onPointerUp();
   const saved = app.settingsProps().source.getSnapshot().value;
   assert.equal(saved.flowingBackgroundKind, 'pattern');
-  assert.equal(saved.flowingBackgroundOpacity, 40, 'The built-in flow keeps its tunable opacity.');
+  assert.equal(saved.flowingBackgroundOpacity, 100);
+  assert.equal(saved.flowingBackgroundBlur, 0);
   assert.deepEqual(app.wallpaperWrites, [], 'Switching types never deletes the saved image.');
   app.unmount();
 });

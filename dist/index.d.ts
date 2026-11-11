@@ -133,13 +133,13 @@ interface McpReconnectConfig {
   maxDelayMs?: number;
   maxAttempts?: number;
 }
-/** Read-only transport projection with no argument, environment, or header values. */
+/** Read-only transport projection with masked argument credentials and no environment/header values. */
 interface McpServerConfig {
   transport: McpTransport;
   /** Present only when the entry declares the field; defaults are not listed. */
   serverName?: string;
   command?: string;
-  argsHidden?: boolean;
+  args?: string[];
   cwd?: string;
   url?: string;
   envKeys: string[];

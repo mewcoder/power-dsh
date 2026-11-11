@@ -12,6 +12,10 @@ export const styles = `
 .power-dsh-usage-page .power-dsh-usage-metric-detail > span { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .power-dsh-usage-page .power-dsh-usage-card { display:flex; flex-direction:column; gap:14px; padding:14px 16px; border:.5px solid var(--dsw-alias-settings-card-stroke); border-radius:var(--dsw-radius-xl); background:var(--dsw-alias-settings-card-fill); }
 .power-dsh-usage-page .power-dsh-usage-card-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
+.power-dsh-usage-page .power-dsh-usage-trend-head { display:grid; grid-template-columns:minmax(0,1fr) auto; }
+.power-dsh-usage-page .power-dsh-usage-trend-head > .power-dsh-usage-tabs { justify-self:end; white-space:nowrap; }
+.power-dsh-usage-page .power-dsh-usage-trend-head > .power-dsh-usage-legend { grid-column:1 / -1; }
+.power-dsh-usage-page .power-dsh-usage-trend-head > .power-dsh-usage-legend:empty { display:none; }
 .power-dsh-usage-page .power-dsh-usage-card-note { color:var(--dsw-alias-label-tertiary); font-size:11px; line-height:18px; }
 .power-dsh-usage-page .power-dsh-usage-card-title { margin:0; color:var(--dsw-alias-label-primary); font-size:13px; font-weight:500; line-height:20px; }
 .power-dsh-usage-page .power-dsh-usage-section-title { margin:0; color:var(--dsw-alias-label-primary); font-size:13px; font-weight:500; line-height:20px; }
@@ -45,7 +49,12 @@ export const styles = `
 .power-dsh-usage-page .power-dsh-usage-legend-dot[data-model], .power-dsh-usage-page .power-dsh-usage-model-bar-fill[data-model] { background:var(--power-dsh-model-color); }
 .power-dsh-usage-page .power-dsh-usage-chart-line { stroke:var(--power-dsh-model-color); stroke-width:1.5; stroke-linejoin:round; stroke-linecap:round; fill:none; }
 .power-dsh-usage-page .power-dsh-usage-chart { display:flex; flex-direction:column; gap:6px; min-width:0; }
-.power-dsh-usage-page .power-dsh-usage-chart-svg { display:block; width:100%; height:180px; overflow:visible; }
+.power-dsh-usage-page .power-dsh-usage-chart-svg { display:block; width:100%; height:180px; overflow:hidden; }
+.power-dsh-usage-page .power-dsh-usage-chart-plot { min-width:0; }
+.power-dsh-usage-page .power-dsh-usage-chart-plot:focus-visible { outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
+.power-dsh-usage-page .power-dsh-usage-chart-guide { display:none; stroke:var(--dsw-alias-label-tertiary); stroke-width:1; stroke-dasharray:3 3; pointer-events:none; }
+.power-dsh-usage-page .power-dsh-usage-chart-plot:hover .power-dsh-usage-chart-guide,
+.power-dsh-usage-page .power-dsh-usage-chart-plot:focus-visible .power-dsh-usage-chart-guide { display:block; }
 .power-dsh-usage-page .power-dsh-usage-chart-axis { stroke:var(--dsw-alias-border-l2); stroke-width:1; vector-effect:non-scaling-stroke; }
 .power-dsh-usage-page .power-dsh-usage-chart-axis-labels { display:flex; justify-content:space-between; gap:4px; min-width:0; }
 .power-dsh-usage-page .power-dsh-usage-chart-axis-label { min-width:0; overflow:hidden; color:var(--dsw-alias-label-tertiary); font-size:10px; line-height:14px; white-space:nowrap; }
@@ -63,7 +72,9 @@ export const styles = `
 .power-dsh-usage-page .power-dsh-usage-model-bar { grid-area:bar; display:block; height:3px; border-radius:999px; background:color-mix(in srgb,var(--dsw-alias-label-tertiary) 14%,transparent); overflow:hidden; }
 .power-dsh-usage-page .power-dsh-usage-model-bar-fill { display:block; height:100%; border-radius:999px; }
 .power-dsh-usage-page .power-dsh-usage-empty { margin:0; padding:24px 0; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; text-align:center; }
-.power-dsh-usage-page .power-dsh-usage-actions { display:flex; justify-content:flex-end; }
+.power-dsh-usage-page .power-dsh-usage-description-row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.power-dsh-usage-page .power-dsh-usage-description-row > .power-dsh-description { min-width:0; }
+.power-dsh-usage-page .power-dsh-usage-refresh { flex:none; width:28px; height:28px; padding:0; }
 @media (prefers-reduced-motion:no-preference) {
   .power-dsh-usage-page .power-dsh-usage-tab { transition:background-color 120ms ease,color 120ms ease; }
 }

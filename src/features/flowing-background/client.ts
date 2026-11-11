@@ -294,7 +294,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const control = 'power-dsh-background-kind';
     const choose = (next: BackgroundKind) => {
       if (disabled || !panelState.open || panelState.saving || panelState.kind === next) return;
-      publishPanel({ kind: next });
+      publishPanel(next === 'pattern' ? { kind: next, opacity: 100, blur: 0 } : { kind: next });
       // Loading the asset is a preview concern: switching types must not write.
       if (next === 'wallpaper' && wallpaper.status === 'idle') void loadWallpaper();
     };

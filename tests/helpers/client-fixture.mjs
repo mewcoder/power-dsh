@@ -268,6 +268,9 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   function FakeTooltip(props) {
     return { type: 'native-tooltip-fixture', props };
   }
+  function FakeMarkdownText(props) {
+    return { type: 'native-markdown-fixture', props: { ...props, children: [props.text] } };
+  }
   function FakeStateDot(props) {
     return { type: 'native-state-dot-fixture', props };
   }
@@ -287,6 +290,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       if (type === FakeMenu) return FakeMenu(props);
       if (type === FakeStateDot) return FakeStateDot({ ...props, children });
       if (type === FakeTooltip) return FakeTooltip({ ...props, children });
+      if (type === FakeMarkdownText) return FakeMarkdownText(props);
       if (typeof props?.ref === 'function') props.ref({ focus() { focusedElementId = props.id; } });
       return { type, props: { ...props, children } };
     },
@@ -403,7 +407,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       __ModuleLoader__: { load(value) { plugin = value.factory(specifier => {
         if (specifier === 'react') return React;
         assert.equal(specifier, '@deepseek-ai/dsh-client-ui-primitives');
-        return { Menu: FakeMenu, Tooltip: FakeTooltip, StateDot: FakeStateDot, Modal: FakeModal, Button: FakeButton };
+        return { Menu: FakeMenu, Tooltip: FakeTooltip, StateDot: FakeStateDot, Modal: FakeModal, Button: FakeButton, MarkdownText: FakeMarkdownText };
       }); } },
     },
   });
@@ -411,7 +415,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   if (featureIds) {
     vm.runInContext(await getCompositionBundle(), context);
     const { createClient, clientFeatures } = context.PowerDshComposition;
-    plugin = createClient(React, { Menu: FakeMenu, Tooltip: FakeTooltip, StateDot: FakeStateDot, Modal: FakeModal, Button: FakeButton },
+    plugin = createClient(React, { Menu: FakeMenu, Tooltip: FakeTooltip, StateDot: FakeStateDot, Modal: FakeModal, Button: FakeButton, MarkdownText: FakeMarkdownText },
       clientFeatures.filter(feature => featureIds.includes(feature.definition.id)));
   }
   const form = {

@@ -444,7 +444,7 @@ test('MCP detail reports only the fields an entry declares and never exposes cre
   assert.equal(detail.server.id, 'include:notes');
   // Defaults the entry did not write (toolCallTimeoutMs, failOnStartupError, ...) stay out.
   assert.deepEqual(detail.config, {
-    transport: 'stdio', serverName: 'notes', command: 'npx', argsHidden: true, cwd: '/work/notes',
+    transport: 'stdio', serverName: 'notes', command: 'npx', args: ['-y', 'server', '--api-key', '[REDACTED]'], cwd: '/work/notes',
     envKeys: ['GITHUB_TOKEN', 'OTHER'], headerKeys: [], expressions: [], urlQueryHidden: false,
     reconnect: { enabled: true, initialDelayMs: 500, maxDelayMs: 30000, maxAttempts: 10 },
   });
