@@ -98,7 +98,7 @@ README 面向使用者，标题固定为 `# power-dsh`，首屏使用已确认�
 3. 按分发渠道核对 `private`：npm 发布前移除 `private: true` 或设为 `false`，开发准备阶段保留它；仓库检查兼容两种有效状态。DSH 官方参考索引生成器会忽略 private 包。不要将这项规则套作 dsh-market 收录的明确门槛，后者按自己的贡献指南检查。
 4. 如果发布 npm，再次确认包名可用和账号权限；一次注册表查询不是名称预留。包名、patch 引用与 Client 注册 id 必须一致。
 5. 审阅项目和打包清单：安装包保留编译 JS `dist/*.js`、公开声明 `dist/*.d.ts`、模块主 Spec `src/features/*/spec.md`、图标/locale、Bundle patch、README、CHANGELOG、截图清单、发布截图及[第三方声明](third-party-notices.md)，另保留 npm 自动收录的[文档索引](README.md)。TS 编译输入、测试、构建配置/脚本、开发规范和参考仓库均排除；tsdown、TypeScript 与 Node/React 类型声明仅为开发依赖，生产安装不需要它们。确认包中没有凭据、参考仓库和个人日志，再准备实际产物验收结果。
-6. 核对官方 `@deepseek-ai/*` 包的依赖声明。市场指南推荐使用 `peerDependencies`；本包目前仍使用固定版本的 `dependencies`，调整时须同时核对宿主模块身份、更新锁文件并执行检查与安装验证。peer 范围须显式包含所支持的预发布分支，不将宽泛范围误当成包含所有 alpha / rc。此项属于上游推荐，不能不经验证机械移动依赖。
+6. 官方 `@deepseek-ai/*` 包以 `peerDependencies` 声明为宿主提供、并在 `peerDependenciesMeta` 标为可选，安装时不再嵌套安装一份宿主 SDK。改动这些范围时须同时更新开发依赖与锁文件，运行完整检查、隔离安装和兼容回归；范围须覆盖所支持的预发布分支，不把宽泛范围误当成包含所有 alpha / rc。
 
 以上许可证、兼容范围与实际产物验收是本项目的发布准备要求；市场自身的收录门槛见下文，不能将两者混为一谈。
 

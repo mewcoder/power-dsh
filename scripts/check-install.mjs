@@ -19,9 +19,16 @@ try {
   assert.ok(packed && path.basename(packed.filename) === packed.filename, 'Invalid package filename.');
   const consumer = path.join(directory, 'consumer');
   await mkdir(consumer);
+  // The host supplies the SDK packages; install them beside the plugin so the
+  // tarball resolves them from the consumer instead of nesting its own copies.
+  const hostPackages = {};
+  for (const name of Object.keys(manifest.peerDependencies ?? {})) {
+    hostPackages[name] = manifest.devDependencies?.[name] ?? manifest.peerDependencies[name];
+  }
+  hostPackages['@deepseek-ai/cordis'] = '^4.1.0';
   await writeFile(path.join(consumer, 'package.json'), JSON.stringify({
     name: 'power-dsh-install-check', private: true, type: 'module',
-    dependencies: { [manifest.name]: `file:${path.join(directory, packed.filename)}` },
+    dependencies: { [manifest.name]: `file:${path.join(directory, packed.filename)}`, ...hostPackages },
   }, null, 2) + '\n');
 
   // All dependency installation is restricted to this disposable consumer.
@@ -42,6 +49,12 @@ try {
     assert.ok((await realpath(packageRequire.resolve(dependency))).startsWith(consumer + path.sep),
       `Production dependencies must resolve inside the independent consumer: ${dependency}`);
   }
+  for (const dependency of Object.keys(installed.peerDependencies ?? {})) {
+    assert.ok((await realpath(packageRequire.resolve(dependency))).startsWith(consumer + path.sep),
+      `Peer dependency must resolve from the host installation: ${dependency}`);
+  }
+  assert.equal(Object.keys(installed.dependencies ?? {}).length, 0,
+    'The plugin must not install its own copy of the host SDK.');
   for (const tool of ['tsdown', 'typescript', 'esbuild', 'react']) {
     let resolved;
     try { resolved = await realpath(packageRequire.resolve(tool)); }

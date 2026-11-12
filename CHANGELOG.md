@@ -6,6 +6,13 @@
 
 后续改动按「新增」「修复」「变更」「兼容性」记录。
 
+## 0.0.2（2026-11-12）
+
+### 修复
+
+- 修复 Windows 上安装后启用失败（`EPERM: operation not permitted`）的问题：`@deepseek-ai/dsh-tools`、`dsh-typert-protocol` 与 `schemastery` 改为可选 `peerDependencies`，由宿主提供，安装时不再在插件目录内嵌套安装 `cordis`／`cosmokit`，也不再需要 pnpm 创建额外目录联接。安装体积随之减小。
+- 已安装 0.0.1 的用户需移除后重新安装 0.0.2；配置与图片保存在 profile 的 `power-dsh/` 下，不受影响。
+
 ## 0.0.1（2026-11-12）
 
 PowerDSH 首个公开版本，面向 DSH 桌面版。各项增强在 **设置 → PowerDSH** 独立开启、持久化保存，按通用、界面、管理、精简、其他五类组织。

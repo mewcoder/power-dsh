@@ -61,7 +61,11 @@ for (const version of versions) {
     }
     const manifestPath = path.join(directory, 'package.json');
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-    manifest.dependencies = {
+    // The SDK packages are peers of the plugin; install historical versions as
+    // development dependencies in the isolated copy so repository checks and
+    // builds resolve them without changing the shipped dependency declaration.
+    manifest.devDependencies = {
+      ...manifest.devDependencies,
       '@deepseek-ai/cordis': combinations[version].cordis,
       '@deepseek-ai/schemastery': combinations[version].schema,
       '@deepseek-ai/dsh-tools': version,

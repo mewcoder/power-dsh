@@ -163,3 +163,11 @@ npm run check:compat -- 0.2.2-alpha.2
 | `dist/index.js` | `851ad8f6cec3292d478f4be9d221f397ff2f0573f749f14c3e4011ea720a01ce` |
 | `dist/index.d.ts` | `1a89acf0f887b7e53f44fab43122a17061ea58da918bdd7cf596ac28e81b6e0a` |
 | `dist/client.js` | `77bd742a757a6722200ec6bdbf2b0311cb112e6ec2b18130b16f2572618aadff` |
+
+### 2026-11-12 0.0.2 依赖模型修正
+
+Windows 用户报告启用失败：`EPERM: operation not permitted, stat ...power-dsh\node_modules\.pnpm\@deepseek-ai+cordis@4.1.0\...\cosmokit`。原因是 0.0.1 把宿主 SDK 声明为普通依赖，安装时在插件目录内嵌套安装 `dsh-tools` 及其 peer `cordis`，pnpm 需在 Windows 上为这些包创建目录联接；权限不足或存在陈旧联接时即报 `EPERM`。
+
+0.0.2 将 `@deepseek-ai/dsh-tools`、`@deepseek-ai/dsh-typert-protocol` 与 `@deepseek-ai/schemastery` 改为可选 `peerDependencies`，由宿主提供；包内不再声明生产依赖。peer 范围按预发布分支显式书写（`>=0.2.0-rc.1 <0.2.1-0 || >=0.2.1-alpha.1 <0.2.2-0 || >=0.2.2-alpha.1 <0.3.0-0`），避免 npm 默认规则把 rc 版本排除。
+
+验证：`npm run check` 558 项通过、`check:package` 与实际 tarball 通过、`check:install` 在独立项目中确认包内零生产依赖且宿主提供的 peer 可解析；`check:compat` 在 `0.2.0-rc.1` 与 `0.2.1-rc.5` 上各通过 558 项测试与 7 项 Host 装配检查。该验证不包含 Windows 实机复测，Windows 结果待用户反馈。
