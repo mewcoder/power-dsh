@@ -52,9 +52,9 @@ for (const version of versions) {
   try {
     for (const entry of await readdir(root, { withFileTypes: true })) {
       const includeFile = entry.isFile() && [
-        'package.json', 'pnpm-lock.yaml', '.gitignore', 'README.md', 'AGENTS.md', 'CHANGELOG.md', 'cordis.patch.yml', 'screenshots.json', 'tsconfig.json', 'tsdown.config.ts', '.node-version',
+        'package.json', 'pnpm-lock.yaml', '.gitignore', 'README.md', 'AGENTS.md', 'CHANGELOG.md', 'LICENSE', 'cordis.patch.yml', 'screenshots.json', 'tsconfig.json', 'tsdown.config.ts', '.node-version',
       ].includes(entry.name);
-      const includeDirectory = entry.isDirectory() && ['src', 'dist', 'assets', 'scripts', 'tests', 'docs', '.github'].includes(entry.name);
+      const includeDirectory = entry.isDirectory() && ['src', 'dist', 'assets', 'scripts', 'tests', 'docs', '.github', '.agents'].includes(entry.name);
       if (includeFile || includeDirectory) {
         await cp(path.join(root, entry.name), path.join(directory, entry.name), { recursive: true, force: false, errorOnExist: true });
       }

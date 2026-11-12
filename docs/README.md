@@ -15,6 +15,7 @@
 | [开发指南](development.md) | 目录职责、固定开发环境、CI、接口发现、独立包安装与分层验证 |
 | [版本兼容性](compatibility.md) | 各功能宿主接口依赖、兼容矩阵、升级验证与发版条件 |
 | [发布与升级](releasing.md) | 品牌、分发方式、版本发布、市场收录与后续更新 |
+| [固定发版 Skill](../.agents/skills/power-dsh-release/SKILL.md) | 继承兼容证据、复用检查、同一安装包发布、注册表核验与市场投稿的可恢复执行入口 |
 | [第三方资源声明](third-party-notices.md) | 随包资源来源、参考实现与许可 |
 
 ## 功能规格（Spec）

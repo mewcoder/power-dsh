@@ -140,3 +140,26 @@ npm run check:compat -- 0.2.2-alpha.2
 | 历史 DSH 完整宿主与平台 | 上述标签、SDK 和 Host 装配证据 | 未安装或启动完整旧宿主；未完成最终 tarball、RPC 真实传输、跨平台页面或系统行为验收 |
 
 原调查使用确切发行标签与相应 SDK 核对接口，没有运行时 Inspect 验收证据。新增功能须按对应[主 Spec](README.md#功能规格spec)逐项验收，不能继承旧矩阵的实际操作结论。
+
+### 2026-11-12 首版候选回归与实机反馈
+
+本次候选基于 `9c800b1`，运行源码及三个构建产物未改变；新增发版 Skill 与安装文档，兼容检查器的隔离复制清单补齐 `LICENSE` 和 `.agents/`。这次只定向补测两版，不改写上面的十二版历史数字，也不将结果外推到未复测版本。
+
+| 对象 | 本次结果 | 证据与限制 |
+| --- | --- | --- |
+| DSH SDK `0.2.0-rc.1` | 558 项仓库测试、7 项固定生产 SDK Host 装配检查通过，0 失败、0 跳过 | Node `24.14.0`，Cordis `4.0.4`、Schemastery `3.18.4`；隔离 SDK／Host 回归，不是完整旧版桌面安装 |
+| DSH SDK `0.2.1-rc.5` | 558 项仓库测试、7 项固定生产 SDK Host 装配检查通过，0 失败、0 跳过 | Node `24.14.0`，Cordis `4.0.5`、Schemastery `3.18.5`；同样不替代完整旧版页面验收 |
+| macOS arm64，DSH Desktop `0.2.2-rc.1`，desktop profile | 已安装 GitHub 来源 `mewcoder/power-dsh` 的 `9c800b17cd96d7a7020616e8e0cf1efb21f76566`；已核对三个产物与仓库一致、插件管理中启用、两次冷启动与主界面、PowerDSH 设置入口及五个分类可见 | 只记录实际执行到的层次；未将选图、永久删除、精简写入、系统通知、卸载及升级的全部场景记为通过 |
+| Windows 桌面使用反馈 | 用户于本次发版准备中再次确认曾在 Windows 使用 PowerDSH | 这是已有实机使用反馈，不应写成“从未使用 Windows”；具体宿主版本、Mod 提交及逐项验收未补录，不擅自补造 |
+
+本次兼容回归的汇总标识为 `summary-1794442466736.json`；对应目录标识为 `0.2.0-rc.1-hBc6hj`、`0.2.1-rc.5-N3BQnW`，各自保留 `check.log` 与 `production-sdk-host.log`。这些原始日志仍在忽略的兼容检查目录，不随仓库或安装包发布。首次运行曾因隔离副本缺少新 Skill 造成文档链接检查失败；修正复制清单后重新执行通过，未将该工具问题解释为 SDK 不兼容。
+
+安装范围采用 `>=0.2.0-rc.1 <0.3.0-0`，保持既有最低基线，并排除下一次版本系列；允许安装的范围与已逐项验证的版本列表分别维护。本机 `0.2.2-rc.1` 的官方 app-boot 实现用 `semver.satisfies(..., { includePrerelease: true })` 检查 `engines.dsh`；这不改变普通 npm peer 范围的预发布匹配规则。
+
+已安装 GitHub 产物的 SHA-256：
+
+| 产物 | SHA-256 |
+| --- | --- |
+| `dist/index.js` | `851ad8f6cec3292d478f4be9d221f397ff2f0573f749f14c3e4011ea720a01ce` |
+| `dist/index.d.ts` | `1a89acf0f887b7e53f44fab43122a17061ea58da918bdd7cf596ac28e81b6e0a` |
+| `dist/client.js` | `77bd742a757a6722200ec6bdbf2b0311cb112e6ec2b18130b16f2572618aadff` |

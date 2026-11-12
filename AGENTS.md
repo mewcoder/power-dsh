@@ -9,7 +9,7 @@
 | Bundle、Host/Client、状态与资源 | [架构规范](docs/architecture.md) |
 | 目录、接口发现、检查与安装 | [开发指南](docs/development.md) |
 | 宿主版本与升级验证 | [版本兼容性](docs/compatibility.md) |
-| 发布、市场收录与更新 | [发布与升级](docs/releasing.md) |
+| 发布、市场收录与更新 | [发版 Skill](.agents/skills/power-dsh-release/SKILL.md)与[发布与升级](docs/releasing.md) |
 
 ## 关键约束
 

@@ -2,6 +2,14 @@
 
 本指南说明 power-dsh 的版本管理、兼容声明、GitHub Release 和 dsh-market 收录流程。源码提交与推送用于仓库协作，不代表已发布版本；标签、Release、npm 发布和市场投稿仍须用户明确确认后执行。
 
+## 固定发版入口
+
+项目级 [power-dsh-release Skill](../.agents/skills/power-dsh-release/SKILL.md)负责接续发布任务：先复用既有兼容记录和本次已通过的检查，再按「账号与工作区 → 版本材料 → 固定检查 → 同一 tarball → npm 公开核验 → 市场 PR」执行。流程来源与取舍见 [参考实践](../.agents/skills/power-dsh-release/references/release-patterns.md)。
+
+兼容性不在每次发版时归零：保留历史测试与用户实机使用反馈的证据层次，只针对本次变更补必要回归；不因当前操作机或 SDK 版本而擅自收窄已确认的产品范围。具体证据与约束仍以[版本兼容性](compatibility.md)及[调查记录](compatibility-audit.md)为准。
+
+本 Skill 复用现有检查和手工授权边界，不新增自动发布 CI、安装构建或凭据收集。遇到登录或网络阻塞从已核实阶段恢复；npm 上传、公开版本核验、市场 PR、合并收录分别报告，不混为完成。
+
 ## 名称与准备状态
 
 | 项目 | 当前约定 |
@@ -13,9 +21,9 @@
 | 简介 | 中文「DSH 增强插件。优雅克制，专注实效。让你的 DSH 更顺手、更高效。」；英文「A DeepSeek Harness (DSH) enhancement plugin. Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.」 |
 | 分发附件名 | `power-dsh.tgz`，每版相同 |
 | 仓库地址 | `https://github.com/mewcoder/power-dsh`；origin 为 `https://github.com/mewcoder/power-dsh.git`，已核对实际改名 |
-| 最低 DSH 版本 | 最低已测基线 `0.2.0-rc.1`；完整宿主验收与 `engines.dsh` 声明待完成 |
+| DSH 版本 | 最低已测基线 `0.2.0-rc.1`；`engines.dsh` 安装范围为 `>=0.2.0-rc.1 <0.3.0-0`，具体平台与功能验收见兼容记录 |
 
-[包清单](../package.json)保留 `private: true`。已有 `dsh.bundle` 声明；Host 使用 ESM，Client 产物预先生成并随源码提交，安装阶段不构建。[更新日志](../CHANGELOG.md)保留「未发布」与首版草稿。新安装的 Loader 条目、设置命名空间、设置页 id、Host/Client 标识与 RPC 描述符统一为 `power-dsh`，对应技术形式为 `powerDsh`、`power_dsh`。
+[包清单](../package.json)已按 npm 发布准备移除 `private` 标志，保留 MIT 与 `dsh.bundle` 声明；Host 使用 ESM，Client 产物预先生成并随源码提交，安装阶段不构建。[更新日志](../CHANGELOG.md)保留「未发布」与首版记录；实际发布状态以注册表核验结果为准。新安装的 Loader 条目、设置命名空间、设置页 id、Host/Client 标识与 RPC 描述符统一为 `power-dsh`，对应技术形式为 `powerDsh`、`power_dsh`。
 
 仓库元数据、Release 下载地址与市场条目统一使用 `mewcoder/power-dsh`。发版前核对实际 remote、标签、Release 与市场状态；待发布样例中的下载地址须在实际产物公开后才作为可用安装来源。
 
@@ -43,7 +51,7 @@ README 面向使用者，标题固定为 `# power-dsh`，首屏使用已确认�
 
 正式版推荐以 **npm 包 `power-dsh`** 分发，利用确切版本、dist-tag 和原生管理器的注册表查询与升级。GitHub 继续维护源码、标签和变更记录，Git 来源用于开发版或固定提交，Release `.tgz` 可作可选附件。它们使用同一个标准 npm 包和同一份预生成 Client 产物，不另建分发格式。
 
-当前仍是未发布开发版，`private: true` 保留到正式发布准备阶段。2026-11-09 查询公共 npm 注册表，`power-dsh` 返回 E404，未发现公开包；这不是名称预留或账号发布权限证明。实际发布前按下文重新核对名称、权限、许可证和版本，不把本地打包通过当作已发布。市场本身不强制 npm，源码来源可安装时仍可申请收录。
+开发准备阶段可保留 `private: true`，在明确执行 npm 发布后移除。发布前重新核对名称、账号权限、许可证和目标版本；注册表返回 E404 不是名称预留或发布权限证明，本地打包通过也不等于已经发布。市场本身不强制 npm，源码来源可安装时仍可申请收录。
 
 | 方式 | 用户获取版本 | 更新路径 |
 | --- | --- | --- |
@@ -64,7 +72,7 @@ README 面向使用者，标题固定为 `# power-dsh`，首屏使用已确认�
 
 ## DSH 兼容性
 
-兼容性是发版前置条件。接口依赖、支持结论、平台范围与升级要求见[版本兼容性](compatibility.md)，历史全矩阵与后续单版复测分别见[调查报告](compatibility-audit.md#sdk-验证方法与结果)。最低已测基线及完整宿主验收候选为 `0.2.0-rc.1`；实际产物安装与页面仍待完成。当前 SDK 版本不是最低宿主要求，没有 `engines.dsh` 也不代表全版本兼容。
+兼容性是发版前置条件。接口依赖、支持结论、平台范围与升级要求见[版本兼容性](compatibility.md)，历史全矩阵与后续定向回归分别见[调查报告](compatibility-audit.md#sdk-验证方法与结果)。最低已测基线保持 `0.2.0-rc.1`，安装范围为 `>=0.2.0-rc.1 <0.3.0-0`；本轮 macOS GitHub 安装、冷启动与设置入口，以及 Windows 使用反馈见[首版候选记录](compatibility-audit.md#2026-11-12-首版候选回归与实机反馈)。范围内允许安装不代表所有平台、版本与功能场景均已实机验收；当前 SDK 版本也不是最低宿主要求。
 
 先完成兼容矩阵，再按验证结果填写 `engines.dsh` 并核对范围边界，README、更新日志、Release 和市场展示采用相同结论。DSH 安装和 profile 启动优先检查 `engines.dsh`，没有它时才检查 DSH peer 依赖；本包目前没有 DSH peer 范围，因此开发期间没有声明式宿主版本拦截。
 
@@ -189,8 +197,8 @@ url: https://github.com/mewcoder/power-dsh
 name: mewcoder/power-dsh
 category: ui
 description:
-  en: 'A DSH enhancement plugin offering Skills/MCP management, global instructions, task notifications, and other practical features, with options to streamline built-in functionality as needed.'
-  zh: 'DSH 增强插件，提供技能/MCP 管理、全局指令、任务通知等实用功能，支持按需精简内置功能。'
+  en: 'A DSH Desktop enhancement plugin offering Skills/MCP management, global instructions, task notifications, and other practical features, with options to streamline built-in functionality as needed.'
+  zh: 'DSH 桌面增强插件，提供技能/MCP 管理、全局指令、任务通知等实用功能，支持按需精简内置功能。'
 ```
 
 只有已公开发布并验证可下载的安装包才追加：
