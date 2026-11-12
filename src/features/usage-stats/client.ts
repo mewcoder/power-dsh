@@ -640,7 +640,6 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             ? h('div', { className: 'power-dsh-usage-chart' },
               h('div', { className: 'power-dsh-usage-chart-plot', role: 'group', 'aria-label': t('usageTrendTitle') },
                 h('svg', { className: 'power-dsh-usage-chart-svg', viewBox: '0 0 100 100', preserveAspectRatio: 'none', role: 'img', 'aria-label': t('usageTrendTitle') },
-                  h('line', { x1: 0, y1: 100, x2: 100, y2: 100, className: 'power-dsh-usage-chart-axis' }),
                   ...trendSeries.map(({ model, points, colorIndex }) => h('path', {
                     key: `${model.provider}/${model.modelId}`, d: smoothPath(points),
                     className: 'power-dsh-usage-chart-line', 'data-model': colorIndex,

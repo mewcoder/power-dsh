@@ -7464,7 +7464,6 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 .power-dsh-usage-page .power-dsh-usage-chart-point:hover .power-dsh-usage-chart-point-dot,
 .power-dsh-usage-page .power-dsh-usage-chart-point:focus-visible .power-dsh-usage-chart-point-dot { opacity:1; }
 .power-dsh-usage-page .power-dsh-usage-chart-point:focus-visible { outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:1px; }
-.power-dsh-usage-page .power-dsh-usage-chart-axis { stroke:var(--dsw-alias-border-l2); stroke-width:1; vector-effect:non-scaling-stroke; }
 .power-dsh-usage-page .power-dsh-usage-chart-axis-labels { display:flex; justify-content:space-between; gap:4px; min-width:0; }
 .power-dsh-usage-page .power-dsh-usage-chart-axis-label { min-width:0; overflow:hidden; color:var(--dsw-alias-label-tertiary); font-size:10px; line-height:14px; white-space:nowrap; }
 .power-dsh-usage-page .power-dsh-usage-models { display:flex; flex-direction:column; margin:0; padding:0; list-style:none; }
@@ -8409,13 +8408,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				preserveAspectRatio: "none",
 				role: "img",
 				"aria-label": t("usageTrendTitle")
-			}, h("line", {
-				x1: 0,
-				y1: 100,
-				x2: 100,
-				y2: 100,
-				className: "power-dsh-usage-chart-axis"
-			}), ...trendSeries.map(({ model, points, colorIndex }) => h("path", {
+			}, ...trendSeries.map(({ model, points, colorIndex }) => h("path", {
 				key: `${model.provider}/${model.modelId}`,
 				d: smoothPath(points),
 				className: "power-dsh-usage-chart-line",
