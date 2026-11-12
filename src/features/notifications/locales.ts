@@ -7,6 +7,8 @@ export const locales = {
     "notificationBackground": "When not focused",
     "notificationAlways": "Always",
     "notificationTest": "Send test notification",
+    "notificationTestSent": "Submitted to the system",
+    "notificationTestUnconfirmed": "Notification delivery has not been confirmed. Check Notification Center, Focus, and notifications during screen sharing.",
     "notificationTestBody": "PowerDSH notification delivery test",
     "notificationNative": "Windows native notifications",
     "notificationTransportPending": "Notification channel unconfirmed",
@@ -38,6 +40,8 @@ export const locales = {
     "notificationBody": "Return to DSH to view the task.",
     "notificationUnsupported": "Desktop notifications are unavailable in this environment.",
     "notificationPermission": "Allow notifications for DSH in your browser or system settings, then try again.",
+    "notificationIdentity": "The Windows notification identity for DSH is missing, ambiguous, or invalid. Check the DSH installation and restart, or have the launcher provide its registered DSH_APP_USER_MODEL_ID.",
+    "notificationNativePermission": "Windows has disabled DSH notifications. Allow them in system notification settings and try again.",
     "notificationFailed": "Could not deliver the notification. Check browser and system notification settings.",
     "notificationUnavailable": "Task notifications have not loaded yet. Re-enable power-dsh, then try again."
   },
@@ -48,6 +52,8 @@ export const locales = {
     "notificationBackground": "仅在未聚焦时提醒",
     "notificationAlways": "始终提醒",
     "notificationTest": "发送测试通知",
+    "notificationTestSent": "已交给系统",
+    "notificationTestUnconfirmed": "尚未确认通知投递，请检查通知中心、专注模式和共享屏幕时的通知设置。",
     "notificationTestBody": "PowerDSH 通知发送测试",
     "notificationNative": "Windows 原生通知",
     "notificationTransportPending": "通知通道尚未确认",
@@ -79,6 +85,8 @@ export const locales = {
     "notificationBody": "返回 DSH 查看任务。",
     "notificationUnsupported": "当前环境不支持桌面通知。",
     "notificationPermission": "请在浏览器或系统设置中允许 DSH 发送通知后重试。",
+    "notificationIdentity": "无法确定有效的 Windows DSH 通知身份。请核对 DSH 安装并重启，或由启动器提供已注册的 DSH_APP_USER_MODEL_ID。",
+    "notificationNativePermission": "Windows 已禁用 DSH 通知，请在系统通知设置中允许后重试。",
     "notificationFailed": "通知发送失败，请检查浏览器和系统通知设置。",
     "notificationUnavailable": "任务通知尚未加载，请重新启用 power-dsh 后重试。"
   }

@@ -199,6 +199,7 @@ interface WindowsNotification {
 }
 interface NotificationDelivery {
   shown: boolean;
+  reason?: 'identity' | 'disabled';
 }
 interface NotificationCleared {
   cleared: boolean;
@@ -208,6 +209,16 @@ interface NotificationTransport {
   nativeAvailable: boolean;
   version: string;
 }
+type PluginRelease = {
+  status: 'ready';
+  version: string;
+  commit: string;
+} | {
+  status: 'unavailable' | 'git-unavailable';
+} | {
+  status: 'rate-limited';
+  retryAt: number;
+};
 interface RestartStatus {
   supported: boolean;
   running: boolean;
@@ -323,6 +334,7 @@ interface PowerDshMethods {
   showWindowsNotification(notification: WindowsNotification): Promise<NotificationDelivery>;
   clearWindowsNotifications(group: string, tag: string): Promise<NotificationCleared>;
   notificationTransport(): Promise<NotificationTransport>;
+  readPluginRelease(): Promise<PluginRelease>;
   setAccountBlocked(blocked: boolean): Promise<PolicyResult>;
   setTelemetryBlocked(blocked: boolean): Promise<PolicyResult>;
   setTodoBlocked(blocked: boolean): Promise<PolicyResult>;
@@ -624,6 +636,14 @@ interface NativeSettings {
   }[], revision?: number): Promise<unknown>;
 }
 interface NativeSubprocessHandle {
+  collected?: {
+    stdout?: {
+      readFrom(offset: number): {
+        text: string;
+        lossy: boolean;
+      };
+    };
+  };
   done: Promise<{
     exitCode: number | null;
     signal: string | null;
@@ -638,6 +658,7 @@ interface NativeSubprocess {
     cwd: string;
     graceMs: number;
     signal: AbortSignal;
+    env?: Record<string, string>;
     stdio: {
       stdin: 'ignore';
       stdout: {

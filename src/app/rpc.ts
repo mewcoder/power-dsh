@@ -16,8 +16,10 @@ import { LIST_ARCHIVED_SESSIONS_RPC, RESTORE_ARCHIVED_SESSION_RPC, DELETE_ARCHIV
 import { READ_WALLPAPER_RPC, SAVE_WALLPAPER_RPC, CLEAR_WALLPAPER_RPC } from '../features/wallpaper/rpc.ts';
 import { LIST_PROJECTS_RPC, REMOVE_PROJECT_RPC } from '../features/projects/rpc.ts';
 import { READ_USAGE_STATS_RPC } from '../features/usage-stats/rpc.ts';
+import { READ_PLUGIN_RELEASE_RPC } from '../features/plugin-updates/rpc.ts';
 
 export {
+  READ_PLUGIN_RELEASE_RPC,
   ACCOUNT_RPC,
   TELEMETRY_RPC,
   TODO_RPC,
@@ -49,6 +51,7 @@ export function composeRpc<T extends RpcDescriptor[]>(descriptors: T): T {
 }
 
 export const MOD_RPC = composeRpc([
+  READ_PLUGIN_RELEASE_RPC,
   NOTIFICATION_TRANSPORT_RPC,
   RESTART_STATUS_RPC, RESTART_APP_RPC,
   LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC,

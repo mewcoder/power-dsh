@@ -158,7 +158,7 @@ test('feature-owned RPC methods retain the invocation owner check through the ac
   const service = caller.get('powerDsh');
   assert.equal(service.ctx.invocation.peer.principal.kind, 'guest');
   for (const [method, args] of [
-    ['restartStatus', []], ['restartApp', []], ['listSystemSounds', []], ['notificationTransport', []],
+    ['restartStatus', []], ['restartApp', []], ['listSystemSounds', []], ['notificationTransport', []], ['readPluginRelease', []],
     ['setAccountBlocked', [true]], ['setTelemetryBlocked', [true]],
     ['setTodoBlocked', [true]], ['setPlanBlocked', [true]], ['setGoalBlocked', [true]], ['setSearchBlocked', [true]],
     ['readPersonalization', []], ['savePersonalization', ['text', 'revision']],

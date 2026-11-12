@@ -113,7 +113,7 @@ test('settings default to General with custom wallpaper first in Interface', asy
   // The notification sound row follows its parent notification switch.
   app.set({ notificationsEnabled: true, flowingBackgroundEnabled: true });
   const groups = {
-    general: ['notificationsEnabled', 'notificationSoundEnabled'],
+    general: ['notificationSoundEnabled'],
     interface: ['wallpaperEnabled', 'showThinkingEffortSwitcher', 'showThemeSwitcher', 'showVersion'],
     enhancements: ['skillManagerEnabled', 'mcpManagerEnabled', 'personalizationEnabled', 'projectManagerEnabled', 'archiveManagerEnabled', 'usageStatsEnabled'],
     simplify: ['blockOfficialAccount', 'blockOfficialSearch', 'blockOfficialTelemetry', 'blockTodo', 'blockPlan', 'blockGoal'],
@@ -147,7 +147,7 @@ test('settings default to General with custom wallpaper first in Interface', asy
     fields.push(...actual);
     assert.ok(!view.some(node => node.type === 'textarea'));
   }
-  assert.equal(new Set(fields).size, 22);
+  assert.equal(new Set(fields).size, 21);
   app.unmount();
 });
 
@@ -176,11 +176,12 @@ test('settings tabs support wrapping arrow keys, Home and End with selection and
 
 test('a pending save marks only its own row busy and keeps the page operable', async () => {
   for (const [id, field, mechanism] of [
-    ['interface', 'showVersion', 'form'], ['general', 'notificationsEnabled', 'form'],
+    ['interface', 'showVersion', 'form'], ['general', 'notificationSoundEnabled', 'form'],
     ['enhancements', 'skillManagerEnabled', 'form'], ['simplify', 'blockTodo', 'rpc'],
   ]) {
     const reply = Promise.withResolvers();
     const app = await mount(mechanism === 'form' ? { formReply: () => reply.promise } : { rpcReply: reply.promise });
+    if (id === 'general') app.set({ notificationsEnabled: true, notificationSoundEnabled: false });
     app.selectSettingsTab(id);
     const view = () => descendants(app.renderSettings());
     const tabs = () => view().filter(node => node.props.role === 'tab');

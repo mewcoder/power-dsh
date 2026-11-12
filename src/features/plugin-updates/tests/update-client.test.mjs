@@ -4,15 +4,13 @@ import { PluginUpdateClient, compareVersions } from '../update-client.ts';
 
 const schema = 'dsh-market/update-api/v1';
 const commit = 'a'.repeat(40);
-const release = version => ({ tag_name: `v${version}`, draft: false, prerelease: false,
-  html_url: `https://github.com/mewcoder/power-dsh/releases/tag/v${version}`,
-  assets: [{ name: 'power-dsh.tgz', state: 'uploaded',
-    browser_download_url: `https://github.com/mewcoder/power-dsh/releases/download/v${version}/power-dsh.tgz` }] });
 const operation = (patch = {}) => ({ schema, operationId: 'boot-update-1', kind: 'update', packageName: 'power-dsh',
   state: 'queued', beforeVersion: '0.0.5', installedVersion: '0.0.5',
   outcome: { refreshRequired: false, restartRequired: false }, ...patch });
-function fixture({ source = 'npm', installed = '0.0.5', latest = '0.0.6', storageMap = new Map(), handler, version = '0.0.5' } = {}) {
+function fixture({ source = 'npm', installed = '0.0.5', latest = '0.0.6', storageMap = new Map(), handler, version = '0.0.5',
+  releaseResult = { status: 'ready', version: '0.0.6', commit }, releaseRead } = {}) {
   const calls = [];
+  const releaseCalls = [];
   const timers = new Map();
   let nextTimer = 0;
   let allowed = true;
@@ -23,6 +21,7 @@ function fixture({ source = 'npm', installed = '0.0.5', latest = '0.0.6', storag
     storage: { getItem: key => storageMap.get(key) ?? null, setItem: (key, value) => storageMap.set(key, value), removeItem: key => storageMap.delete(key) },
     schedule(callback, milliseconds) { timers.set(++nextTimer, { callback, milliseconds }); return nextTimer; },
     cancel(timer) { timers.delete(timer); },
+    async release(signal) { releaseCalls.push(signal); return releaseRead ? releaseRead(signal) : releaseResult; },
     async fetch(url, init) {
       calls.push({ url, init });
       const custom = await handler?.(url, init);
@@ -34,16 +33,13 @@ function fixture({ source = 'npm', installed = '0.0.5', latest = '0.0.6', storag
       else if (url.endsWith('/updates') && init.method === 'POST') data = { schema, operation: result };
       else if (url.includes('/updates?')) data = { schema, package: { name: 'power-dsh', source: config.source,
         installedVersion: config.installed, latestVersion: config.latest, updateAvailable: config.available } };
-      else if (url.endsWith('/releases/latest')) data = release('0.0.6');
-      else if (url.includes('/git/ref/tags/')) data = { object: { type: 'tag', sha: 'b'.repeat(40) } };
-      else if (url.includes('/git/tags/')) data = { object: { type: 'commit', sha: commit } };
       else if (url.includes('/operations?')) data = { schema, operation: result };
       else assert.fail(`Unexpected endpoint: ${url}`);
       return new Response(JSON.stringify(data), { status: 200 });
     },
   };
   const client = new PluginUpdateClient(options);
-  return { client, calls, timers, options, config, storageMap, setResult(value) { result = value; }, allow(value) { allowed = value; },
+  return { client, calls, releaseCalls, timers, options, config, storageMap, setResult(value) { result = value; }, allow(value) { allowed = value; },
     async tick() { const entry = [...timers].find(([, timer]) => timer.milliseconds === 1500); assert.ok(entry); timers.delete(entry[0]); entry[1].callback(); await new Promise(resolve => setImmediate(resolve)); } };
 }
 
@@ -62,8 +58,8 @@ test('manual update checks make no network calls until explicitly requested and 
   assert.equal(f.timers.size, 0);
   for (const call of f.calls) {
     assert.equal(call.init.redirect, 'error');
-    assert.equal(call.init.credentials, call.url.startsWith('https://api.github.com') ? 'omit' : 'same-origin');
-    if (!call.url.startsWith('https://api.github.com')) assert.ok(call.url.startsWith('/prefix/dsh-market/api/v1/'));
+    assert.equal(call.init.credentials, 'same-origin');
+    assert.ok(call.url.startsWith('/prefix/dsh-market/api/v1/'));
   }
 });
 
@@ -72,7 +68,7 @@ test('Git updates require an annotated official Release tag to resolve to the ex
     const f = fixture({ source: 'github', installed: 'c'.repeat(40), latest: matches ? commit : 'd'.repeat(40) });
     await f.client.check();
     assert.equal(f.client.state.phase, matches ? 'available' : 'unconfirmed');
-    assert.ok(f.calls.some(call => call.url.endsWith(`/git/tags/${'b'.repeat(40)}`)));
+    assert.equal(f.releaseCalls.length, 1);
   }
 });
 
@@ -91,10 +87,56 @@ test('local sources, API absence, authentication failures and malformed capabili
   }
 });
 
+test('release limits, missing Git and market permissions remain distinct safe failures', async () => {
+  for (const [releaseResult, expected] of [
+    [{ status: 'rate-limited', retryAt: Date.now() + 120_000 }, 'pluginUpdateRateLimited'],
+    [{ status: 'git-unavailable' }, 'pluginUpdateGitUnavailable'],
+    [{ status: 'unavailable' }, 'pluginUpdateCheckFailed'],
+  ]) {
+    const f = fixture({ releaseResult });
+    await f.client.check();
+    assert.equal(f.client.state.error, expected);
+    assert.equal(f.client.state.target, null);
+    assert.equal(f.calls.some(call => call.init.method === 'POST'), false);
+    assert.equal(JSON.stringify(f.client.state).includes('private address'), false);
+    assert.equal(f.timers.size, 0, 'Rate limits never schedule background retries.');
+  }
+  const denied = fixture({ handler: url => url.endsWith('/capabilities') ? new Response('', { status: 403 }) : null });
+  await denied.client.check();
+  assert.equal(denied.client.state.error, 'pluginUpdateDenied');
+});
+
+test('release cooldown survives a client reload, blocks repeated reads and expires without automatic requests', async () => {
+  let now = 1_800_000_000_000;
+  let limited = true;
+  const storageMap = new Map();
+  const releaseRead = () => limited ? { status: 'rate-limited', retryAt: now + 120_000 } : { status: 'ready', version: '0.0.6', commit };
+  const f = fixture({ releaseRead, storageMap });
+  f.options.now = () => now;
+  await f.client.check();
+  assert.equal(f.client.state.error, 'pluginUpdateRateLimited');
+  await f.client.check();
+  assert.equal(f.releaseCalls.length, 1);
+  const reloaded = fixture({ releaseRead, storageMap });
+  reloaded.options.now = () => now;
+  await reloaded.client.resume();
+  assert.equal(reloaded.calls.length, 0);
+  await reloaded.client.check();
+  assert.equal(reloaded.client.state.error, 'pluginUpdateRateLimited');
+  assert.equal(reloaded.releaseCalls.length, 0);
+  now += 121_000;
+  limited = false;
+  assert.equal(reloaded.releaseCalls.length, 0);
+  await reloaded.client.check();
+  assert.equal(reloaded.client.state.phase, 'available');
+  assert.equal(reloaded.timers.size, 0);
+});
+
 test('release and package validation reject wrong assets, versions, identities, and apparent updates that are not safe targets', async () => {
   for (const options of [
     { installed: '0.0.4' }, { latest: '0.0.7' },
-    { handler: url => url.includes('/releases/latest') ? new Response(JSON.stringify({ ...release('0.0.6'), assets: [] })) : null },
+    { releaseResult: { status: 'ready', version: '0.0.6-beta.1', commit } },
+    { releaseResult: { status: 'ready', version: '0.0.6', commit: 'wrong' } },
     { handler: url => url.includes('/updates?') ? new Response(JSON.stringify({ schema, package: { name: 'other', updateAvailable: true } })) : null },
   ]) {
     const f = fixture(options);
@@ -105,6 +147,7 @@ test('release and package validation reject wrong assets, versions, identities, 
   const current = fixture({ version: '0.0.6' });
   await current.client.check();
   assert.equal(current.client.state.phase, 'current');
+  assert.equal(current.calls.length, 0, 'A current version does not ask the market to refresh upstream metadata.');
   assert.equal(compareVersions('0.0.10', '0.0.9'), 1);
   assert.equal(compareVersions('0.0.6-beta.1', '0.0.5'), null);
 });

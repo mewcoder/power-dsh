@@ -1,21 +1,21 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mount, notificationSession, notificationSwitch, loadedSoundSettings, soundControl, notificationSoundSwitch, button, descendants } from '../../../../tests/helpers/client-fixture.mjs';
+import { mount, notificationSession, notificationMenu, loadedSoundSettings, soundControl, notificationSoundSwitch, button, descendants } from '../../../../tests/helpers/client-fixture.mjs';
 
 test('task notification permission is requested from the switch before refreshing settings, then persists', async () => {
   const granted = Promise.withResolvers();
   let described = 0;
   const app = await mount({ notificationPermission: 'default', notificationRequest: () => granted.promise, formLoad: () => { described++; } });
-  const action = notificationSwitch(app).props.onClick();
+  const action = notificationMenu(app).props.onSelect('background');
   assert.equal(app.permissionRequests(), 1);
   assert.equal(described, 0, 'Permission must be requested before an unrelated await loses user activation.');
-  assert.equal(notificationSwitch(app).props['aria-busy'], true);
-  await notificationSwitch(app).props.onClick();
+  assert.equal(notificationMenu(app).props.anchor.props['aria-busy'], true);
+  await notificationMenu(app).props.onSelect('always');
   assert.equal(app.permissionRequests(), 1);
   granted.resolve('granted');
   await action;
-  assert.equal(described, 1);
-  assert.equal(notificationSwitch(app).props['aria-checked'], true);
+  assert.equal(described, 2);
+  assert.equal(notificationMenu(app).props.selectedId, 'background');
   assert.equal(app.notifications.length, 0, 'Enabling must not send a test or history notification.');
   app.unmount();
 });
@@ -29,8 +29,8 @@ test('permission denial, unsupported environments, missing services and rejected
     [{ formReply: () => false }, 'saveFailed'],
   ]) {
     const app = await mount(options);
-    await notificationSwitch(app).props.onClick();
-    assert.equal(notificationSwitch(app).props['aria-checked'], false);
+    await notificationMenu(app).props.onSelect('background');
+    assert.equal(notificationMenu(app).props.selectedId, 'never');
     assert.ok(descendants(app.renderSettings()).some(node => node.props.role === 'alert' && node.props.children.includes(expected)));
     app.unmount();
   }
@@ -127,18 +127,18 @@ test('local Windows desktop uses the Host for every repeated trigger and preserv
 test('Windows Host delivery cannot fall back to renderer when desktop bridge and platform markers are absent', async () => {
   const app = await mount({ windows: true, desktop: false, platformMarker: false, notificationPermission: 'denied' });
   app.setSessions([notificationSession()]);
-  await notificationSwitch(app).props.onClick();
-  assert.equal(notificationSwitch(app).props['aria-checked'], true);
+  await notificationMenu(app).props.onSelect('background');
+  assert.equal(notificationMenu(app).props.selectedId, 'background');
   app.setSessions([notificationSession({ seq: 10, reason: 'completed', running: false })]);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(app.notifications.length, 0);
   assert.equal(app.nativeNotifications.length, 1);
   assert.equal(app.permissionRequests(), 0);
-  const testButton = descendants(app.renderSettings()).find(node => node.type === 'button' && node.props.children.includes('notificationTest'));
+  const testButton = descendants(app.renderSettings()).find(node => node.type === 'button' && node.props['aria-label'] === 'notificationTest');
   await testButton.props.onClick();
   assert.equal(app.nativeNotifications.length, 2);
   assert.equal(app.notifications.length, 0);
-  assert.ok(descendants(app.renderSettings()).some(node => node.props.children.some(child => typeof child === 'string' && child.includes('notificationNative'))));
+  assert.equal(descendants(app.renderSettings()).find(node => node.props['aria-label'] === 'notificationTest').props.title, 'notificationTestSent');
   app.set({ notificationMode: 'never' });
   await testButton.props.onClick();
   assert.equal(app.nativeNotifications.length, 2, 'A stale test button cannot bypass the current policy.');
@@ -162,6 +162,46 @@ test('unknown, unavailable or mismatched local Host transport never silently sen
   }
 });
 
+test('the test icon sits immediately before the policy menu and waits for delivery acknowledgement without claiming a visible banner', async () => {
+  const app = await mount();
+  app.set({ notificationsEnabled: true, notificationMode: 'always' });
+  const icon = () => descendants(app.renderSettings()).find(node => node.props['aria-label'] === 'notificationTest');
+  const controls = descendants(app.renderSettings()).find(node => node.props.className === 'power-dsh-notification-controls');
+  assert.equal(controls.props.children.length, 2);
+  assert.equal(controls.props.children[0].props['aria-label'], 'notificationTest');
+  assert.equal(controls.props.children[1].props.anchor.props['aria-label'], 'notificationsEnabled');
+  assert.equal(descendants(icon()).filter(node => node.type === 'svg').length, 1);
+  assert.equal(icon().props.children.some(child => typeof child === 'string'), false);
+  assert.equal(descendants(app.renderSettings()).some(node => node.props.role === 'switch' && node.props.id?.endsWith('-notificationsEnabled')), false);
+  const sending = icon().props.onClick();
+  assert.equal(icon().props['aria-busy'], true);
+  await sending;
+  assert.equal(icon().props.title, 'notificationTestSent');
+  assert.equal(app.settingsProps().transportSource.getSnapshot().tested, true);
+  assert.equal(app.timers.size, 0);
+  app.unmount();
+});
+
+test('an unconfirmed test reports system notification guidance, can retry, and releases pending timers on unload', async () => {
+  const app = await mount();
+  app.set({ notificationsEnabled: true });
+  const icon = () => descendants(app.renderSettings()).find(node => node.props['aria-label'] === 'notificationTest');
+  const pending = icon().props.onClick();
+  app.notifications.at(-1).onshow = null;
+  const timeout = [...app.timers.values()].find(timer => timer.ms === 5000);
+  timeout.fn();
+  await pending;
+  assert.equal(app.settingsProps().notificationsSource.getSnapshot().error, 'notificationTestUnconfirmed');
+  assert.equal(icon().props.title, 'notificationTest');
+  await icon().props.onClick();
+  assert.equal(app.settingsProps().notificationsSource.getSnapshot().error, '');
+  const closing = icon().props.onClick();
+  app.notifications.at(-1).onshow = null;
+  app.unmount();
+  await closing;
+  assert.equal(app.timers.size, 0);
+});
+
 test('notification policy persists and switches focused completions between background, always and never', async () => {
   const app = await mount({ windows: true, platformMarker: false });
   const row = notificationSession({ retainedBy: { mainView: 1 } });
@@ -172,7 +212,7 @@ test('notification policy persists and switches focused completions between back
   assert.equal(app.nativeNotifications.length, 0);
   const menu = () => descendants(app.renderSettings()).find(node => node.type === 'native-menu-fixture' && node.props.items.some(item => item.id === 'always'));
   await menu().props.onSelect('always');
-  assert.equal(app.settingsProps().source.getSnapshot().value.notificationMode, 'always');
+  assert.equal(notificationMenu(app).props.selectedId, 'always');
   assert.equal(app.nativeNotifications.length, 0, 'Changing policy never replays an old completion.');
   app.setSessions([notificationSession({ seq: 20, reason: 'completed', running: false, retainedBy: { mainView: 1 } })]);
   assert.equal(app.nativeNotifications.length, 1);
@@ -191,12 +231,28 @@ test('failed notification policy saves preserve the old policy and show feedback
   await menu.props.onSelect('always');
   assert.equal(app.settingsProps().source.getSnapshot().value.notificationMode, 'background');
   const view = descendants(app.renderSettings());
-  const control = view.find(node => node.type === 'button' && node.props['aria-label'] === 'notificationMode');
+  const control = view.find(node => node.type === 'button' && node.props['aria-label'] === 'notificationsEnabled');
   assert.equal(control.props['aria-invalid'], true);
   assert.ok(view.some(node => node.props.role === 'alert' && node.props.children.includes('saveFailed')));
   app.unmount();
 });
 
+test('legacy never preferences hide sound actions and stale callbacks cannot bypass the combined policy', async () => {
+  let writes = 0;
+  const app = await mount({ formLoad: () => { writes++; } });
+  app.set({ notificationsEnabled: true });
+  await loadedSoundSettings(app);
+  const soundToggle = notificationSoundSwitch(app);
+  const soundMenu = descendants(app.renderSettings()).find(node => node.type === 'native-menu-fixture' && node.props.items.some(item => item.id === 'default'));
+  app.set({ notificationMode: 'never' });
+  assert.equal(notificationMenu(app).props.selectedId, 'never');
+  assert.equal(notificationSoundSwitch(app), undefined);
+  await soundToggle.props.onClick();
+  await soundMenu.props.onSelect('mac:Ping.aiff');
+  assert.equal(writes, 0);
+  assert.equal(app.soundPlays.length, 0);
+  app.unmount();
+});
 test('transport handshake and reconnect seed history rather than deliver before the route is known', async () => {
   const delayed = Promise.withResolvers();
   const app = await mount({ windows: true, notificationTransportReply: () => delayed.promise });
@@ -218,8 +274,8 @@ test('Windows default-sound preview uses the native channel without renderer per
   let saves = 0;
   const app = await mount({ windows: true, desktop: true, notificationPermission: 'denied', notificationsAvailable: false,
     formLoad: () => { saves++; } });
-  await notificationSwitch(app).props.onClick();
-  assert.equal(notificationSwitch(app).props['aria-checked'], true);
+  await notificationMenu(app).props.onSelect('background');
+  assert.equal(notificationMenu(app).props.selectedId, 'background');
   assert.equal(app.permissionRequests(), 0);
   const previousSaves = saves;
   await loadedSoundSettings(app);
@@ -285,6 +341,41 @@ test('Windows native send failure reports the notification error and never plays
   app.unmount();
 });
 
+test('native identity and permission failures retain their safe cause through focus checks and clear on a successful retry', async () => {
+  for (const [reason, expected] of [['identity', 'notificationIdentity'], ['disabled', 'notificationNativePermission']]) {
+    let failing = true;
+    const app = await mount({ windows: true,
+      nativeNotificationReply: () => ({ ok: true, value: failing ? { shown: false, reason } : { shown: true } }) });
+    app.setSessions([notificationSession()]);
+    app.set({ notificationsEnabled: true, notificationSoundEnabled: true, notificationSound: 'win:SystemExclamation' });
+    app.setSessions([notificationSession({ seq: 10, reason: 'completed', running: false })]);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(app.settingsProps().notificationsSource.getSnapshot().error, expected);
+    app.set({ notificationMode: 'always' });
+    assert.equal(app.settingsProps().notificationsSource.getSnapshot().error, expected);
+    assert.equal(app.notifications.length, 0);
+    assert.deepEqual(app.soundPlays, []);
+    failing = false;
+    app.setSessions([notificationSession({ seq: 20, reason: 'completed', running: false })]);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(app.settingsProps().notificationsSource.getSnapshot().error, '');
+    assert.equal(app.soundPlays.length, 1);
+    app.unmount();
+  }
+});
+
+test('default sound preview preserves native identity errors instead of reporting audio settings', async () => {
+  const app = await mount({ windows: true,
+    nativeNotificationReply: () => ({ ok: true, value: { shown: false, reason: 'identity' } }) });
+  app.set({ notificationsEnabled: true, notificationSoundEnabled: true });
+  await loadedSoundSettings(app);
+  const menu = descendants(app.renderSettings()).find(node => node.type === 'native-menu-fixture' && node.props.items.some(item => item.id === 'default'));
+  await menu.props.onSelect('default');
+  assert.equal(app.settingsProps().soundsSource.getSnapshot().error, 'notificationIdentity');
+  assert.equal(app.notifications.length, 0);
+  app.unmount();
+});
+
 test('Windows native completion acknowledgements cannot play audio after disable, session removal, reconnect or unload', async () => {
   for (const dispose of [
     app => app.set({ notificationsEnabled: false }),
@@ -324,7 +415,7 @@ test('system sound menu saves a native choice, previews it once, and sends one s
   app.set({ notificationsEnabled: true });
   await loadedSoundSettings(app);
   const settingRows = () => descendants(app.renderSettings()).filter(node => node.props.className === 'power-dsh-setting-row');
-  assert.equal(settingRows().length, 5, 'General includes notification policy and the delivery test.');
+  assert.equal(settingRows().length, 3, 'The policy and test button share one row, followed by sound preferences.');
   const menu = () => descendants(app.renderSettings()).find(node => node.type === 'native-menu-fixture' && node.props.items?.some(item => item.id === 'mac:Ping.aiff'));
   soundControl(app, 'select').props.onClick();
   assert.equal(menu().props.open, true);
@@ -346,7 +437,7 @@ test('system sound menu saves a native choice, previews it once, and sends one s
   assert.equal(app.soundPlays.length, 3);
   assert.equal(soundControl(app, 'select'), undefined);
   assert.equal(soundControl(app, 'preview'), undefined);
-  assert.equal(settingRows().length, 4, 'Sound disabled collapses only the tone-selection row.');
+  assert.equal(settingRows().length, 2, 'Sound disabled collapses only the tone-selection row.');
   assert.equal(app.notifications[1].options.silent, true);
   app.unmount();
 });
@@ -470,7 +561,7 @@ test('Windows aliases are localized through the native menu without exposing scr
 test('notification sound follows system defaults, can mute every trigger, and updates without replaying notifications', async () => {
   const app = await mount();
   app.setSessions([notificationSession()]);
-  await notificationSwitch(app).props.onClick();
+  await notificationMenu(app).props.onSelect('background');
   app.setSessions([notificationSession({ seq: 10, reason: 'completed', running: false })]);
   assert.equal(Object.hasOwn(app.notifications[0].options, 'silent'), false);
   assert.equal(Object.hasOwn(app.notifications[0].options, 'renotify'), false);
@@ -503,8 +594,8 @@ test('sound settings appear only while notifications are on and preserve choices
   assert.equal(soundControl(app, 'select'), undefined);
   assert.equal(soundControl(app, 'preview'), undefined);
 
-  await notificationSwitch(app).props.onClick();
-  assert.equal(rows().length, 5);
+  await notificationMenu(app).props.onSelect('background');
+  assert.equal(rows().length, 3);
   assert.equal(notificationSoundSwitch(app).props['aria-checked'], true);
   assert.ok(soundControl(app, 'select').props.children.includes('Ping'));
   soundControl(app, 'select').props.onClick();
@@ -512,7 +603,7 @@ test('sound settings appear only while notifications are on and preserve choices
   const staleSoundToggle = notificationSoundSwitch(app).props.onClick;
   assert.equal(staleMenu.props.open, true);
 
-  await notificationSwitch(app).props.onClick();
+  await notificationMenu(app).props.onSelect('never');
   const savesBeforeStaleCallbacks = saves;
   await staleSoundToggle();
   await staleMenu.props.onSelect('mac:Glass.aiff');
@@ -525,15 +616,15 @@ test('sound settings appear only while notifications are on and preserve choices
   assert.equal(app.settingsProps().source.getSnapshot().value.notificationSound, 'mac:Ping.aiff');
   assert.equal(app.soundPlays.length, 0);
 
-  await notificationSwitch(app).props.onClick();
+  await notificationMenu(app).props.onSelect('background');
   assert.equal(notificationSoundSwitch(app).props['aria-checked'], true);
   assert.ok(soundControl(app, 'select').props.children.includes('Ping'));
   assert.equal(descendants(app.renderSettings()).find(node => node.type === 'native-menu-fixture').props.open, false);
   await notificationSoundSwitch(app).props.onClick();
-  await notificationSwitch(app).props.onClick();
+  await notificationMenu(app).props.onSelect('never');
   assert.equal(notificationSoundSwitch(app), undefined);
-  await notificationSwitch(app).props.onClick();
-  assert.equal(rows().length, 4);
+  await notificationMenu(app).props.onSelect('background');
+  assert.equal(rows().length, 2);
   assert.equal(notificationSoundSwitch(app).props['aria-checked'], false);
   assert.equal(soundControl(app, 'select'), undefined);
   assert.equal(app.settingsProps().source.getSnapshot().value.notificationSound, 'mac:Ping.aiff');
@@ -669,7 +760,7 @@ test('delivery failure is contained and permission changes expose an actionable 
   app.setNotificationPermission('denied');
   app.focus();
   assert.ok(descendants(app.renderSettings()).some(node => node.props.role === 'alert' && node.props.children.includes('notificationPermission')));
-  await notificationSwitch(app).props.onClick();
-  assert.equal(notificationSwitch(app).props['aria-checked'], false, 'Revoked permission must not prevent turning notifications off.');
+  await notificationMenu(app).props.onSelect('never');
+  assert.equal(notificationMenu(app).props.selectedId, 'never', 'Revoked permission must not prevent turning notifications off.');
   app.unmount();
 });

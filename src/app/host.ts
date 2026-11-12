@@ -12,6 +12,7 @@ import type * as RestartFeature from '../features/restart-button/host.ts';
 import type * as ArchiveFeature from '../features/archive/host.ts';
 import type * as BackgroundFeature from '../features/wallpaper/host.ts';
 import type * as UsageFeature from '../features/usage-stats/host.ts';
+import type * as PluginUpdatesFeature from '../features/plugin-updates/host.ts';
 import { NativeRemoteService, type NativeContext } from '../shared/host/native.ts';
 import type { HostFeature } from '../shared/host/feature.ts';
 import type { LivePreferences } from '../shared/types/preferences.ts';
@@ -37,7 +38,8 @@ type ComposedService =
   & typeof RestartFeature.methods & ReturnType<typeof RestartFeature.createHost>
   & typeof ArchiveFeature.methods & ReturnType<typeof ArchiveFeature.createHost>
   & typeof BackgroundFeature.methods & ReturnType<typeof BackgroundFeature.createHost>
-  & typeof UsageFeature.methods & ReturnType<typeof UsageFeature.createHost>;
+  & typeof UsageFeature.methods & ReturnType<typeof UsageFeature.createHost>
+  & typeof PluginUpdatesFeature.methods & ReturnType<typeof PluginUpdatesFeature.createHost>;
 interface ModService extends ComposedService {}
 class ModService extends NativeRemoteService {
   queue: OperationQueue;

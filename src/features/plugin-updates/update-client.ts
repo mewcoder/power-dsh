@@ -1,7 +1,9 @@
 export const SCHEMA = 'dsh-market/update-api/v1';
 const API = 'dsh-market/api/v1/';
-const REPOSITORY_API = 'https://api.github.com/repos/mewcoder/power-dsh';
 const RELEASES = 'https://github.com/mewcoder/power-dsh/releases';
+import type { PluginRelease } from '../../shared/types/wire.ts';
+import { compareVersions, versionParts } from './versions.ts';
+export { compareVersions } from './versions.ts';
 
 interface Capabilities { bootId: string; update: boolean }
 export interface UpdateTarget {
@@ -17,21 +19,11 @@ interface UpdateOptions {
   baseURI: string; version: string; canUse(): boolean; notify(): void;
   fetch: typeof fetch; storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
   schedule(callback: () => void, milliseconds: number): number; cancel(timer: number): void;
+  now?(): number;
+  release(signal: AbortSignal): Promise<PluginRelease>;
 }
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-function versionParts(value: unknown): number[] | null {
-  if (typeof value !== 'string' || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value)) return null;
-  const parts = value.split('.').map(Number);
-  return parts.every(Number.isSafeInteger) ? parts : null;
-}
-export function compareVersions(left: string, right: string): number | null {
-  const first = versionParts(left);
-  const second = versionParts(right);
-  if (!first || !second) return null;
-  for (let index = 0; index < 3; index++) if (first[index] !== second[index]) return first[index] > second[index] ? 1 : -1;
-  return 0;
 }
 function problem(key: string): never { throw new Error(key); }
 function validTarget(value: unknown): value is UpdateTarget {
@@ -51,6 +43,7 @@ export class PluginUpdateClient {
   closed = false;
   sequence = 0;
   polls = 0;
+  githubRetryAt = 0;
   readonly storageKey: string;
   constructor(options: UpdateOptions) {
     this.options = options;
@@ -64,22 +57,34 @@ export class PluginUpdateClient {
   path(endpoint: string) {
     return new URL(`${API}${endpoint}`, this.options.baseURI).pathname;
   }
-  async request(url: string, signal: AbortSignal, body?: object, github = false) {
+  githubCooldown() {
+    try {
+      const saved = Number(this.options.storage?.getItem('power-dsh:update:github-retry-at'));
+      if (Number.isFinite(saved)) this.githubRetryAt = Math.max(this.githubRetryAt, saved);
+    } catch (_error) {}
+    return this.githubRetryAt > (this.options.now?.() ?? Date.now());
+  }
+  async request(url: string, signal: AbortSignal, body?: object) {
     const timeout = new AbortController();
     const timer = this.options.schedule(() => timeout.abort(), 15_000);
     try {
       const response = await this.options.fetch(url, {
         method: body ? 'POST' : 'GET', signal: AbortSignal.any([signal, timeout.signal]),
-        credentials: github ? 'omit' : 'same-origin', redirect: 'error', cache: 'no-store',
+        credentials: 'same-origin', redirect: 'error', cache: 'no-store',
         headers: body ? { 'Content-Type': 'application/json' } : { Accept: 'application/json' },
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
-      if (!response.ok) problem(!github && (response.status === 404 || response.status === 405) ? 'pluginUpdateApiUnavailable'
-        : response.status === 401 || response.status === 403 ? 'pluginUpdateDenied' : 'pluginUpdateCheckFailed');
       const text = await response.text();
       if (text.length > 131_072) problem('pluginUpdateCheckFailed');
+      if (!response.ok) {
+        if (response.status === 429) {
+          problem('pluginUpdateRateLimited');
+        }
+        problem(response.status === 404 || response.status === 405 ? 'pluginUpdateApiUnavailable'
+          : response.status === 401 || response.status === 403 ? 'pluginUpdateDenied' : 'pluginUpdateCheckFailed');
+      }
       const data: unknown = JSON.parse(text);
-      if (!record(data) || (!github && data.schema !== SCHEMA)) problem('pluginUpdateApiUnavailable');
+      if (!record(data) || data.schema !== SCHEMA) problem('pluginUpdateApiUnavailable');
       return data;
     } finally { this.options.cancel(timer); }
   }
@@ -92,33 +97,32 @@ export class PluginUpdateClient {
     return { bootId: data.bootId, update: data.features.update === true };
   }
   async inspect(signal: AbortSignal): Promise<{ target: UpdateTarget | null; phase: 'available' | 'current' | 'unconfirmed' }> {
+    if (this.githubCooldown()) problem('pluginUpdateRateLimited');
+    const release = await this.options.release(signal);
+    signal.throwIfAborted();
+    if (release.status === 'rate-limited') {
+      const now = this.options.now?.() ?? Date.now();
+      this.githubRetryAt = Math.min(now + 86_400_000, Math.max(now + 60_000, release.retryAt));
+      try { this.options.storage?.setItem('power-dsh:update:github-retry-at', String(this.githubRetryAt)); } catch (_error) {}
+      problem('pluginUpdateRateLimited');
+    }
+    if (release.status !== 'ready') problem(release.status === 'git-unavailable' ? 'pluginUpdateGitUnavailable' : 'pluginUpdateCheckFailed');
+    const version = release.version;
+    if (!versionParts(version) || !/^[a-f0-9]{40}$/.test(release.commit)) problem('pluginUpdateCheckFailed');
+    const comparison = compareVersions(version, this.options.version);
+    if (comparison === null) problem('pluginUpdateSource');
+    if (comparison <= 0) return { target: null, phase: 'current' };
     const capabilities = await this.discover(signal);
     const data = await this.request(`${this.path('updates')}?name=power-dsh&force=1`, signal);
     const item = data.package;
     if (!record(item) || item.name !== 'power-dsh' || typeof item.updateAvailable !== 'boolean') problem('pluginUpdateCheckFailed');
     if (item.source !== 'github' && item.source !== 'npm') problem('pluginUpdateSource');
-    const release = await this.request(`${REPOSITORY_API}/releases/latest`, signal, undefined, true);
-    const version = typeof release.tag_name === 'string' ? release.tag_name.replace(/^v/, '') : '';
-    if (!versionParts(version) || release.tag_name !== `v${version}` || release.draft !== false || release.prerelease !== false
-      || release.html_url !== `${RELEASES}/tag/v${version}` || !Array.isArray(release.assets)
-      || !release.assets.some(asset => record(asset) && asset.name === 'power-dsh.tgz' && asset.state === 'uploaded'
-        && asset.browser_download_url === `${RELEASES}/download/v${version}/power-dsh.tgz`)) problem('pluginUpdateCheckFailed');
-    const comparison = compareVersions(version, this.options.version);
-    if (comparison === null) problem('pluginUpdateSource');
-    if (comparison <= 0) return { target: null, phase: 'current' };
     if (!capabilities.update || !item.updateAvailable || typeof item.installedVersion !== 'string' || !item.installedVersion
       || item.installedVersion.length > 128 || typeof item.latestVersion !== 'string' || item.latestVersion.length > 128) {
       return { target: null, phase: 'unconfirmed' };
     }
     if (item.source === 'github') {
-      const reference = await this.request(`${REPOSITORY_API}/git/ref/tags/v${version}`, signal, undefined, true);
-      let object = reference.object;
-      for (let depth = 0; depth < 4 && record(object) && object.type === 'tag'; depth++) {
-        if (typeof object.sha !== 'string' || !/^[a-f0-9]{40}$/.test(object.sha)) problem('pluginUpdateCheckFailed');
-        object = (await this.request(`${REPOSITORY_API}/git/tags/${object.sha}`, signal, undefined, true)).object;
-      }
-      if (!record(object) || object.type !== 'commit' || typeof object.sha !== 'string' || !/^[a-f0-9]{40}$/.test(object.sha)
-        || item.latestVersion !== object.sha) return { target: null, phase: 'unconfirmed' };
+      if (item.latestVersion !== release.commit) return { target: null, phase: 'unconfirmed' };
     } else if (item.latestVersion !== version || item.installedVersion !== this.options.version) {
       return { target: null, phase: 'unconfirmed' };
     }
@@ -127,7 +131,8 @@ export class PluginUpdateClient {
   }
   errorKey(error: unknown) {
     const key = error instanceof Error ? error.message : '';
-    return ['pluginUpdateApiUnavailable', 'pluginUpdateDenied', 'pluginUpdateSource', 'pluginUpdateChanged'].includes(key)
+    return ['pluginUpdateApiUnavailable', 'pluginUpdateDenied', 'pluginUpdateGitUnavailable', 'pluginUpdateRateLimited',
+      'pluginUpdateSource', 'pluginUpdateChanged'].includes(key)
       ? key : 'pluginUpdateCheckFailed';
   }
   async check() {

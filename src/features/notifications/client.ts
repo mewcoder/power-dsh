@@ -13,8 +13,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   let active = true;
   let notificationSequence = 0;
   const newNativeGroup = () => `pd${Math.random().toString(36).slice(2, 14)}`;
-  let transport: { status: 'loading' | 'ready' | 'error'; value: NotificationTransport | null; local: boolean; testing: boolean } = {
-    status: 'loading', value: null, local: false, testing: false,
+  let transport: { status: 'loading' | 'ready' | 'error'; value: NotificationTransport | null; local: boolean; testing: boolean; tested: boolean } = {
+    status: 'loading', value: null, local: false, testing: false, tested: false,
   };
   let transportGeneration = 0;
   const transportSource = observable(() => transport);
@@ -47,6 +47,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   function notificationRunner(ctx: ClientContext, form: SettingsForm, t: Translate, reportError: (error: string) => void, playSound: (id: string, preview: boolean) => Promise<void>) {
     const records = new Map<string, NotificationRecord>();
     const visible = new Map<string, Notification>();
+    const pendingTests = new Map<Notification, () => void>();
     const nativeTags = new Map<string, string>();
     let nativeGroup = newNativeGroup();
     let active = true;
@@ -54,7 +55,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     let generation = ctx.connection.generation.getSnapshot();
     function closeAll() {
       for (const notification of visible.values()) {
-        notification.onclick = notification.onerror = notification.onclose = null;
+        pendingTests.get(notification)?.();
+        notification.onclick = notification.onerror = notification.onclose = notification.onshow = null;
         notification.close();
       }
       visible.clear();
@@ -65,7 +67,11 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       }
     }
     function send(id: string, row: SessionRow, kind: 'Approval' | 'Input' | 'Error' | 'Complete', manual = false) {
-      if (!active || !transportReady() || (!usesNativeNotifications() && window.Notification?.permission !== 'granted')) return;
+      if (!active || !transportReady()) return;
+      if (!usesNativeNotifications() && window.Notification?.permission !== 'granted') {
+        if (manual) reportError(window.Notification ? 'notificationPermission' : 'notificationUnsupported');
+        return;
+      }
       try {
         const preferences = form.getSnapshot().value;
         const inFront = !document.hidden && document.hasFocus() && (row.retainedBy?.mainView ?? 0) > 0;
@@ -85,7 +91,12 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             });
             if (!active || !enabled || sentGroup !== nativeGroup || sentGeneration !== generation || nativeTags.get(id) !== tag) return;
             if (!reply.ok) throw new Error('notificationFailed');
+            if (reply.value.reason) {
+              reportError(reply.value.reason === 'identity' ? 'notificationIdentity' : 'notificationNativePermission');
+              return;
+            }
             if (reply.value.shown) reportError('');
+            if (manual && reply.value.shown) publishTransport({ tested: true });
             if (reply.value.shown && localTone) {
               try { await playSound(sound, false); }
               catch (_error) { if (active) reportError('notificationSoundFailed'); }
@@ -105,11 +116,23 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         visible.set(id, notification);
         if (localTone) void playSound(sound, false).catch(() => { if (active) reportError('notificationSoundFailed'); });
         notification.onclick = () => { window.focus(); notification.close(); };
-        notification.onclose = () => { if (visible.get(id) === notification) visible.delete(id); };
+        notification.onclose = () => { pendingTests.get(notification)?.(); if (visible.get(id) === notification) visible.delete(id); };
         notification.onerror = () => {
           if (active) reportError('notificationFailed');
+          pendingTests.get(notification)?.();
           notification.close();
         };
+        if (manual) return new Promise<void>(resolve => {
+          const timer = window.setTimeout(() => {
+            if (active) reportError('notificationTestUnconfirmed');
+            pendingTests.get(notification)?.();
+          }, 5000);
+          pendingTests.set(notification, () => { window.clearTimeout(timer); pendingTests.delete(notification); resolve(); });
+          notification.onshow = () => {
+            if (active) { reportError(''); publishTransport({ tested: true }); }
+            pendingTests.get(notification)?.();
+          };
+        });
       } catch (_error) {
         reportError('notificationFailed');
       }
@@ -223,7 +246,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   const playSystemSound = async (id: string, preview: boolean) => {
     const preferences = form.getSnapshot();
     if (!active || !transportReady() || !soundConnection?.isLoopback || preferences.status !== 'ready'
-      || !preferences.value?.notificationsEnabled || !preferences.value?.notificationSoundEnabled) return;
+      || !preferences.value?.notificationsEnabled || preferences.value.notificationMode === 'never' || !preferences.value?.notificationSoundEnabled) return;
     if (preview && (!preferences.writable || soundState.playing || soundState.status !== 'ready'
       || (preferences.value?.notificationSound || 'default') !== id
       || !soundState.value?.sounds.some(sound => sound.id === id))) return;
@@ -238,6 +261,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             attention: false, preview: true, dismiss: t('notificationDismiss'),
           });
           if (!reply.ok) throw new Error('notificationSoundFailed');
+          if (reply.value.reason) throw new Error(reply.value.reason === 'identity' ? 'notificationIdentity' : 'notificationNativePermission');
           return;
         }
         if (window.Notification?.permission !== 'granted') throw new Error('notificationPermission');
@@ -251,7 +275,9 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         if (!reply.ok) throw new Error('notificationSoundFailed');
       }
     } catch (failure) {
-      if (active && generation === soundGeneration) publishSound({ error: errorMessage(failure) === 'notificationPermission' ? 'notificationPermission' : 'notificationSoundFailed' });
+      const message = errorMessage(failure) || '';
+      if (active && generation === soundGeneration) publishSound({ error: ['notificationPermission', 'notificationIdentity', 'notificationNativePermission'].includes(message)
+        ? message : 'notificationSoundFailed' });
       if (!preview) throw failure;
     } finally {
       if (active && preview && generation === soundGeneration) publishSound({ playing: false });
@@ -268,11 +294,12 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     notificationsSource.notify();
   };
   const checkNotificationPermission = () => {
-    if (form.getSnapshot().value?.notificationsEnabled !== true) { closeSoundPreview(); reportNotificationError(''); return; }
+    if (form.getSnapshot().value?.notificationsEnabled !== true || form.getSnapshot().value?.notificationMode === 'never') { closeSoundPreview(); reportNotificationError(''); return; }
     if (form.getSnapshot().value?.notificationSoundEnabled !== true) closeSoundPreview();
     reportNotificationError(transport.local && transport.value && transport.value.version !== env.pluginVersion ? 'notificationVersionMismatch'
       : !transportReady() ? 'notificationUnavailable'
-      : usesNativeNotifications() ? (!notificationReady ? 'notificationUnavailable' : '')
+      : usesNativeNotifications() ? (!notificationReady ? 'notificationUnavailable'
+        : ['notificationIdentity', 'notificationNativePermission', 'notificationFailed'].includes(notificationError) ? notificationError : '')
       : !window.Notification ? 'notificationUnsupported'
       : window.Notification.permission !== 'granted' ? 'notificationPermission'
         : !notificationReady ? 'notificationUnavailable' : '');
@@ -316,34 +343,42 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     checkNotificationPermission();
     return () => window.removeEventListener('focus', checkNotificationPermission);
   });
-  const setNotificationsEnabled = async (enabled: boolean) => {
-    if (enabled) {
+  const ensurePermission = async () => {
       if (!notificationReady || !transportReady()) throw new Error(t('notificationUnavailable'));
       if (!usesNativeNotifications()) {
         if (!window.Notification) throw new Error(t('notificationUnsupported'));
         const permission = window.Notification.permission === 'default'
           ? await window.Notification.requestPermission() : window.Notification.permission;
-        if (!active) return;
+        if (!active) return false;
         if (permission !== 'granted') throw new Error(t('notificationPermission'));
       }
-    }
+      return active;
+  };
+  const setNotificationsEnabled = async (enabled: boolean) => {
+    if (enabled && !await ensurePermission()) return;
     await savePreference('notificationsEnabled', enabled, 'notificationUnavailable');
     reportNotificationError('');
   };
-  const mainSetting: SettingContribution = { field: 'notificationsEnabled', description: 'notificationsDescription', save: next => setNotificationsEnabled(next === true) };
-  const soundSetting: SettingContribution = { field: 'notificationSoundEnabled', save: next => savePreference('notificationSoundEnabled', next === true, 'notificationUnavailable'), canSave: () => source.getSnapshot().value?.notificationsEnabled === true };
+  const mainSetting: SettingContribution = { field: 'notificationsEnabled', hidden: true, save: next => setNotificationsEnabled(next === true) };
+  const soundSetting: SettingContribution = { field: 'notificationSoundEnabled', save: next => savePreference('notificationSoundEnabled', next === true, 'notificationUnavailable'),
+    canSave: () => source.getSnapshot().value?.notificationsEnabled === true && source.getSnapshot().value?.notificationMode !== 'never' };
   const toneSetting: SettingContribution = { field: 'notificationSound', hidden: true, canSave: next => {
     const sounds = soundsSource.getSnapshot();
     const config = source.getSnapshot();
-    return config.value?.notificationsEnabled === true && config.value?.notificationSoundEnabled === true
+    return config.value?.notificationsEnabled === true && config.value.notificationMode !== 'never' && config.value?.notificationSoundEnabled === true
       && sounds.status === 'ready' && !sounds.playing && !!sounds.value?.sounds.some(sound => sound.id === next);
   }, save: async (next, { mounted }) => {
     if (typeof next === 'string' && source.getSnapshot().value?.notificationSound !== next) await savePreference('notificationSound', next, 'notificationUnavailable', 'string');
     if (mounted.current && typeof next === 'string') await playSystemSound(next, true);
   } };
   const modeSetting: SettingContribution = { field: 'notificationMode', hidden: true,
-    canSave: next => ['never', 'background', 'always'].includes(String(next)) && source.getSnapshot().value?.notificationsEnabled === true,
-    save: next => savePreference('notificationMode', String(next), 'notificationUnavailable', 'string') };
+    canSave: next => ['never', 'background', 'always'].includes(String(next)),
+    save: async next => {
+      if (next === 'never') return setNotificationsEnabled(false);
+      if (!await ensurePermission()) return;
+      await savePreference('notificationMode', String(next), 'notificationUnavailable', 'string');
+      if (source.getSnapshot().value?.notificationsEnabled !== true) await setNotificationsEnabled(true);
+    } };
   function useSettings({ snapshot, disabled, saving, error, save, id }: SettingsViewContext): SettingContribution[] {
     const sounds = useSnapshot(soundsSource);
     const notifications = useSnapshot(notificationsSource);
@@ -352,50 +387,54 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const [soundMenuOpen, setSoundMenuOpen] = React.useState(false);
     React.useEffect(() => { void loadSystemSounds(); }, []);
     React.useEffect(() => {
-      if (snapshot.value?.notificationsEnabled !== true) setSoundMenuOpen(false);
-    }, [snapshot.value?.notificationsEnabled]);
+      if (snapshot.value?.notificationsEnabled !== true || snapshot.value.notificationMode === 'never') setSoundMenuOpen(false);
+    }, [snapshot.value?.notificationsEnabled, snapshot.value?.notificationMode]);
     const soundName = (sound: SoundEntry) => sound.id === 'default' ? t('notificationSoundDefault')
       : sound.id.startsWith('win:') ? t(`sound${sound.id.slice(4)}`) : sound.name;
-    const mode = snapshot.value?.notificationMode || 'background';
+    const mode = snapshot.value?.notificationsEnabled === true ? snapshot.value.notificationMode || 'background' : 'never';
     function modeRow() {
-      if (snapshot.value?.notificationsEnabled !== true) return null;
       const busy = saving?.field === 'notificationMode';
       const modeLabel = (value: string) => t(value === 'always' ? 'notificationAlways' : value === 'never' ? 'notificationNever' : 'notificationBackground');
+      const failed = error?.field === 'notificationMode';
       return h('div', { className: 'power-dsh-setting-row', key: 'notificationMode' },
         h('div', { className: 'power-dsh-setting-copy' },
-          h('div', { id: `${id}-notificationMode-label`, className: 'power-dsh-setting-label' }, t('notificationMode')),
-          h('div', { id: `${id}-notificationMode-description`, className: 'power-dsh-description' }, t('notificationModeDescription')),
-          error?.field === 'notificationMode' && errorFeedback({ t, id: `${id}-notificationMode-error`, message: error.message, code: 'PD-NOTIFICATION-MODE', operation: 'settings.notificationMode' })),
-        h(Menu, { open: modeMenuOpen && !disabled && !busy, onClose: () => setModeMenuOpen(false), selectedId: mode,
+          h('div', { id: `${id}-notificationMode-label`, className: 'power-dsh-setting-label' }, t('notificationsEnabled')),
+          h('div', { id: `${id}-notificationMode-description`, className: 'power-dsh-description' }, t('notificationsDescription')),
+          failed ? errorFeedback({ t, id: `${id}-notificationMode-error`, message: error.message, code: 'PD-NOTIFICATION-MODE', operation: 'settings.notificationMode' })
+            : notifications.error && errorFeedback({ t, id: `${id}-notificationMode-error`, message: t(notifications.error), code: 'PD-NOTIFICATION-DELIVERY',
+              operation: 'notifications.deliver', context: { stage: 'transport',
+                actual: `${channel.status}:${channel.value?.platform || 'browser'}:${channel.value?.version || 'unknown'}`,
+                expected: `${usesNativeNotifications() ? 'winrt' : 'browser'}:${env.pluginVersion}` } })),
+        h('div', { className: 'power-dsh-notification-controls' },
+          h('button', { type: 'button', className: 'power-dsh-notification-test',
+            disabled: disabled || busy || !notificationReady || !transportReady() || channel.testing || mode === 'never',
+            title: t(channel.tested ? 'notificationTestSent' : 'notificationTest'),
+            'aria-label': t('notificationTest'), 'aria-busy': channel.testing, onClick: testNotification },
+            h('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+              strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, focusable: false },
+              channel.tested ? h('path', { d: 'm5 12 4 4L19 6' }) : h(React.Fragment, null,
+                h('path', { d: 'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4' })))),
+          h(Menu, { open: modeMenuOpen && !disabled && !busy, onClose: () => setModeMenuOpen(false), selectedId: mode,
           portal: true, align: 'end', autoFocus: true, minWidthFromAnchor: true,
           items: ['never', 'background', 'always'].map(value => ({ id: value, label: modeLabel(value) })),
           onSelect: value => { setModeMenuOpen(false); return save('notificationMode', value); },
           anchor: h('button', { type: 'button', className: 'power-dsh-mode-select', disabled: disabled || busy,
-            'aria-label': t('notificationMode'), 'aria-haspopup': 'menu', 'aria-expanded': modeMenuOpen && !disabled && !busy,
-            'aria-describedby': `${id}-notificationMode-description${error?.field === 'notificationMode' ? ` ${id}-notificationMode-error` : ''}`,
-            'aria-invalid': error?.field === 'notificationMode',
+            'aria-label': t('notificationsEnabled'), 'aria-haspopup': 'menu', 'aria-expanded': modeMenuOpen && !disabled && !busy,
+            'aria-describedby': `${id}-notificationMode-description${failed || notifications.error ? ` ${id}-notificationMode-error` : ''}`,
+            'aria-invalid': Boolean(failed || notifications.error),
             'aria-busy': busy, onClick: () => { if (!disabled && !busy) setModeMenuOpen(true); },
-          }, modeLabel(mode)) }));
+          }, modeLabel(mode)) })));
     }
     const testNotification = async () => {
       const current = source.getSnapshot();
       if (!active || current.status !== 'ready' || !current.writable || current.value?.notificationsEnabled !== true
         || current.value.notificationMode === 'never' || !transportReady() || transport.testing || !testSender) return;
-      publishTransport({ testing: true });
+      publishTransport({ testing: true, tested: false });
       try { await testSender(); }
       finally { if (active) publishTransport({ testing: false }); }
     };
-    function transportRow() {
-      if (snapshot.value?.notificationsEnabled !== true) return null;
-      return h('div', { className: 'power-dsh-setting-row', key: 'notificationTransport' },
-        h('div', { className: 'power-dsh-setting-copy' },
-          h('div', { className: 'power-dsh-setting-label' }, t('notificationTest')),
-          h('div', { className: 'power-dsh-description' }, `${t(channel.status !== 'ready' ? 'notificationTransportPending' : usesNativeNotifications() ? 'notificationNative' : 'notificationBrowser')} · PowerDSH ${channel.value?.version || env.pluginVersion}`)),
-        h(runtime.Button, { size: 'sm', variant: 'outline', disabled: disabled || !transportReady() || channel.testing || mode === 'never',
-          'aria-busy': channel.testing, onClick: testNotification }, t('notificationTest')));
-    }
     function soundRow() {
-      if (snapshot.value?.notificationsEnabled !== true) return null;
+      if (mode === 'never') return null;
       const field = 'notificationSoundEnabled';
       const control = `${id}-${field}`;
       const busy = saving?.field === field;
@@ -418,7 +457,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             'aria-checked': checked, 'aria-labelledby': `${control}-label`,
             'aria-describedby': `${control}-description${error?.field === field ? ` ${control}-error` : ''}`,
             'aria-invalid': error?.field === field,
-            'aria-busy': busy, disabled: disabled || !snapshot.value?.notificationsEnabled,
+            'aria-busy': busy, disabled: disabled || busy || !snapshot.value?.notificationsEnabled,
             onClick: () => { setSoundMenuOpen(false); return save(field, !checked); },
           }, h('span', { className: 'power-dsh-switch-thumb', 'aria-hidden': true }))),
         checked && h('div', { className: 'power-dsh-setting-row' },
@@ -455,13 +494,10 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             h('path', { d: 'm6.5 5 4 3-4 3z', fill: 'currentColor' }))))));
     }
     return [
-      { ...mainSetting, failure: notifications.error ? { message: t(notifications.error), code: 'PD-NOTIFICATION-DELIVERY',
-        operation: 'notifications.deliver', context: { stage: 'transport',
-          actual: `${channel.status}:${channel.value?.platform || 'browser'}:${channel.value?.version || 'unknown'}`,
-          expected: `${usesNativeNotifications() ? 'winrt' : 'browser'}:${env.pluginVersion}` } } : undefined },
+      mainSetting,
       { ...modeSetting, hidden: false, render: modeRow },
       { ...soundSetting, render: soundRow },
-      { ...toneSetting, hidden: false, render: transportRow },
+      toneSetting,
     ];
   }
   return { settings: [mainSetting, modeSetting, soundSetting, toneSetting], useSettings, styles,

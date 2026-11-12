@@ -681,14 +681,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		return source;
 	}
 
-// src/features/plugin-updates/update-client.ts
-	const SCHEMA = "dsh-market/update-api/v1";
-	const API = "dsh-market/api/v1/";
-	const REPOSITORY_API = "https://api.github.com/repos/mewcoder/power-dsh";
-	const RELEASES = "https://github.com/mewcoder/power-dsh/releases";
-	function record(value) {
-		return typeof value === "object" && value !== null && !Array.isArray(value);
-	}
+// src/features/plugin-updates/versions.ts
 	function versionParts(value) {
 		if (typeof value !== "string" || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value)) return null;
 		const parts = value.split(".").map(Number);
@@ -700,6 +693,14 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		if (!first || !second) return null;
 		for (let index = 0; index < 3; index++) if (first[index] !== second[index]) return first[index] > second[index] ? 1 : -1;
 		return 0;
+	}
+
+// src/features/plugin-updates/update-client.ts
+	const SCHEMA = "dsh-market/update-api/v1";
+	const API = "dsh-market/api/v1/";
+	const RELEASES = "https://github.com/mewcoder/power-dsh/releases";
+	function record(value) {
+		return typeof value === "object" && value !== null && !Array.isArray(value);
 	}
 	function problem(key) {
 		throw new Error(key);
@@ -724,6 +725,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		closed = false;
 		sequence = 0;
 		polls = 0;
+		githubRetryAt = 0;
 		storageKey;
 		constructor(options) {
 			this.options = options;
@@ -740,24 +742,34 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		path(endpoint) {
 			return new URL(`${API}${endpoint}`, this.options.baseURI).pathname;
 		}
-		async request(url, signal, body, github = false) {
+		githubCooldown() {
+			try {
+				const saved = Number(this.options.storage?.getItem("power-dsh:update:github-retry-at"));
+				if (Number.isFinite(saved)) this.githubRetryAt = Math.max(this.githubRetryAt, saved);
+			} catch (_error) {}
+			return this.githubRetryAt > (this.options.now?.() ?? Date.now());
+		}
+		async request(url, signal, body) {
 			const timeout = new AbortController();
 			const timer = this.options.schedule(() => timeout.abort(), 15e3);
 			try {
 				const response = await this.options.fetch(url, {
 					method: body ? "POST" : "GET",
 					signal: AbortSignal.any([signal, timeout.signal]),
-					credentials: github ? "omit" : "same-origin",
+					credentials: "same-origin",
 					redirect: "error",
 					cache: "no-store",
 					headers: body ? { "Content-Type": "application/json" } : { Accept: "application/json" },
 					...body ? { body: JSON.stringify(body) } : {}
 				});
-				if (!response.ok) problem(!github && (response.status === 404 || response.status === 405) ? "pluginUpdateApiUnavailable" : response.status === 401 || response.status === 403 ? "pluginUpdateDenied" : "pluginUpdateCheckFailed");
 				const text = await response.text();
 				if (text.length > 131072) problem("pluginUpdateCheckFailed");
+				if (!response.ok) {
+					if (response.status === 429) problem("pluginUpdateRateLimited");
+					problem(response.status === 404 || response.status === 405 ? "pluginUpdateApiUnavailable" : response.status === 401 || response.status === 403 ? "pluginUpdateDenied" : "pluginUpdateCheckFailed");
+				}
 				const data = JSON.parse(text);
-				if (!record(data) || !github && data.schema !== "dsh-market/update-api/v1") problem("pluginUpdateApiUnavailable");
+				if (!record(data) || data.schema !== "dsh-market/update-api/v1") problem("pluginUpdateApiUnavailable");
 				return data;
 			} finally {
 				this.options.cancel(timer);
@@ -772,30 +784,36 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			};
 		}
 		async inspect(signal) {
-			const capabilities = await this.discover(signal);
-			const item = (await this.request(`${this.path("updates")}?name=power-dsh&force=1`, signal)).package;
-			if (!record(item) || item.name !== "power-dsh" || typeof item.updateAvailable !== "boolean") problem("pluginUpdateCheckFailed");
-			if (item.source !== "github" && item.source !== "npm") problem("pluginUpdateSource");
-			const release = await this.request(`${REPOSITORY_API}/releases/latest`, signal, void 0, true);
-			const version = typeof release.tag_name === "string" ? release.tag_name.replace(/^v/, "") : "";
-			if (!versionParts(version) || release.tag_name !== `v${version}` || release.draft !== false || release.prerelease !== false || release.html_url !== `${RELEASES}/tag/v${version}` || !Array.isArray(release.assets) || !release.assets.some((asset) => record(asset) && asset.name === "power-dsh.tgz" && asset.state === "uploaded" && asset.browser_download_url === `${RELEASES}/download/v${version}/power-dsh.tgz`)) problem("pluginUpdateCheckFailed");
+			if (this.githubCooldown()) problem("pluginUpdateRateLimited");
+			const release = await this.options.release(signal);
+			signal.throwIfAborted();
+			if (release.status === "rate-limited") {
+				const now = this.options.now?.() ?? Date.now();
+				this.githubRetryAt = Math.min(now + 864e5, Math.max(now + 6e4, release.retryAt));
+				try {
+					this.options.storage?.setItem("power-dsh:update:github-retry-at", String(this.githubRetryAt));
+				} catch (_error) {}
+				problem("pluginUpdateRateLimited");
+			}
+			if (release.status !== "ready") problem(release.status === "git-unavailable" ? "pluginUpdateGitUnavailable" : "pluginUpdateCheckFailed");
+			const version = release.version;
+			if (!versionParts(version) || !/^[a-f0-9]{40}$/.test(release.commit)) problem("pluginUpdateCheckFailed");
 			const comparison = compareVersions(version, this.options.version);
 			if (comparison === null) problem("pluginUpdateSource");
 			if (comparison <= 0) return {
 				target: null,
 				phase: "current"
 			};
+			const capabilities = await this.discover(signal);
+			const item = (await this.request(`${this.path("updates")}?name=power-dsh&force=1`, signal)).package;
+			if (!record(item) || item.name !== "power-dsh" || typeof item.updateAvailable !== "boolean") problem("pluginUpdateCheckFailed");
+			if (item.source !== "github" && item.source !== "npm") problem("pluginUpdateSource");
 			if (!capabilities.update || !item.updateAvailable || typeof item.installedVersion !== "string" || !item.installedVersion || item.installedVersion.length > 128 || typeof item.latestVersion !== "string" || item.latestVersion.length > 128) return {
 				target: null,
 				phase: "unconfirmed"
 			};
 			if (item.source === "github") {
-				let object = (await this.request(`${REPOSITORY_API}/git/ref/tags/v${version}`, signal, void 0, true)).object;
-				for (let depth = 0; depth < 4 && record(object) && object.type === "tag"; depth++) {
-					if (typeof object.sha !== "string" || !/^[a-f0-9]{40}$/.test(object.sha)) problem("pluginUpdateCheckFailed");
-					object = (await this.request(`${REPOSITORY_API}/git/tags/${object.sha}`, signal, void 0, true)).object;
-				}
-				if (!record(object) || object.type !== "commit" || typeof object.sha !== "string" || !/^[a-f0-9]{40}$/.test(object.sha) || item.latestVersion !== object.sha) return {
+				if (item.latestVersion !== release.commit) return {
 					target: null,
 					phase: "unconfirmed"
 				};
@@ -820,6 +838,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			return [
 				"pluginUpdateApiUnavailable",
 				"pluginUpdateDenied",
+				"pluginUpdateGitUnavailable",
+				"pluginUpdateRateLimited",
 				"pluginUpdateSource",
 				"pluginUpdateChanged"
 			].includes(key) ? key : "pluginUpdateCheckFailed";
@@ -1073,6 +1093,12 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			storage,
 			fetch: (...args) => fetch(...args),
 			notify: () => updateSource.notify(),
+			release: async (signal) => {
+				const reply = await ctx.remote.powerDsh.readPluginRelease();
+				signal.throwIfAborted();
+				if (!reply.ok) throw new Error("pluginUpdateCheckFailed");
+				return reply.value;
+			},
 			schedule: (callback, milliseconds) => window.setTimeout(callback, milliseconds),
 			cancel: (timer) => window.clearTimeout(timer)
 		});
@@ -1129,6 +1155,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				}
 			}, `${t("pluginUpdateAction")} ${state.target.version}`))), state.target && h("a", {
 				href: state.target.url,
+				target: "_blank",
+				rel: "noopener noreferrer"
+			}, t("pluginUpdateReleaseNotes")), !state.target && ["pluginUpdateRateLimited", "pluginUpdateGitUnavailable"].includes(state.error) && h("a", {
+				href: "https://github.com/mewcoder/power-dsh/releases",
 				target: "_blank",
 				rel: "noopener noreferrer"
 			}, t("pluginUpdateReleaseNotes")), [
@@ -1204,7 +1234,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			pluginUpdateConfirm: "更新 PowerDSH",
 			pluginUpdateConfirmDescription: "由插件市场完成安装，过程中插件可能重新加载。完成后可能需要刷新界面或重启 DSH。",
 			pluginUpdateReleaseNotes: "更新日志",
-			pluginUpdateCurrent: "当前运行版本已不低于最新正式版",
+			pluginUpdateCurrent: "当前版本无需更新",
 			pluginUpdateUnconfirmed: "未确认可用更新，请到插件市场核对当前安装来源。",
 			pluginUpdateRunning: "插件市场正在处理更新…",
 			pluginUpdateDone: "已安装",
@@ -1212,6 +1242,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			pluginUpdateRestart: "请通过 DSH 的原生入口重启应用后使用新版。",
 			pluginUpdateApiUnavailable: "当前插件市场不支持公开更新接口，请启用或升级市场后重试，也可在市场中更新。",
 			pluginUpdateDenied: "无法访问更新服务，请检查当前登录和管理权限。",
+			pluginUpdateRateLimited: "接口请求过于频繁，请稍后重试，也可在 GitHub 发布页查看版本。",
+			pluginUpdateGitUnavailable: "当前 DSH 无法使用 Git 检查版本，请安装 Git 后重启 DSH，或直接查看 GitHub 发布页。",
 			pluginUpdateSource: "当前安装来源或版本无法安全更新，请在插件市场处理。",
 			pluginUpdateChanged: "更新目标或安装状态已变化，请重新检查并确认。",
 			pluginUpdateCheckFailed: "检查更新失败，请检查网络后重试。",
@@ -1231,7 +1263,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			pluginUpdateConfirm: "Update PowerDSH",
 			pluginUpdateConfirmDescription: "The plugin market handles installation. The plugin may reload during the update, and DSH may need a refresh or restart afterward.",
 			pluginUpdateReleaseNotes: "Release notes",
-			pluginUpdateCurrent: "The running version is at least the latest stable release",
+			pluginUpdateCurrent: "No update needed for this version",
 			pluginUpdateUnconfirmed: "No update target confirmed. Check the installation source in the plugin market.",
 			pluginUpdateRunning: "The plugin market is processing the update…",
 			pluginUpdateDone: "Installed",
@@ -1239,6 +1271,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			pluginUpdateRestart: "Restart DSH using its native controls to use the new version.",
 			pluginUpdateApiUnavailable: "The plugin market update API is unavailable. Enable or update the market and retry, or update there.",
 			pluginUpdateDenied: "Cannot access the update service. Check your session and management permissions.",
+			pluginUpdateRateLimited: "Too many requests to the update service. Try again later or check the GitHub releases page.",
+			pluginUpdateGitUnavailable: "Git is unavailable to DSH. Install Git and restart DSH, or check the GitHub releases page.",
 			pluginUpdateSource: "This installation source or version cannot be updated safely here. Use the plugin market.",
 			pluginUpdateChanged: "The update target or installation changed. Check again and confirm the new target.",
 			pluginUpdateCheckFailed: "Could not check for updates. Check your connection and retry.",
@@ -1250,6 +1284,56 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			pluginUpdateResume: "Read progress again"
 		}
 	};
+
+// src/shared/types/protocol.ts
+	function isArray(value) {
+		return Array.isArray(value);
+	}
+	function isStringArray(value) {
+		return isArray(value) && value.every((item) => typeof item === "string");
+	}
+	/** Validate external wire objects before reading their fields. */
+	function isRecord(value) {
+		return typeof value === "object" && value !== null;
+	}
+	function hasStrings(value, keys) {
+		return keys.every((key) => typeof value[key] === "string");
+	}
+	function hasBooleans(value, keys) {
+		return keys.every((key) => typeof value[key] === "boolean");
+	}
+	function isOneOf(value, values) {
+		return typeof value === "string" && values.includes(value);
+	}
+
+// src/features/plugin-updates/rpc.ts
+	const READ_PLUGIN_RELEASE_RPC = {
+		id: "power-dsh#powerDsh/readPluginRelease",
+		service: "powerDsh",
+		namespace: "powerDsh",
+		method: "readPluginRelease",
+		invocation: { kind: "direct" },
+		parameters: [],
+		result: {
+			mode: "strict",
+			typeSymbol: "power-dsh#PluginRelease",
+			create: () => ({ parse(value) {
+				if (!isRecord(value)) throw new TypeError("Invalid plugin release");
+				if (value.status === "ready" && typeof value.version === "string" && versionParts(value.version) && typeof value.commit === "string" && /^[a-f0-9]{40}$/.test(value.commit)) return {
+					status: "ready",
+					version: value.version,
+					commit: value.commit
+				};
+				if (isOneOf(value.status, ["unavailable", "git-unavailable"])) return { status: value.status };
+				if (value.status === "rate-limited" && Number.isSafeInteger(value.retryAt) && Number(value.retryAt) > 0) return {
+					status: value.status,
+					retryAt: Number(value.retryAt)
+				};
+				throw new TypeError("Invalid plugin release");
+			} })
+		}
+	};
+	const rpc$15 = [READ_PLUGIN_RELEASE_RPC];
 
 // src/features/account-blocking/client.ts
 	function createClientFeature$20(runtime, env) {
@@ -1289,27 +1373,6 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"blockAccountDescription": "停用官方登录、账号界面及内置模型接入"
 		}
 	};
-
-// src/shared/types/protocol.ts
-	function isArray(value) {
-		return Array.isArray(value);
-	}
-	function isStringArray(value) {
-		return isArray(value) && value.every((item) => typeof item === "string");
-	}
-	/** Validate external wire objects before reading their fields. */
-	function isRecord(value) {
-		return typeof value === "object" && value !== null;
-	}
-	function hasStrings(value, keys) {
-		return keys.every((key) => typeof value[key] === "string");
-	}
-	function hasBooleans(value, keys) {
-		return keys.every((key) => typeof value[key] === "boolean");
-	}
-	function isOneOf(value, values) {
-		return typeof value === "string" && values.includes(value);
-	}
 
 // src/shared/rpc/codecs.ts
 	const booleanCodec = {
@@ -2603,6 +2666,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 
 // src/features/notifications/styles.ts
 	const styles$9 = `
+.power-dsh-page .power-dsh-notification-controls { display:flex; align-items:center; gap:8px; flex:none; }
+.power-dsh-notification-test { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; padding:4px; border:0; border-radius:var(--dsw-radius-sm); background:transparent; color:var(--dsw-alias-label-secondary); cursor:pointer; }
+.power-dsh-notification-test:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover-solid); color:var(--dsw-alias-label-primary); }
+.power-dsh-notification-test:focus-visible { outline:2px solid var(--dsw-alias-state-business-primary); outline-offset:2px; }
+.power-dsh-notification-test:disabled { opacity:.45; cursor:default; }
 .power-dsh-page .power-dsh-sound-controls { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; flex:none; max-width:50%; }
 .power-dsh-page .power-dsh-mode-select { box-sizing:border-box; display:inline-flex; align-items:center; min-height:36px; padding:0 14px; border:0; border-radius:var(--dsw-radius-md); background:var(--dsw-alias-bg-module-platform); color:var(--dsw-alias-label-primary); font:inherit; font-size:14px; cursor:pointer; }
 .power-dsh-page .power-dsh-mode-select:disabled { opacity:.5; cursor:default; }
@@ -2629,7 +2697,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			status: "loading",
 			value: null,
 			local: false,
-			testing: false
+			testing: false,
+			tested: false
 		};
 		let transportGeneration = 0;
 		const transportSource = observable(() => transport);
@@ -2677,6 +2746,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		function notificationRunner(ctx, form, t, reportError, playSound) {
 			const records = /* @__PURE__ */ new Map();
 			const visible = /* @__PURE__ */ new Map();
+			const pendingTests = /* @__PURE__ */ new Map();
 			const nativeTags = /* @__PURE__ */ new Map();
 			let nativeGroup = newNativeGroup();
 			let active = true;
@@ -2684,7 +2754,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			let generation = ctx.connection.generation.getSnapshot();
 			function closeAll() {
 				for (const notification of visible.values()) {
-					notification.onclick = notification.onerror = notification.onclose = null;
+					pendingTests.get(notification)?.();
+					notification.onclick = notification.onerror = notification.onclose = notification.onshow = null;
 					notification.close();
 				}
 				visible.clear();
@@ -2697,7 +2768,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				}
 			}
 			function send(id, row, kind, manual = false) {
-				if (!active || !transportReady() || !usesNativeNotifications() && window.Notification?.permission !== "granted") return;
+				if (!active || !transportReady()) return;
+				if (!usesNativeNotifications() && window.Notification?.permission !== "granted") {
+					if (manual) reportError(window.Notification ? "notificationPermission" : "notificationUnsupported");
+					return;
+				}
 				try {
 					const preferences = form.getSnapshot().value;
 					const inFront = !document.hidden && document.hasFocus() && (row.retainedBy?.mainView ?? 0) > 0;
@@ -2721,7 +2796,12 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 							});
 							if (!active || !enabled || sentGroup !== nativeGroup || sentGeneration !== generation || nativeTags.get(id) !== tag) return;
 							if (!reply.ok) throw new Error("notificationFailed");
+							if (reply.value.reason) {
+								reportError(reply.value.reason === "identity" ? "notificationIdentity" : "notificationNativePermission");
+								return;
+							}
 							if (reply.value.shown) reportError("");
+							if (manual && reply.value.shown) publishTransport({ tested: true });
 							if (reply.value.shown && localTone) try {
 								await playSound(sound, false);
 							} catch (_error) {
@@ -2747,12 +2827,32 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 						notification.close();
 					};
 					notification.onclose = () => {
+						pendingTests.get(notification)?.();
 						if (visible.get(id) === notification) visible.delete(id);
 					};
 					notification.onerror = () => {
 						if (active) reportError("notificationFailed");
+						pendingTests.get(notification)?.();
 						notification.close();
 					};
+					if (manual) return new Promise((resolve) => {
+						const timer = window.setTimeout(() => {
+							if (active) reportError("notificationTestUnconfirmed");
+							pendingTests.get(notification)?.();
+						}, 5e3);
+						pendingTests.set(notification, () => {
+							window.clearTimeout(timer);
+							pendingTests.delete(notification);
+							resolve();
+						});
+						notification.onshow = () => {
+							if (active) {
+								reportError("");
+								publishTransport({ tested: true });
+							}
+							pendingTests.get(notification)?.();
+						};
+					});
 				} catch (_error) {
 					reportError("notificationFailed");
 				}
@@ -2935,7 +3035,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		};
 		const playSystemSound = async (id, preview) => {
 			const preferences = form.getSnapshot();
-			if (!active || !transportReady() || !soundConnection?.isLoopback || preferences.status !== "ready" || !preferences.value?.notificationsEnabled || !preferences.value?.notificationSoundEnabled) return;
+			if (!active || !transportReady() || !soundConnection?.isLoopback || preferences.status !== "ready" || !preferences.value?.notificationsEnabled || preferences.value.notificationMode === "never" || !preferences.value?.notificationSoundEnabled) return;
 			if (preview && (!preferences.writable || soundState.playing || soundState.status !== "ready" || (preferences.value?.notificationSound || "default") !== id || !soundState.value?.sounds.some((sound) => sound.id === id))) return;
 			if (preview) publishSound({
 				playing: true,
@@ -2946,7 +3046,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				if (preview && id === "default") {
 					if (usesNativeNotifications()) {
 						nativePreviewVisible = true;
-						if (!(await ctx.remote.powerDsh.showWindowsNotification({
+						const reply = await ctx.remote.powerDsh.showWindowsNotification({
 							group: nativePreviewGroup,
 							tag: "preview",
 							title: t("notificationSoundTestTitle"),
@@ -2954,7 +3054,9 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 							attention: false,
 							preview: true,
 							dismiss: t("notificationDismiss")
-						})).ok) throw new Error("notificationSoundFailed");
+						});
+						if (!reply.ok) throw new Error("notificationSoundFailed");
+						if (reply.value.reason) throw new Error(reply.value.reason === "identity" ? "notificationIdentity" : "notificationNativePermission");
 						return;
 					}
 					if (window.Notification?.permission !== "granted") throw new Error("notificationPermission");
@@ -2965,7 +3067,12 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					};
 				} else if (!(await ctx.remote.powerDsh.playSystemSound(id, preview)).ok) throw new Error("notificationSoundFailed");
 			} catch (failure) {
-				if (active && generation === soundGeneration) publishSound({ error: errorMessage(failure) === "notificationPermission" ? "notificationPermission" : "notificationSoundFailed" });
+				const message = errorMessage(failure) || "";
+				if (active && generation === soundGeneration) publishSound({ error: [
+					"notificationPermission",
+					"notificationIdentity",
+					"notificationNativePermission"
+				].includes(message) ? message : "notificationSoundFailed" });
 				if (!preview) throw failure;
 			} finally {
 				if (active && preview && generation === soundGeneration) publishSound({ playing: false });
@@ -2982,13 +3089,17 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			notificationsSource.notify();
 		};
 		const checkNotificationPermission = () => {
-			if (form.getSnapshot().value?.notificationsEnabled !== true) {
+			if (form.getSnapshot().value?.notificationsEnabled !== true || form.getSnapshot().value?.notificationMode === "never") {
 				closeSoundPreview();
 				reportNotificationError("");
 				return;
 			}
 			if (form.getSnapshot().value?.notificationSoundEnabled !== true) closeSoundPreview();
-			reportNotificationError(transport.local && transport.value && transport.value.version !== env.pluginVersion ? "notificationVersionMismatch" : !transportReady() ? "notificationUnavailable" : usesNativeNotifications() ? !notificationReady ? "notificationUnavailable" : "" : !window.Notification ? "notificationUnsupported" : window.Notification.permission !== "granted" ? "notificationPermission" : !notificationReady ? "notificationUnavailable" : "");
+			reportNotificationError(transport.local && transport.value && transport.value.version !== env.pluginVersion ? "notificationVersionMismatch" : !transportReady() ? "notificationUnavailable" : usesNativeNotifications() ? !notificationReady ? "notificationUnavailable" : [
+				"notificationIdentity",
+				"notificationNativePermission",
+				"notificationFailed"
+			].includes(notificationError) ? notificationError : "" : !window.Notification ? "notificationUnsupported" : window.Notification.permission !== "granted" ? "notificationPermission" : !notificationReady ? "notificationUnavailable" : "");
 		};
 		ctx.inject(["connection"], (child) => {
 			child.effect(() => child.connection.generation.subscribe(() => {
@@ -3053,28 +3164,30 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			checkNotificationPermission();
 			return () => window.removeEventListener("focus", checkNotificationPermission);
 		});
-		const setNotificationsEnabled = async (enabled) => {
-			if (enabled) {
-				if (!notificationReady || !transportReady()) throw new Error(t("notificationUnavailable"));
-				if (!usesNativeNotifications()) {
-					if (!window.Notification) throw new Error(t("notificationUnsupported"));
-					const permission = window.Notification.permission === "default" ? await window.Notification.requestPermission() : window.Notification.permission;
-					if (!active) return;
-					if (permission !== "granted") throw new Error(t("notificationPermission"));
-				}
+		const ensurePermission = async () => {
+			if (!notificationReady || !transportReady()) throw new Error(t("notificationUnavailable"));
+			if (!usesNativeNotifications()) {
+				if (!window.Notification) throw new Error(t("notificationUnsupported"));
+				const permission = window.Notification.permission === "default" ? await window.Notification.requestPermission() : window.Notification.permission;
+				if (!active) return false;
+				if (permission !== "granted") throw new Error(t("notificationPermission"));
 			}
+			return active;
+		};
+		const setNotificationsEnabled = async (enabled) => {
+			if (enabled && !await ensurePermission()) return;
 			await savePreference("notificationsEnabled", enabled, "notificationUnavailable");
 			reportNotificationError("");
 		};
 		const mainSetting = {
 			field: "notificationsEnabled",
-			description: "notificationsDescription",
+			hidden: true,
 			save: (next) => setNotificationsEnabled(next === true)
 		};
 		const soundSetting = {
 			field: "notificationSoundEnabled",
 			save: (next) => savePreference("notificationSoundEnabled", next === true, "notificationUnavailable"),
-			canSave: () => source.getSnapshot().value?.notificationsEnabled === true
+			canSave: () => source.getSnapshot().value?.notificationsEnabled === true && source.getSnapshot().value?.notificationMode !== "never"
 		};
 		const toneSetting = {
 			field: "notificationSound",
@@ -3082,7 +3195,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			canSave: (next) => {
 				const sounds = soundsSource.getSnapshot();
 				const config = source.getSnapshot();
-				return config.value?.notificationsEnabled === true && config.value?.notificationSoundEnabled === true && sounds.status === "ready" && !sounds.playing && !!sounds.value?.sounds.some((sound) => sound.id === next);
+				return config.value?.notificationsEnabled === true && config.value.notificationMode !== "never" && config.value?.notificationSoundEnabled === true && sounds.status === "ready" && !sounds.playing && !!sounds.value?.sounds.some((sound) => sound.id === next);
 			},
 			save: async (next, { mounted }) => {
 				if (typeof next === "string" && source.getSnapshot().value?.notificationSound !== next) await savePreference("notificationSound", next, "notificationUnavailable", "string");
@@ -3096,8 +3209,13 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				"never",
 				"background",
 				"always"
-			].includes(String(next)) && source.getSnapshot().value?.notificationsEnabled === true,
-			save: (next) => savePreference("notificationMode", String(next), "notificationUnavailable", "string")
+			].includes(String(next)),
+			save: async (next) => {
+				if (next === "never") return setNotificationsEnabled(false);
+				if (!await ensurePermission()) return;
+				await savePreference("notificationMode", String(next), "notificationUnavailable", "string");
+				if (source.getSnapshot().value?.notificationsEnabled !== true) await setNotificationsEnabled(true);
+			}
 		};
 		function useSettings({ snapshot, disabled, saving, error, save, id }) {
 			const sounds = useSnapshot(soundsSource);
@@ -3109,30 +3227,60 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				loadSystemSounds();
 			}, []);
 			React.useEffect(() => {
-				if (snapshot.value?.notificationsEnabled !== true) setSoundMenuOpen(false);
-			}, [snapshot.value?.notificationsEnabled]);
+				if (snapshot.value?.notificationsEnabled !== true || snapshot.value.notificationMode === "never") setSoundMenuOpen(false);
+			}, [snapshot.value?.notificationsEnabled, snapshot.value?.notificationMode]);
 			const soundName = (sound) => sound.id === "default" ? t("notificationSoundDefault") : sound.id.startsWith("win:") ? t(`sound${sound.id.slice(4)}`) : sound.name;
-			const mode = snapshot.value?.notificationMode || "background";
+			const mode = snapshot.value?.notificationsEnabled === true ? snapshot.value.notificationMode || "background" : "never";
 			function modeRow() {
-				if (snapshot.value?.notificationsEnabled !== true) return null;
 				const busy = saving?.field === "notificationMode";
 				const modeLabel = (value) => t(value === "always" ? "notificationAlways" : value === "never" ? "notificationNever" : "notificationBackground");
+				const failed = error?.field === "notificationMode";
 				return h("div", {
 					className: "power-dsh-setting-row",
 					key: "notificationMode"
 				}, h("div", { className: "power-dsh-setting-copy" }, h("div", {
 					id: `${id}-notificationMode-label`,
 					className: "power-dsh-setting-label"
-				}, t("notificationMode")), h("div", {
+				}, t("notificationsEnabled")), h("div", {
 					id: `${id}-notificationMode-description`,
 					className: "power-dsh-description"
-				}, t("notificationModeDescription")), error?.field === "notificationMode" && errorFeedback({
+				}, t("notificationsDescription")), failed ? errorFeedback({
 					t,
 					id: `${id}-notificationMode-error`,
 					message: error.message,
 					code: "PD-NOTIFICATION-MODE",
 					operation: "settings.notificationMode"
-				})), h(Menu, {
+				}) : notifications.error && errorFeedback({
+					t,
+					id: `${id}-notificationMode-error`,
+					message: t(notifications.error),
+					code: "PD-NOTIFICATION-DELIVERY",
+					operation: "notifications.deliver",
+					context: {
+						stage: "transport",
+						actual: `${channel.status}:${channel.value?.platform || "browser"}:${channel.value?.version || "unknown"}`,
+						expected: `${usesNativeNotifications() ? "winrt" : "browser"}:${env.pluginVersion}`
+					}
+				})), h("div", { className: "power-dsh-notification-controls" }, h("button", {
+					type: "button",
+					className: "power-dsh-notification-test",
+					disabled: disabled || busy || !notificationReady || !transportReady() || channel.testing || mode === "never",
+					title: t(channel.tested ? "notificationTestSent" : "notificationTest"),
+					"aria-label": t("notificationTest"),
+					"aria-busy": channel.testing,
+					onClick: testNotification
+				}, h("svg", {
+					width: 16,
+					height: 16,
+					viewBox: "0 0 24 24",
+					fill: "none",
+					stroke: "currentColor",
+					strokeWidth: 1.5,
+					strokeLinecap: "round",
+					strokeLinejoin: "round",
+					"aria-hidden": true,
+					focusable: false
+				}, channel.tested ? h("path", { d: "m5 12 4 4L19 6" }) : h(React.Fragment, null, h("path", { d: "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" })))), h(Menu, {
 					open: modeMenuOpen && !disabled && !busy,
 					onClose: () => setModeMenuOpen(false),
 					selectedId: mode,
@@ -3156,43 +3304,33 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 						type: "button",
 						className: "power-dsh-mode-select",
 						disabled: disabled || busy,
-						"aria-label": t("notificationMode"),
+						"aria-label": t("notificationsEnabled"),
 						"aria-haspopup": "menu",
 						"aria-expanded": modeMenuOpen && !disabled && !busy,
-						"aria-describedby": `${id}-notificationMode-description${error?.field === "notificationMode" ? ` ${id}-notificationMode-error` : ""}`,
-						"aria-invalid": error?.field === "notificationMode",
+						"aria-describedby": `${id}-notificationMode-description${failed || notifications.error ? ` ${id}-notificationMode-error` : ""}`,
+						"aria-invalid": Boolean(failed || notifications.error),
 						"aria-busy": busy,
 						onClick: () => {
 							if (!disabled && !busy) setModeMenuOpen(true);
 						}
 					}, modeLabel(mode))
-				}));
+				})));
 			}
 			const testNotification = async () => {
 				const current = source.getSnapshot();
 				if (!active || current.status !== "ready" || !current.writable || current.value?.notificationsEnabled !== true || current.value.notificationMode === "never" || !transportReady() || transport.testing || !testSender) return;
-				publishTransport({ testing: true });
+				publishTransport({
+					testing: true,
+					tested: false
+				});
 				try {
 					await testSender();
 				} finally {
 					if (active) publishTransport({ testing: false });
 				}
 			};
-			function transportRow() {
-				if (snapshot.value?.notificationsEnabled !== true) return null;
-				return h("div", {
-					className: "power-dsh-setting-row",
-					key: "notificationTransport"
-				}, h("div", { className: "power-dsh-setting-copy" }, h("div", { className: "power-dsh-setting-label" }, t("notificationTest")), h("div", { className: "power-dsh-description" }, `${t(channel.status !== "ready" ? "notificationTransportPending" : usesNativeNotifications() ? "notificationNative" : "notificationBrowser")} · PowerDSH ${channel.value?.version || env.pluginVersion}`)), h(runtime.Button, {
-					size: "sm",
-					variant: "outline",
-					disabled: disabled || !transportReady() || channel.testing || mode === "never",
-					"aria-busy": channel.testing,
-					onClick: testNotification
-				}, t("notificationTest")));
-			}
 			function soundRow() {
-				if (snapshot.value?.notificationsEnabled !== true) return null;
+				if (mode === "never") return null;
 				const field = "notificationSoundEnabled";
 				const control = `${id}-${field}`;
 				const busy = saving?.field === field;
@@ -3227,7 +3365,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					"aria-describedby": `${control}-description${error?.field === field ? ` ${control}-error` : ""}`,
 					"aria-invalid": error?.field === field,
 					"aria-busy": busy,
-					disabled: disabled || !snapshot.value?.notificationsEnabled,
+					disabled: disabled || busy || !snapshot.value?.notificationsEnabled,
 					onClick: () => {
 						setSoundMenuOpen(false);
 						return save(field, !checked);
@@ -3318,19 +3456,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				}))))));
 			}
 			return [
-				{
-					...mainSetting,
-					failure: notifications.error ? {
-						message: t(notifications.error),
-						code: "PD-NOTIFICATION-DELIVERY",
-						operation: "notifications.deliver",
-						context: {
-							stage: "transport",
-							actual: `${channel.status}:${channel.value?.platform || "browser"}:${channel.value?.version || "unknown"}`,
-							expected: `${usesNativeNotifications() ? "winrt" : "browser"}:${env.pluginVersion}`
-						}
-					} : void 0
-				},
+				mainSetting,
 				{
 					...modeSetting,
 					hidden: false,
@@ -3340,11 +3466,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					...soundSetting,
 					render: soundRow
 				},
-				{
-					...toneSetting,
-					hidden: false,
-					render: transportRow
-				}
+				toneSetting
 			];
 		}
 		return {
@@ -3391,6 +3513,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"notificationBackground": "When not focused",
 			"notificationAlways": "Always",
 			"notificationTest": "Send test notification",
+			"notificationTestSent": "Submitted to the system",
+			"notificationTestUnconfirmed": "Notification delivery has not been confirmed. Check Notification Center, Focus, and notifications during screen sharing.",
 			"notificationTestBody": "PowerDSH notification delivery test",
 			"notificationNative": "Windows native notifications",
 			"notificationTransportPending": "Notification channel unconfirmed",
@@ -3422,6 +3546,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"notificationBody": "Return to DSH to view the task.",
 			"notificationUnsupported": "Desktop notifications are unavailable in this environment.",
 			"notificationPermission": "Allow notifications for DSH in your browser or system settings, then try again.",
+			"notificationIdentity": "The Windows notification identity for DSH is missing, ambiguous, or invalid. Check the DSH installation and restart, or have the launcher provide its registered DSH_APP_USER_MODEL_ID.",
+			"notificationNativePermission": "Windows has disabled DSH notifications. Allow them in system notification settings and try again.",
 			"notificationFailed": "Could not deliver the notification. Check browser and system notification settings.",
 			"notificationUnavailable": "Task notifications have not loaded yet. Re-enable power-dsh, then try again."
 		},
@@ -3432,6 +3558,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"notificationBackground": "仅在未聚焦时提醒",
 			"notificationAlways": "始终提醒",
 			"notificationTest": "发送测试通知",
+			"notificationTestSent": "已交给系统",
+			"notificationTestUnconfirmed": "尚未确认通知投递，请检查通知中心、专注模式和共享屏幕时的通知设置。",
 			"notificationTestBody": "PowerDSH 通知发送测试",
 			"notificationNative": "Windows 原生通知",
 			"notificationTransportPending": "通知通道尚未确认",
@@ -3463,6 +3591,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"notificationBody": "返回 DSH 查看任务。",
 			"notificationUnsupported": "当前环境不支持桌面通知。",
 			"notificationPermission": "请在浏览器或系统设置中允许 DSH 发送通知后重试。",
+			"notificationIdentity": "无法确定有效的 Windows DSH 通知身份。请核对 DSH 安装并重启，或由启动器提供已注册的 DSH_APP_USER_MODEL_ID。",
+			"notificationNativePermission": "Windows 已禁用 DSH 通知，请在系统通知设置中允许后重试。",
 			"notificationFailed": "通知发送失败，请检查浏览器和系统通知设置。",
 			"notificationUnavailable": "任务通知尚未加载，请重新启用 power-dsh 后重试。"
 		}
@@ -3558,8 +3688,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			mode: "strict",
 			typeSymbol: "power-dsh#NotificationDelivery",
 			create: () => ({ parse(value) {
-				if (!isRecord(value) || typeof value.shown !== "boolean") throw new TypeError("Invalid notification delivery");
-				return { shown: value.shown };
+				if (!isRecord(value) || typeof value.shown !== "boolean" || value.reason !== void 0 && (!isOneOf(value.reason, ["identity", "disabled"]) || value.shown)) throw new TypeError("Invalid notification delivery");
+				return {
+					shown: value.shown,
+					...value.reason === void 0 ? {} : { reason: value.reason }
+				};
 			} })
 		}
 	};
@@ -10350,7 +10483,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			definition: definition$21,
 			create: createClientFeature$21,
 			locales: locales$22,
-			rpc: []
+			rpc: rpc$15
 		},
 		{
 			definition: definition$6,
@@ -10571,6 +10704,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		return descriptors;
 	}
 	const MOD_RPC = composeRpc([
+		READ_PLUGIN_RELEASE_RPC,
 		NOTIFICATION_TRANSPORT_RPC,
 		RESTART_STATUS_RPC,
 		RESTART_APP_RPC,
@@ -10667,7 +10801,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 							t,
 							version,
 							namespace,
-							pluginVersion: "0.0.6",
+							pluginVersion: "0.0.7",
 							savePreference,
 							preferenceSlot: preferenceSlot$1,
 							get footerBusy() {

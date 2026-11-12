@@ -51,8 +51,9 @@ export const SHOW_WINDOWS_NOTIFICATION_RPC: RpcDescriptor<'showWindowsNotificati
     mode: 'strict', typeSymbol: 'power-dsh#WindowsNotification', create: () => ({ parse: parseWindowsNotification }),
   } }],
   result: { mode: 'strict', typeSymbol: 'power-dsh#NotificationDelivery', create: () => ({ parse(value) {
-    if (!isRecord(value) || typeof value.shown !== 'boolean') throw new TypeError('Invalid notification delivery');
-    return { shown: value.shown };
+    if (!isRecord(value) || typeof value.shown !== 'boolean'
+      || (value.reason !== undefined && (!isOneOf(value.reason, ['identity', 'disabled']) || value.shown))) throw new TypeError('Invalid notification delivery');
+    return { shown: value.shown, ...(value.reason === undefined ? {} : { reason: value.reason }) };
   } }) },
 };
 export const CLEAR_WINDOWS_NOTIFICATIONS_RPC: RpcDescriptor<'clearWindowsNotifications', NotificationCleared> = {

@@ -152,6 +152,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       this.popupSuppressed = windows && Boolean(options.tag)
         && notifications.some(notification => notification.options.tag === options.tag);
       notifications.push(this);
+      queueMicrotask(() => { if (!this.closed) this.onshow?.(); });
     }
     close() { this.closed = true; this.onclose?.(); }
   }
@@ -478,6 +479,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       if (dependencies.includes('remote.powerDsh')) {
         ctx.remote.powerDsh = Object.fromEntries(rpcDescriptors.map(descriptor => [descriptor.method, async (...rpcArgs) => {
           const [blocked, revision, name, enabled] = rpcArgs;
+          if (descriptor.method === 'readPluginRelease') return { ok: true, value: { status: 'ready', version: '0.0.999', commit: 'a'.repeat(40) } };
           if (descriptor.method === 'notificationTransport') return notificationTransportReply ? await notificationTransportReply() : {
             ok: true, value: { platform: windows ? 'win32' : 'darwin', nativeAvailable: windows, version: pluginVersion },
           };
@@ -868,8 +870,8 @@ export function notificationSession({ id = 'task', seq = -1, reason = '', runnin
     projectionValues: { powerDshNotifications: { seq, turn: 1, reason } }, ...rest };
 }
 
-export function notificationSwitch(app) {
-  return descendants(app.selectSettingsTab('general')).find(node => node.props.id === 'settings-test-notificationsEnabled');
+export function notificationMenu(app) {
+  return descendants(app.selectSettingsTab('general')).find(node => node.type === 'native-menu-fixture' && node.props.items?.some(item => item.id === 'always'));
 }
 
 export async function loadedSoundSettings(app) {

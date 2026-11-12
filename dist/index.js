@@ -72,6 +72,210 @@ const definition$21 = Object.freeze({
 var config_exports$21 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$21 });
 const configFields$21 = { pluginUpdatesEnabled: z.boolean().default(true).volatile() };
 
+// src/features/plugin-updates/versions.ts
+function versionParts(value) {
+	if (typeof value !== "string" || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value)) return null;
+	const parts = value.split(".").map(Number);
+	return parts.every(Number.isSafeInteger) ? parts : null;
+}
+
+// src/features/plugin-updates/releases.ts
+const REPOSITORY = "https://github.com/mewcoder/power-dsh";
+function releaseCommits(text) {
+	const tags = /* @__PURE__ */ new Map();
+	for (const line of text.split(/\r?\n/)) {
+		const match = /^([a-f0-9]{40})\trefs\/tags\/v([^/\s^]+)(\^\{\})?$/.exec(line);
+		if (!match || !versionParts(match[2])) continue;
+		const entry = tags.get(match[2]) ?? { tag: "" };
+		if (match[3]) entry.commit = match[1];
+		else entry.tag = match[1];
+		tags.set(match[2], entry);
+	}
+	return new Map([...tags].filter(([, value]) => value.tag).map(([version, value]) => [version, value.commit ?? value.tag]));
+}
+var PluginReleases = class {
+	ctx;
+	config;
+	fetch;
+	controller = null;
+	handle = null;
+	retryAt = 0;
+	closed = false;
+	constructor(ctx, config, request = fetch) {
+		this.ctx = ctx;
+		this.config = config;
+		this.fetch = request;
+		ctx.effect(() => () => this.close());
+	}
+	async head(url, signal) {
+		const response = await this.fetch(url, {
+			method: "HEAD",
+			redirect: "manual",
+			credentials: "omit",
+			signal
+		});
+		if (response.status === 429 || response.status === 403 && (response.headers.get("x-ratelimit-remaining") === "0" || response.headers.has("retry-after"))) {
+			const now = Date.now();
+			const retry = response.headers.get("retry-after") || "";
+			const deadline = /^\d+$/.test(retry) ? now + Number(retry) * 1e3 : Date.parse(retry);
+			this.retryAt = Math.min(now + 864e5, Math.max(now + 6e4, Number.isFinite(deadline) ? deadline : 0));
+			throw new Error("rate-limited");
+		}
+		return response;
+	}
+	async read() {
+		if (this.closed || this.config.pluginUpdatesEnabled.get() !== true) return { status: "unavailable" };
+		if (this.retryAt > Date.now()) return {
+			status: "rate-limited",
+			retryAt: this.retryAt
+		};
+		const subprocess = this.ctx.get("subprocess");
+		if (!subprocess) return { status: "git-unavailable" };
+		const controller = this.controller = new AbortController();
+		const timer = setTimeout(() => controller.abort(), 2e4);
+		const stopped = new Promise((_resolve, reject) => {
+			controller.signal.addEventListener("abort", () => reject(/* @__PURE__ */ new Error("unavailable")), { once: true });
+		});
+		try {
+			let executable;
+			try {
+				executable = await Promise.race([subprocess.resolveExecutable("git", void 0, controller.signal), stopped]);
+			} catch (_error) {
+				return { status: controller.signal.aborted ? "unavailable" : "git-unavailable" };
+			}
+			if (this.closed || this.config.pluginUpdatesEnabled.get() !== true) return { status: "unavailable" };
+			const handle = this.handle = subprocess.spawn({
+				argv: [
+					executable,
+					"-c",
+					"credential.helper=",
+					"-c",
+					"core.askPass=",
+					"ls-remote",
+					"--tags",
+					`${REPOSITORY}.git`,
+					"refs/tags/v*"
+				],
+				env: {
+					GIT_TERMINAL_PROMPT: "0",
+					GIT_CONFIG_NOSYSTEM: "1",
+					GIT_CONFIG_COUNT: "0",
+					GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null"
+				},
+				cwd: process.cwd(),
+				graceMs: 250,
+				signal: controller.signal,
+				stdio: {
+					stdin: "ignore",
+					stdout: { maxBytes: 65536 },
+					stderr: { maxBytes: 4096 }
+				}
+			});
+			const outcome = await Promise.race([handle.done, stopped]);
+			if (!await Promise.race([handle.waitForExit(controller.signal), stopped]) || outcome.exitCode !== 0 || outcome.signal !== null) throw new Error("unavailable");
+			const output = handle.collected?.stdout?.readFrom(0);
+			if (!output || output.lossy || output.text.length > 65536) throw new Error("unavailable");
+			const tags = releaseCommits(output.text);
+			controller.signal.throwIfAborted();
+			if (this.config.pluginUpdatesEnabled.get() !== true) return { status: "unavailable" };
+			const latest = await this.head(`${REPOSITORY}/releases/latest`, controller.signal);
+			controller.signal.throwIfAborted();
+			const location = latest.headers.get("location") || "";
+			const version = location.startsWith(`${REPOSITORY}/releases/tag/v`) ? location.slice(`${REPOSITORY}/releases/tag/v`.length) : "";
+			if (latest.status !== 302 || !versionParts(version) || !tags.has(version)) throw new Error("unavailable");
+			if (this.config.pluginUpdatesEnabled.get() !== true) return { status: "unavailable" };
+			const asset = await this.head(`${REPOSITORY}/releases/download/v${version}/power-dsh.tgz`, controller.signal);
+			const assetUrl = new URL(asset.headers.get("location") || "");
+			if (asset.status !== 302 || assetUrl.protocol !== "https:" || assetUrl.hostname !== "release-assets.githubusercontent.com" || assetUrl.username || assetUrl.password) throw new Error("unavailable");
+			controller.signal.throwIfAborted();
+			if (this.closed || this.config.pluginUpdatesEnabled.get() !== true) return { status: "unavailable" };
+			return {
+				status: "ready",
+				version,
+				commit: tags.get(version)
+			};
+		} catch (error) {
+			return error instanceof Error && error.message === "rate-limited" ? {
+				status: "rate-limited",
+				retryAt: this.retryAt
+			} : { status: "unavailable" };
+		} finally {
+			clearTimeout(timer);
+			controller.abort();
+			this.handle?.terminate();
+			this.handle = null;
+			if (this.controller === controller) this.controller = null;
+		}
+	}
+	close() {
+		this.closed = true;
+		this.controller?.abort();
+		this.handle?.terminate();
+	}
+};
+
+// src/features/plugin-updates/host.ts
+var host_exports$15 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$15,
+	methods: () => methods$15
+});
+function createHost$15(ctx, config) {
+	return { pluginReleases: new PluginReleases(ctx, config) };
+}
+const methods$15 = { readPluginRelease() {
+	return this.run(() => this.pluginReleases.read());
+} };
+
+// src/shared/types/protocol.ts
+function isArray(value) {
+	return Array.isArray(value);
+}
+function isStringArray(value) {
+	return isArray(value) && value.every((item) => typeof item === "string");
+}
+/** Validate external wire objects before reading their fields. */
+function isRecord$1(value) {
+	return typeof value === "object" && value !== null;
+}
+function hasStrings(value, keys) {
+	return keys.every((key) => typeof value[key] === "string");
+}
+function hasBooleans(value, keys) {
+	return keys.every((key) => typeof value[key] === "boolean");
+}
+function isOneOf(value, values) {
+	return typeof value === "string" && values.includes(value);
+}
+
+// src/features/plugin-updates/rpc.ts
+const READ_PLUGIN_RELEASE_RPC = {
+	id: "power-dsh#powerDsh/readPluginRelease",
+	service: "powerDsh",
+	namespace: "powerDsh",
+	method: "readPluginRelease",
+	invocation: { kind: "direct" },
+	parameters: [],
+	result: {
+		mode: "strict",
+		typeSymbol: "power-dsh#PluginRelease",
+		create: () => ({ parse(value) {
+			if (!isRecord$1(value)) throw new TypeError("Invalid plugin release");
+			if (value.status === "ready" && typeof value.version === "string" && versionParts(value.version) && typeof value.commit === "string" && /^[a-f0-9]{40}$/.test(value.commit)) return {
+				status: "ready",
+				version: value.version,
+				commit: value.commit
+			};
+			if (isOneOf(value.status, ["unavailable", "git-unavailable"])) return { status: value.status };
+			if (value.status === "rate-limited" && Number.isSafeInteger(value.retryAt) && Number(value.retryAt) > 0) return {
+				status: value.status,
+				retryAt: Number(value.retryAt)
+			};
+			throw new TypeError("Invalid plugin release");
+		} })
+	}
+};
+const rpc$15 = [READ_PLUGIN_RELEASE_RPC];
+
 // src/features/version-display/definition.ts
 const definition$20 = Object.freeze({
 	id: "version-display",
@@ -368,27 +572,6 @@ const methods$14 = {
 		return this.run(() => this.restart.restart());
 	}
 };
-
-// src/shared/types/protocol.ts
-function isArray(value) {
-	return Array.isArray(value);
-}
-function isStringArray(value) {
-	return isArray(value) && value.every((item) => typeof item === "string");
-}
-/** Validate external wire objects before reading their fields. */
-function isRecord$1(value) {
-	return typeof value === "object" && value !== null;
-}
-function hasStrings(value, keys) {
-	return keys.every((key) => typeof value[key] === "string");
-}
-function hasBooleans(value, keys) {
-	return keys.every((key) => typeof value[key] === "boolean");
-}
-function isOneOf(value, values) {
-	return typeof value === "string" && values.includes(value);
-}
 
 // src/features/restart-button/rpc.ts
 const RESTART_STATUS_RPC = {
@@ -780,8 +963,11 @@ const SHOW_WINDOWS_NOTIFICATION_RPC = {
 		mode: "strict",
 		typeSymbol: "power-dsh#NotificationDelivery",
 		create: () => ({ parse(value) {
-			if (!isRecord$1(value) || typeof value.shown !== "boolean") throw new TypeError("Invalid notification delivery");
-			return { shown: value.shown };
+			if (!isRecord$1(value) || typeof value.shown !== "boolean" || value.reason !== void 0 && (!isOneOf(value.reason, ["identity", "disabled"]) || value.shown)) throw new TypeError("Invalid notification delivery");
+			return {
+				shown: value.shown,
+				...value.reason === void 0 ? {} : { reason: value.reason }
+			};
 		} })
 	}
 };
@@ -844,9 +1030,40 @@ const rpc$13 = [
 ];
 
 // src/features/notifications/windows-toasts.ts
+function windowsToastIdentityScript() {
+	return String.raw`function Resolve-ToastAppId {
+  param([string]$configured)
+  if (-not [string]::IsNullOrWhiteSpace($configured)) {
+    $configured = $configured.Trim()
+    if ($configured -notmatch '^[^\x00-\x1f\x7f]{1,128}$') { throw 'PD_NOTIFICATION_IDENTITY' }
+    return $configured
+  }
+  $identities = @()
+  foreach ($candidate in @('electron.app.DeepSeek Harness', 'com.deepseek.dsh')) {
+    foreach ($root in @('Registry::HKEY_CURRENT_USER\Software\Classes\AppUserModelId\', 'Registry::HKEY_LOCAL_MACHINE\Software\Classes\AppUserModelId\')) {
+      if (Test-Path -LiteralPath ($root + $candidate) -ErrorAction SilentlyContinue) { $identities += $candidate }
+    }
+  }
+  try {
+    $applications = @(Get-StartApps -ErrorAction Stop | Where-Object { $_.Name -eq 'DeepSeek Harness' })
+    foreach ($application in $applications) { $identities += [string]$application.AppID }
+  } catch {}
+  $identities = @($identities | Where-Object { $_ -match '^[^\x00-\x1f\x7f]{1,128}$' } | Select-Object -Unique)
+  if ($identities.Count -ne 1) { throw 'PD_NOTIFICATION_IDENTITY' }
+  return [string]$identities[0]
+}`;
+}
 function windowsToastScript(command) {
+	const data = Buffer$1.from(JSON.stringify(command), "utf8").toString("base64");
 	return `$ErrorActionPreference = 'Stop'
-$data = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${Buffer$1.from(JSON.stringify(command), "utf8").toString("base64")}')) | ConvertFrom-Json
+trap {
+  if ($_.Exception.Message -eq 'PD_NOTIFICATION_IDENTITY') { exit 21 }
+  if ($_.Exception.Message -eq 'PD_NOTIFICATION_DISABLED') { exit 22 }
+  exit 23
+}
+${windowsToastIdentityScript()}
+$data = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${data}')) | ConvertFrom-Json
+$data.appId = Resolve-ToastAppId ([string]$data.appId)
 $null = [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]
 $null = [Windows.UI.Notifications.ToastNotification, Windows.UI.Notifications, ContentType = WindowsRuntime]
 $null = [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]
@@ -863,8 +1080,10 @@ if ($null -ne $data.groups) {
   $toast.Group = [string]$data.group
   $toast.Tag = [string]$data.tag
   $toast.SuppressPopup = $false
-  $notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier([string]$data.appId)
-  if ($notifier.Setting.ToString() -ne 'Enabled') { throw 'Notifications are disabled' }
+  try { $notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier([string]$data.appId) }
+  catch { throw 'PD_NOTIFICATION_IDENTITY' }
+  if ($null -eq $notifier) { throw 'PD_NOTIFICATION_IDENTITY' }
+  if ($notifier.Setting.ToString() -ne 'Enabled') { throw 'PD_NOTIFICATION_DISABLED' }
   $notifier.Show($toast)
 }`;
 }
@@ -890,13 +1109,14 @@ var WindowsToasts = class {
 		this.ctx = ctx;
 		this.config = config;
 		this.platform = options.platform ?? process.platform;
-		this.appId = options.appId ?? process.env.DSH_APP_USER_MODEL_ID ?? "com.deepseek.dsh";
+		this.appId = (options.appId ?? process.env.DSH_APP_USER_MODEL_ID ?? "").trim();
 		this.timeoutMs = options.timeoutMs ?? 1e4;
 		ctx.effect(() => () => this.close());
 	}
 	async execute(command, allowed = () => true) {
 		const subprocess = this.ctx.get("subprocess");
-		if (this.platform !== "win32" || !subprocess || !/^[a-zA-Z0-9._-]{1,128}$/.test(this.appId)) throw new Error("notificationUnsupported");
+		if (this.platform !== "win32" || !subprocess) throw new Error("notificationUnsupported");
+		if (this.appId && !/^[^\u0000-\u001f\u007f]{1,128}$/.test(this.appId)) throw new Error("notificationIdentity");
 		const operation = { controller: new AbortController() };
 		this.current = operation;
 		const timer = setTimeout(() => operation.controller.abort(), this.timeoutMs);
@@ -929,11 +1149,13 @@ var WindowsToasts = class {
 				}
 			});
 			const outcome = await Promise.race([operation.handle.done, stopped]);
-			if (!await Promise.race([operation.handle.waitForExit(operation.controller.signal), stopped]) || outcome.exitCode !== 0 || outcome.signal !== null) throw new Error("notificationFailed");
+			if (!await Promise.race([operation.handle.waitForExit(operation.controller.signal), stopped]) || outcome.signal !== null) throw new Error("notificationFailed");
+			if (outcome.exitCode !== 0) throw new Error(outcome.exitCode === 21 ? "notificationIdentity" : outcome.exitCode === 22 ? "notificationNativePermission" : "notificationFailed");
 			operation.controller.signal.throwIfAborted();
 			return true;
-		} catch (_error) {
+		} catch (error) {
 			operation.controller.abort();
+			if (error instanceof Error && ["notificationIdentity", "notificationNativePermission"].includes(error.message)) throw error;
 			throw new Error("notificationFailed");
 		} finally {
 			clearTimeout(timer);
@@ -963,6 +1185,16 @@ var WindowsToasts = class {
 				tag: notification.tag,
 				xml
 			}, () => current() && this.config.notificationsEnabled.get() === true && (notification.preview || this.config.notificationMode?.get() !== "never") && this.config.notificationSoundEnabled.get() === soundEnabled && (this.config.notificationSound.get() || "default") === sound) };
+		}).catch((error) => {
+			if (error instanceof Error && error.message === "notificationIdentity") return {
+				shown: false,
+				reason: "identity"
+			};
+			if (error instanceof Error && error.message === "notificationNativePermission") return {
+				shown: false,
+				reason: "disabled"
+			};
+			throw error;
 		});
 	}
 	clear(group, tag) {
@@ -997,7 +1229,7 @@ var WindowsToasts = class {
 };
 
 // package.json
-var version = "0.0.6";
+var version = "0.0.7";
 
 // src/features/notifications/host.ts
 var host_exports$13 = /* @__PURE__ */ __exportAll({
@@ -5516,7 +5748,9 @@ const rpc = [LIST_PROJECTS_RPC, REMOVE_PROJECT_RPC];
 const HOST_FEATURES = Object.freeze([
 	{
 		definition: definition$21,
-		...config_exports$21
+		...config_exports$21,
+		...host_exports$15,
+		rpc: rpc$15
 	},
 	{
 		definition: definition$20,
@@ -5647,6 +5881,7 @@ function composeRpc(descriptors) {
 	return descriptors;
 }
 const MOD_RPC = composeRpc([
+	READ_PLUGIN_RELEASE_RPC,
 	NOTIFICATION_TRANSPORT_RPC,
 	RESTART_STATUS_RPC,
 	RESTART_APP_RPC,

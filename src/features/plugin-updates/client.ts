@@ -13,6 +13,12 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   const updates = new PluginUpdateClient({
     version: pluginVersion, baseURI: document.baseURI, canUse, storage,
     fetch: (...args) => fetch(...args), notify: () => updateSource.notify(),
+    release: async signal => {
+      const reply = await ctx.remote.powerDsh.readPluginRelease();
+      signal.throwIfAborted();
+      if (!reply.ok) throw new Error('pluginUpdateCheckFailed');
+      return reply.value;
+    },
     schedule: (callback, milliseconds) => window.setTimeout(callback, milliseconds), cancel: timer => window.clearTimeout(timer),
   });
   const updateSource = observable(() => updates.state);
@@ -49,6 +55,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             onClick: () => { if (canUse() && updates.state.target) { confirmation.current = { target: updates.state.target }; setConfirming(updates.state.target); } },
           }, `${t('pluginUpdateAction')} ${state.target.version}`))),
       state.target && h('a', { href: state.target.url, target: '_blank', rel: 'noopener noreferrer' }, t('pluginUpdateReleaseNotes')),
+      !state.target && ['pluginUpdateRateLimited', 'pluginUpdateGitUnavailable'].includes(state.error)
+        && h('a', { href: 'https://github.com/mewcoder/power-dsh/releases', target: '_blank', rel: 'noopener noreferrer' }, t('pluginUpdateReleaseNotes')),
       ['current', 'unconfirmed', 'updating', 'done'].includes(state.phase) && h('p', { className: 'power-dsh-description', role: 'status' },
         state.phase === 'done' ? `${t('pluginUpdateDone')} ${state.target?.version || ''}`
           : t(state.phase === 'current' ? 'pluginUpdateCurrent' : state.phase === 'unconfirmed' ? 'pluginUpdateUnconfirmed' : 'pluginUpdateRunning')),

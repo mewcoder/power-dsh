@@ -121,9 +121,11 @@ export interface WindowsNotification {
   group: string; tag: string; title: string; body: string;
   attention: boolean; preview: boolean; dismiss: string;
 }
-export interface NotificationDelivery { shown: boolean }
+export interface NotificationDelivery { shown: boolean; reason?: 'identity' | 'disabled' }
 export interface NotificationCleared { cleared: boolean }
 export interface NotificationTransport { platform: 'win32' | 'darwin' | 'other'; nativeAvailable: boolean; version: string }
+export type PluginRelease = { status: 'ready'; version: string; commit: string }
+  | { status: 'unavailable' | 'git-unavailable' } | { status: 'rate-limited'; retryAt: number };
 
 export interface RestartStatus {
   supported: boolean;

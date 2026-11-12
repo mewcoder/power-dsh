@@ -9,10 +9,41 @@ interface ToastOptions { platform?: string; appId?: string; timeoutMs?: number }
 interface ToastOperation { controller: AbortController; handle?: NativeSubprocessHandle }
 interface ToastCommand { appId: string; group?: string; tag?: string; xml?: string; groups?: string[] }
 
+export function windowsToastIdentityScript() {
+  return String.raw`function Resolve-ToastAppId {
+  param([string]$configured)
+  if (-not [string]::IsNullOrWhiteSpace($configured)) {
+    $configured = $configured.Trim()
+    if ($configured -notmatch '^[^\x00-\x1f\x7f]{1,128}$') { throw 'PD_NOTIFICATION_IDENTITY' }
+    return $configured
+  }
+  $identities = @()
+  foreach ($candidate in @('electron.app.DeepSeek Harness', 'com.deepseek.dsh')) {
+    foreach ($root in @('Registry::HKEY_CURRENT_USER\Software\Classes\AppUserModelId\', 'Registry::HKEY_LOCAL_MACHINE\Software\Classes\AppUserModelId\')) {
+      if (Test-Path -LiteralPath ($root + $candidate) -ErrorAction SilentlyContinue) { $identities += $candidate }
+    }
+  }
+  try {
+    $applications = @(Get-StartApps -ErrorAction Stop | Where-Object { $_.Name -eq 'DeepSeek Harness' })
+    foreach ($application in $applications) { $identities += [string]$application.AppID }
+  } catch {}
+  $identities = @($identities | Where-Object { $_ -match '^[^\x00-\x1f\x7f]{1,128}$' } | Select-Object -Unique)
+  if ($identities.Count -ne 1) { throw 'PD_NOTIFICATION_IDENTITY' }
+  return [string]$identities[0]
+}`;
+}
+
 export function windowsToastScript(command: ToastCommand) {
   const data = Buffer.from(JSON.stringify(command), 'utf8').toString('base64');
   return `$ErrorActionPreference = 'Stop'
+trap {
+  if ($_.Exception.Message -eq 'PD_NOTIFICATION_IDENTITY') { exit 21 }
+  if ($_.Exception.Message -eq 'PD_NOTIFICATION_DISABLED') { exit 22 }
+  exit 23
+}
+${windowsToastIdentityScript()}
 $data = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${data}')) | ConvertFrom-Json
+$data.appId = Resolve-ToastAppId ([string]$data.appId)
 $null = [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]
 $null = [Windows.UI.Notifications.ToastNotification, Windows.UI.Notifications, ContentType = WindowsRuntime]
 $null = [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]
@@ -29,8 +60,10 @@ if ($null -ne $data.groups) {
   $toast.Group = [string]$data.group
   $toast.Tag = [string]$data.tag
   $toast.SuppressPopup = $false
-  $notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier([string]$data.appId)
-  if ($notifier.Setting.ToString() -ne 'Enabled') { throw 'Notifications are disabled' }
+  try { $notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier([string]$data.appId) }
+  catch { throw 'PD_NOTIFICATION_IDENTITY' }
+  if ($null -eq $notifier) { throw 'PD_NOTIFICATION_IDENTITY' }
+  if ($notifier.Setting.ToString() -ne 'Enabled') { throw 'PD_NOTIFICATION_DISABLED' }
   $notifier.Show($toast)
 }`;
 }
@@ -54,16 +87,17 @@ export class WindowsToasts {
     this.ctx = ctx;
     this.config = config;
     this.platform = options.platform ?? process.platform;
-    this.appId = options.appId ?? process.env.DSH_APP_USER_MODEL_ID ?? 'com.deepseek.dsh';
+    this.appId = (options.appId ?? process.env.DSH_APP_USER_MODEL_ID ?? '').trim();
     this.timeoutMs = options.timeoutMs ?? 10_000;
     ctx.effect(() => () => this.close());
   }
 
   async execute(command: Omit<ToastCommand, 'appId'>, allowed = () => true) {
     const subprocess = this.ctx.get('subprocess');
-    if (this.platform !== 'win32' || !subprocess || !/^[a-zA-Z0-9._-]{1,128}$/.test(this.appId)) {
+    if (this.platform !== 'win32' || !subprocess) {
       throw new Error('notificationUnsupported');
     }
+    if (this.appId && !/^[^\u0000-\u001f\u007f]{1,128}$/.test(this.appId)) throw new Error('notificationIdentity');
     const operation: ToastOperation = { controller: new AbortController() };
     this.current = operation;
     const timer = setTimeout(() => operation.controller.abort(), this.timeoutMs);
@@ -84,11 +118,14 @@ export class WindowsToasts {
       });
       const outcome = await Promise.race([operation.handle.done, stopped]);
       if (!await Promise.race([operation.handle.waitForExit(operation.controller.signal), stopped])
-        || outcome.exitCode !== 0 || outcome.signal !== null) throw new Error('notificationFailed');
+        || outcome.signal !== null) throw new Error('notificationFailed');
+      if (outcome.exitCode !== 0) throw new Error(outcome.exitCode === 21 ? 'notificationIdentity'
+        : outcome.exitCode === 22 ? 'notificationNativePermission' : 'notificationFailed');
       operation.controller.signal.throwIfAborted();
       return true;
-    } catch (_error) {
+    } catch (error) {
       operation.controller.abort();
+      if (error instanceof Error && ['notificationIdentity', 'notificationNativePermission'].includes(error.message)) throw error;
       throw new Error('notificationFailed');
     } finally {
       clearTimeout(timer);
@@ -120,6 +157,10 @@ export class WindowsToasts {
         current() && this.config.notificationsEnabled.get() === true && (notification.preview || this.config.notificationMode?.get() !== 'never')
         && this.config.notificationSoundEnabled.get() === soundEnabled && (this.config.notificationSound.get() || 'default') === sound);
       return { shown };
+    }).catch(error => {
+      if (error instanceof Error && error.message === 'notificationIdentity') return { shown: false, reason: 'identity' as const };
+      if (error instanceof Error && error.message === 'notificationNativePermission') return { shown: false, reason: 'disabled' as const };
+      throw error;
     });
   }
 

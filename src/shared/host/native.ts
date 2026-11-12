@@ -98,13 +98,14 @@ export interface NativeSettings {
   mutate(namespace: string, mutations: { op: 'set'; path: string[]; value: unknown }[], revision?: number): Promise<unknown>;
 }
 export interface NativeSubprocessHandle {
+  collected?: { stdout?: { readFrom(offset: number): { text: string; lossy: boolean } } };
   done: Promise<{ exitCode: number | null; signal: string | null }>;
   waitForExit(signal: AbortSignal): Promise<boolean>;
   terminate(): void;
 }
 export interface NativeSubprocess {
   resolveExecutable(name: string, options: undefined, signal: AbortSignal): Promise<string>;
-  spawn(options: { argv: string[]; cwd: string; graceMs: number; signal: AbortSignal; stdio: { stdin: 'ignore'; stdout: { maxBytes: number }; stderr: { maxBytes: number } } }): NativeSubprocessHandle;
+  spawn(options: { argv: string[]; cwd: string; graceMs: number; signal: AbortSignal; env?: Record<string, string>; stdio: { stdin: 'ignore'; stdout: { maxBytes: number }; stderr: { maxBytes: number } } }): NativeSubprocessHandle;
 }
 interface NativeServices {
   skills: NativeSkills; tools: NativeTools; settings: NativeSettings;

@@ -2,6 +2,7 @@ import type { ClientFeatureSelection } from '../shared/client/types.ts';
 import { createClientFeature as pluginUpdates } from '../features/plugin-updates/client.ts';
 import { definition as pluginUpdatesDefinition } from '../features/plugin-updates/definition.ts';
 import { locales as pluginUpdatesLocales } from '../features/plugin-updates/locales.ts';
+import { rpc as pluginUpdatesRpc } from '../features/plugin-updates/rpc.ts';
 // Explicit Client selection: each entry carries its UI factory, metadata, locale and wire contributions.
 import { createClientFeature as accountBlocking } from '../features/account-blocking/client.ts';
 import { definition as accountBlockingDefinition } from '../features/account-blocking/definition.ts';
@@ -83,7 +84,7 @@ import { locales as projectsLocales } from '../features/projects/locales.ts';
 import { rpc as projectsRpc } from '../features/projects/rpc.ts';
 
 export const clientFeatures: ClientFeatureSelection[] = [
-  { definition: pluginUpdatesDefinition, create: pluginUpdates, locales: pluginUpdatesLocales, rpc: [] },
+  { definition: pluginUpdatesDefinition, create: pluginUpdates, locales: pluginUpdatesLocales, rpc: pluginUpdatesRpc },
   { definition: versionDisplayDefinition, create: versionDisplay, locales: versionDisplayLocales, rpc: [] },
   { definition: appearanceShortcutDefinition, create: appearanceShortcut, locales: appearanceShortcutLocales, rpc: [] },
   { definition: refreshButtonDefinition, create: refreshButton, locales: refreshButtonLocales, rpc: [] },

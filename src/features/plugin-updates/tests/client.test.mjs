@@ -33,6 +33,17 @@ test('read-only settings cannot initiate update reads and unavailable API errors
   allowed.unmount();
 });
 
+test('rate-limit feedback offers the releases page and opening settings never performs update checks', async () => {
+  const app = await mount({ updateFetch: async url => url.endsWith('/capabilities')
+    ? new Response('', { status: 429 }) : assert.fail(`Unexpected request: ${url}`) });
+  await descendants(app.renderSettings()).find(node => node.type === 'button' && node.props.children.includes('pluginUpdateCheck')).props.onClick();
+  const view = descendants(app.renderSettings());
+  assert.ok(view.some(node => node.props.role === 'alert' && node.props.children.includes('pluginUpdateRateLimited')));
+  const link = view.find(node => node.type === 'a' && node.props.href === 'https://github.com/mewcoder/power-dsh/releases');
+  assert.equal(link.props.rel, 'noopener noreferrer');
+  app.unmount();
+});
+
 test('checking and opening the confirmation never installs; only the current confirmed action submits once', async () => {
   const schema = 'dsh-market/update-api/v1';
   let posts = 0;

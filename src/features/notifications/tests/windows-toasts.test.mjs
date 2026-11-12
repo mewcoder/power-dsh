@@ -1,20 +1,21 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
-import { WindowsToasts, windowsToastScript } from '../windows-toasts.ts';
-import { parseWindowsNotification } from '../rpc.ts';
+import { WindowsToasts, windowsToastIdentityScript, windowsToastScript } from '../windows-toasts.ts';
+import { parseWindowsNotification, SHOW_WINDOWS_NOTIFICATION_RPC } from '../rpc.ts';
 
 const request = (patch = {}) => ({
   group: 'pdclient', tag: 'task1', title: '任务已完成', body: 'Build the project',
   attention: false, preview: false, dismiss: '关闭', ...patch,
 });
+const powershell = process.platform === 'win32' ? 'powershell.exe' : process.env.POWER_DSH_TEST_POWERSHELL;
 function payload(spec) {
   const script = Buffer.from(spec.argv.at(-1), 'base64').toString('utf16le');
   const match = script.match(/FromBase64String\('([A-Za-z0-9+/=]+)'\)/);
   assert.ok(match);
   return JSON.parse(Buffer.from(match[1], 'base64').toString('utf8'));
 }
-function fixture({ platform = 'win32', service = true, resolve, playback, timeoutMs = 1000 } = {}) {
+function fixture({ platform = 'win32', service = true, resolve, playback, timeoutMs = 1000, appId = 'com.deepseek.dsh' } = {}) {
   let state = { notificationsEnabled: true, notificationSoundEnabled: true, notificationSound: 'default' };
   const config = Object.fromEntries(Object.keys(state).map(key => [key, { get: () => state[key] }]));
   const calls = [];
@@ -34,7 +35,7 @@ function fixture({ platform = 'win32', service = true, resolve, playback, timeou
     },
   };
   const ctx = { effect(fn) { effects.push(fn()); }, get(name) { assert.equal(name, 'subprocess'); return service ? subprocess : undefined; } };
-  const manager = new WindowsToasts(ctx, config, { platform, appId: 'com.deepseek.dsh', timeoutMs });
+  const manager = new WindowsToasts(ctx, config, { platform, appId, timeoutMs });
   return { manager, calls, effects, set(patch) { state = { ...state, ...patch }; } };
 }
 
@@ -57,8 +58,53 @@ test('native Windows delivery uses managed non-detached PowerShell and a Unicode
   assert.match(script, /\$toast.SuppressPopup = \$false/);
   assert.match(script, /CreateToastNotifier\(\[string\]\$data.appId\)/);
   assert.match(script, /\$notifier.Setting.ToString\(\) -ne 'Enabled'/);
+  assert.match(script, /\$null -eq \$notifier/);
   assert.match(script, /\$notifier.Show\(\$toast\)/);
   await f.manager.close();
+});
+
+test('unset or blank notification identity triggers discovery instead of an unregistered packaging default', async () => {
+  const previous = process.env.DSH_APP_USER_MODEL_ID;
+  try {
+    for (const configured of [undefined, '', '   ', ' electron.app.DeepSeek Harness ']) {
+      if (configured === undefined) delete process.env.DSH_APP_USER_MODEL_ID;
+      else process.env.DSH_APP_USER_MODEL_ID = configured;
+      const f = fixture();
+      const manager = new WindowsToasts(f.manager.ctx, f.manager.config, { platform: 'win32' });
+      await manager.show(request());
+      assert.equal(payload(f.calls[0]).appId, configured?.trim() ?? '');
+      await manager.close();
+      await f.manager.close();
+    }
+  } finally {
+    if (previous === undefined) delete process.env.DSH_APP_USER_MODEL_ID;
+    else process.env.DSH_APP_USER_MODEL_ID = previous;
+  }
+});
+
+test('registered Electron identities accept spaces while invalid identifiers fail before spawning', async () => {
+  const appId = 'electron.app.DeepSeek Harness';
+  const f = fixture({ appId });
+  assert.deepEqual(await f.manager.show(request()), { shown: true });
+  assert.equal(payload(f.calls[0]).appId, appId);
+  await f.manager.close();
+  const invalid = fixture({ appId: 'broken\u0000identity' });
+  assert.deepEqual(await invalid.manager.show(request()), { shown: false, reason: 'identity' });
+  assert.equal(invalid.calls.length, 0);
+  await invalid.manager.close();
+});
+
+test('identity and disabled-notification failures cross RPC only as fixed safe reasons', async () => {
+  const codec = SHOW_WINDOWS_NOTIFICATION_RPC.result.create();
+  for (const [exitCode, reason] of [[21, 'identity'], [22, 'disabled']]) {
+    const f = fixture({ playback: () => ({ done: Promise.resolve({ exitCode, signal: null }),
+      terminate() {}, async waitForExit() { return true; } }) });
+    assert.deepEqual(codec.parse(await f.manager.show(request())), { shown: false, reason });
+    await f.manager.close();
+  }
+  for (const value of [{ shown: true, reason: 'identity' }, { shown: false, reason: 'private subprocess output' }]) {
+    assert.throws(() => codec.parse(value), /Invalid notification delivery/);
+  }
 });
 
 test('live sound preferences control native XML while attention notices request reminder behavior', async () => {
@@ -198,13 +244,44 @@ test('unsupported platforms or missing subprocess never silently route back to r
   }
 });
 
-test('Windows PowerShell parses the exact helper and .NET accepts its XML without showing a toast', { skip: process.platform !== 'win32' }, () => {
+test('PowerShell parses the exact Windows helper and .NET accepts its XML without showing a toast', { skip: !powershell }, () => {
   const command = { appId: 'com.deepseek.dsh', group: 'pdtest', tag: 'one',
     xml: '<toast scenario="reminder" duration="long"><visual><binding template="ToastGeneric"><text>中文 &amp; 🐟</text></binding></visual><audio silent="true"/><actions><action activationType="system" arguments="dismiss" content="关闭"/></actions></toast>' };
   const script = Buffer.from(windowsToastScript(command), 'utf8').toString('base64');
   const parser = `$ErrorActionPreference='Stop'; $script=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${script}')); $tokens=$null; $errors=$null; $null=[System.Management.Automation.Language.Parser]::ParseInput($script,[ref]$tokens,[ref]$errors); if ($errors.Count) { exit 1 }; $data=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${Buffer.from(JSON.stringify(command)).toString('base64')}')) | ConvertFrom-Json; $xml=New-Object System.Xml.XmlDocument; $xml.LoadXml([string]$data.xml)`;
-  const result = spawnSync('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand',
+  const result = spawnSync(powershell, ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand',
     Buffer.from(parser, 'utf16le').toString('base64')], { windowsHide: true, encoding: 'utf8', timeout: 15_000 });
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test('PowerShell resolves only registered DSH identities, handles ambiguity and honors an explicit spaced identity', { skip: !powershell }, () => {
+  const script = `$ErrorActionPreference = 'Stop'
+${windowsToastIdentityScript()}
+$script:registered = @('electron.app.DeepSeek Harness')
+$script:applications = @()
+function Test-Path { param($LiteralPath, $ErrorAction) return $script:registered -contains ($LiteralPath -replace '^.*\\\\AppUserModelId\\\\', '') }
+function Get-StartApps { param($ErrorAction) return $script:applications }
+function Expect-IdentityFailure {
+  try { $null = Resolve-ToastAppId ''; throw 'Expected identity failure' }
+  catch { if ($_.Exception.Message -ne 'PD_NOTIFICATION_IDENTITY') { throw } }
+}
+if ((Resolve-ToastAppId '') -cne 'electron.app.DeepSeek Harness') { throw 'Electron identity not found' }
+if ((Resolve-ToastAppId ' custom.Identity With Spaces ') -cne 'custom.Identity With Spaces') { throw 'Explicit identity changed' }
+$script:registered = @()
+Expect-IdentityFailure
+$script:applications = @([pscustomobject]@{Name='Other App';AppID='other'}, [pscustomobject]@{Name='DeepSeek Harness';AppID='registered.dsh'})
+if ((Resolve-ToastAppId '') -cne 'registered.dsh') { throw 'Shortcut identity not found' }
+$script:registered = @('com.deepseek.dsh')
+Expect-IdentityFailure
+$script:applications = @([pscustomobject]@{Name='DeepSeek Harness';AppID='com.deepseek.dsh'})
+if ((Resolve-ToastAppId '') -cne 'com.deepseek.dsh') { throw 'Duplicate registration treated as ambiguity' }
+$script:registered = @()
+$script:applications = @()
+function Get-StartApps { throw 'Unavailable' }
+Expect-IdentityFailure`;
+  const result = spawnSync(powershell, ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand',
+    Buffer.from(script, 'utf16le').toString('base64')], { windowsHide: true, encoding: 'utf8', timeout: 15_000 });
   assert.equal(result.error, undefined);
   assert.equal(result.status, 0, result.stderr);
 });
