@@ -1,7 +1,9 @@
-# power-dsh
+# PowerDSH
 
 > **优雅克制，专注实效。让你的 DSH 更顺手、更高效。**\
 > *Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.*
+
+PowerDSH 是插件显示名称，`power-dsh` 是它的包名与仓库名。
 
 <img src="docs/images/0.0.1/settings.webp" alt="PowerDSH 管理页" width="560">
 
