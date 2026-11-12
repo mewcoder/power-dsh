@@ -1,0 +1,83 @@
+name: Release
+
+# Cutting a release is one action: push an annotated v<version> tag that matches
+# package.json. The tag is the release boundary, so the tarball attached to the
+# GitHub Release is built from that exact commit and verified against the
+# committed dist artifacts before anything is published.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Tag must match the package version
+        run: |
+          pkg="$(node -p "require('./package.json').version")"
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$pkg" != "$tag" ]; then
+            echo "tag v$tag does not match package.json $pkg" >&2
+            exit 1
+          fi
+
+      # Reuses the repository's own gates: committed artifacts must be fresh,
+      # behavior must pass, and the actual tarball must install on its own.
+      - name: Check artifacts, behavior, package and isolated install
+        run: |
+          npm run check:build
+          npm run check
+          npm run check:package
+          npm run check:install
+
+      - name: Pack the reviewed artifact
+        run: |
+          mkdir -p release
+          npm pack --ignore-scripts --pack-destination release
+          mv release/power-dsh-*.tgz release/power-dsh.tgz
+          sha256sum release/power-dsh.tgz | tee release/power-dsh.tgz.sha256
+
+      # A prerelease tag publishes a GitHub pre-release; a plain v1.2.3 is the
+      # stable "latest" users are offered. Neither path publishes to npm.
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          case "$GITHUB_REF_NAME" in
+            *-*) prerelease=(--prerelease) ;;
+            *) prerelease=(--latest) ;;
+          esac
+          gh release create "$GITHUB_REF_NAME" release/power-dsh.tgz \
+            --title "power-dsh ${GITHUB_REF_NAME#v}" \
+            --generate-notes \
+            "${prerelease[@]}" \
+            --notes "DSH: >=0.2.0-rc.1 <0.3.0-0 · Install: \`github:mewcoder/power-dsh\` or the attached \`power-dsh.tgz\` · npm: not published"

@@ -69,10 +69,10 @@ git diff --check
 - 审阅包内资源、公开入口、许可和三份构建产物；排除 `.agents`、`.zcode`、开发测试、参考源码、个人路径和诊断日志。
 - 静态检查、实际包独立安装和宿主验证针对同一候选内容。发布前确认工作区未又变化；文件有变则候选失效，重新检查并打包，不默默改用另一个包。
 - 已授权提交推送时把源码、文档与三个产物保存在可追溯提交中，核对 CI 对应的提交。只有明确授权的 GitHub Release 才创建标签和 Release。
-- 使用已审阅 tarball，复制或重命名为 `power-dsh.tgz` 后确认哈希不变，不在上传前临时重建另一个包。
-- 创建 `v<package.json.version>` 的 annotated tag，指向已通过检查的确切提交；核对远端无同名 tag 再推送，不强推或移动已发布标签。
-- 使用该 tag 创建 GitHub Release 草稿，上传 `power-dsh.tgz`，检查版本、tag 指向、附件名、大小、哈希和 Release notes，再发布。正式版设置为 Latest；测试版标为 Pre-release，不替换正式版入口。
-- GitHub Release notes 使用本次版本说明，写明 DSH 范围、桌面安装方式与真实验证边界；不要把 tag 本身或上传完成报成最终发布成功。
+- 正常路径是自动的：`.github/workflows/release.yml` 在推送 `v*` tag 后重新跑固定检查、打包 `power-dsh.tgz` 并创建 GitHub Release。先确认 `package.json.version` 已增加、更新日志已写、发版提交已进入 `main`，再创建 annotated `v<version>` tag。核对远端无同名 tag，不强推或移动已发布标签。
+- 推送 tag 后等待该 tag 的 Release workflow 成功；失败时在同一提交修复流程或补充元数据，用新版本发布，不覆盖已发布附件。
+- 正式版设置 Latest，带预发布标识的 tag 生成 Pre-release，不替换正式版入口。只有自动流程不可用或用户明确要求手工时，才用已审阅 tarball 手工上传同名附件；上传前确认哈希未变。
+- GitHub Release notes 写明 DSH 范围、桌面安装方式与真实验证边界；不要把 tag 推送、附件上传或 workflow 成功直接报成用户已可安装升级。
 - 只有用户重新明确选择 npm 时才进入 `docs/releasing.md` 的可选 npm 章节；不是因账号已经登录就改变当前分发约定。
 
 ## 7. 发布后核验与重试
