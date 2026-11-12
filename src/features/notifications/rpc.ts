@@ -3,6 +3,7 @@ import type { SoundEntry, SystemSoundsCatalog, SystemSounds, SoundPlayback } fro
 export type { SoundEntry, SystemSoundsCatalog, SystemSounds, SoundPlayback } from '../../shared/types/wire.ts';
 import { stringCodec, booleanCodec } from '../../shared/rpc/codecs.ts';
 import type { WindowsNotification, NotificationDelivery, NotificationCleared } from '../../shared/types/wire.ts';
+import type { NotificationTransport } from '../../shared/types/wire.ts';
 
 export function parseWindowsNotification(value: unknown): WindowsNotification {
   if (!isRecord(value) || typeof value.group !== 'string' || !/^[a-z0-9]{1,16}$/.test(value.group)
@@ -67,4 +68,15 @@ export const CLEAR_WINDOWS_NOTIFICATIONS_RPC: RpcDescriptor<'clearWindowsNotific
   } }) },
 };
 
-export const rpc = [LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC, SHOW_WINDOWS_NOTIFICATION_RPC, CLEAR_WINDOWS_NOTIFICATIONS_RPC];
+export const NOTIFICATION_TRANSPORT_RPC: RpcDescriptor<'notificationTransport', NotificationTransport> = {
+  id: 'power-dsh#powerDsh/notificationTransport', service: 'powerDsh', namespace: 'powerDsh', method: 'notificationTransport',
+  invocation: { kind: 'direct' }, parameters: [],
+  result: { mode: 'strict', typeSymbol: 'power-dsh#NotificationTransport', create: () => ({ parse(value) {
+    if (!isRecord(value) || !isOneOf(value.platform, ['win32', 'darwin', 'other'])
+      || typeof value.nativeAvailable !== 'boolean' || typeof value.version !== 'string'
+      || !/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(value.version)) throw new TypeError('Invalid notification transport');
+    return { platform: value.platform, nativeAvailable: value.nativeAvailable, version: value.version };
+  } }) },
+};
+
+export const rpc = [LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC, SHOW_WINDOWS_NOTIFICATION_RPC, CLEAR_WINDOWS_NOTIFICATIONS_RPC, NOTIFICATION_TRANSPORT_RPC];

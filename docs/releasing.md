@@ -91,6 +91,8 @@ README 面向使用者，标题使用显示名 `# PowerDSH`，并在首屏说明
 
 包版本写 `0.0.1`，Git 标签写 `v0.0.1`，GitHub Release 标题写 `power-dsh v0.0.1`，对应同一个提交。Release 正文使用该版本的更新日志，加上宿主要求、安装方式与升级操作。已发布的 tag、版本和附件保持不变，修复另发新版本。
 
+插件运行版本已内联至 Host 与 Client，供通知通道握手和设置页更新入口核对。修改 `package.json.version` 后须执行 `npm run build` 并交付新的三个构建产物；随后再做产物新鲜度和实际包检查，不能沿用旧版产物或候选哈希。
+
 ## 首次发版前的准备
 
 1. 确认品牌、简介、仓库地址与选定许可证，补充真实的 `repository`、`homepage`、`bugs` 和作者信息，保留[第三方声明](third-party-notices.md)。许可证由作者决定。

@@ -15,6 +15,8 @@ export interface Preferences {
   showRefreshButton: boolean;
   showRestartButton: boolean;
   notificationsEnabled: boolean;
+  notificationMode: string;
+  pluginUpdatesEnabled: boolean;
   notificationSoundEnabled: boolean;
   notificationSound: string;
   personalizationEnabled: boolean;

@@ -47,6 +47,10 @@ DSH `0.2.2-rc.1` 的原生 logger 提供内存缓冲与 exporter；插件安装�
 
 ## 任务通知
 
+本机通知通过 `notificationTransport` 取得 Host 平台、原生服务能力和包版本，版本与 Client 构建版本一致后才发送。本机 Windows 不依赖 DOM 或 Electron bridge 标记做路由，失败不回退 renderer；具体握手、策略、测试通知和诊断字段见主 Spec。插件运行版本通过构建时常量内联至 Client，不把包清单或 Host 模块导入浏览器模块图。
+
+插件更新通过设置页的 feature-owned footer 贡献显示独立入口；只调用市场公开 API v1，并匿名校验官方 Release，不新增 Host 写入接口。设置外壳只渲染 footer 贡献，版本校验、确认、进度和生命周期均归 `plugin-updates` 模块。
+
 [通知模块](../src/features/notifications/)拥有结束摘要投影、通知订阅和系统声音。Host 注册最小投影，Client 订阅原生列表与交互状态；本机 Windows 桌面端经 owner-only RPC 和宿主 subprocess 托管 PowerShell / WinRT Toast，其余环境调用浏览器通知。原生 Toast 独立串行发送与定向清理，避免阻塞设置策略队列；声音保留原有并发控制与托管进程。触发、权限、去重、声音及生命周期边界由[任务通知 Spec](../src/features/notifications/spec.md)维护。
 
 ## MCP 详情

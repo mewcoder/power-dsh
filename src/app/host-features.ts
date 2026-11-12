@@ -1,4 +1,6 @@
 import type { HostFeature } from '../shared/host/feature.ts';
+import { definition as pluginUpdatesDefinition } from '../features/plugin-updates/definition.ts';
+import * as pluginUpdatesConfig from '../features/plugin-updates/config.ts';
 // This list explicitly selects the Host features included in PowerDSH.
 import { definition as versionDefinition } from '../features/version-display/definition.ts';
 import * as versionConfig from '../features/version-display/config.ts';
@@ -74,6 +76,7 @@ import * as projectsHost from '../features/projects/host.ts';
 import { rpc as projectsRpc } from '../features/projects/rpc.ts';
 
 export const HOST_FEATURES = Object.freeze([
+  { definition: pluginUpdatesDefinition, ...pluginUpdatesConfig },
   { definition: versionDefinition, ...versionConfig },
   { definition: appearanceDefinition, ...appearanceConfig },
   { definition: refreshDefinition, ...refreshConfig },

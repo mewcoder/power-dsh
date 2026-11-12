@@ -15,6 +15,8 @@ interface Preferences {
   showRefreshButton: boolean;
   showRestartButton: boolean;
   notificationsEnabled: boolean;
+  notificationMode: string;
+  pluginUpdatesEnabled: boolean;
   notificationSoundEnabled: boolean;
   notificationSound: string;
   personalizationEnabled: boolean;
@@ -64,7 +66,7 @@ type SettingsOutput = Pick<Preferences, SettingsParameter> & {
   version: string | null;
   telemetry: TelemetryStatus;
 };
-type FeatureId = 'version-display' | 'appearance-shortcut' | 'refresh-button' | 'restart-button' | 'notifications' | 'personalization' | 'skills' | 'mcp' | 'account-blocking' | 'search-blocking' | 'telemetry-blocking' | 'todo-blocking' | 'plan-blocking' | 'goal-blocking' | 'double-click-rename' | 'thinking-effort' | 'flowing-background' | 'archive' | 'usage-stats' | 'projects' | 'wallpaper';
+type FeatureId = 'version-display' | 'appearance-shortcut' | 'refresh-button' | 'restart-button' | 'notifications' | 'personalization' | 'skills' | 'mcp' | 'account-blocking' | 'search-blocking' | 'telemetry-blocking' | 'todo-blocking' | 'plan-blocking' | 'goal-blocking' | 'double-click-rename' | 'thinking-effort' | 'flowing-background' | 'archive' | 'usage-stats' | 'projects' | 'wallpaper' | 'plugin-updates';
 type FeatureCategory = 'general' | 'interface' | 'enhance' | 'simplify' | 'other';
 interface FeatureDefinition {
   readonly id: FeatureId;
@@ -201,6 +203,11 @@ interface NotificationDelivery {
 interface NotificationCleared {
   cleared: boolean;
 }
+interface NotificationTransport {
+  platform: 'win32' | 'darwin' | 'other';
+  nativeAvailable: boolean;
+  version: string;
+}
 interface RestartStatus {
   supported: boolean;
   running: boolean;
@@ -315,6 +322,7 @@ interface PowerDshMethods {
   playSystemSound(id: string, preview: boolean): Promise<SoundPlayback>;
   showWindowsNotification(notification: WindowsNotification): Promise<NotificationDelivery>;
   clearWindowsNotifications(group: string, tag: string): Promise<NotificationCleared>;
+  notificationTransport(): Promise<NotificationTransport>;
   setAccountBlocked(blocked: boolean): Promise<PolicyResult>;
   setTelemetryBlocked(blocked: boolean): Promise<PolicyResult>;
   setTodoBlocked(blocked: boolean): Promise<PolicyResult>;

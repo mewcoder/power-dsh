@@ -59,6 +59,19 @@ var OperationQueue = class {
 	}
 };
 
+// src/features/plugin-updates/definition.ts
+const definition$21 = Object.freeze({
+	id: "plugin-updates",
+	category: "other",
+	order: 100,
+	keys: Object.freeze(["pluginUpdatesEnabled"]),
+	spec: "src/features/plugin-updates/spec.md"
+});
+
+// src/features/plugin-updates/config.ts
+var config_exports$21 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$21 });
+const configFields$21 = { pluginUpdatesEnabled: z.boolean().default(true).volatile() };
+
 // src/features/version-display/definition.ts
 const definition$20 = Object.freeze({
 	id: "version-display",
@@ -423,6 +436,7 @@ const definition$16 = Object.freeze({
 	order: 0,
 	keys: Object.freeze([
 		"notificationsEnabled",
+		"notificationMode",
 		"notificationSoundEnabled",
 		"notificationSound"
 	]),
@@ -433,6 +447,7 @@ const definition$16 = Object.freeze({
 var config_exports$16 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$16 });
 const configFields$16 = {
 	notificationsEnabled: z.boolean().default(false).volatile(),
+	notificationMode: z.string().default("background").volatile(),
 	notificationSoundEnabled: z.boolean().default(true).volatile(),
 	notificationSound: z.string().default("default").volatile()
 };
@@ -796,11 +811,36 @@ const CLEAR_WINDOWS_NOTIFICATIONS_RPC = {
 		} })
 	}
 };
+const NOTIFICATION_TRANSPORT_RPC = {
+	id: "power-dsh#powerDsh/notificationTransport",
+	service: "powerDsh",
+	namespace: "powerDsh",
+	method: "notificationTransport",
+	invocation: { kind: "direct" },
+	parameters: [],
+	result: {
+		mode: "strict",
+		typeSymbol: "power-dsh#NotificationTransport",
+		create: () => ({ parse(value) {
+			if (!isRecord$1(value) || !isOneOf(value.platform, [
+				"win32",
+				"darwin",
+				"other"
+			]) || typeof value.nativeAvailable !== "boolean" || typeof value.version !== "string" || !/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(value.version)) throw new TypeError("Invalid notification transport");
+			return {
+				platform: value.platform,
+				nativeAvailable: value.nativeAvailable,
+				version: value.version
+			};
+		} })
+	}
+};
 const rpc$13 = [
 	LIST_SYSTEM_SOUNDS_RPC,
 	PLAY_SYSTEM_SOUND_RPC,
 	SHOW_WINDOWS_NOTIFICATION_RPC,
-	CLEAR_WINDOWS_NOTIFICATIONS_RPC
+	CLEAR_WINDOWS_NOTIFICATIONS_RPC,
+	NOTIFICATION_TRANSPORT_RPC
 ];
 
 // src/features/notifications/windows-toasts.ts
@@ -908,7 +948,7 @@ var WindowsToasts = class {
 		const tagRevision = this.revisions.get(tagKey);
 		const current = () => revision === this.revisions.get(notification.group) && tagRevision === this.revisions.get(tagKey);
 		return this.queue.run(async () => {
-			if (!current() || this.config.notificationsEnabled.get() !== true || notification.preview && this.config.notificationSoundEnabled.get() !== true) return { shown: false };
+			if (!current() || this.config.notificationsEnabled.get() !== true || !notification.preview && this.config.notificationMode?.get() === "never" || notification.preview && this.config.notificationSoundEnabled.get() !== true) return { shown: false };
 			const soundEnabled = this.config.notificationSoundEnabled.get() === true;
 			const sound = this.config.notificationSound.get() || "default";
 			if (notification.preview && sound !== "default") return { shown: false };
@@ -922,7 +962,7 @@ var WindowsToasts = class {
 				group: notification.group,
 				tag: notification.tag,
 				xml
-			}, () => current() && this.config.notificationsEnabled.get() === true && this.config.notificationSoundEnabled.get() === soundEnabled && (this.config.notificationSound.get() || "default") === sound) };
+			}, () => current() && this.config.notificationsEnabled.get() === true && (notification.preview || this.config.notificationMode?.get() !== "never") && this.config.notificationSoundEnabled.get() === soundEnabled && (this.config.notificationSound.get() || "default") === sound) };
 		});
 	}
 	clear(group, tag) {
@@ -956,6 +996,9 @@ var WindowsToasts = class {
 	}
 };
 
+// package.json
+var version = "0.0.6";
+
 // src/features/notifications/host.ts
 var host_exports$13 = /* @__PURE__ */ __exportAll({
 	createHost: () => createHost$13,
@@ -971,6 +1014,13 @@ function createHost$13(ctx, config) {
 	};
 }
 const methods$13 = {
+	notificationTransport() {
+		return this.run(() => ({
+			platform: this.windowsToasts.platform === "win32" ? "win32" : this.windowsToasts.platform === "darwin" ? "darwin" : "other",
+			nativeAvailable: this.windowsToasts.platform === "win32" && Boolean(this.ctx.get("subprocess")),
+			version
+		}));
+	},
 	listSystemSounds() {
 		return this.run(() => this.sounds.list());
 	},
@@ -5465,6 +5515,10 @@ const rpc = [LIST_PROJECTS_RPC, REMOVE_PROJECT_RPC];
 // src/app/host-features.ts
 const HOST_FEATURES = Object.freeze([
 	{
+		definition: definition$21,
+		...config_exports$21
+	},
+	{
 		definition: definition$20,
 		...config_exports$20
 	},
@@ -5593,6 +5647,7 @@ function composeRpc(descriptors) {
 	return descriptors;
 }
 const MOD_RPC = composeRpc([
+	NOTIFICATION_TRANSPORT_RPC,
 	RESTART_STATUS_RPC,
 	RESTART_APP_RPC,
 	LIST_SYSTEM_SOUNDS_RPC,

@@ -54,6 +54,7 @@ export function createSettingsPage(runtime: ClientRuntime) {
     }
     const viewContext = { snapshot, disabled, saving, error, save, id, leaveSettings: close };
     const fields = features.flatMap(feature => feature.useSettings ? feature.useSettings(viewContext) : feature.settings || []);
+    const footers = features.map(feature => feature.useSettingsFooter?.(viewContext));
     const allSettings = features.flatMap(feature => feature.settings || []);
     // Hidden operation descriptors can still be called by a feature-owned custom row.
     for (const setting of allSettings) if (!fields.some(field => field.field === setting.field)) fields.push(setting);
@@ -105,7 +106,7 @@ export function createSettingsPage(runtime: ClientRuntime) {
       h('div', {
         id: `${id}-panel-${activeTab}`, className: 'power-dsh-fields', role: 'tabpanel',
         'aria-labelledby': `${id}-tab-${activeTab}`,
-      }, ...fields.filter(field => field.category === activeTab).map(row)));
+      }, ...fields.filter(field => field.category === activeTab).map(row)), ...footers);
   }
   return SettingsPage;
 }

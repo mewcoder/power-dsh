@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
 export const clientBundleUrl = new URL('../../dist/client.js', import.meta.url);
+const pluginVersion = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8')).version;
 
 let compositionBundle;
 async function getCompositionBundle() {
@@ -13,6 +14,7 @@ async function getCompositionBundle() {
       config: false, entry: [fileURLToPath(new URL('./client-composition-entry.mjs', import.meta.url))],
       write: false, clean: false, exports: false, report: false, dts: false, minify: false,
       platform: 'browser', format: 'iife', target: 'es2022', globalName: 'PowerDshComposition', logLevel: 'silent',
+      define: { __POWER_DSH_VERSION__: JSON.stringify(pluginVersion) },
     });
     try {
       const chunks = handle.bundles.flatMap(bundle => bundle.chunks);
@@ -107,7 +109,7 @@ export function usageSnapshotFixture(overrides = {}) {
   };
 }
 
-export async function mount({ featureIds, localeLanguage, restartStatus = { supported: true, running: false, error: '' }, restartReply, desktop = false, themeAvailable = true, updates, rpcError, rpcReply, formReply, formLoad, fileText = '', fileReply, fileReadError, wallpaper, wallpaperReply, wallpaperReadError, wallpaperClearError, skillCatalog, skillList, skillReply, skillReadError, skillDetail, skillDetailReply, skillDetailError, mcpCatalog, mcpList, mcpReply, mcpReadError, mcpDetail, mcpDetailReply, mcpDetailError, archiveCatalog, archiveList, archiveReply, archiveReadError, usageSnapshot, usageList, usageReply, usageReadError, projectCatalog, projectList, projectReply, projectReadError, writable = true, reload = () => {}, windows = false, notificationPermission = 'granted', notificationRequest, notificationFailure = false, notificationServices = true, notificationsAvailable = true, nativeNotificationReply, nativeClearReply, localConnection = true, soundCatalog, soundReply, soundListError, modelDirectory, modelSelectReply, modelDirectoriesAvailable = true } = {}) {
+export async function mount({ featureIds, localeLanguage, restartStatus = { supported: true, running: false, error: '' }, restartReply, desktop = false, themeAvailable = true, updates, rpcError, rpcReply, formReply, formLoad, fileText = '', fileReply, fileReadError, wallpaper, wallpaperReply, wallpaperReadError, wallpaperClearError, skillCatalog, skillList, skillReply, skillReadError, skillDetail, skillDetailReply, skillDetailError, mcpCatalog, mcpList, mcpReply, mcpReadError, mcpDetail, mcpDetailReply, mcpDetailError, archiveCatalog, archiveList, archiveReply, archiveReadError, usageSnapshot, usageList, usageReply, usageReadError, projectCatalog, projectList, projectReply, projectReadError, writable = true, reload = () => {}, windows = false, notificationPermission = 'granted', notificationRequest, notificationFailure = false, notificationServices = true, notificationsAvailable = true, nativeNotificationReply, nativeClearReply, notificationTransportReply, platformMarker = true, localConnection = true, soundCatalog, soundReply, soundListError, updateFetch, updateStorage, modelDirectory, modelSelectReply, modelDirectoriesAvailable = true } = {}) {
   let plugin;
   const nativeLauncher = { native: true };
   const entries = new Map([['settings.launcher:single', nativeLauncher]]);
@@ -195,7 +197,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   let observeCount = 0;
   let disconnectCount = 0;
   let edge = 280;
-  let settings = { status: 'ready', writable, value: { blockDoubleClickRename: false, notificationsEnabled: false, notificationSoundEnabled: true, notificationSound: 'default', blockTodo: false, blockPlan: false, blockGoal: false, showThemeSwitcher: false, personalizationEnabled: false, skillManagerEnabled: false, mcpManagerEnabled: false, globalPrompt: '', thinkingEffortGlyph: 'arc', flowingBackgroundKind: 'pattern', flowingBackgroundOpacity: 100, flowingBackgroundBlur: 0, autoArchiveDays: 0 } };
+  let settings = { status: 'ready', writable, value: { pluginUpdatesEnabled: true, notificationMode: 'background', blockDoubleClickRename: false, notificationsEnabled: false, notificationSoundEnabled: true, notificationSound: 'default', blockTodo: false, blockPlan: false, blockGoal: false, showThemeSwitcher: false, personalizationEnabled: false, skillManagerEnabled: false, mcpManagerEnabled: false, globalPrompt: '', thinkingEffortGlyph: 'arc', flowingBackgroundKind: 'pattern', flowingBackgroundOpacity: 100, flowingBackgroundBlur: 0, autoArchiveDays: 0 } };
   let theme = { preference: 'system' };
   const calls = [];
   const rpcCalls = [];
@@ -359,10 +361,11 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   // The host marks dialogs with aria-modal="true"; the fixture exposes that
   // contract so the background panel can observe it going from closed to open.
   const documentStub = {
+    baseURI: 'https://dsh.example/app/',
     get hidden() { return documentHidden; },
     hasFocus: () => documentFocused,
     body: {},
-    documentElement: { hasAttribute: name => windows && name === 'data-windows-titlebar', getAttribute: () => windows ? 'win32' : desktop ? 'darwin' : null },
+    documentElement: { hasAttribute: name => platformMarker && windows && name === 'data-windows-titlebar', getAttribute: () => !platformMarker ? null : windows ? 'win32' : desktop ? 'darwin' : null },
     querySelector(selector) {
       if (selector === '[aria-modal="true"]') return modalLayers > 0 ? menuElement : null;
       assert.equal(selector, '[data-windows-menu]');
@@ -375,6 +378,8 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   };
   const context = vm.createContext({
     URL,
+    AbortController, AbortSignal,
+    fetch: updateFetch || (() => assert.fail('Updates must not request the network without a user action.')),
     // Minimal reader so the wallpaper picker can be exercised without a real File API.
     FileReader: class {
       constructor() { this.result = null; this.onerror = null; this.onload = null; }
@@ -402,6 +407,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     },
     document: documentStub,
     window: {
+      sessionStorage: updateStorage,
       setTimeout(fn, ms) { timers.set(++timerId, { fn, ms }); return timerId; },
       clearTimeout(id) { timers.delete(id); },
       Notification: notificationsAvailable ? FakeNotification : undefined,
@@ -472,6 +478,9 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       if (dependencies.includes('remote.powerDsh')) {
         ctx.remote.powerDsh = Object.fromEntries(rpcDescriptors.map(descriptor => [descriptor.method, async (...rpcArgs) => {
           const [blocked, revision, name, enabled] = rpcArgs;
+          if (descriptor.method === 'notificationTransport') return notificationTransportReply ? await notificationTransportReply() : {
+            ok: true, value: { platform: windows ? 'win32' : 'darwin', nativeAvailable: windows, version: pluginVersion },
+          };
           if (descriptor.method === 'restartStatus') return { ok: true, value: restartStatus };
           if (descriptor.method === 'restartApp') {
             restartCalls.push([]);

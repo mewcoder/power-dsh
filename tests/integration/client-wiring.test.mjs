@@ -60,7 +60,7 @@ test('Mod settings survive startup with real Cordis dependency enforcement, inde
           ctx.provide('connection', { state: { getSnapshot: () => 'connected', subscribe: () => () => {} } });
         } });
         let plugin;
-        const sandbox = vm.createContext({ window: {
+        const sandbox = vm.createContext({ URL, document: { baseURI: 'https://dsh.example/' }, window: {
           __ModuleLoader__: { load(definition) { plugin = definition.factory(specifier => {
             if (specifier === 'react') return { createElement: (type, props) => ({ type, props }) };
             assert.equal(specifier, '@deepseek-ai/dsh-client-ui-primitives');

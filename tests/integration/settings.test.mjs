@@ -117,7 +117,7 @@ test('settings default to General with custom wallpaper first in Interface', asy
     interface: ['wallpaperEnabled', 'showThinkingEffortSwitcher', 'showThemeSwitcher', 'showVersion'],
     enhancements: ['skillManagerEnabled', 'mcpManagerEnabled', 'personalizationEnabled', 'projectManagerEnabled', 'archiveManagerEnabled', 'usageStatsEnabled'],
     simplify: ['blockOfficialAccount', 'blockOfficialSearch', 'blockOfficialTelemetry', 'blockTodo', 'blockPlan', 'blockGoal'],
-    other: ['showRefreshButton', 'showRestartButton', 'blockDoubleClickRename'],
+    other: ['showRefreshButton', 'showRestartButton', 'blockDoubleClickRename', 'pluginUpdatesEnabled'],
   };
   const firstTabs = descendants(app.renderSettings()).filter(node => node.props.role === 'tab');
   assert.equal(firstTabs[0].props.id, 'settings-test-tab-general');
@@ -147,7 +147,7 @@ test('settings default to General with custom wallpaper first in Interface', asy
     fields.push(...actual);
     assert.ok(!view.some(node => node.type === 'textarea'));
   }
-  assert.equal(new Set(fields).size, 21);
+  assert.equal(new Set(fields).size, 22);
   app.unmount();
 });
 

@@ -1,4 +1,5 @@
 import type { RpcDescriptor } from '../shared/types/protocol.ts';
+import { NOTIFICATION_TRANSPORT_RPC } from '../features/notifications/rpc.ts';
 // Browser-safe aggregation of the feature-owned wire contracts.
 import { ACCOUNT_RPC } from '../features/account-blocking/rpc.ts';
 import { TELEMETRY_RPC } from '../features/telemetry-blocking/rpc.ts';
@@ -48,6 +49,7 @@ export function composeRpc<T extends RpcDescriptor[]>(descriptors: T): T {
 }
 
 export const MOD_RPC = composeRpc([
+  NOTIFICATION_TRANSPORT_RPC,
   RESTART_STATUS_RPC, RESTART_APP_RPC,
   LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC,
   SHOW_WINDOWS_NOTIFICATION_RPC, CLEAR_WINDOWS_NOTIFICATIONS_RPC,

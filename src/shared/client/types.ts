@@ -88,6 +88,7 @@ export interface ClientContext {
 export type SavePreference = <K extends PreferenceKey>(field: K, value: PreferenceValues[K], unavailable?: string, type?: 'boolean' | 'string' | 'number') => Promise<void>;
 export interface ClientEnvironment {
   ctx: ClientContext; form: SettingsForm; source: SnapshotSource<FormSnapshot>; t: Translate; version: string | null; namespace: string;
+  pluginVersion: string;
   savePreference: SavePreference;
   footerBusy: SnapshotSource<boolean>;
   preferenceSlot(field: PreferenceKey, name: string, options: SlotOptions, component: SlotComponent): void;
@@ -111,6 +112,7 @@ export interface HeaderAction { id: string; label: string; visible: boolean; dis
 export interface ClientFeature {
   settings?: SettingContribution[]; styles?: string; api?: Record<string, unknown>;
   useSettings?(context: SettingsViewContext): SettingContribution[];
+  useSettingsFooter?(context: SettingsViewContext): ReactTypes.ReactNode;
   sidebar?(props: SlotProps): ReactTypes.ReactNode;
   headerAction?(context: HeaderActionContext): HeaderAction;
 }

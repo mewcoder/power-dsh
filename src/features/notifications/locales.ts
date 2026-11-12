@@ -1,6 +1,17 @@
 import type { Locales } from '../../shared/client/types.ts';
 export const locales = {
   "en": {
+    "notificationMode": "Notification policy",
+    "notificationModeDescription": "Choose when task reminders appear",
+    "notificationNever": "Never",
+    "notificationBackground": "When not focused",
+    "notificationAlways": "Always",
+    "notificationTest": "Send test notification",
+    "notificationTestBody": "PowerDSH notification delivery test",
+    "notificationNative": "Windows native notifications",
+    "notificationTransportPending": "Notification channel unconfirmed",
+    "notificationBrowser": "Browser notifications",
+    "notificationVersionMismatch": "The running Host and interface versions differ. Reload or restart DSH and try again.",
     "notificationsEnabled": "Task notifications",
     "notificationsDescription": "Send desktop notifications when tasks finish, fail, or need confirmation",
     "notificationSoundEnabled": "Notification sound",
@@ -31,6 +42,17 @@ export const locales = {
     "notificationUnavailable": "Task notifications have not loaded yet. Re-enable power-dsh, then try again."
   },
   "zh": {
+    "notificationMode": "提醒时机",
+    "notificationModeDescription": "选择任务通知的提醒方式",
+    "notificationNever": "从不提醒",
+    "notificationBackground": "仅在未聚焦时提醒",
+    "notificationAlways": "始终提醒",
+    "notificationTest": "发送测试通知",
+    "notificationTestBody": "PowerDSH 通知发送测试",
+    "notificationNative": "Windows 原生通知",
+    "notificationTransportPending": "通知通道尚未确认",
+    "notificationBrowser": "浏览器通知",
+    "notificationVersionMismatch": "当前运行的 Host 与界面版本不一致，请刷新或重启 DSH 后重试。",
     "notificationsEnabled": "任务通知",
     "notificationsDescription": "任务完成、失败或需要确认时发送桌面通知",
     "notificationSoundEnabled": "通知声音",

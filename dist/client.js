@@ -393,6 +393,7 @@
 				leaveSettings: close
 			};
 			const fields = features.flatMap((feature) => feature.useSettings ? feature.useSettings(viewContext) : feature.settings || []);
+			const footers = features.map((feature) => feature.useSettingsFooter?.(viewContext));
 			const allSettings = features.flatMap((feature) => feature.settings || []);
 			for (const setting of allSettings) if (!fields.some((field) => field.field === setting.field)) fields.push(setting);
 			function row(setting) {
@@ -478,7 +479,7 @@
 				className: "power-dsh-fields",
 				role: "tabpanel",
 				"aria-labelledby": `${id}-tab-${activeTab}`
-			}, ...fields.filter((field) => field.category === activeTab).map(row)));
+			}, ...fields.filter((field) => field.category === activeTab).map(row)), ...footers);
 		}
 		return SettingsPage;
 	}
@@ -679,6 +680,576 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		});
 		return source;
 	}
+
+// src/features/plugin-updates/update-client.ts
+	const SCHEMA = "dsh-market/update-api/v1";
+	const API = "dsh-market/api/v1/";
+	const REPOSITORY_API = "https://api.github.com/repos/mewcoder/power-dsh";
+	const RELEASES = "https://github.com/mewcoder/power-dsh/releases";
+	function record(value) {
+		return typeof value === "object" && value !== null && !Array.isArray(value);
+	}
+	function versionParts(value) {
+		if (typeof value !== "string" || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value)) return null;
+		const parts = value.split(".").map(Number);
+		return parts.every(Number.isSafeInteger) ? parts : null;
+	}
+	function compareVersions(left, right) {
+		const first = versionParts(left);
+		const second = versionParts(right);
+		if (!first || !second) return null;
+		for (let index = 0; index < 3; index++) if (first[index] !== second[index]) return first[index] > second[index] ? 1 : -1;
+		return 0;
+	}
+	function problem(key) {
+		throw new Error(key);
+	}
+	function validTarget(value) {
+		return record(value) && typeof value.version === "string" && versionParts(value.version) !== null && value.url === `${RELEASES}/tag/v${value.version}` && ["github", "npm"].includes(String(value.source)) && typeof value.installed === "string" && value.installed.length <= 128 && typeof value.latest === "string" && value.latest.length <= 128 && typeof value.bootId === "string" && value.bootId.length > 0 && value.bootId.length <= 128;
+	}
+	var PluginUpdateClient = class {
+		options;
+		state = {
+			phase: "idle",
+			target: null,
+			error: "",
+			notice: "",
+			restartRequired: false,
+			refreshRequired: false,
+			pending: null
+		};
+		controller = null;
+		timer = null;
+		busy = false;
+		closed = false;
+		sequence = 0;
+		polls = 0;
+		storageKey;
+		constructor(options) {
+			this.options = options;
+			this.storageKey = `power-dsh:update:${new URL(".", options.baseURI).href}`;
+		}
+		publish(patch) {
+			if (this.closed) return;
+			this.state = {
+				...this.state,
+				...patch
+			};
+			this.options.notify();
+		}
+		path(endpoint) {
+			return new URL(`${API}${endpoint}`, this.options.baseURI).pathname;
+		}
+		async request(url, signal, body, github = false) {
+			const timeout = new AbortController();
+			const timer = this.options.schedule(() => timeout.abort(), 15e3);
+			try {
+				const response = await this.options.fetch(url, {
+					method: body ? "POST" : "GET",
+					signal: AbortSignal.any([signal, timeout.signal]),
+					credentials: github ? "omit" : "same-origin",
+					redirect: "error",
+					cache: "no-store",
+					headers: body ? { "Content-Type": "application/json" } : { Accept: "application/json" },
+					...body ? { body: JSON.stringify(body) } : {}
+				});
+				if (!response.ok) problem(!github && (response.status === 404 || response.status === 405) ? "pluginUpdateApiUnavailable" : response.status === 401 || response.status === 403 ? "pluginUpdateDenied" : "pluginUpdateCheckFailed");
+				const text = await response.text();
+				if (text.length > 131072) problem("pluginUpdateCheckFailed");
+				const data = JSON.parse(text);
+				if (!record(data) || !github && data.schema !== "dsh-market/update-api/v1") problem("pluginUpdateApiUnavailable");
+				return data;
+			} finally {
+				this.options.cancel(timer);
+			}
+		}
+		async discover(signal) {
+			const data = await this.request(this.path("capabilities"), signal);
+			if (data.apiVersion !== 1 || !["beta", "stable"].includes(String(data.stability)) || !record(data.features) || !record(data.endpoints) || data.features.check !== true || data.features.progress !== true || data.endpoints.updates !== "/dsh-market/api/v1/updates" || data.endpoints.operations !== "/dsh-market/api/v1/operations" || typeof data.bootId !== "string" || !data.bootId || data.bootId.length > 128) problem("pluginUpdateApiUnavailable");
+			return {
+				bootId: data.bootId,
+				update: data.features.update === true
+			};
+		}
+		async inspect(signal) {
+			const capabilities = await this.discover(signal);
+			const item = (await this.request(`${this.path("updates")}?name=power-dsh&force=1`, signal)).package;
+			if (!record(item) || item.name !== "power-dsh" || typeof item.updateAvailable !== "boolean") problem("pluginUpdateCheckFailed");
+			if (item.source !== "github" && item.source !== "npm") problem("pluginUpdateSource");
+			const release = await this.request(`${REPOSITORY_API}/releases/latest`, signal, void 0, true);
+			const version = typeof release.tag_name === "string" ? release.tag_name.replace(/^v/, "") : "";
+			if (!versionParts(version) || release.tag_name !== `v${version}` || release.draft !== false || release.prerelease !== false || release.html_url !== `${RELEASES}/tag/v${version}` || !Array.isArray(release.assets) || !release.assets.some((asset) => record(asset) && asset.name === "power-dsh.tgz" && asset.state === "uploaded" && asset.browser_download_url === `${RELEASES}/download/v${version}/power-dsh.tgz`)) problem("pluginUpdateCheckFailed");
+			const comparison = compareVersions(version, this.options.version);
+			if (comparison === null) problem("pluginUpdateSource");
+			if (comparison <= 0) return {
+				target: null,
+				phase: "current"
+			};
+			if (!capabilities.update || !item.updateAvailable || typeof item.installedVersion !== "string" || !item.installedVersion || item.installedVersion.length > 128 || typeof item.latestVersion !== "string" || item.latestVersion.length > 128) return {
+				target: null,
+				phase: "unconfirmed"
+			};
+			if (item.source === "github") {
+				let object = (await this.request(`${REPOSITORY_API}/git/ref/tags/v${version}`, signal, void 0, true)).object;
+				for (let depth = 0; depth < 4 && record(object) && object.type === "tag"; depth++) {
+					if (typeof object.sha !== "string" || !/^[a-f0-9]{40}$/.test(object.sha)) problem("pluginUpdateCheckFailed");
+					object = (await this.request(`${REPOSITORY_API}/git/tags/${object.sha}`, signal, void 0, true)).object;
+				}
+				if (!record(object) || object.type !== "commit" || typeof object.sha !== "string" || !/^[a-f0-9]{40}$/.test(object.sha) || item.latestVersion !== object.sha) return {
+					target: null,
+					phase: "unconfirmed"
+				};
+			} else if (item.latestVersion !== version || item.installedVersion !== this.options.version) return {
+				target: null,
+				phase: "unconfirmed"
+			};
+			return {
+				phase: "available",
+				target: {
+					version,
+					url: `${RELEASES}/tag/v${version}`,
+					source: item.source,
+					installed: item.installedVersion,
+					latest: item.latestVersion,
+					bootId: capabilities.bootId
+				}
+			};
+		}
+		errorKey(error) {
+			const key = error instanceof Error ? error.message : "";
+			return [
+				"pluginUpdateApiUnavailable",
+				"pluginUpdateDenied",
+				"pluginUpdateSource",
+				"pluginUpdateChanged"
+			].includes(key) ? key : "pluginUpdateCheckFailed";
+		}
+		async check() {
+			if (this.closed || this.busy || this.state.pending || !this.options.canUse()) return;
+			this.busy = true;
+			const sequence = ++this.sequence;
+			const controller = this.controller = new AbortController();
+			this.publish({
+				phase: "checking",
+				target: null,
+				error: "",
+				notice: ""
+			});
+			try {
+				const result = await this.inspect(controller.signal);
+				if (sequence === this.sequence && this.options.canUse()) this.publish({
+					...result,
+					error: ""
+				});
+			} catch (error) {
+				if (sequence === this.sequence) this.publish({
+					phase: "error",
+					error: this.errorKey(error)
+				});
+			} finally {
+				if (sequence === this.sequence) {
+					this.busy = false;
+					this.controller = null;
+				}
+			}
+		}
+		savePending(pending) {
+			try {
+				if (!this.options.storage) problem("pluginUpdateUnknown");
+				if (pending) this.options.storage.setItem(this.storageKey, JSON.stringify(pending));
+				else this.options.storage.removeItem(this.storageKey);
+			} catch (_error) {
+				if (pending) this.publish({ notice: "pluginUpdateStorage" });
+			}
+		}
+		async update(expected) {
+			if (this.closed || this.busy || this.state.pending || this.state.target !== expected || !this.options.canUse()) return;
+			this.busy = true;
+			const sequence = ++this.sequence;
+			const controller = this.controller = new AbortController();
+			let submitted = false;
+			this.publish({
+				phase: "checking",
+				error: ""
+			});
+			try {
+				const fresh = await this.inspect(controller.signal);
+				if (sequence !== this.sequence || !this.options.canUse()) return;
+				if (!fresh.target || JSON.stringify(fresh.target) !== JSON.stringify(expected)) problem("pluginUpdateChanged");
+				submitted = true;
+				const unknown = {
+					operationId: "submission-unknown",
+					target: expected,
+					beforeVersion: this.options.version
+				};
+				this.savePending(unknown);
+				this.publish({ pending: unknown });
+				const operation = (await this.request(this.path("updates"), controller.signal, { packageName: "power-dsh" })).operation;
+				if (!record(operation) || operation.packageName !== "power-dsh" || typeof operation.operationId !== "string" || !operation.operationId || operation.operationId.length > 256) problem("pluginUpdateUnknown");
+				const pending = {
+					operationId: operation.operationId,
+					target: expected,
+					beforeVersion: this.options.version
+				};
+				this.savePending(pending);
+				if (sequence !== this.sequence) return;
+				this.polls = 0;
+				this.publish({
+					phase: "updating",
+					pending,
+					target: expected
+				});
+				this.observe(operation);
+			} catch (error) {
+				if (sequence === this.sequence) this.publish({
+					phase: "error",
+					target: null,
+					error: submitted ? "pluginUpdateUnknown" : this.errorKey(error)
+				});
+			} finally {
+				if (sequence === this.sequence) {
+					this.busy = false;
+					this.controller = null;
+				}
+			}
+		}
+		observe(value) {
+			const pending = this.state.pending;
+			if (!pending || !record(value) || value.schema !== "dsh-market/update-api/v1" || value.kind !== "update" || value.packageName !== "power-dsh" || value.operationId !== pending.operationId) problem("pluginUpdateUnknown");
+			if (value.state === "queued" || value.state === "running") {
+				if (++this.polls > 400) problem("pluginUpdateUnknown");
+				this.publish({
+					phase: "updating",
+					error: ""
+				});
+				this.timer = this.options.schedule(() => {
+					this.timer = null;
+					this.poll();
+				}, 1500);
+				return;
+			}
+			if (value.state === "succeeded" && record(value.outcome) && typeof value.installedVersion === "string" && value.beforeVersion === pending.beforeVersion && compareVersions(value.installedVersion, pending.target.version) !== null && compareVersions(value.installedVersion, pending.target.version) >= 0 && typeof value.outcome.refreshRequired === "boolean" && typeof value.outcome.restartRequired === "boolean") {
+				this.savePending(null);
+				this.publish({
+					phase: "done",
+					pending: null,
+					error: "",
+					restartRequired: value.outcome.restartRequired,
+					refreshRequired: value.outcome.refreshRequired,
+					target: {
+						...pending.target,
+						version: value.installedVersion
+					}
+				});
+			} else if ([
+				"failed",
+				"cancelled",
+				"rolled-back"
+			].includes(String(value.state))) {
+				this.savePending(null);
+				this.publish({
+					phase: "error",
+					pending: null,
+					target: null,
+					error: value.state === "rolled-back" ? "pluginUpdateRolledBack" : value.state === "cancelled" ? "pluginUpdateCancelled" : "pluginUpdateFailed"
+				});
+			} else problem("pluginUpdateUnknown");
+		}
+		async poll() {
+			const pending = this.state.pending;
+			if (this.closed || this.busy || !pending || !this.options.canUse()) return;
+			this.busy = true;
+			const sequence = ++this.sequence;
+			const controller = this.controller = new AbortController();
+			try {
+				const reply = await this.request(`${this.path("operations")}?operationId=${encodeURIComponent(pending.operationId)}`, controller.signal);
+				if (sequence === this.sequence && this.options.canUse()) this.observe(reply.operation);
+			} catch (_error) {
+				if (sequence === this.sequence) this.publish({
+					phase: "error",
+					error: "pluginUpdateUnknown"
+				});
+			} finally {
+				if (sequence === this.sequence) {
+					this.busy = false;
+					this.controller = null;
+				}
+			}
+		}
+		async resume() {
+			if (this.closed || this.busy || !this.options.canUse()) return;
+			if (this.timer !== null) this.options.cancel(this.timer);
+			this.timer = null;
+			let pending = this.state.pending;
+			if (!pending) try {
+				pending = JSON.parse(this.options.storage?.getItem(this.storageKey) || "null");
+			} catch (_error) {
+				return;
+			}
+			if (!pending) return;
+			if (!record(pending) || typeof pending.operationId !== "string" || !pending.operationId || pending.operationId.length > 256 || !validTarget(pending.target) || typeof pending.beforeVersion !== "string" || !versionParts(pending.beforeVersion)) {
+				this.savePending(null);
+				return;
+			}
+			const restored = {
+				operationId: pending.operationId,
+				target: pending.target,
+				beforeVersion: pending.beforeVersion
+			};
+			this.busy = true;
+			const sequence = ++this.sequence;
+			const controller = this.controller = new AbortController();
+			this.publish({
+				phase: "updating",
+				pending: restored,
+				target: restored.target,
+				error: ""
+			});
+			try {
+				const capabilities = await this.discover(controller.signal);
+				if (sequence !== this.sequence) return;
+				if (capabilities.bootId !== restored.target.bootId) {
+					this.savePending(null);
+					this.publish({
+						phase: "error",
+						pending: null,
+						target: null,
+						error: "pluginUpdateUnknown"
+					});
+					return;
+				}
+			} catch (_error) {
+				if (sequence === this.sequence) this.publish({
+					phase: "error",
+					error: "pluginUpdateUnknown"
+				});
+				return;
+			} finally {
+				if (sequence === this.sequence) {
+					this.busy = false;
+					this.controller = null;
+				}
+			}
+			if (sequence === this.sequence && this.options.canUse()) {
+				this.polls = 0;
+				await this.poll();
+			}
+		}
+		pause() {
+			this.sequence++;
+			this.controller?.abort();
+			this.controller = null;
+			if (this.timer !== null) this.options.cancel(this.timer);
+			this.timer = null;
+			this.busy = false;
+			if (this.state.phase === "checking") this.publish({
+				phase: this.state.pending ? "error" : "idle",
+				error: this.state.pending ? "pluginUpdateUnknown" : "",
+				target: null
+			});
+		}
+		close() {
+			this.pause();
+			this.closed = true;
+		}
+	};
+
+// src/features/plugin-updates/client.ts
+	function createClientFeature$21(runtime, env) {
+		const { React, h, Button, Modal, observable, useSnapshot, errorFeedback } = runtime;
+		const { ctx, source, t, pluginVersion } = env;
+		const canUse = () => {
+			const snapshot = source.getSnapshot();
+			return snapshot.status === "ready" && snapshot.writable && snapshot.value?.pluginUpdatesEnabled === true;
+		};
+		let storage;
+		try {
+			storage = window.sessionStorage;
+		} catch (_error) {}
+		const updates = new PluginUpdateClient({
+			version: pluginVersion,
+			baseURI: document.baseURI,
+			canUse,
+			storage,
+			fetch: (...args) => fetch(...args),
+			notify: () => updateSource.notify(),
+			schedule: (callback, milliseconds) => window.setTimeout(callback, milliseconds),
+			cancel: (timer) => window.clearTimeout(timer)
+		});
+		const updateSource = observable(() => updates.state);
+		ctx.effect(() => () => updates.close());
+		function useSettingsFooter({ snapshot, id }) {
+			const state = useSnapshot(updateSource);
+			const [confirming, setConfirming] = React.useState(null);
+			const confirmation = React.useRef(null);
+			const visible = snapshot.status === "ready" && snapshot.value?.pluginUpdatesEnabled === true;
+			const writable = visible && snapshot.writable;
+			const close = () => {
+				confirmation.current = null;
+				setConfirming(null);
+			};
+			React.useEffect(() => {
+				if (writable) updates.resume();
+				return () => {
+					updates.pause();
+					confirmation.current = null;
+				};
+			}, [writable]);
+			React.useEffect(() => {
+				close();
+			}, [writable, state.target]);
+			if (!visible) return null;
+			const busy = state.phase === "checking" || state.phase === "updating";
+			const request = confirmation.current;
+			const confirm = () => {
+				const expected = request?.target;
+				if (!expected || confirmation.current !== request || !canUse() || state.target !== expected || updates.busy) return;
+				close();
+				updates.update(expected);
+			};
+			return h("footer", {
+				className: "power-dsh-plugin-update",
+				key: "plugin-updates",
+				"aria-label": t("pluginUpdateConfirm")
+			}, h("div", { className: "power-dsh-plugin-update-row" }, h("span", null, `PowerDSH ${pluginVersion}`), h("div", { className: "power-dsh-plugin-update-actions" }, h(Button, {
+				size: "sm",
+				variant: "outline",
+				disabled: !writable || busy || Boolean(state.pending) || state.error === "pluginUpdateUnknown",
+				"aria-busy": state.phase === "checking",
+				onClick: () => updates.check()
+			}, t(state.phase === "checking" ? "pluginUpdateChecking" : "pluginUpdateCheck")), state.phase === "available" && state.target && h(Button, {
+				size: "sm",
+				variant: "primary",
+				disabled: !writable || busy,
+				onClick: () => {
+					if (canUse() && updates.state.target) {
+						confirmation.current = { target: updates.state.target };
+						setConfirming(updates.state.target);
+					}
+				}
+			}, `${t("pluginUpdateAction")} ${state.target.version}`))), state.target && h("a", {
+				href: state.target.url,
+				target: "_blank",
+				rel: "noopener noreferrer"
+			}, t("pluginUpdateReleaseNotes")), [
+				"current",
+				"unconfirmed",
+				"updating",
+				"done"
+			].includes(state.phase) && h("p", {
+				className: "power-dsh-description",
+				role: "status"
+			}, state.phase === "done" ? `${t("pluginUpdateDone")} ${state.target?.version || ""}` : t(state.phase === "current" ? "pluginUpdateCurrent" : state.phase === "unconfirmed" ? "pluginUpdateUnconfirmed" : "pluginUpdateRunning")), state.notice && h("p", { className: "power-dsh-description" }, t(state.notice)), state.phase === "done" && state.restartRequired && h("p", { className: "power-dsh-description" }, t("pluginUpdateRestart")), state.phase === "done" && state.refreshRequired && h(Button, {
+				size: "sm",
+				variant: "outline",
+				onClick: () => window.location.reload()
+			}, t("pluginUpdateRefresh")), state.error && errorFeedback({
+				t,
+				id: `${id}-plugin-update-error`,
+				message: t(state.error),
+				code: "PD-PLUGIN-UPDATE",
+				operation: state.pending ? "pluginUpdate.observe" : "pluginUpdate.check",
+				retry: state.pending ? () => updates.resume() : state.error === "pluginUpdateUnknown" ? void 0 : () => updates.check()
+			}), h(Modal, {
+				open: Boolean(confirming) && writable && state.target === confirming,
+				onClose: close,
+				title: t("pluginUpdateConfirm"),
+				closeLabel: t("close"),
+				description: t("pluginUpdateConfirmDescription"),
+				footer: h(React.Fragment, null, h(Button, {
+					variant: "outline",
+					"data-modal-autofocus": true,
+					onClick: close
+				}, t("cancel")), h(Button, {
+					variant: "primary",
+					disabled: !writable || busy,
+					onClick: confirm
+				}, t("pluginUpdateAction")))
+			}, h("p", null, `${pluginVersion} → ${confirming?.version || ""}`)));
+		}
+		return {
+			settings: [{
+				field: "pluginUpdatesEnabled",
+				description: "pluginUpdatesDescription"
+			}],
+			useSettingsFooter,
+			styles: `.power-dsh-plugin-update { margin-top:24px; padding-top:16px; border-top:.5px solid var(--dsw-alias-border-l2); font-size:13px; color:var(--dsw-alias-label-secondary); }
+.power-dsh-plugin-update-row,.power-dsh-plugin-update-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.power-dsh-plugin-update-row { justify-content:space-between; }
+.power-dsh-plugin-update a { display:inline-block; margin-top:8px; color:var(--dsw-alias-state-business-primary); }`,
+			api: {
+				pluginUpdateSource: updateSource,
+				pluginUpdates: updates
+			}
+		};
+	}
+
+// src/features/plugin-updates/definition.ts
+	const definition$21 = Object.freeze({
+		id: "plugin-updates",
+		category: "other",
+		order: 100,
+		keys: Object.freeze(["pluginUpdatesEnabled"]),
+		spec: "src/features/plugin-updates/spec.md"
+	});
+
+// src/features/plugin-updates/locales.ts
+	const locales$22 = {
+		zh: {
+			pluginUpdatesEnabled: "显示插件更新入口",
+			pluginUpdatesDescription: "在设置页底部手动检查 PowerDSH 更新",
+			pluginUpdateCheck: "检查更新",
+			pluginUpdateChecking: "正在检查…",
+			pluginUpdateAction: "更新",
+			pluginUpdateConfirm: "更新 PowerDSH",
+			pluginUpdateConfirmDescription: "由插件市场完成安装，过程中插件可能重新加载。完成后可能需要刷新界面或重启 DSH。",
+			pluginUpdateReleaseNotes: "更新日志",
+			pluginUpdateCurrent: "当前运行版本已不低于最新正式版",
+			pluginUpdateUnconfirmed: "未确认可用更新，请到插件市场核对当前安装来源。",
+			pluginUpdateRunning: "插件市场正在处理更新…",
+			pluginUpdateDone: "已安装",
+			pluginUpdateRefresh: "刷新界面",
+			pluginUpdateRestart: "请通过 DSH 的原生入口重启应用后使用新版。",
+			pluginUpdateApiUnavailable: "当前插件市场不支持公开更新接口，请启用或升级市场后重试，也可在市场中更新。",
+			pluginUpdateDenied: "无法访问更新服务，请检查当前登录和管理权限。",
+			pluginUpdateSource: "当前安装来源或版本无法安全更新，请在插件市场处理。",
+			pluginUpdateChanged: "更新目标或安装状态已变化，请重新检查并确认。",
+			pluginUpdateCheckFailed: "检查更新失败，请检查网络后重试。",
+			pluginUpdateUnknown: "无法确认更新结果，请到插件市场查看，避免重复安装。",
+			pluginUpdateStorage: "进度无法在刷新后保留，请在插件市场查看更新结果。",
+			pluginUpdateFailed: "更新未成功，请到插件市场查看原因和恢复操作。",
+			pluginUpdateCancelled: "更新已取消，请在市场确认当前安装状态。",
+			pluginUpdateRolledBack: "市场已回滚更新，请确认恢复结果后再试。",
+			pluginUpdateResume: "重新查询进度"
+		},
+		en: {
+			pluginUpdatesEnabled: "Show plugin update controls",
+			pluginUpdatesDescription: "Manually check PowerDSH updates at the bottom of settings",
+			pluginUpdateCheck: "Check for updates",
+			pluginUpdateChecking: "Checking…",
+			pluginUpdateAction: "Update",
+			pluginUpdateConfirm: "Update PowerDSH",
+			pluginUpdateConfirmDescription: "The plugin market handles installation. The plugin may reload during the update, and DSH may need a refresh or restart afterward.",
+			pluginUpdateReleaseNotes: "Release notes",
+			pluginUpdateCurrent: "The running version is at least the latest stable release",
+			pluginUpdateUnconfirmed: "No update target confirmed. Check the installation source in the plugin market.",
+			pluginUpdateRunning: "The plugin market is processing the update…",
+			pluginUpdateDone: "Installed",
+			pluginUpdateRefresh: "Refresh interface",
+			pluginUpdateRestart: "Restart DSH using its native controls to use the new version.",
+			pluginUpdateApiUnavailable: "The plugin market update API is unavailable. Enable or update the market and retry, or update there.",
+			pluginUpdateDenied: "Cannot access the update service. Check your session and management permissions.",
+			pluginUpdateSource: "This installation source or version cannot be updated safely here. Use the plugin market.",
+			pluginUpdateChanged: "The update target or installation changed. Check again and confirm the new target.",
+			pluginUpdateCheckFailed: "Could not check for updates. Check your connection and retry.",
+			pluginUpdateUnknown: "The update result is unknown. Check the plugin market before installing again.",
+			pluginUpdateStorage: "Progress cannot survive a refresh. Check the update result in the plugin market.",
+			pluginUpdateFailed: "The update did not succeed. Check the plugin market for details and recovery.",
+			pluginUpdateCancelled: "The update was cancelled. Confirm the installation state in the plugin market.",
+			pluginUpdateRolledBack: "The market rolled back the update. Confirm recovery before retrying.",
+			pluginUpdateResume: "Read progress again"
+		}
+	};
 
 // src/features/account-blocking/client.ts
 	function createClientFeature$20(runtime, env) {
@@ -2033,6 +2604,9 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 // src/features/notifications/styles.ts
 	const styles$9 = `
 .power-dsh-page .power-dsh-sound-controls { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; flex:none; max-width:50%; }
+.power-dsh-page .power-dsh-mode-select { box-sizing:border-box; display:inline-flex; align-items:center; min-height:36px; padding:0 14px; border:0; border-radius:var(--dsw-radius-md); background:var(--dsw-alias-bg-module-platform); color:var(--dsw-alias-label-primary); font:inherit; font-size:14px; cursor:pointer; }
+.power-dsh-page .power-dsh-mode-select:disabled { opacity:.5; cursor:default; }
+.power-dsh-page .power-dsh-mode-select:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
 .power-dsh-page .power-dsh-sound-select { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; gap:12px; min-height:36px; max-width:100%; padding:0 14px; border:0; border-radius:var(--dsw-radius-md); background:var(--dsw-alias-bg-module-platform); color:var(--dsw-alias-label-primary); font:inherit; font-size:14px; line-height:22px; cursor:pointer; }
 .power-dsh-page .power-dsh-sound-preview { display:inline-flex; align-items:center; justify-content:center; flex:none; width:36px; height:36px; padding:0; border:0; border-radius:var(--dsw-radius-md); background:transparent; color:var(--dsw-alias-label-secondary); cursor:pointer; }
 .power-dsh-page .power-dsh-sound-preview:disabled { opacity:.5; cursor:default; }
@@ -2049,11 +2623,51 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		const { ctx, form, source, t, savePreference } = env;
 		const styles = styles$9;
 		let active = true;
-		const notificationTagPrefix = `power-dsh:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 10)}`;
 		let notificationSequence = 0;
-		const nextNotificationTag = () => `${notificationTagPrefix}:${(++notificationSequence).toString(36)}`;
 		const newNativeGroup = () => `pd${Math.random().toString(36).slice(2, 14)}`;
-		const usesNativeNotifications = () => Boolean(window.dshDesktop?.protocolVersion === 1 && document.documentElement.getAttribute("data-platform") === "win32" && soundConnection?.isLoopback);
+		let transport = {
+			status: "loading",
+			value: null,
+			local: false,
+			testing: false
+		};
+		let transportGeneration = 0;
+		const transportSource = observable(() => transport);
+		const publishTransport = (patch) => {
+			transport = {
+				...transport,
+				...patch
+			};
+			transportSource.notify();
+		};
+		const transportReady = () => transport.status === "ready" && (!transport.local || transport.value?.version === env.pluginVersion && (transport.value.platform !== "win32" || transport.value.nativeAvailable));
+		const usesNativeNotifications = () => transport.local && transport.value?.platform === "win32";
+		let testSender = null;
+		const loadTransport = async () => {
+			if (!active || !soundConnection) return;
+			const generation = ++transportGeneration;
+			publishTransport({
+				status: "loading",
+				value: null,
+				local: soundConnection.isLoopback
+			});
+			if (!soundConnection.isLoopback) {
+				publishTransport({ status: "ready" });
+				return;
+			}
+			try {
+				const reply = await ctx.remote.powerDsh.notificationTransport();
+				if (!active || generation !== transportGeneration) return;
+				if (!reply.ok) throw new Error("notificationUnavailable");
+				publishTransport({
+					status: "ready",
+					value: reply.value
+				});
+			} catch (_error) {
+				if (active && generation === transportGeneration) publishTransport({ status: "error" });
+			}
+			checkNotificationPermission();
+		};
 		const clearNativeNotifications = async (group, tag = "") => {
 			if (!(await ctx.remote.powerDsh.clearWindowsNotifications(group, tag)).ok) throw new Error("notificationFailed");
 		};
@@ -2082,10 +2696,12 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					nativeGroup = newNativeGroup();
 				}
 			}
-			function send(id, row, kind) {
-				if (!active || !usesNativeNotifications() && window.Notification?.permission !== "granted") return;
+			function send(id, row, kind, manual = false) {
+				if (!active || !transportReady() || !usesNativeNotifications() && window.Notification?.permission !== "granted") return;
 				try {
 					const preferences = form.getSnapshot().value;
+					const inFront = !document.hidden && document.hasFocus() && (row.retainedBy?.mainView ?? 0) > 0;
+					if (!manual && (preferences?.notificationMode === "never" || preferences?.notificationMode !== "always" && inFront)) return;
 					const sound = preferences?.notificationSound || "default";
 					const localTone = preferences?.notificationSoundEnabled === true && sound !== "default" && ctx.connection.isLoopback;
 					if (usesNativeNotifications()) {
@@ -2093,7 +2709,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 						nativeTags.set(id, tag);
 						const sentGroup = nativeGroup;
 						const sentGeneration = generation;
-						(async () => {
+						return (async () => {
 							const reply = await ctx.remote.powerDsh.showWindowsNotification({
 								group: sentGroup,
 								tag,
@@ -2114,14 +2730,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 						})().catch(() => {
 							if (active && enabled && sentGroup === nativeGroup && sentGeneration === generation) reportError("notificationFailed");
 						});
-						return;
 					}
 					visible.get(id)?.close();
 					visible.delete(id);
 					const notification = new window.Notification(t(`notification${kind}`), {
 						body: (row.displayTitle || row.title || t("notificationBody")).slice(0, 160),
-						tag: nextNotificationTag(),
-						renotify: true,
 						...kind === "Approval" || kind === "Input" ? { requireInteraction: true } : {},
 						...preferences?.notificationSoundEnabled === true && !localTone ? {} : { silent: true }
 					});
@@ -2157,8 +2770,13 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					records.clear();
 					return;
 				}
+				if (!transportReady()) {
+					records.clear();
+					closeAll();
+					return;
+				}
 				const settings = form.getSnapshot();
-				const nextEnabled = settings.status === "ready" && settings.value?.notificationsEnabled === true;
+				const nextEnabled = settings.status === "ready" && settings.value?.notificationsEnabled === true && settings.value.notificationMode !== "never";
 				if (nextEnabled !== enabled) {
 					seed = true;
 					enabled = nextEnabled;
@@ -2196,9 +2814,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					if (fresh && advanced && enabled) {
 						if (outcome.reason === "blocked") {
 							if (!pending && !current.attention) send(id, row, "Input");
-						} else if (!pending && (outcome.reason === "completed" || outcome.reason === "error")) {
-							if (!(!document.hidden && document.hasFocus() && (row.retainedBy?.mainView ?? 0) > 0)) send(id, row, outcome.reason === "error" ? "Error" : "Complete");
-						}
+						} else if (!pending && (outcome.reason === "completed" || outcome.reason === "error")) send(id, row, outcome.reason === "error" ? "Error" : "Complete");
 					}
 					if (advanced) current.seen = new Set(pending ? [pending.key] : []);
 					current.seq = outcome?.seq;
@@ -2224,8 +2840,20 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			const offStatus = ctx.uiSession.sessionStatus.subscribe(() => run());
 			const offForm = form.subscribe(() => run());
 			const offConnection = ctx.connection.generation.subscribe(() => run(true));
+			let lastTransport = transport;
+			const offTransport = transportSource.subscribe(() => {
+				const previous = lastTransport;
+				lastTransport = transport;
+				if (previous.status !== transport.status || previous.value !== transport.value || previous.local !== transport.local) run(true);
+			});
+			testSender = () => Promise.resolve(send("power-dsh-test", {
+				running: false,
+				title: t("notificationTestBody")
+			}, "Complete", true));
 			return () => {
 				active = false;
+				testSender = null;
+				offTransport();
 				offList();
 				offStatus();
 				offForm();
@@ -2307,7 +2935,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		};
 		const playSystemSound = async (id, preview) => {
 			const preferences = form.getSnapshot();
-			if (!active || !soundConnection?.isLoopback || preferences.status !== "ready" || !preferences.value?.notificationsEnabled || !preferences.value?.notificationSoundEnabled) return;
+			if (!active || !transportReady() || !soundConnection?.isLoopback || preferences.status !== "ready" || !preferences.value?.notificationsEnabled || !preferences.value?.notificationSoundEnabled) return;
 			if (preview && (!preferences.writable || soundState.playing || soundState.status !== "ready" || (preferences.value?.notificationSound || "default") !== id || !soundState.value?.sounds.some((sound) => sound.id === id))) return;
 			if (preview) publishSound({
 				playing: true,
@@ -2331,11 +2959,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					}
 					if (window.Notification?.permission !== "granted") throw new Error("notificationPermission");
 					soundPreview?.close();
-					soundPreview = new window.Notification(t("notificationSoundTestTitle"), {
-						body: t("notificationSoundTestBody"),
-						tag: nextNotificationTag(),
-						renotify: true
-					});
+					soundPreview = new window.Notification(t("notificationSoundTestTitle"), { body: t("notificationSoundTestBody") });
 					soundPreview.onerror = () => {
 						if (active) publishSound({ error: "notificationSoundFailed" });
 					};
@@ -2364,10 +2988,16 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				return;
 			}
 			if (form.getSnapshot().value?.notificationSoundEnabled !== true) closeSoundPreview();
-			reportNotificationError(usesNativeNotifications() ? !notificationReady ? "notificationUnavailable" : "" : !window.Notification ? "notificationUnsupported" : window.Notification.permission !== "granted" ? "notificationPermission" : !notificationReady ? "notificationUnavailable" : "");
+			reportNotificationError(transport.local && transport.value && transport.value.version !== env.pluginVersion ? "notificationVersionMismatch" : !transportReady() ? "notificationUnavailable" : usesNativeNotifications() ? !notificationReady ? "notificationUnavailable" : "" : !window.Notification ? "notificationUnsupported" : window.Notification.permission !== "granted" ? "notificationPermission" : !notificationReady ? "notificationUnavailable" : "");
 		};
 		ctx.inject(["connection"], (child) => {
 			child.effect(() => child.connection.generation.subscribe(() => {
+				transportGeneration++;
+				publishTransport({
+					status: "loading",
+					value: null
+				});
+				if (child.connection.generation.getSnapshot() !== void 0) loadTransport();
 				soundGeneration++;
 				closeSoundPreview();
 				const requested = soundState.status !== "idle";
@@ -2381,10 +3011,16 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			}));
 			child.effect(() => {
 				soundConnection = child.connection;
+				loadTransport();
 				if (soundState.status !== "idle") loadSystemSounds();
 				return () => {
 					closeSoundPreview();
 					soundConnection = null;
+					transportGeneration++;
+					publishTransport({
+						status: "loading",
+						value: null
+					});
 					soundGeneration++;
 					publishSound({
 						status: "waiting",
@@ -2419,7 +3055,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		});
 		const setNotificationsEnabled = async (enabled) => {
 			if (enabled) {
-				if (!notificationReady) throw new Error(t("notificationUnavailable"));
+				if (!notificationReady || !transportReady()) throw new Error(t("notificationUnavailable"));
 				if (!usesNativeNotifications()) {
 					if (!window.Notification) throw new Error(t("notificationUnsupported"));
 					const permission = window.Notification.permission === "default" ? await window.Notification.requestPermission() : window.Notification.permission;
@@ -2453,9 +3089,21 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				if (mounted.current && typeof next === "string") await playSystemSound(next, true);
 			}
 		};
+		const modeSetting = {
+			field: "notificationMode",
+			hidden: true,
+			canSave: (next) => [
+				"never",
+				"background",
+				"always"
+			].includes(String(next)) && source.getSnapshot().value?.notificationsEnabled === true,
+			save: (next) => savePreference("notificationMode", String(next), "notificationUnavailable", "string")
+		};
 		function useSettings({ snapshot, disabled, saving, error, save, id }) {
 			const sounds = useSnapshot(soundsSource);
 			const notifications = useSnapshot(notificationsSource);
+			const channel = useSnapshot(transportSource);
+			const [modeMenuOpen, setModeMenuOpen] = React.useState(false);
 			const [soundMenuOpen, setSoundMenuOpen] = React.useState(false);
 			React.useEffect(() => {
 				loadSystemSounds();
@@ -2464,6 +3112,85 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				if (snapshot.value?.notificationsEnabled !== true) setSoundMenuOpen(false);
 			}, [snapshot.value?.notificationsEnabled]);
 			const soundName = (sound) => sound.id === "default" ? t("notificationSoundDefault") : sound.id.startsWith("win:") ? t(`sound${sound.id.slice(4)}`) : sound.name;
+			const mode = snapshot.value?.notificationMode || "background";
+			function modeRow() {
+				if (snapshot.value?.notificationsEnabled !== true) return null;
+				const busy = saving?.field === "notificationMode";
+				const modeLabel = (value) => t(value === "always" ? "notificationAlways" : value === "never" ? "notificationNever" : "notificationBackground");
+				return h("div", {
+					className: "power-dsh-setting-row",
+					key: "notificationMode"
+				}, h("div", { className: "power-dsh-setting-copy" }, h("div", {
+					id: `${id}-notificationMode-label`,
+					className: "power-dsh-setting-label"
+				}, t("notificationMode")), h("div", {
+					id: `${id}-notificationMode-description`,
+					className: "power-dsh-description"
+				}, t("notificationModeDescription")), error?.field === "notificationMode" && errorFeedback({
+					t,
+					id: `${id}-notificationMode-error`,
+					message: error.message,
+					code: "PD-NOTIFICATION-MODE",
+					operation: "settings.notificationMode"
+				})), h(Menu, {
+					open: modeMenuOpen && !disabled && !busy,
+					onClose: () => setModeMenuOpen(false),
+					selectedId: mode,
+					portal: true,
+					align: "end",
+					autoFocus: true,
+					minWidthFromAnchor: true,
+					items: [
+						"never",
+						"background",
+						"always"
+					].map((value) => ({
+						id: value,
+						label: modeLabel(value)
+					})),
+					onSelect: (value) => {
+						setModeMenuOpen(false);
+						return save("notificationMode", value);
+					},
+					anchor: h("button", {
+						type: "button",
+						className: "power-dsh-mode-select",
+						disabled: disabled || busy,
+						"aria-label": t("notificationMode"),
+						"aria-haspopup": "menu",
+						"aria-expanded": modeMenuOpen && !disabled && !busy,
+						"aria-describedby": `${id}-notificationMode-description${error?.field === "notificationMode" ? ` ${id}-notificationMode-error` : ""}`,
+						"aria-invalid": error?.field === "notificationMode",
+						"aria-busy": busy,
+						onClick: () => {
+							if (!disabled && !busy) setModeMenuOpen(true);
+						}
+					}, modeLabel(mode))
+				}));
+			}
+			const testNotification = async () => {
+				const current = source.getSnapshot();
+				if (!active || current.status !== "ready" || !current.writable || current.value?.notificationsEnabled !== true || current.value.notificationMode === "never" || !transportReady() || transport.testing || !testSender) return;
+				publishTransport({ testing: true });
+				try {
+					await testSender();
+				} finally {
+					if (active) publishTransport({ testing: false });
+				}
+			};
+			function transportRow() {
+				if (snapshot.value?.notificationsEnabled !== true) return null;
+				return h("div", {
+					className: "power-dsh-setting-row",
+					key: "notificationTransport"
+				}, h("div", { className: "power-dsh-setting-copy" }, h("div", { className: "power-dsh-setting-label" }, t("notificationTest")), h("div", { className: "power-dsh-description" }, `${t(channel.status !== "ready" ? "notificationTransportPending" : usesNativeNotifications() ? "notificationNative" : "notificationBrowser")} · PowerDSH ${channel.value?.version || env.pluginVersion}`)), h(runtime.Button, {
+					size: "sm",
+					variant: "outline",
+					disabled: disabled || !transportReady() || channel.testing || mode === "never",
+					"aria-busy": channel.testing,
+					onClick: testNotification
+				}, t("notificationTest")));
+			}
 			function soundRow() {
 				if (snapshot.value?.notificationsEnabled !== true) return null;
 				const field = "notificationSoundEnabled";
@@ -2590,17 +3317,40 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					fill: "currentColor"
 				}))))));
 			}
-			return [{
-				...mainSetting,
-				error: notifications.error && t(notifications.error)
-			}, {
-				...soundSetting,
-				render: soundRow
-			}];
+			return [
+				{
+					...mainSetting,
+					failure: notifications.error ? {
+						message: t(notifications.error),
+						code: "PD-NOTIFICATION-DELIVERY",
+						operation: "notifications.deliver",
+						context: {
+							stage: "transport",
+							actual: `${channel.status}:${channel.value?.platform || "browser"}:${channel.value?.version || "unknown"}`,
+							expected: `${usesNativeNotifications() ? "winrt" : "browser"}:${env.pluginVersion}`
+						}
+					} : void 0
+				},
+				{
+					...modeSetting,
+					hidden: false,
+					render: modeRow
+				},
+				{
+					...soundSetting,
+					render: soundRow
+				},
+				{
+					...toneSetting,
+					hidden: false,
+					render: transportRow
+				}
+			];
 		}
 		return {
 			settings: [
 				mainSetting,
+				modeSetting,
 				soundSetting,
 				toneSetting
 			],
@@ -2611,7 +3361,9 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				setNotificationsEnabled,
 				soundsSource,
 				loadSystemSounds,
-				playSystemSound
+				playSystemSound,
+				transportSource,
+				loadTransport
 			}
 		};
 	}
@@ -2623,6 +3375,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		order: 0,
 		keys: Object.freeze([
 			"notificationsEnabled",
+			"notificationMode",
 			"notificationSoundEnabled",
 			"notificationSound"
 		]),
@@ -2632,6 +3385,17 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 // src/features/notifications/locales.ts
 	const locales$17 = {
 		"en": {
+			"notificationMode": "Notification policy",
+			"notificationModeDescription": "Choose when task reminders appear",
+			"notificationNever": "Never",
+			"notificationBackground": "When not focused",
+			"notificationAlways": "Always",
+			"notificationTest": "Send test notification",
+			"notificationTestBody": "PowerDSH notification delivery test",
+			"notificationNative": "Windows native notifications",
+			"notificationTransportPending": "Notification channel unconfirmed",
+			"notificationBrowser": "Browser notifications",
+			"notificationVersionMismatch": "The running Host and interface versions differ. Reload or restart DSH and try again.",
 			"notificationsEnabled": "Task notifications",
 			"notificationsDescription": "Send desktop notifications when tasks finish, fail, or need confirmation",
 			"notificationSoundEnabled": "Notification sound",
@@ -2662,6 +3426,17 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"notificationUnavailable": "Task notifications have not loaded yet. Re-enable power-dsh, then try again."
 		},
 		"zh": {
+			"notificationMode": "提醒时机",
+			"notificationModeDescription": "选择任务通知的提醒方式",
+			"notificationNever": "从不提醒",
+			"notificationBackground": "仅在未聚焦时提醒",
+			"notificationAlways": "始终提醒",
+			"notificationTest": "发送测试通知",
+			"notificationTestBody": "PowerDSH 通知发送测试",
+			"notificationNative": "Windows 原生通知",
+			"notificationTransportPending": "通知通道尚未确认",
+			"notificationBrowser": "浏览器通知",
+			"notificationVersionMismatch": "当前运行的 Host 与界面版本不一致，请刷新或重启 DSH 后重试。",
 			"notificationsEnabled": "任务通知",
 			"notificationsDescription": "任务完成、失败或需要确认时发送桌面通知",
 			"notificationSoundEnabled": "通知声音",
@@ -2814,11 +3589,36 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			} })
 		}
 	};
+	const NOTIFICATION_TRANSPORT_RPC = {
+		id: "power-dsh#powerDsh/notificationTransport",
+		service: "powerDsh",
+		namespace: "powerDsh",
+		method: "notificationTransport",
+		invocation: { kind: "direct" },
+		parameters: [],
+		result: {
+			mode: "strict",
+			typeSymbol: "power-dsh#NotificationTransport",
+			create: () => ({ parse(value) {
+				if (!isRecord(value) || !isOneOf(value.platform, [
+					"win32",
+					"darwin",
+					"other"
+				]) || typeof value.nativeAvailable !== "boolean" || typeof value.version !== "string" || !/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(value.version)) throw new TypeError("Invalid notification transport");
+				return {
+					platform: value.platform,
+					nativeAvailable: value.nativeAvailable,
+					version: value.version
+				};
+			} })
+		}
+	};
 	const rpc$12 = [
 		LIST_SYSTEM_SOUNDS_RPC,
 		PLAY_SYSTEM_SOUND_RPC,
 		SHOW_WINDOWS_NOTIFICATION_RPC,
-		CLEAR_WINDOWS_NOTIFICATIONS_RPC
+		CLEAR_WINDOWS_NOTIFICATIONS_RPC,
+		NOTIFICATION_TRANSPORT_RPC
 	];
 
 // src/features/personalization/styles.ts
@@ -9547,6 +10347,12 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 // src/app/client-features.ts
 	const clientFeatures = [
 		{
+			definition: definition$21,
+			create: createClientFeature$21,
+			locales: locales$22,
+			rpc: []
+		},
+		{
 			definition: definition$6,
 			create: createClientFeature$6,
 			locales: locales$7,
@@ -9765,6 +10571,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		return descriptors;
 	}
 	const MOD_RPC = composeRpc([
+		NOTIFICATION_TRANSPORT_RPC,
 		RESTART_STATUS_RPC,
 		RESTART_APP_RPC,
 		LIST_SYSTEM_SOUNDS_RPC,
@@ -9860,6 +10667,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 							t,
 							version,
 							namespace,
+							pluginVersion: "0.0.6",
 							savePreference,
 							preferenceSlot: preferenceSlot$1,
 							get footerBusy() {

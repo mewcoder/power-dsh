@@ -7,6 +7,7 @@ import type { ClientContext, ClientEnvironment, ClientFeatureSelection, IconProp
 import { clientFeatures } from './client-features.ts';
 import { featureDictionaries } from './locales.ts';
 import { MOD_RPC, composeRpc } from './rpc.ts';
+declare const __POWER_DSH_VERSION__: string;
 
 export function createClient(React: ReactModule, primitives: PublicPrimitives, selectedFeatures: readonly ClientFeatureSelection[] = clientFeatures) {
   const runtime = createRuntime(React, primitives);
@@ -50,7 +51,7 @@ export function createClient(React: ReactModule, primitives: PublicPrimitives, s
         const features = [...selectedFeatures].sort((a, b) => a.definition.order - b.definition.order).map(({ definition, create }) => {
           if (ids.has(definition.id)) throw new Error(`Duplicate Client feature: ${definition.id}`);
           ids.add(definition.id);
-          const feature = create(runtime, { ctx, form, source, t, version, namespace, savePreference, preferenceSlot,
+          const feature = create(runtime, { ctx, form, source, t, version, namespace, pluginVersion: __POWER_DSH_VERSION__, savePreference, preferenceSlot,
             get footerBusy() { return footerBusy ??= createFooterBusySource(ctx, runtime.observable); },
           });
           for (const setting of feature.settings || []) {

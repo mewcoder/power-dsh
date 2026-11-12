@@ -104,7 +104,7 @@ export class WindowsToasts {
     const tagRevision = this.revisions.get(tagKey);
     const current = () => revision === this.revisions.get(notification.group) && tagRevision === this.revisions.get(tagKey);
     return this.queue.run(async () => {
-      if (!current() || this.config.notificationsEnabled.get() !== true
+      if (!current() || this.config.notificationsEnabled.get() !== true || (!notification.preview && this.config.notificationMode?.get() === 'never')
         || (notification.preview && this.config.notificationSoundEnabled.get() !== true)) return { shown: false };
       const soundEnabled = this.config.notificationSoundEnabled.get() === true;
       const sound = this.config.notificationSound.get() || 'default';
@@ -117,7 +117,7 @@ export class WindowsToasts {
       if (!this.groups.has(notification.group) && this.groups.size >= 64) throw new Error('notificationFailed');
       this.groups.add(notification.group);
       const shown = await this.execute({ group: notification.group, tag: notification.tag, xml }, () =>
-        current() && this.config.notificationsEnabled.get() === true
+        current() && this.config.notificationsEnabled.get() === true && (notification.preview || this.config.notificationMode?.get() !== 'never')
         && this.config.notificationSoundEnabled.get() === soundEnabled && (this.config.notificationSound.get() || 'default') === sound);
       return { shown };
     });

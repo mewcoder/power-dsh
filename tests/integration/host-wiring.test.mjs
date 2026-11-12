@@ -158,7 +158,7 @@ test('feature-owned RPC methods retain the invocation owner check through the ac
   const service = caller.get('powerDsh');
   assert.equal(service.ctx.invocation.peer.principal.kind, 'guest');
   for (const [method, args] of [
-    ['restartStatus', []], ['restartApp', []], ['listSystemSounds', []],
+    ['restartStatus', []], ['restartApp', []], ['listSystemSounds', []], ['notificationTransport', []],
     ['setAccountBlocked', [true]], ['setTelemetryBlocked', [true]],
     ['setTodoBlocked', [true]], ['setPlanBlocked', [true]], ['setGoalBlocked', [true]], ['setSearchBlocked', [true]],
     ['readPersonalization', []], ['savePersonalization', ['text', 'revision']],
@@ -188,7 +188,7 @@ test('all feature configuration defaults and settings tool output requirements s
   const { tool } = await fixture(t);
   const expected = {
     showVersion: false, showThemeSwitcher: false, showRefreshButton: false, showRestartButton: false,
-    notificationsEnabled: false, notificationSoundEnabled: true, notificationSound: 'default',
+    notificationsEnabled: false, notificationMode: 'background', notificationSoundEnabled: true, notificationSound: 'default', pluginUpdatesEnabled: true,
     blockOfficialAccount: false, blockOfficialSearch: false, blockOfficialTelemetry: false,
     blockTodo: false, blockPlan: false, blockGoal: false, blockDoubleClickRename: false, personalizationEnabled: false,
     skillManagerEnabled: false, mcpManagerEnabled: false, disabledSkills: [],

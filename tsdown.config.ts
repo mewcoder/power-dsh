@@ -1,5 +1,6 @@
 import { defineConfig, type UserConfig } from 'tsdown';
 import { fileURLToPath } from 'node:url';
+import manifest from './package.json' with { type: 'json' };
 
 const cwd = fileURLToPath(new URL('.', import.meta.url));
 const common = {
@@ -35,6 +36,7 @@ export const clientConfig = {
   platform: 'browser',
   target: 'es2022',
   dts: false,
+  define: { __POWER_DSH_VERSION__: JSON.stringify(manifest.version) },
   outputOptions: { entryFileNames: '[name].js' },
 } satisfies UserConfig;
 

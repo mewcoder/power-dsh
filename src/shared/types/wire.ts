@@ -123,6 +123,7 @@ export interface WindowsNotification {
 }
 export interface NotificationDelivery { shown: boolean }
 export interface NotificationCleared { cleared: boolean }
+export interface NotificationTransport { platform: 'win32' | 'darwin' | 'other'; nativeAvailable: boolean; version: string }
 
 export interface RestartStatus {
   supported: boolean;

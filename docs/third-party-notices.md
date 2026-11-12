@@ -103,6 +103,10 @@ SOFTWARE.
 
 Mod 使用已核对的 DSH `0.2.2-rc.1` 原生会话、交互及 subprocess 通道，自行实现最小投影、系统默认通知与本机系统声音白名单播放，仅借鉴上述项目的设计，没有复制或改编其代码，不引入其依赖、音频文件、脚本或设置页面。Windows 使用固定 WinMM 系统事件别名，接口依据为微软 [PlaySound 文档](https://learn.microsoft.com/en-us/previous-versions/dd743680(v=vs.85))。行为边界见[任务通知](../src/features/notifications/spec.md)。
 
+## 插件更新协议参考
+
+插件更新入口只读参考 [dsh-market/dsh-market](https://github.com/dsh-market/dsh-market/tree/da774820fd49f4915461ff2031eedbef9b48dfe7)（MIT，`1.73.19`）的 `UPDATE-API-V1.md`、`src/routes.ts`、`src/update-api-v1.ts` 公开协议及 `src/client/market-data.ts` 的路径前缀规则，自行实现有界客户端，没有复制安装、恢复、UI 或依赖。API 当前为 beta，采用能力发现与严格校验；边界见[插件更新](../src/features/plugin-updates/spec.md)。
+
 ## 推理等级插件参考
 
 开发前检索 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 市场目录（快照 `e190236`），并浅克隆下列仓库，仅用于理解市场做法与宿主接口，**没有复制或改编任何代码、样式或配置写入实现**：

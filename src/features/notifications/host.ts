@@ -5,6 +5,7 @@ import { notificationProjection } from './notifications.ts';
 import { SystemSounds } from './system-sounds.ts';
 import { WindowsToasts } from './windows-toasts.ts';
 import type { WindowsNotification } from '../../shared/types/wire.ts';
+import manifest from '../../../package.json' with { type: 'json' };
 
 export function createHost(ctx: NativeContext, config: LivePreferences) {
   ctx.inject(['sessionProjections'], async child => {
@@ -14,6 +15,13 @@ export function createHost(ctx: NativeContext, config: LivePreferences) {
 }
 
 export const methods = {
+  notificationTransport() {
+    return this.run(() => ({
+      platform: this.windowsToasts.platform === 'win32' ? 'win32' as const : this.windowsToasts.platform === 'darwin' ? 'darwin' as const : 'other' as const,
+      nativeAvailable: this.windowsToasts.platform === 'win32' && Boolean(this.ctx.get('subprocess')),
+      version: manifest.version,
+    }));
+  },
   listSystemSounds() {
     return this.run(() => this.sounds.list());
   },
