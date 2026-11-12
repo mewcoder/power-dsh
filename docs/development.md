@@ -76,7 +76,7 @@ npm run check:package
 npm run check:install
 ```
 
-新鲜度检查之前不执行 `build`，以便发现遗漏或过期的已提交产物。修改源码后在本地构建并包含三个产物；CI 不替开发者改写产物、不提交代码、不发布 npm 或 Release。此顺序已在本地验证，GitHub 远端执行状态以实际运行记录为准。
+同一检查流程在 Ubuntu 与 Windows runner 上执行；文本文件通过根目录 `.gitattributes` 统一使用 LF，避免 Git 换行转换影响产物新鲜度比较。新鲜度检查之前不执行 `build`，以便发现遗漏或过期的已提交产物。修改源码后在本地构建并包含三个产物；CI 不替开发者改写产物、不提交代码、不发布 npm 或 Release。此顺序已在本地验证，GitHub 远端执行状态以实际运行记录为准。
 
 ### 历史 SDK 检查
 

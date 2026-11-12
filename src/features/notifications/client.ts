@@ -31,13 +31,15 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         const preferences = form.getSnapshot().value;
         const sound = preferences?.notificationSound || 'default';
         const localTone = preferences?.notificationSoundEnabled === true && sound !== 'default' && ctx.connection.isLoopback;
+        visible.get(id)?.close();
+        visible.delete(id);
         const notification = new window.Notification(t(`notification${kind}`), {
           body: (row.displayTitle || row.title || t('notificationBody')).slice(0, 160),
           tag: `power-dsh:${id}`,
+          ...(kind === 'Approval' || kind === 'Input' ? { requireInteraction: true } : {}),
           // Omit silent to respect system defaults; a replacement is still a new reminder.
           ...(preferences?.notificationSoundEnabled === true && !localTone ? { renotify: true } : { silent: true }),
         });
-        visible.get(id)?.close();
         visible.set(id, notification);
         if (localTone) void playSound(sound, false).catch(() => { if (active) reportError('notificationSoundFailed'); });
         notification.onclick = () => { window.focus(); notification.close(); };

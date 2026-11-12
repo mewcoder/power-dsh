@@ -82,6 +82,22 @@ test('macOS playback uses exact native argv with bounded collectors and the actu
   assert.equal(Object.hasOwn(f.calls[0], 'env'), false);
 });
 
+test('macOS sound paths preserve POSIX separators and names containing spaces regardless of the host platform', async () => {
+  const checked = [];
+  const f = fixture({ io: {
+    soundsDirectory: '/System/Library/Test Sounds',
+    readDirectory: async () => [{ name: 'Soft Ping.aiff', isFile: () => true }],
+    fileInfo: async filename => { checked.push(filename); return { isFile: () => true }; },
+  } });
+  assert.deepEqual(await f.manager.list(), { platform: 'darwin', sounds: [
+    { id: 'default', name: 'default' }, { id: 'mac:Soft Ping.aiff', name: 'Soft Ping' },
+  ] });
+  assert.deepEqual(await f.manager.play('mac:Soft Ping.aiff', true), { played: true });
+  assert.deepEqual(checked, ['/System/Library/Test Sounds/Soft Ping.aiff', '/System/Library/Test Sounds/Soft Ping.aiff']);
+  assert.deepEqual(f.calls[0].argv, ['/usr/bin/afplay', '/System/Library/Test Sounds/Soft Ping.aiff']);
+  await f.manager.close();
+});
+
 test('automatic playback obeys live toggles and selection, while explicit preview can play an unselected built-in sound', async () => {
   const f = fixture();
   for (const patch of [{ notificationsEnabled: false }, { notificationsEnabled: true, notificationSoundEnabled: false },

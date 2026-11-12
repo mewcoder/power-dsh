@@ -45,11 +45,13 @@ test('muted completion and error notifications are silent, deduplicated, and omi
   assert.equal(app.notifications[0].title, 'notificationComplete');
   assert.equal(app.notifications[0].options.silent, true);
   assert.equal(app.notifications[0].options.body, 'Build the project');
+  assert.equal(Object.hasOwn(app.notifications[0].options, 'requireInteraction'), false);
   app.setSessions([notificationSession({ seq: 10, reason: 'completed', running: false })]);
   assert.equal(app.notifications.length, 1);
   app.setSessions([notificationSession({ seq: 12, reason: 'error', running: false })]);
   assert.equal(app.notifications.length, 2);
   assert.equal(app.notifications[1].title, 'notificationError');
+  assert.equal(Object.hasOwn(app.notifications[1].options, 'requireInteraction'), false);
   assert.equal(app.notifications[0].closed, true);
   for (const reason of ['aborted', 'interrupted', 'max-tokens', 'forked', 'future-reason']) {
     app.setSessions([notificationSession({ seq: 20 + reason.length, reason, running: false })]);
@@ -57,6 +59,29 @@ test('muted completion and error notifications are silent, deduplicated, and omi
   app.setSessions([notificationSession({ id: 'child', origin: 'subagent' })]);
   app.setSessions([notificationSession({ id: 'child', seq: 90, reason: 'completed', origin: 'subagent', running: false })]);
   assert.equal(app.notifications.length, 2);
+  app.unmount();
+});
+
+test('Windows tag-based closing leaves replacement banners and other sessions visible until cleanup', async () => {
+  const app = await mount({ windows: true });
+  const other = notificationSession({ id: 'other', seq: 10, reason: 'completed', running: false });
+  app.setSessions([notificationSession(), notificationSession({ id: 'other' })]);
+  app.set({ notificationsEnabled: true });
+  app.setSessions([notificationSession({ seq: 10, reason: 'completed', running: false }), other]);
+  assert.equal(app.notifications.length, 2);
+  const previous = app.notifications[0];
+  const lateClose = previous.onclose;
+  app.setSessions([notificationSession({ seq: 20, reason: 'error', running: false }), other]);
+  const replacement = app.notifications.at(-1);
+  assert.equal(app.notifications.length, 3);
+  assert.equal(previous.closed, true);
+  assert.equal(replacement.options.tag, previous.options.tag);
+  assert.equal(replacement.closed, false, 'Closing the previous tag must happen before creating its replacement.');
+  assert.equal(app.notifications[1].closed, false, 'A separate session keeps its own banner.');
+  lateClose();
+  app.set({ notificationsEnabled: false });
+  assert.equal(replacement.closed, true, 'A late close event from the old banner must not lose the replacement.');
+  assert.equal(app.notifications[1].closed, true);
   app.unmount();
 });
 
@@ -101,6 +126,7 @@ test('selecting the current default sound previews without rewriting preferences
   await menu.props.onSelect('default');
   assert.equal(saves, 0, 'Reselecting the current tone previews without rewriting it.');
   assert.equal(app.notifications[0].title, 'notificationSoundTestTitle');
+  assert.equal(Object.hasOwn(app.notifications[0].options, 'requireInteraction'), false);
   assert.equal(Object.hasOwn(app.notifications[0].options, 'silent'), false);
   assert.equal(app.soundPlays.length, 0);
   app.unmount();
@@ -316,13 +342,16 @@ test('input and approval arrivals notify even in front, deduplicate native keys,
   const approval = { key: 'approval:1', kind: 'approval', sessionId: 'task' };
   app.setSessionStatus([['task', { running: true, pendingInteraction: question }]]);
   assert.equal(app.notifications.at(-1).title, 'notificationInput');
+  assert.equal(app.notifications.at(-1).options.requireInteraction, true);
   app.setSessionStatus([['task', { running: true }]]);
   app.setSessionStatus([['task', { running: true, pendingInteraction: question }]]);
   assert.equal(app.notifications.length, 1);
   app.setSessionStatus([['task', { running: true, pendingInteraction: approval }]]);
   assert.equal(app.notifications.at(-1).title, 'notificationApproval');
+  assert.equal(app.notifications.at(-1).options.requireInteraction, true);
   app.setSessionStatus([['task', { running: true, pendingInteraction: { key: 'plan:1', kind: 'plan-review' } }]]);
   assert.equal(app.notifications.at(-1).title, 'notificationInput');
+  assert.equal(app.notifications.at(-1).options.requireInteraction, true);
   app.setSessionStatus([['task', { running: true }]]);
   app.setSessions([notificationSession({ seq: 10, reason: 'blocked', running: false })]);
   assert.equal(app.notifications.length, 3, 'A blocked turn must not duplicate its input or approval notice.');
@@ -336,6 +365,7 @@ test('unexplained blocked turns request input while review cards and idle histor
   app.set({ notificationsEnabled: true });
   app.setSessions([notificationSession({ seq: 5, reason: 'blocked', running: false })]);
   assert.equal(app.notifications.at(-1).title, 'notificationInput');
+  assert.equal(app.notifications.at(-1).options.requireInteraction, true);
   app.setSessionStatus([['task', { running: false, pendingInteraction: { key: 'old:1', kind: 'question' } }]]);
   app.setSessionStatus([['task', { running: true, pendingInteraction: { key: 'review:1', kind: 'question', review: { readOnly: true } } }]]);
   assert.equal(app.notifications.length, 1);

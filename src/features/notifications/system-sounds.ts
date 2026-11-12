@@ -10,7 +10,7 @@ interface SoundOptions {
 }
 interface SoundOperation { controller: AbortController; handle: NativeSubprocessHandle | null }
 import { readdir, lstat, realpath } from 'node:fs/promises';
-import path from 'node:path';
+import { posix as path } from 'node:path';
 
 const DEFAULT_SOUND = { id: 'default', name: 'default' };
 const WINDOWS_ALIASES = new Set(['SystemDefault', 'SystemAsterisk', 'SystemExclamation', 'SystemHand', 'SystemQuestion']);

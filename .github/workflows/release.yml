@@ -66,6 +66,19 @@ jobs:
           mv release/power-dsh-*.tgz release/power-dsh.tgz
           sha256sum release/power-dsh.tgz | tee release/power-dsh.tgz.sha256
 
+      - name: Prepare release notes from the changelog
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFile, writeFile } from 'node:fs/promises';
+          const { version, engines } = JSON.parse(await readFile('package.json', 'utf8'));
+          const changelog = await readFile('CHANGELOG.md', 'utf8');
+          const section = changelog.split(/^## /m).find(text => text.startsWith(`${version}（`));
+          assert.ok(section, `Missing changelog section for ${version}`);
+          const notes = `# PowerDSH ${section.trim()}\n\n### 安装与验证范围\n\n- DSH：\`${engines.dsh}\`；Node.js：\`${engines.node}\`。\n- 桌面插件管理器安装：\`github:mewcoder/power-dsh\`，或安装附件 \`power-dsh.tgz\`。\n- 验证范围与实机限制见本版本的版本兼容性文档；自动化检查不代替系统通知和声音的实机验收。\n- 不发布 npm。\n`;
+          await writeFile('release/notes.md', notes);
+          NODE
+
       # A prerelease tag publishes a GitHub pre-release; a plain v1.2.3 is the
       # stable "latest" users are offered. Neither path publishes to npm.
       - name: Create the GitHub Release
@@ -80,4 +93,4 @@ jobs:
             --title "power-dsh ${GITHUB_REF_NAME#v}" \
             --generate-notes \
             "${prerelease[@]}" \
-            --notes "DSH: >=0.2.0-rc.1 <0.3.0-0 · Install: \`github:mewcoder/power-dsh\` or the attached \`power-dsh.tgz\` · npm: not published"
+            --notes-file release/notes.md

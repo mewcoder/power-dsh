@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import ToolsService from '@deepseek-ai/dsh-tools';
 const { apply, inject, Config } = await import(process.env.POWER_DSH_HOST_TEST_ENTRY ?? new URL('../../src/index.ts', import.meta.url));
 
 // The compatibility runner can load production dependencies with an older Host injector.
 const require = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools'));
-const { Context } = await import(require.resolve('@deepseek-ai/cordis'));
-const { default: SessionProjectionRegistry } = await import(require.resolve('@deepseek-ai/dsh-session-projection'));
+const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href);
+const { default: SessionProjectionRegistry } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-session-projection')).href);
 
 async function fixture(t, { hostWorkspace = true, managedId = 'power-dsh' } = {}) {
   const root = new Context();

@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import ToolsService from '@deepseek-ai/dsh-tools';
 import { McpProviders } from '../mcp-providers.ts';
 import { OperationQueue } from '../../../shared/host/operation-queue.ts';
 
 const require = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools'));
-const { Context, Service } = await import(require.resolve('@deepseek-ai/cordis'));
-const scopes = await import(require.resolve('@deepseek-ai/dsh-scope'));
+const { Context, Service } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href);
+const scopes = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-scope')).href);
 const SECRET = 'private-MCP-configuration';
 
 function registerTool(ctx, name, schemaReadable = false) {

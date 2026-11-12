@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import ToolsService, * as toolsSdk from '@deepseek-ai/dsh-tools';
 import { SearchPolicy } from '../search-policy.ts';
 import { OperationQueue } from '../../../shared/host/operation-queue.ts';
 import { SEARCH_RPC } from '../../../app/rpc.ts';
 
 const require = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools'));
-const { Context } = await import(require.resolve('@deepseek-ai/cordis'));
-const { createScope, scopeTarget } = await import(require.resolve('@deepseek-ai/dsh-scope'));
+const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href);
+const { createScope, scopeTarget } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-scope')).href);
 const { defineTool, TOOL_RUNTIME_SCHEDULER } = toolsSdk;
 const { ToolExecutionPipeline } = TOOL_RUNTIME_SCHEDULER === undefined
   ? await import('@deepseek-ai/dsh-tools/pipeline') : {};

@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { clientBundleUrl } from '../helpers/client-fixture.mjs';
 
 const require = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools'));
-const { Context, Service } = await import(require.resolve('@deepseek-ai/cordis'));
+const { Context, Service } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href);
 
 test('Mod settings survive startup with real Cordis dependency enforcement, independently of connection availability', async t => {
   for (const connected of [true, false]) {

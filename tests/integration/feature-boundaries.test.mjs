@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import ToolsService from '@deepseek-ai/dsh-tools';
 import { apply, inject } from '../../src/index.ts';
 import { hostFeatures } from '../../src/app/host-features.ts';
@@ -9,8 +10,8 @@ import { composeDictionaries } from '../../src/app/locales.ts';
 import { MOD_RPC, composeRpc } from '../../src/app/rpc.ts';
 
 const require = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools'));
-const { Context } = await import(require.resolve('@deepseek-ai/cordis'));
-const { default: SessionProjectionRegistry } = await import(require.resolve('@deepseek-ai/dsh-session-projection'));
+const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href);
+const { default: SessionProjectionRegistry } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-session-projection')).href);
 
 test('a selected Host assembly excludes unrelated capabilities and preserves their saved preferences', async t => {
   const features = hostFeatures.filter(feature => ['version-display', 'refresh-button', 'account-blocking'].includes(feature.definition.id));

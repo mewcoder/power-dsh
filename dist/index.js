@@ -2,7 +2,7 @@ import { TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import z from "@deepseek-ai/schemastery";
 import { spawn } from "node:child_process";
 import { access, lstat, mkdir, readFile, readdir, realpath, rename, unlink, writeFile } from "node:fs/promises";
-import path, { basename, dirname, isAbsolute, join, normalize, resolve, win32 } from "node:path";
+import { basename, dirname, isAbsolute, join, normalize, posix, resolve, win32 } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { linkSync, lstatSync, mkdtempSync, readdirSync, renameSync, rmdirSync, unlinkSync } from "node:fs";
@@ -524,12 +524,12 @@ var SystemSounds = class {
 		const files = /* @__PURE__ */ new Map();
 		const root = await this.realPath(this.directory);
 		for (const entry of entries) {
-			if (!entry.isFile() || entry.name !== path.basename(entry.name) || entry.name.startsWith(".") || !MAC_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) continue;
-			const filename = path.join(this.directory, entry.name);
-			if (!(await this.fileInfo(filename)).isFile() || await this.realPath(filename) !== path.join(root, entry.name)) continue;
+			if (!entry.isFile() || entry.name !== posix.basename(entry.name) || entry.name.startsWith(".") || !MAC_EXTENSIONS.has(posix.extname(entry.name).toLowerCase())) continue;
+			const filename = posix.join(this.directory, entry.name);
+			if (!(await this.fileInfo(filename)).isFile() || await this.realPath(filename) !== posix.join(root, entry.name)) continue;
 			files.set(`mac:${entry.name}`, {
 				filename,
-				name: path.basename(entry.name, path.extname(entry.name))
+				name: posix.basename(entry.name, posix.extname(entry.name))
 			});
 		}
 		return files;

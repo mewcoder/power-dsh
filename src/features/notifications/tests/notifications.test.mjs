@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import { notificationProjection } from '../notifications.ts';
 
 const require = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools'));
-const { Context } = await import(require.resolve('@deepseek-ai/cordis'));
-const { default: SessionProjectionRegistry } = await import(require.resolve('@deepseek-ai/dsh-session-projection'));
+const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href);
+const { default: SessionProjectionRegistry } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-session-projection')).href);
 
 function turnEnd(seq, turn, kind, detail = {}) {
   return { type: 'turn/end', seq, time: seq, data: { turn, reason: { kind, ...detail } } };

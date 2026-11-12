@@ -15,7 +15,7 @@ const filesIn = directory => listFiles(root, directory);
 const manifest = JSON.parse(await read('package.json'));
 assert.equal(manifest.name, 'power-dsh');
 assert.match(manifest.packageManager, /^pnpm@\d+\.\d+\.\d+$/, 'Pin an exact development package-manager version.');
-assert.match(await read('.node-version'), /^\d+\.\d+\.\d+\n$/, 'Pin a development Node version.');
+assert.match((await read('.node-version')).trim(), /^\d+\.\d+\.\d+$/, 'Pin a development Node version.');
 assert.ok(manifest.private === undefined || typeof manifest.private === 'boolean', 'Use a valid npm private flag.');
 assert.equal(manifest.dsh.bundle.patch, './cordis.patch.yml');
 assert.equal(manifest.dsh.client.platform, 'web');
@@ -49,7 +49,7 @@ assert.notEqual(parsed.options.noImplicitAny, false, 'Do not weaken strict mode 
 assert.equal(parsed.options.erasableSyntaxOnly, true, 'Source tests use native Node TypeScript stripping.');
 assert.equal(parsed.options.noEmit, true);
 assert.notEqual(parsed.options.allowJs, true);
-const checkedSources = new Set(parsed.fileNames.map(name => path.relative(root, name)));
+const checkedSources = new Set(parsed.fileNames.map(name => path.relative(root, name).replaceAll(path.sep, '/')));
 for (const name of sourceFiles.filter(name => name.endsWith('.ts'))) assert.ok(checkedSources.has(name), `Source is excluded from type checking: ${name}`);
 const patch = await read('cordis.patch.yml');
 assert.match(patch, /^- insert:\s*\n\s+- id: power-dsh\s*\n\s+name: ['"]power-dsh['"]\s*$/);
@@ -138,7 +138,7 @@ for (const name of codeFiles) {
     if (runtime) assert.ok(Object.hasOwn(dictionaries.en, key), `Missing translation: ${name} → ${key}`);
   }
   for (const [, specifier] of text.matchAll(/(?:from\s*|import\s*)['"](\.[^'"]+)['"]/g)) {
-    const resolved = path.relative(root, path.resolve(root, path.dirname(name), specifier));
+    const resolved = path.relative(root, path.resolve(root, path.dirname(name), specifier)).replaceAll(path.sep, '/');
     assert.ok(await isFile(resolved), `Missing local import: ${name} → ${specifier}`);
     if (runtime && name.startsWith('src/features/')) {
       const owner = name.split('/')[2];

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
 export const clientBundleUrl = new URL('../../dist/client.js', import.meta.url);
@@ -9,7 +10,7 @@ async function getCompositionBundle() {
   compositionBundle ||= (async () => {
     const { build } = await import('tsdown');
     const handle = await build({
-      config: false, entry: [new URL('./client-composition-entry.mjs', import.meta.url).pathname],
+      config: false, entry: [fileURLToPath(new URL('./client-composition-entry.mjs', import.meta.url))],
       write: false, clean: false, exports: false, report: false, dts: false, minify: false,
       platform: 'browser', format: 'iife', target: 'es2022', globalName: 'PowerDshComposition', logLevel: 'silent',
     });
@@ -146,7 +147,12 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       this.closed = false;
       notifications.push(this);
     }
-    close() { this.closed = true; this.onclose?.(); }
+    close() {
+      for (const notification of windows ? notifications.filter(item => !item.closed && item.options.tag === this.options.tag) : [this]) {
+        notification.closed = true;
+        notification.onclose?.();
+      }
+    }
   }
   const resizeListeners = new Set();
   const focusListeners = new Set();

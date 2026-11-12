@@ -23,6 +23,8 @@
 
 声音开启且选择「系统默认」时，通知省略 `silent` 并设置 `renotify: true`，声音由操作系统通知设置决定；试听也发送一条真实浏览器通知。选择其他本机提示音时，通知本身设置 `silent: true`，Host 单独播放所选系统声音，避免双响。关闭声音时仅发送静音通知。该偏好适用于四类触发，即时生效，不补发通知。通知 API 语义见 [Notification 构造参数](https://developer.mozilla.org/en-US/docs/Web/API/Notification/Notification#parameters)。标题区分上述四类状态，正文显示有界会话标题；点击通知只尝试聚焦窗口并关闭该通知，不承诺跳转到对应轮次。
 
+每个会话复用独立的通知 tag；替换时先关闭旧通知，再创建新通知，避免 Windows 按 tag 关闭时同时收起新横幅，其他会话的通知不受影响。等待输入、方案确认和请求审批的通知设置 `requireInteraction: true`，请求系统保留提醒直到用户处理；完成、出错和声音试听沿用系统默认消失行为。驻留请求是否被遵循仍由浏览器与操作系统决定。
+
 页面需要保持打开。首次加载、启用和重连仅建立当前基线，不补发过去的完成或待交互提醒，不提供离线重放。关闭开关或卸载 Client 后停止提醒并清理当前通知；没有独立后台推送服务。
 
 ## 本机系统提示音
@@ -43,4 +45,4 @@ Client 观察原生 `uiSession.sessionStatus` 的 `pendingInteraction`，以交�
 
 已核对 DSH `0.2.2-rc.1` 安装包中的会话投影、列表与控制流、原生交互状态、桌面 preload、连接 `isLoopback` 及 subprocess 的 `spawn`、取消和托管范围退出接口。原生 `turnOutline` 和 `turnBoundary` 不保存结束原因，故使用上述最小摘要；桌面公开桥未提供通用通知方法，Client 直接使用浏览器 `Notification` API。接口判断属于安装包源码核对证据，不能代替实际通知验收。
 
-[摘要测试](tests/notifications.test.mjs)覆盖已知及未来结束原因、无关事件引用稳定性、输入校验和真实 Cordis 投影的注册释放。[原生声音测试](tests/system-sounds.test.mjs)覆盖 macOS 目录枚举、目录与参数白名单、Windows 固定脚本、配置变更、重叠请求、超时和卸载取消，不代表 Windows 实机播放已验证。[Client 测试](tests/client.test.mjs)覆盖保存与试听、静音横幅、去重、远程访问、失败及过期操作。实际下拉、系统通知权限与声音仍需在运行中的 DSH 验收；播放器正常退出不等于实际听到声音。验证层次见[开发指南](../../../docs/development.md#验证方法与限制)，市场参考与提交见[第三方资源声明](../../../docs/third-party-notices.md#通知插件参考)。
+[摘要测试](tests/notifications.test.mjs)覆盖已知及未来结束原因、无关事件引用稳定性、输入校验和真实 Cordis 投影的注册释放。[原生声音测试](tests/system-sounds.test.mjs)覆盖 macOS 目录枚举、跨平台 POSIX 路径、目录与参数白名单、Windows 固定脚本、配置变更、重叠请求、超时和卸载取消，不代表 Windows 实机播放已验证。[Client 测试](tests/client.test.mjs)覆盖保存与试听、静音横幅、去重、Windows 按 tag 关闭的替换顺序与跨会话隔离、待交互通知的驻留参数、远程访问、失败及过期操作。实际下拉、系统通知权限与声音仍需在运行中的 DSH 验收；播放器正常退出不等于实际听到声音。验证层次见[开发指南](../../../docs/development.md#验证方法与限制)，市场参考与提交见[第三方资源声明](../../../docs/third-party-notices.md#通知插件参考)。

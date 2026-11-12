@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import ToolsService, { defineTool } from '@deepseek-ai/dsh-tools';
 import { PlanPolicy } from '../plan-policy.ts';
 import { OperationQueue } from '../../../shared/host/operation-queue.ts';
 
 // Resolve peers from Tools so real Cordis scopes share the SDK's registry symbols.
 const require = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools'));
-const { Context } = await import(require.resolve('@deepseek-ai/cordis'));
-const { createScope } = await import(require.resolve('@deepseek-ai/dsh-scope'));
+const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href);
+const { createScope } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-scope')).href);
 const PLAN = '@deepseek-ai/dsh-plan-mode';
 const PRESET = '@deepseek-ai/dsh-agent-preset';
 const TODO = '@deepseek-ai/dsh-tool-todo';

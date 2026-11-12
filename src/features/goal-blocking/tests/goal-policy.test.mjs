@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import ToolsService, { defineTool } from '@deepseek-ai/dsh-tools';
 import { GoalPolicy } from '../goal-policy.ts';
 import { OperationQueue } from '../../../shared/host/operation-queue.ts';
 
 const require = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools'));
-const { Context } = await import(require.resolve('@deepseek-ai/cordis'));
-const { createScope } = await import(require.resolve('@deepseek-ai/dsh-scope'));
+const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href);
+const { createScope } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-scope')).href);
 const COMMAND = '@deepseek-ai/dsh-command-goal';
 const TOOL = '@deepseek-ai/dsh-tool-goal';
 const PRESET = '@deepseek-ai/dsh-agent-preset';

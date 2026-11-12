@@ -172,7 +172,7 @@ https://github.com/mewcoder/power-dsh/releases/latest/download/power-dsh.tgz
 
 `latest/download` 只动态解析标签，附件名是固定文本；因此每版都上传 `power-dsh.tgz`，不要把版本号放进这个固定链接的文件名。以上地址采用已改名的仓库，在实际发布前不可用。
 
-发版已由 [Release workflow](../.github/workflows/release.yml)固定：推送与 `package.json` 版本一致的 annotated `v*` 标签后，CI 重新运行产物新鲜度、类型、行为、实际 tarball 与独立安装检查，再打包附件、创建 GitHub Release 并上传 `power-dsh.tgz`。正式标签生成 Latest 版本，带预发布标识的标签生成 Pre-release；不带附件或版本不一致时任务失败。
+发版已由 [Release workflow](../.github/workflows/release.yml)固定：推送与 `package.json` 版本一致的 annotated `v*` 标签后，CI 重新运行产物新鲜度、类型、行为、实际 tarball 与独立安装检查，再打包附件、创建 GitHub Release 并上传 `power-dsh.tgz`。Release 正文提取更新日志中对应版本的完整条目，附安装方式与验证边界；缺少版本条目时停止发布。正式标签生成 Latest 版本，带预发布标识的标签生成 Pre-release；不带附件或版本不一致时任务失败。
 
 [现有 CI](../.github/workflows/ci.yml)继续在每次 push 和 PR 上做同样的检查，不触发发布。该流水线不执行 npm 发布、不读取 npm 凭据；npm 不属于当前分发渠道。
 

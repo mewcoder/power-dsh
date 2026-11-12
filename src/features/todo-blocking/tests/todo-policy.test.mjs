@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import ToolsService, * as toolsSdk from '@deepseek-ai/dsh-tools';
 import { TodoPolicy } from '../todo-policy.ts';
 import { OperationQueue } from '../../../shared/host/operation-queue.ts';
 
 // Resolve peer dependencies from the SDK so scopes use the registry's own symbols.
 const require = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools'));
-const { Context } = await import(require.resolve('@deepseek-ai/cordis'));
-const { createScope } = await import(require.resolve('@deepseek-ai/dsh-scope'));
+const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href);
+const { createScope } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-scope')).href);
 const TODO = '@deepseek-ai/dsh-tool-todo';
 const PRESET = '@deepseek-ai/dsh-agent-preset';
 const { defineTool, TOOL_RUNTIME_SCHEDULER } = toolsSdk;
