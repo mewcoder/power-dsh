@@ -13,11 +13,20 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   const notificationTagPrefix = `power-dsh:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 10)}`;
   let notificationSequence = 0;
   const nextNotificationTag = () => `${notificationTagPrefix}:${(++notificationSequence).toString(36)}`;
+  const newNativeGroup = () => `pd${Math.random().toString(36).slice(2, 14)}`;
+  const usesNativeNotifications = () => Boolean(window.dshDesktop?.protocolVersion === 1
+    && document.documentElement.getAttribute('data-platform') === 'win32' && soundConnection?.isLoopback);
+  const clearNativeNotifications = async (group: string, tag = '') => {
+    const reply = await ctx.remote.powerDsh.clearWindowsNotifications(group, tag);
+    if (!reply.ok) throw new Error('notificationFailed');
+  };
   ctx.effect(() => () => { active = false; });
   // Read native sources in the plugin context; components only receive snapshots and callbacks.
   function notificationRunner(ctx: ClientContext, form: SettingsForm, t: Translate, reportError: (error: string) => void, playSound: (id: string, preview: boolean) => Promise<void>) {
     const records = new Map<string, NotificationRecord>();
     const visible = new Map<string, Notification>();
+    const nativeTags = new Map<string, string>();
+    let nativeGroup = newNativeGroup();
     let active = true;
     let enabled = false;
     let generation = ctx.connection.generation.getSnapshot();
@@ -27,13 +36,41 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         notification.close();
       }
       visible.clear();
+      if (nativeTags.size) {
+        void clearNativeNotifications(nativeGroup).catch(() => { if (active) reportError('notificationFailed'); });
+        nativeTags.clear();
+        nativeGroup = newNativeGroup();
+      }
     }
     function send(id: string, row: SessionRow, kind: 'Approval' | 'Input' | 'Error' | 'Complete') {
-      if (!active || window.Notification?.permission !== 'granted') return;
+      if (!active || (!usesNativeNotifications() && window.Notification?.permission !== 'granted')) return;
       try {
         const preferences = form.getSnapshot().value;
         const sound = preferences?.notificationSound || 'default';
         const localTone = preferences?.notificationSoundEnabled === true && sound !== 'default' && ctx.connection.isLoopback;
+        if (usesNativeNotifications()) {
+          const tag = nativeTags.get(id) ?? (++notificationSequence).toString(36);
+          nativeTags.set(id, tag);
+          const sentGroup = nativeGroup;
+          const sentGeneration = generation;
+          void (async () => {
+            const reply = await ctx.remote.powerDsh.showWindowsNotification({
+              group: sentGroup, tag, title: t(`notification${kind}`).slice(0, 80),
+              body: (row.displayTitle || row.title || t('notificationBody')).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').slice(0, 160),
+              attention: kind === 'Approval' || kind === 'Input', preview: false, dismiss: t('notificationDismiss'),
+            });
+            if (!active || !enabled || sentGroup !== nativeGroup || sentGeneration !== generation || nativeTags.get(id) !== tag) return;
+            if (!reply.ok) throw new Error('notificationFailed');
+            if (reply.value.shown) reportError('');
+            if (reply.value.shown && localTone) {
+              try { await playSound(sound, false); }
+              catch (_error) { if (active) reportError('notificationSoundFailed'); }
+            }
+          })().catch(() => {
+            if (active && enabled && sentGroup === nativeGroup && sentGeneration === generation) reportError('notificationFailed');
+          });
+          return;
+        }
         visible.get(id)?.close();
         visible.delete(id);
         const notification = new window.Notification(t(`notification${kind}`), {
@@ -107,6 +144,11 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         records.delete(id);
         visible.get(id)?.close();
         visible.delete(id);
+        const tag = nativeTags.get(id);
+        if (tag) {
+          nativeTags.delete(id);
+          void clearNativeNotifications(nativeGroup, tag).catch(() => { if (active) reportError('notificationFailed'); });
+        }
       }
     }
     run(true);
@@ -121,8 +163,20 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   let soundConnection: Connection | null = null;
   let soundGeneration = 0;
   let soundPreview: Notification | null = null;
+  let nativePreviewGroup = newNativeGroup();
+  let nativePreviewVisible = false;
+  const closeSoundPreview = () => {
+    soundPreview?.close();
+    if (nativePreviewVisible) {
+      void clearNativeNotifications(nativePreviewGroup).catch(() => {
+        if (active) publishSound({ error: 'notificationSoundFailed' });
+      });
+      nativePreviewVisible = false;
+      nativePreviewGroup = newNativeGroup();
+    }
+  };
   const publishSound = (patch: Partial<SoundState>) => { soundState = { ...soundState, ...patch }; soundsSource.notify(); };
-  ctx.effect(() => () => { soundGeneration++; soundPreview?.close(); });
+  ctx.effect(() => () => { soundGeneration++; closeSoundPreview(); });
   const loadSystemSounds = async () => {
     if (!active || soundState.status === 'loading') return;
     if (!soundConnection) { publishSound({ status: 'waiting', error: '' }); return; }
@@ -146,8 +200,18 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       || (preferences.value?.notificationSound || 'default') !== id
       || !soundState.value?.sounds.some(sound => sound.id === id))) return;
     if (preview) publishSound({ playing: true, error: '' });
+    const generation = soundGeneration;
     try {
       if (preview && id === 'default') {
+        if (usesNativeNotifications()) {
+          nativePreviewVisible = true;
+          const reply = await ctx.remote.powerDsh.showWindowsNotification({
+            group: nativePreviewGroup, tag: 'preview', title: t('notificationSoundTestTitle'), body: t('notificationSoundTestBody'),
+            attention: false, preview: true, dismiss: t('notificationDismiss'),
+          });
+          if (!reply.ok) throw new Error('notificationSoundFailed');
+          return;
+        }
         if (window.Notification?.permission !== 'granted') throw new Error('notificationPermission');
         soundPreview?.close();
         soundPreview = new window.Notification(t('notificationSoundTestTitle'), {
@@ -159,10 +223,10 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         if (!reply.ok) throw new Error('notificationSoundFailed');
       }
     } catch (failure) {
-      if (active) publishSound({ error: errorMessage(failure) === 'notificationPermission' ? 'notificationPermission' : 'notificationSoundFailed' });
+      if (active && generation === soundGeneration) publishSound({ error: errorMessage(failure) === 'notificationPermission' ? 'notificationPermission' : 'notificationSoundFailed' });
       if (!preview) throw failure;
     } finally {
-      if (active && preview) publishSound({ playing: false });
+      if (active && preview && generation === soundGeneration) publishSound({ playing: false });
     }
   };
   let notificationError = '';
@@ -176,16 +240,26 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     notificationsSource.notify();
   };
   const checkNotificationPermission = () => {
-    if (form.getSnapshot().value?.notificationsEnabled !== true) { soundPreview?.close(); reportNotificationError(''); return; }
-    reportNotificationError(!window.Notification ? 'notificationUnsupported'
+    if (form.getSnapshot().value?.notificationsEnabled !== true) { closeSoundPreview(); reportNotificationError(''); return; }
+    if (form.getSnapshot().value?.notificationSoundEnabled !== true) closeSoundPreview();
+    reportNotificationError(usesNativeNotifications() ? (!notificationReady ? 'notificationUnavailable' : '')
+      : !window.Notification ? 'notificationUnsupported'
       : window.Notification.permission !== 'granted' ? 'notificationPermission'
         : !notificationReady ? 'notificationUnavailable' : '');
   };
   ctx.inject(['connection'], child => {
+    child.effect(() => child.connection.generation.subscribe(() => {
+      soundGeneration++;
+      closeSoundPreview();
+      const requested = soundState.status !== 'idle';
+      publishSound({ status: requested ? 'waiting' : 'idle', value: null, error: '', playing: false });
+      if (requested && child.connection.generation.getSnapshot() !== undefined) void loadSystemSounds();
+    }));
     child.effect(() => {
       soundConnection = child.connection;
       if (soundState.status !== 'idle') void loadSystemSounds();
       return () => {
+        closeSoundPreview();
         soundConnection = null;
         soundGeneration++;
         publishSound({ status: 'waiting', value: null, error: '', playing: false });
@@ -209,12 +283,13 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   const setNotificationsEnabled = async (enabled: boolean) => {
     if (enabled) {
       if (!notificationReady) throw new Error(t('notificationUnavailable'));
-      if (!window.Notification) throw new Error(t('notificationUnsupported'));
-      // Request before any other await so the browser keeps this click's user activation.
-      const permission = window.Notification.permission === 'default'
-        ? await window.Notification.requestPermission() : window.Notification.permission;
-      if (!active) return;
-      if (permission !== 'granted') throw new Error(t('notificationPermission'));
+      if (!usesNativeNotifications()) {
+        if (!window.Notification) throw new Error(t('notificationUnsupported'));
+        const permission = window.Notification.permission === 'default'
+          ? await window.Notification.requestPermission() : window.Notification.permission;
+        if (!active) return;
+        if (permission !== 'granted') throw new Error(t('notificationPermission'));
+      }
     }
     await savePreference('notificationsEnabled', enabled, 'notificationUnavailable');
     reportNotificationError('');

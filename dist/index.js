@@ -3,6 +3,7 @@ import z from "@deepseek-ai/schemastery";
 import { spawn } from "node:child_process";
 import { access, lstat, mkdir, readFile, readdir, realpath, rename, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, normalize, posix, resolve, win32 } from "node:path";
+import { Buffer as Buffer$1 } from "node:buffer";
 import { createHash, randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { linkSync, lstatSync, mkdtempSync, readdirSync, renameSync, rmdirSync, unlinkSync } from "node:fs";
@@ -633,28 +634,6 @@ var SystemSounds = class {
 	}
 };
 
-// src/features/notifications/host.ts
-var host_exports$13 = /* @__PURE__ */ __exportAll({
-	createHost: () => createHost$13,
-	methods: () => methods$13
-});
-function createHost$13(ctx, config) {
-	ctx.inject(["sessionProjections"], async (child) => {
-		await child.sessionProjections.register(notificationProjection());
-	});
-	return { sounds: new SystemSounds(ctx, config) };
-}
-const methods$13 = {
-	listSystemSounds() {
-		return this.run(() => this.sounds.list());
-	},
-	playSystemSound(id, preview) {
-		this.queue.ensureActive();
-		if (this.ctx.invocation && this.ctx.invocation.peer.principal.kind !== "owner") throw new Error("Only the profile owner can play system sounds.");
-		return this.sounds.play(id, preview);
-	}
-};
-
 // src/shared/rpc/codecs.ts
 const booleanCodec = {
 	mode: "strict",
@@ -697,6 +676,22 @@ function policyRpc(method, resultType) {
 }
 
 // src/features/notifications/rpc.ts
+function parseWindowsNotification(value) {
+	if (!isRecord$1(value) || typeof value.group !== "string" || !/^[a-z0-9]{1,16}$/.test(value.group) || typeof value.tag !== "string" || !/^[a-z0-9]{1,16}$/.test(value.tag) || typeof value.title !== "string" || !value.title || value.title.length > 80 || typeof value.body !== "string" || value.body.length > 160 || typeof value.dismiss !== "string" || !value.dismiss || value.dismiss.length > 40 || typeof value.attention !== "boolean" || typeof value.preview !== "boolean" || [
+		value.title,
+		value.body,
+		value.dismiss
+	].some((text) => /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(text))) throw new TypeError("Invalid Windows notification");
+	return {
+		group: value.group,
+		tag: value.tag,
+		title: value.title,
+		body: value.body,
+		attention: value.attention,
+		preview: value.preview,
+		dismiss: value.dismiss
+	};
+}
 const soundCatalogCodec = {
 	mode: "strict",
 	typeSymbol: "power-dsh#SystemSounds",
@@ -750,7 +745,251 @@ const PLAY_SYSTEM_SOUND_RPC = {
 		} })
 	}
 };
-const rpc$13 = [LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC];
+const SHOW_WINDOWS_NOTIFICATION_RPC = {
+	id: "power-dsh#powerDsh/showWindowsNotification",
+	service: "powerDsh",
+	namespace: "powerDsh",
+	method: "showWindowsNotification",
+	invocation: { kind: "direct" },
+	parameters: [{
+		name: "notification",
+		wire: "notification",
+		source: "json",
+		codec: {
+			mode: "strict",
+			typeSymbol: "power-dsh#WindowsNotification",
+			create: () => ({ parse: parseWindowsNotification })
+		}
+	}],
+	result: {
+		mode: "strict",
+		typeSymbol: "power-dsh#NotificationDelivery",
+		create: () => ({ parse(value) {
+			if (!isRecord$1(value) || typeof value.shown !== "boolean") throw new TypeError("Invalid notification delivery");
+			return { shown: value.shown };
+		} })
+	}
+};
+const CLEAR_WINDOWS_NOTIFICATIONS_RPC = {
+	id: "power-dsh#powerDsh/clearWindowsNotifications",
+	service: "powerDsh",
+	namespace: "powerDsh",
+	method: "clearWindowsNotifications",
+	invocation: { kind: "direct" },
+	parameters: [{
+		name: "group",
+		wire: "group",
+		source: "json",
+		codec: stringCodec
+	}, {
+		name: "tag",
+		wire: "tag",
+		source: "json",
+		codec: stringCodec
+	}],
+	result: {
+		mode: "strict",
+		typeSymbol: "power-dsh#NotificationCleared",
+		create: () => ({ parse(value) {
+			if (!isRecord$1(value) || typeof value.cleared !== "boolean") throw new TypeError("Invalid notification cleanup");
+			return { cleared: value.cleared };
+		} })
+	}
+};
+const rpc$13 = [
+	LIST_SYSTEM_SOUNDS_RPC,
+	PLAY_SYSTEM_SOUND_RPC,
+	SHOW_WINDOWS_NOTIFICATION_RPC,
+	CLEAR_WINDOWS_NOTIFICATIONS_RPC
+];
+
+// src/features/notifications/windows-toasts.ts
+function windowsToastScript(command) {
+	return `$ErrorActionPreference = 'Stop'
+$data = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${Buffer$1.from(JSON.stringify(command), "utf8").toString("base64")}')) | ConvertFrom-Json
+$null = [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]
+$null = [Windows.UI.Notifications.ToastNotification, Windows.UI.Notifications, ContentType = WindowsRuntime]
+$null = [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]
+$history = [Windows.UI.Notifications.ToastNotificationManager]::History
+if ($null -ne $data.groups) {
+  foreach ($group in $data.groups) { $history.RemoveGroup([string]$group, [string]$data.appId) }
+} elseif ($null -eq $data.xml) {
+  if ([string]::IsNullOrEmpty($data.tag)) { $history.RemoveGroup([string]$data.group, [string]$data.appId) }
+  else { $history.Remove([string]$data.tag, [string]$data.group, [string]$data.appId) }
+} else {
+  $doc = New-Object Windows.Data.Xml.Dom.XmlDocument
+  $doc.LoadXml([string]$data.xml)
+  $toast = New-Object Windows.UI.Notifications.ToastNotification $doc
+  $toast.Group = [string]$data.group
+  $toast.Tag = [string]$data.tag
+  $toast.SuppressPopup = $false
+  $notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier([string]$data.appId)
+  if ($notifier.Setting.ToString() -ne 'Enabled') { throw 'Notifications are disabled' }
+  $notifier.Show($toast)
+}`;
+}
+const escapeXml = (text) => text.replace(/[\uD800-\uDFFF\uFFFE\uFFFF]/gu, "�").replace(/[&<>"']/g, (character) => ({
+	"&": "&amp;",
+	"<": "&lt;",
+	">": "&gt;",
+	"\"": "&quot;",
+	"'": "&apos;"
+})[character]);
+var WindowsToasts = class {
+	ctx;
+	config;
+	platform;
+	appId;
+	timeoutMs;
+	queue = new OperationQueue();
+	current = null;
+	groups = /* @__PURE__ */ new Set();
+	revisions = /* @__PURE__ */ new Map();
+	closed = false;
+	constructor(ctx, config, options = {}) {
+		this.ctx = ctx;
+		this.config = config;
+		this.platform = options.platform ?? process.platform;
+		this.appId = options.appId ?? process.env.DSH_APP_USER_MODEL_ID ?? "com.deepseek.dsh";
+		this.timeoutMs = options.timeoutMs ?? 1e4;
+		ctx.effect(() => () => this.close());
+	}
+	async execute(command, allowed = () => true) {
+		const subprocess = this.ctx.get("subprocess");
+		if (this.platform !== "win32" || !subprocess || !/^[a-zA-Z0-9._-]{1,128}$/.test(this.appId)) throw new Error("notificationUnsupported");
+		const operation = { controller: new AbortController() };
+		this.current = operation;
+		const timer = setTimeout(() => operation.controller.abort(), this.timeoutMs);
+		const stopped = new Promise((_resolve, reject) => {
+			operation.controller.signal.addEventListener("abort", () => reject(/* @__PURE__ */ new Error("notificationFailed")), { once: true });
+		});
+		try {
+			const executable = await Promise.race([subprocess.resolveExecutable("powershell.exe", void 0, operation.controller.signal), stopped]);
+			operation.controller.signal.throwIfAborted();
+			if (!allowed()) return false;
+			operation.handle = subprocess.spawn({
+				argv: [
+					executable,
+					"-NoLogo",
+					"-NoProfile",
+					"-NonInteractive",
+					"-EncodedCommand",
+					Buffer$1.from(windowsToastScript({
+						...command,
+						appId: this.appId
+					}), "utf16le").toString("base64")
+				],
+				cwd: process.cwd(),
+				graceMs: 250,
+				signal: operation.controller.signal,
+				stdio: {
+					stdin: "ignore",
+					stdout: { maxBytes: 1024 },
+					stderr: { maxBytes: 4096 }
+				}
+			});
+			const outcome = await Promise.race([operation.handle.done, stopped]);
+			if (!await Promise.race([operation.handle.waitForExit(operation.controller.signal), stopped]) || outcome.exitCode !== 0 || outcome.signal !== null) throw new Error("notificationFailed");
+			operation.controller.signal.throwIfAborted();
+			return true;
+		} catch (_error) {
+			operation.controller.abort();
+			throw new Error("notificationFailed");
+		} finally {
+			clearTimeout(timer);
+			if (operation.controller.signal.aborted) operation.handle?.terminate();
+			if (this.current === operation) this.current = null;
+		}
+	}
+	show(input) {
+		const notification = parseWindowsNotification(input);
+		const revision = this.revisions.get(notification.group);
+		const tagKey = `${notification.group}:${notification.tag}`;
+		const tagRevision = this.revisions.get(tagKey);
+		const current = () => revision === this.revisions.get(notification.group) && tagRevision === this.revisions.get(tagKey);
+		return this.queue.run(async () => {
+			if (!current() || this.config.notificationsEnabled.get() !== true || notification.preview && this.config.notificationSoundEnabled.get() !== true) return { shown: false };
+			const soundEnabled = this.config.notificationSoundEnabled.get() === true;
+			const sound = this.config.notificationSound.get() || "default";
+			if (notification.preview && sound !== "default") return { shown: false };
+			const audio = soundEnabled && sound === "default" ? "" : "<audio silent=\"true\"/>";
+			const attention = notification.attention && !notification.preview;
+			const actions = attention ? `<actions><action activationType="system" arguments="dismiss" content="${escapeXml(notification.dismiss)}"/></actions>` : "";
+			const xml = `<toast${attention ? " scenario=\"reminder\" duration=\"long\"" : ""}><visual><binding template="ToastGeneric"><text>${escapeXml(notification.title)}</text><text>${escapeXml(notification.body)}</text></binding></visual>${audio}${actions}</toast>`;
+			if (!this.groups.has(notification.group) && this.groups.size >= 64) throw new Error("notificationFailed");
+			this.groups.add(notification.group);
+			return { shown: await this.execute({
+				group: notification.group,
+				tag: notification.tag,
+				xml
+			}, () => current() && this.config.notificationsEnabled.get() === true && this.config.notificationSoundEnabled.get() === soundEnabled && (this.config.notificationSound.get() || "default") === sound) };
+		});
+	}
+	clear(group, tag) {
+		if (typeof group !== "string" || !/^[a-z0-9]{1,16}$/.test(group) || typeof tag !== "string" || !/^[a-z0-9]{0,16}$/.test(tag)) return Promise.reject(/* @__PURE__ */ new Error("notificationFailed"));
+		const key = tag ? `${group}:${tag}` : group;
+		this.revisions.set(key, (this.revisions.get(key) ?? 0) + 1);
+		return this.queue.run(async () => {
+			if (!this.groups.has(group)) return { cleared: false };
+			await this.execute({
+				group,
+				tag
+			});
+			if (!tag) this.groups.delete(group);
+			return { cleared: true };
+		});
+	}
+	async close() {
+		if (this.closed) return;
+		this.closed = true;
+		this.queue.close();
+		const operation = this.current;
+		operation?.controller.abort();
+		operation?.handle?.terminate();
+		await this.queue.tail;
+		const groups = [...this.groups];
+		this.groups.clear();
+		this.revisions.clear();
+		if (groups.length) try {
+			await this.execute({ groups });
+		} catch (_error) {}
+	}
+};
+
+// src/features/notifications/host.ts
+var host_exports$13 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$13,
+	methods: () => methods$13
+});
+function createHost$13(ctx, config) {
+	ctx.inject(["sessionProjections"], async (child) => {
+		await child.sessionProjections.register(notificationProjection());
+	});
+	return {
+		sounds: new SystemSounds(ctx, config),
+		windowsToasts: new WindowsToasts(ctx, config)
+	};
+}
+const methods$13 = {
+	listSystemSounds() {
+		return this.run(() => this.sounds.list());
+	},
+	playSystemSound(id, preview) {
+		this.queue.ensureActive();
+		if (this.ctx.invocation && this.ctx.invocation.peer.principal.kind !== "owner") throw new Error("Only the profile owner can play system sounds.");
+		return this.sounds.play(id, preview);
+	},
+	showWindowsNotification(notification) {
+		this.queue.ensureActive();
+		if (this.ctx.invocation && this.ctx.invocation.peer.principal.kind !== "owner") throw new Error("Only the profile owner can send native notifications.");
+		return this.windowsToasts.show(notification);
+	},
+	clearWindowsNotifications(group, tag) {
+		this.queue.ensureActive();
+		if (this.ctx.invocation && this.ctx.invocation.peer.principal.kind !== "owner") throw new Error("Only the profile owner can send native notifications.");
+		return this.windowsToasts.clear(group, tag);
+	}
+};
 
 // src/features/personalization/definition.ts
 const definition$15 = Object.freeze({
@@ -5358,6 +5597,8 @@ const MOD_RPC = composeRpc([
 	RESTART_APP_RPC,
 	LIST_SYSTEM_SOUNDS_RPC,
 	PLAY_SYSTEM_SOUND_RPC,
+	SHOW_WINDOWS_NOTIFICATION_RPC,
+	CLEAR_WINDOWS_NOTIFICATIONS_RPC,
 	ACCOUNT_RPC,
 	TELEMETRY_RPC,
 	TODO_RPC,

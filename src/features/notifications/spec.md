@@ -19,11 +19,15 @@
 
 权限、声音目录及播放失败复用[统一错误反馈](../../../docs/error-handling.md)，在相关设置行提供错误信息与复制，并关联控件。只对声音目录读取提供重试，不通过错误详情重复发送系统通知或自动重放试听。
 
-点击开启开关时申请浏览器 `Notification` 权限，获得授权后保存开启状态；拒绝授权或环境不支持时保留关闭状态并显示行内错误。已有开启状态遇到权限失效时显示恢复提示；重新授权需使用浏览器站点权限或系统通知设置。
+本机 Windows 桌面端使用 Host 的 PowerShell 5.1 / WinRT Toast，不依赖 renderer 的 Web Notification 权限。其他环境点击开启开关时申请浏览器 `Notification` 权限，获得授权后保存开启状态；拒绝授权或环境不支持时保留关闭状态并显示行内错误。已有开启状态遇到权限失效时显示恢复提示；重新授权需使用浏览器站点权限或系统通知设置。
 
-四类任务通知均设置 `renotify: true`，与声音偏好独立，请求支持该参数的浏览器重新提醒。声音开启且选择「系统默认」时，通知省略 `silent`，声音由操作系统通知设置决定；试听也发送一条真实浏览器通知。选择其他本机提示音时，通知同时设置 `renotify: true` 与 `silent: true`，Host 单独播放所选系统声音，避免双响。关闭声音时同样保留 `renotify: true` 并设置 `silent: true`。声音偏好只决定声音，不应取消横幅的重新提醒；偏好即时生效，不补发通知。通知 API 语义见 [Notification 构造参数](https://developer.mozilla.org/en-US/docs/Web/API/Notification/Notification#parameters)。标题区分上述四类状态，正文显示有界会话标题；点击通知只尝试聚焦窗口并关闭该通知，不承诺跳转到对应轮次。
+浏览器路径的四类任务通知均设置 `renotify: true`，与声音偏好独立，请求支持该参数的浏览器重新提醒。声音开启且选择「系统默认」时，通知省略 `silent`，声音由操作系统通知设置决定；试听也发送一条真实浏览器通知。选择其他本机提示音时，通知同时设置 `renotify: true` 与 `silent: true`，Host 单独播放所选系统声音，避免双响。关闭声音时同样保留 `renotify: true` 并设置 `silent: true`。声音偏好只决定声音，不应取消横幅的重新提醒；偏好即时生效，不补发通知。通知 API 语义见 [Notification 构造参数](https://developer.mozilla.org/en-US/docs/Web/API/Notification/Notification#parameters)。标题区分上述四类状态，正文显示有界会话标题；点击通知只尝试聚焦窗口并关闭该通知，不承诺跳转到对应轮次。
 
-每条任务通知及系统默认声音试听生成独立的短 tag，由 Client 实例的时间与随机前缀加递增序号组成，同一毫秒连发也不复用；tag 不包含会话 id 或正文。每个会话仍只跟踪当前通知对象，替换时先关闭旧实例，关闭、卸载和重连时清理所属通知，其他会话不受影响，原有事件去重不变。[Chromium Windows 通知桥](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/chrome/browser/notifications/notification_platform_bridge_win.cc)会在未设置 renotify 且通知历史中存在相同 group/tag 时设置 `SuppressPopup(true)`；另外，已核对 [Electron 44.7.0 的 renderer 通知桥](https://github.com/electron/electron/blob/v44.7.0/shell/browser/notifications/platform_notification_service.cc)没有将 renotify 传入原生通知选项。因此独立 tag 是桌面重复提醒的关键，不依赖关闭顺序或 renotify 在桌面壳中的传递。等待输入、方案确认和请求审批的通知设置 `requireInteraction: true`，请求系统保留提醒直到用户处理；完成、出错和声音试听沿用系统默认消失行为。横幅、声音与驻留请求是否被遵循仍由浏览器、操作系统通知权限及专注设置决定。
+浏览器路径的每条任务通知及系统默认声音试听生成独立短 tag，按会话跟踪通知对象并清理。0.0.4 的独立 tag 与 `renotify` 处理仍不足以解决 Win11 24H2 / DSH `0.2.2-rc.2` 的实测横幅抑制，不能再将 tag 重名解释为全部根因。
+
+本机 Windows 桌面端由 Client 保持原有触发与去重，经 owner-only RPC 交给 Host，使用宿主 subprocess 托管 PowerShell 5.1，通过 WinRT `CreateToastNotifier(appId).Show()` 显示。应用标识优先取 Host 的 `DSH_APP_USER_MODEL_ID`，缺失时采用已核对官方 Windows 打包配置的 `com.deepseek.dsh`；不注册系统身份、不改通知权限或注册表。每个 Client 使用独立的短 group，同一会话复用该 group 内的短 tag；显式设置原生 `SuppressPopup = false`。移除会话时仅清除对应 tag，关闭、重连及卸载时清理所属 group，不清空整个 DSH 的通知历史。操作按顺序执行，过期请求不补发；Host 停用时取消当前进程，并尽力清理已登记的 group。启动进程不使用 `detached: true`，不安装模块或现场编译程序。
+
+Windows 的静音设置由 Host 读实时偏好生成 Toast XML：关闭声音或选择本机提示音时使用 `<audio silent="true"/>`；本机提示音仅在 Toast 成功交接后播放，默认声音交给 Windows。默认声音试听走同一原生通道，不经 renderer。等待输入与审批请求 `scenario="reminder"`、长显示及系统关闭按钮，完成、出错和试听采用系统默认时长。浏览器路径的待交互通知继续设置 `requireInteraction: true`。浏览器通知点击只尝试聚焦窗口；原生 Toast 暂不提供点击聚焦或会话跳转。横幅、声音与驻留是否生效仍由操作系统、通知权限及专注设置决定；进程成功退出不证明用户看到了横幅。原生发送失败显示通知错误，不静默改用已知存在问题的 renderer 通道。
 
 页面需要保持打开。首次加载、启用和重连仅建立当前基线，不补发过去的完成或待交互提醒，不提供离线重放。关闭开关或卸载 Client 后停止提醒并清理当前通知；没有独立后台推送服务。
 
@@ -43,6 +47,6 @@ Client 观察原生 `uiSession.sessionStatus` 的 `pendingInteraction`，以交�
 
 ## 接口依据与验证
 
-已核对 DSH `0.2.2-rc.1` 安装包中的会话投影、列表与控制流、原生交互状态、桌面 preload、连接 `isLoopback` 及 subprocess 的 `spawn`、取消和托管范围退出接口。原生 `turnOutline` 和 `turnBoundary` 不保存结束原因，故使用上述最小摘要；桌面公开桥未提供通用通知方法，Client 直接使用浏览器 `Notification` API。接口判断属于安装包源码核对证据，不能代替实际通知验收。
+已核对 DSH `0.2.2-rc.1` 安装包中的会话投影、列表与控制流、原生交互状态、桌面 preload、连接 `isLoopback` 及 subprocess 的 `spawn`、取消和托管范围退出接口。原生 `turnOutline` 和 `turnBoundary` 不保存结束原因，故使用上述最小摘要；桌面公开桥未提供通用通知方法。Windows 原生通道复用已使用的 subprocess 接口，核对同版 `subprocess-local/src/spawn.ts` 的 Windows 非 detached / 隐藏窗口行为和官方 `apps/desktop/config/windows-packaging/production.env.example` 的应用标识。会话触发仍在 Client，本机 Windows 才调用 Host；其他环境继续使用浏览器 `Notification`。Inspect 本轮不可用；接口判断属于确切安装包及参考源码核对证据，不能代替实际通知验收。
 
-[摘要测试](tests/notifications.test.mjs)覆盖已知及未来结束原因、无关事件引用稳定性、输入校验和真实 Cordis 投影的注册释放。[原生声音测试](tests/system-sounds.test.mjs)覆盖 macOS 目录枚举、跨平台 POSIX 路径、目录与参数白名单、Windows 固定脚本、配置变更、重叠请求、超时和卸载取消，不代表 Windows 实机播放已验证。[Client 测试](tests/client.test.mjs)覆盖保存与试听、静音横幅、去重、同一会话替换与跨会话隔离、模拟 Electron 不传递 renotify 且保留 tag 历史时四类通知在静音及本机提示音下连续重新提醒、独立短 tag、待交互通知的驻留参数、远程访问、失败及过期操作。实际下拉、系统通知权限与声音仍需在运行中的 DSH 验收；播放器正常退出不等于实际听到声音。验证层次见[开发指南](../../../docs/development.md#验证方法与限制)，市场参考与提交见[第三方资源声明](../../../docs/third-party-notices.md#通知插件参考)。
+[摘要测试](tests/notifications.test.mjs)覆盖已知及未来结束原因、无关事件引用稳定性、输入校验和真实 Cordis 投影的注册释放。[原生声音测试](tests/system-sounds.test.mjs)覆盖 macOS 目录枚举、跨平台 POSIX 路径、目录与参数白名单、Windows 固定脚本、配置变更、重叠请求、超时和卸载取消，不代表 Windows 实机播放已验证。[Client 测试](tests/client.test.mjs)覆盖四类触发、前台抑制、去重、浏览器通知与 Windows 原生路由、默认声音试听、会话/group 隔离、远程访问及迟到响应。[Windows Toast 测试](tests/windows-toasts.test.mjs)覆盖编码命令、XML 转义、实时声音偏好、原生参数、定向清理、停用、超时与卸载；Windows runner 另解析实际 PowerShell 脚本及 XML，但不发送通知。实际系统通知权限、横幅、关闭、声音与点击行为仍需 Windows DSH 实机验收；脚本解析及进程正常退出不等于用户看到了横幅或听到声音。验证层次见[开发指南](../../../docs/development.md#验证方法与限制)，市场参考与提交见[第三方资源声明](../../../docs/third-party-notices.md#通知插件参考)。

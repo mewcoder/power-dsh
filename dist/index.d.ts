@@ -186,6 +186,21 @@ interface SystemSoundsCatalog {
 interface SoundPlayback {
   played: boolean;
 }
+interface WindowsNotification {
+  group: string;
+  tag: string;
+  title: string;
+  body: string;
+  attention: boolean;
+  preview: boolean;
+  dismiss: string;
+}
+interface NotificationDelivery {
+  shown: boolean;
+}
+interface NotificationCleared {
+  cleared: boolean;
+}
 interface RestartStatus {
   supported: boolean;
   running: boolean;
@@ -298,6 +313,8 @@ interface PowerDshMethods {
   restartApp(): Promise<RestartAccepted>;
   listSystemSounds(): Promise<SystemSoundsCatalog>;
   playSystemSound(id: string, preview: boolean): Promise<SoundPlayback>;
+  showWindowsNotification(notification: WindowsNotification): Promise<NotificationDelivery>;
+  clearWindowsNotifications(group: string, tag: string): Promise<NotificationCleared>;
   setAccountBlocked(blocked: boolean): Promise<PolicyResult>;
   setTelemetryBlocked(blocked: boolean): Promise<PolicyResult>;
   setTodoBlocked(blocked: boolean): Promise<PolicyResult>;

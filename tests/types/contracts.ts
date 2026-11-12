@@ -15,6 +15,13 @@ void form.set('showVersion', true);
 void form.set('notificationSound', 'default');
 void remote.setAccountBlocked(true);
 void remote.setSkillEnabled('', 'user', 'code-review', false);
+void remote.showWindowsNotification({ group: 'pdclient', tag: 'task', title: 'Task', body: '', attention: false, preview: false, dismiss: 'Dismiss' });
+void remote.clearWindowsNotifications('pdclient', 'task');
+
+// @ts-expect-error Native notification policy is boolean, not an arbitrary script option.
+void remote.showWindowsNotification({ group: 'pdclient', tag: 'task', title: 'Task', body: '', attention: 'yes', preview: false, dismiss: 'Dismiss' });
+// @ts-expect-error Native cleanup requires both the group and explicit tag or empty group selector.
+void remote.clearWindowsNotifications('pdclient');
 
 // @ts-expect-error A boolean preference cannot accept a string.
 void form.set('showVersion', 'true');

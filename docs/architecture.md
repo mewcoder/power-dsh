@@ -47,7 +47,7 @@ DSH `0.2.2-rc.1` 的原生 logger 提供内存缓冲与 exporter；插件安装�
 
 ## 任务通知
 
-[通知模块](../src/features/notifications/)拥有结束摘要投影、通知订阅和系统声音。Host 注册最小投影，Client 订阅原生列表与交互状态并调用浏览器通知；声音经 owner-only RPC 与托管 subprocess 播放。触发、权限、去重和声音边界由[任务通知 Spec](../src/features/notifications/spec.md)维护。
+[通知模块](../src/features/notifications/)拥有结束摘要投影、通知订阅和系统声音。Host 注册最小投影，Client 订阅原生列表与交互状态；本机 Windows 桌面端经 owner-only RPC 和宿主 subprocess 托管 PowerShell / WinRT Toast，其余环境调用浏览器通知。原生 Toast 独立串行发送与定向清理，避免阻塞设置策略队列；声音保留原有并发控制与托管进程。触发、权限、去重、声音及生命周期边界由[任务通知 Spec](../src/features/notifications/spec.md)维护。
 
 ## MCP 详情
 

@@ -1,4 +1,5 @@
 import type { SkillCatalog, SkillDetail, McpCatalog, McpServerDetail, PersonalizationFile, SystemSoundsCatalog, SoundPlayback, RestartStatus, RestartAccepted, ArchiveCatalog, WallpaperAsset, WallpaperCleared, UsageSnapshot, ProjectCatalog } from './wire.ts';
+import type { WindowsNotification, NotificationDelivery, NotificationCleared } from './wire.ts';
 
 /** Named Host operations, before the transport adds its result envelope. */
 export interface PowerDshMethods {
@@ -6,6 +7,8 @@ export interface PowerDshMethods {
   restartApp(): Promise<RestartAccepted>;
   listSystemSounds(): Promise<SystemSoundsCatalog>;
   playSystemSound(id: string, preview: boolean): Promise<SoundPlayback>;
+  showWindowsNotification(notification: WindowsNotification): Promise<NotificationDelivery>;
+  clearWindowsNotifications(group: string, tag: string): Promise<NotificationCleared>;
   setAccountBlocked(blocked: boolean): Promise<PolicyResult>;
   setTelemetryBlocked(blocked: boolean): Promise<PolicyResult>;
   setTodoBlocked(blocked: boolean): Promise<PolicyResult>;

@@ -107,7 +107,7 @@ export function usageSnapshotFixture(overrides = {}) {
   };
 }
 
-export async function mount({ featureIds, localeLanguage, restartStatus = { supported: true, running: false, error: '' }, restartReply, desktop = false, themeAvailable = true, updates, rpcError, rpcReply, formReply, formLoad, fileText = '', fileReply, fileReadError, wallpaper, wallpaperReply, wallpaperReadError, wallpaperClearError, skillCatalog, skillList, skillReply, skillReadError, skillDetail, skillDetailReply, skillDetailError, mcpCatalog, mcpList, mcpReply, mcpReadError, mcpDetail, mcpDetailReply, mcpDetailError, archiveCatalog, archiveList, archiveReply, archiveReadError, usageSnapshot, usageList, usageReply, usageReadError, projectCatalog, projectList, projectReply, projectReadError, writable = true, reload = () => {}, windows = false, notificationPermission = 'granted', notificationRequest, notificationFailure = false, notificationServices = true, notificationsAvailable = true, localConnection = true, soundCatalog, soundReply, soundListError, modelDirectory, modelSelectReply, modelDirectoriesAvailable = true } = {}) {
+export async function mount({ featureIds, localeLanguage, restartStatus = { supported: true, running: false, error: '' }, restartReply, desktop = false, themeAvailable = true, updates, rpcError, rpcReply, formReply, formLoad, fileText = '', fileReply, fileReadError, wallpaper, wallpaperReply, wallpaperReadError, wallpaperClearError, skillCatalog, skillList, skillReply, skillReadError, skillDetail, skillDetailReply, skillDetailError, mcpCatalog, mcpList, mcpReply, mcpReadError, mcpDetail, mcpDetailReply, mcpDetailError, archiveCatalog, archiveList, archiveReply, archiveReadError, usageSnapshot, usageList, usageReply, usageReadError, projectCatalog, projectList, projectReply, projectReadError, writable = true, reload = () => {}, windows = false, notificationPermission = 'granted', notificationRequest, notificationFailure = false, notificationServices = true, notificationsAvailable = true, nativeNotificationReply, nativeClearReply, localConnection = true, soundCatalog, soundReply, soundListError, modelDirectory, modelSelectReply, modelDirectoriesAvailable = true } = {}) {
   let plugin;
   const nativeLauncher = { native: true };
   const entries = new Map([['settings.launcher:single', nativeLauncher]]);
@@ -129,6 +129,8 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   let documentFocused = false;
   let windowFocusCount = 0;
   const notifications = [];
+  const nativeNotifications = [];
+  const nativeClears = [];
   const soundPlays = [];
   const restartCalls = [];
   let soundLists = 0;
@@ -475,6 +477,14 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
             restartCalls.push([]);
             return restartReply ? await restartReply() : { ok: true, value: { accepted: true } };
           }
+          if (descriptor.method === 'showWindowsNotification') {
+            nativeNotifications.push(blocked);
+            return nativeNotificationReply ? await nativeNotificationReply(blocked) : { ok: true, value: { shown: true } };
+          }
+          if (descriptor.method === 'clearWindowsNotifications') {
+            nativeClears.push({ group: blocked, tag: revision });
+            return nativeClearReply ? await nativeClearReply(blocked, revision) : { ok: true, value: { cleared: true } };
+          }
           if (descriptor.method === 'listSystemSounds') {
             soundLists++;
             if (soundListError) return { ok: false, error: { message: soundListError } };
@@ -666,7 +676,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     connectionStateListeners,
     entries, calls, dictionaries, nativeLauncher, rpcCalls, rpcDescriptors, fileWrites, skillReads, skillDetailReads, skillWrites, mcpReads, mcpDetailReads, mcpWrites, archiveReads, archiveWrites, projectReads, projectWrites, usageReads,
     soundPlays, soundLists: () => soundLists,
-    notifications,
+    notifications, nativeNotifications, nativeClears,
     permissionRequests: () => permissionRequests,
     notificationSubscriptions: () => sessionListeners.size + statusListeners.size + connectionListeners.size,
     windowFocusCount: () => windowFocusCount,

@@ -2052,12 +2052,19 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		const notificationTagPrefix = `power-dsh:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 10)}`;
 		let notificationSequence = 0;
 		const nextNotificationTag = () => `${notificationTagPrefix}:${(++notificationSequence).toString(36)}`;
+		const newNativeGroup = () => `pd${Math.random().toString(36).slice(2, 14)}`;
+		const usesNativeNotifications = () => Boolean(window.dshDesktop?.protocolVersion === 1 && document.documentElement.getAttribute("data-platform") === "win32" && soundConnection?.isLoopback);
+		const clearNativeNotifications = async (group, tag = "") => {
+			if (!(await ctx.remote.powerDsh.clearWindowsNotifications(group, tag)).ok) throw new Error("notificationFailed");
+		};
 		ctx.effect(() => () => {
 			active = false;
 		});
 		function notificationRunner(ctx, form, t, reportError, playSound) {
 			const records = /* @__PURE__ */ new Map();
 			const visible = /* @__PURE__ */ new Map();
+			const nativeTags = /* @__PURE__ */ new Map();
+			let nativeGroup = newNativeGroup();
 			let active = true;
 			let enabled = false;
 			let generation = ctx.connection.generation.getSnapshot();
@@ -2067,13 +2074,48 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					notification.close();
 				}
 				visible.clear();
+				if (nativeTags.size) {
+					clearNativeNotifications(nativeGroup).catch(() => {
+						if (active) reportError("notificationFailed");
+					});
+					nativeTags.clear();
+					nativeGroup = newNativeGroup();
+				}
 			}
 			function send(id, row, kind) {
-				if (!active || window.Notification?.permission !== "granted") return;
+				if (!active || !usesNativeNotifications() && window.Notification?.permission !== "granted") return;
 				try {
 					const preferences = form.getSnapshot().value;
 					const sound = preferences?.notificationSound || "default";
 					const localTone = preferences?.notificationSoundEnabled === true && sound !== "default" && ctx.connection.isLoopback;
+					if (usesNativeNotifications()) {
+						const tag = nativeTags.get(id) ?? (++notificationSequence).toString(36);
+						nativeTags.set(id, tag);
+						const sentGroup = nativeGroup;
+						const sentGeneration = generation;
+						(async () => {
+							const reply = await ctx.remote.powerDsh.showWindowsNotification({
+								group: sentGroup,
+								tag,
+								title: t(`notification${kind}`).slice(0, 80),
+								body: (row.displayTitle || row.title || t("notificationBody")).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").slice(0, 160),
+								attention: kind === "Approval" || kind === "Input",
+								preview: false,
+								dismiss: t("notificationDismiss")
+							});
+							if (!active || !enabled || sentGroup !== nativeGroup || sentGeneration !== generation || nativeTags.get(id) !== tag) return;
+							if (!reply.ok) throw new Error("notificationFailed");
+							if (reply.value.shown) reportError("");
+							if (reply.value.shown && localTone) try {
+								await playSound(sound, false);
+							} catch (_error) {
+								if (active) reportError("notificationSoundFailed");
+							}
+						})().catch(() => {
+							if (active && enabled && sentGroup === nativeGroup && sentGeneration === generation) reportError("notificationFailed");
+						});
+						return;
+					}
 					visible.get(id)?.close();
 					visible.delete(id);
 					const notification = new window.Notification(t(`notification${kind}`), {
@@ -2168,6 +2210,13 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					records.delete(id);
 					visible.get(id)?.close();
 					visible.delete(id);
+					const tag = nativeTags.get(id);
+					if (tag) {
+						nativeTags.delete(id);
+						clearNativeNotifications(nativeGroup, tag).catch(() => {
+							if (active) reportError("notificationFailed");
+						});
+					}
 				}
 			}
 			run(true);
@@ -2195,6 +2244,18 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		let soundConnection = null;
 		let soundGeneration = 0;
 		let soundPreview = null;
+		let nativePreviewGroup = newNativeGroup();
+		let nativePreviewVisible = false;
+		const closeSoundPreview = () => {
+			soundPreview?.close();
+			if (nativePreviewVisible) {
+				clearNativeNotifications(nativePreviewGroup).catch(() => {
+					if (active) publishSound({ error: "notificationSoundFailed" });
+				});
+				nativePreviewVisible = false;
+				nativePreviewGroup = newNativeGroup();
+			}
+		};
 		const publishSound = (patch) => {
 			soundState = {
 				...soundState,
@@ -2204,7 +2265,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		};
 		ctx.effect(() => () => {
 			soundGeneration++;
-			soundPreview?.close();
+			closeSoundPreview();
 		});
 		const loadSystemSounds = async () => {
 			if (!active || soundState.status === "loading") return;
@@ -2252,8 +2313,22 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				playing: true,
 				error: ""
 			});
+			const generation = soundGeneration;
 			try {
 				if (preview && id === "default") {
+					if (usesNativeNotifications()) {
+						nativePreviewVisible = true;
+						if (!(await ctx.remote.powerDsh.showWindowsNotification({
+							group: nativePreviewGroup,
+							tag: "preview",
+							title: t("notificationSoundTestTitle"),
+							body: t("notificationSoundTestBody"),
+							attention: false,
+							preview: true,
+							dismiss: t("notificationDismiss")
+						})).ok) throw new Error("notificationSoundFailed");
+						return;
+					}
 					if (window.Notification?.permission !== "granted") throw new Error("notificationPermission");
 					soundPreview?.close();
 					soundPreview = new window.Notification(t("notificationSoundTestTitle"), {
@@ -2266,10 +2341,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					};
 				} else if (!(await ctx.remote.powerDsh.playSystemSound(id, preview)).ok) throw new Error("notificationSoundFailed");
 			} catch (failure) {
-				if (active) publishSound({ error: errorMessage(failure) === "notificationPermission" ? "notificationPermission" : "notificationSoundFailed" });
+				if (active && generation === soundGeneration) publishSound({ error: errorMessage(failure) === "notificationPermission" ? "notificationPermission" : "notificationSoundFailed" });
 				if (!preview) throw failure;
 			} finally {
-				if (active && preview) publishSound({ playing: false });
+				if (active && preview && generation === soundGeneration) publishSound({ playing: false });
 			}
 		};
 		let notificationError = "";
@@ -2284,17 +2359,31 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		};
 		const checkNotificationPermission = () => {
 			if (form.getSnapshot().value?.notificationsEnabled !== true) {
-				soundPreview?.close();
+				closeSoundPreview();
 				reportNotificationError("");
 				return;
 			}
-			reportNotificationError(!window.Notification ? "notificationUnsupported" : window.Notification.permission !== "granted" ? "notificationPermission" : !notificationReady ? "notificationUnavailable" : "");
+			if (form.getSnapshot().value?.notificationSoundEnabled !== true) closeSoundPreview();
+			reportNotificationError(usesNativeNotifications() ? !notificationReady ? "notificationUnavailable" : "" : !window.Notification ? "notificationUnsupported" : window.Notification.permission !== "granted" ? "notificationPermission" : !notificationReady ? "notificationUnavailable" : "");
 		};
 		ctx.inject(["connection"], (child) => {
+			child.effect(() => child.connection.generation.subscribe(() => {
+				soundGeneration++;
+				closeSoundPreview();
+				const requested = soundState.status !== "idle";
+				publishSound({
+					status: requested ? "waiting" : "idle",
+					value: null,
+					error: "",
+					playing: false
+				});
+				if (requested && child.connection.generation.getSnapshot() !== void 0) loadSystemSounds();
+			}));
 			child.effect(() => {
 				soundConnection = child.connection;
 				if (soundState.status !== "idle") loadSystemSounds();
 				return () => {
+					closeSoundPreview();
 					soundConnection = null;
 					soundGeneration++;
 					publishSound({
@@ -2331,10 +2420,12 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		const setNotificationsEnabled = async (enabled) => {
 			if (enabled) {
 				if (!notificationReady) throw new Error(t("notificationUnavailable"));
-				if (!window.Notification) throw new Error(t("notificationUnsupported"));
-				const permission = window.Notification.permission === "default" ? await window.Notification.requestPermission() : window.Notification.permission;
-				if (!active) return;
-				if (permission !== "granted") throw new Error(t("notificationPermission"));
+				if (!usesNativeNotifications()) {
+					if (!window.Notification) throw new Error(t("notificationUnsupported"));
+					const permission = window.Notification.permission === "default" ? await window.Notification.requestPermission() : window.Notification.permission;
+					if (!active) return;
+					if (permission !== "granted") throw new Error(t("notificationPermission"));
+				}
 			}
 			await savePreference("notificationsEnabled", enabled, "notificationUnavailable");
 			reportNotificationError("");
@@ -2563,6 +2654,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"notificationError": "Task failed",
 			"notificationInput": "Input required",
 			"notificationApproval": "Approval required",
+			"notificationDismiss": "Dismiss",
 			"notificationBody": "Return to DSH to view the task.",
 			"notificationUnsupported": "Desktop notifications are unavailable in this environment.",
 			"notificationPermission": "Allow notifications for DSH in your browser or system settings, then try again.",
@@ -2592,6 +2684,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"notificationError": "任务出错",
 			"notificationInput": "等待输入",
 			"notificationApproval": "请求审批",
+			"notificationDismiss": "关闭",
 			"notificationBody": "返回 DSH 查看任务。",
 			"notificationUnsupported": "当前环境不支持桌面通知。",
 			"notificationPermission": "请在浏览器或系统设置中允许 DSH 发送通知后重试。",
@@ -2601,6 +2694,22 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	};
 
 // src/features/notifications/rpc.ts
+	function parseWindowsNotification(value) {
+		if (!isRecord(value) || typeof value.group !== "string" || !/^[a-z0-9]{1,16}$/.test(value.group) || typeof value.tag !== "string" || !/^[a-z0-9]{1,16}$/.test(value.tag) || typeof value.title !== "string" || !value.title || value.title.length > 80 || typeof value.body !== "string" || value.body.length > 160 || typeof value.dismiss !== "string" || !value.dismiss || value.dismiss.length > 40 || typeof value.attention !== "boolean" || typeof value.preview !== "boolean" || [
+			value.title,
+			value.body,
+			value.dismiss
+		].some((text) => /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(text))) throw new TypeError("Invalid Windows notification");
+		return {
+			group: value.group,
+			tag: value.tag,
+			title: value.title,
+			body: value.body,
+			attention: value.attention,
+			preview: value.preview,
+			dismiss: value.dismiss
+		};
+	}
 	const soundCatalogCodec = {
 		mode: "strict",
 		typeSymbol: "power-dsh#SystemSounds",
@@ -2654,7 +2763,63 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			} })
 		}
 	};
-	const rpc$12 = [LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC];
+	const SHOW_WINDOWS_NOTIFICATION_RPC = {
+		id: "power-dsh#powerDsh/showWindowsNotification",
+		service: "powerDsh",
+		namespace: "powerDsh",
+		method: "showWindowsNotification",
+		invocation: { kind: "direct" },
+		parameters: [{
+			name: "notification",
+			wire: "notification",
+			source: "json",
+			codec: {
+				mode: "strict",
+				typeSymbol: "power-dsh#WindowsNotification",
+				create: () => ({ parse: parseWindowsNotification })
+			}
+		}],
+		result: {
+			mode: "strict",
+			typeSymbol: "power-dsh#NotificationDelivery",
+			create: () => ({ parse(value) {
+				if (!isRecord(value) || typeof value.shown !== "boolean") throw new TypeError("Invalid notification delivery");
+				return { shown: value.shown };
+			} })
+		}
+	};
+	const CLEAR_WINDOWS_NOTIFICATIONS_RPC = {
+		id: "power-dsh#powerDsh/clearWindowsNotifications",
+		service: "powerDsh",
+		namespace: "powerDsh",
+		method: "clearWindowsNotifications",
+		invocation: { kind: "direct" },
+		parameters: [{
+			name: "group",
+			wire: "group",
+			source: "json",
+			codec: stringCodec
+		}, {
+			name: "tag",
+			wire: "tag",
+			source: "json",
+			codec: stringCodec
+		}],
+		result: {
+			mode: "strict",
+			typeSymbol: "power-dsh#NotificationCleared",
+			create: () => ({ parse(value) {
+				if (!isRecord(value) || typeof value.cleared !== "boolean") throw new TypeError("Invalid notification cleanup");
+				return { cleared: value.cleared };
+			} })
+		}
+	};
+	const rpc$12 = [
+		LIST_SYSTEM_SOUNDS_RPC,
+		PLAY_SYSTEM_SOUND_RPC,
+		SHOW_WINDOWS_NOTIFICATION_RPC,
+		CLEAR_WINDOWS_NOTIFICATIONS_RPC
+	];
 
 // src/features/personalization/styles.ts
 	const styles$8 = `
@@ -9604,6 +9769,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		RESTART_APP_RPC,
 		LIST_SYSTEM_SOUNDS_RPC,
 		PLAY_SYSTEM_SOUND_RPC,
+		SHOW_WINDOWS_NOTIFICATION_RPC,
+		CLEAR_WINDOWS_NOTIFICATIONS_RPC,
 		ACCOUNT_RPC,
 		TELEMETRY_RPC,
 		TODO_RPC,

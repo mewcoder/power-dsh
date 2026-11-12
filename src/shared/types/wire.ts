@@ -117,6 +117,12 @@ export interface SystemSoundsCatalog {
 }
 export type SystemSounds = SystemSoundsCatalog;
 export interface SoundPlayback { played: boolean }
+export interface WindowsNotification {
+  group: string; tag: string; title: string; body: string;
+  attention: boolean; preview: boolean; dismiss: string;
+}
+export interface NotificationDelivery { shown: boolean }
+export interface NotificationCleared { cleared: boolean }
 
 export interface RestartStatus {
   supported: boolean;

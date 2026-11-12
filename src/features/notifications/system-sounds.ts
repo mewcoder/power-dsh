@@ -89,7 +89,6 @@ export class SystemSounds {
   async play(id: string, preview = false): Promise<SoundPlayback> {
     if (this.closed) throw new Error('notificationSoundUnavailable');
     if (typeof id !== 'string' || typeof preview !== 'boolean') throw new Error('notificationSoundInvalid');
-    // The browser owns the system-default notification, including its preview.
     if (id === 'default' || (!preview && !this.automaticAllowed(id)) || this.current) return { played: false };
     const subprocess = this.ctx.get('subprocess');
     if (!subprocess || !['darwin', 'win32'].includes(this.platform)) throw new Error('notificationSoundUnavailable');

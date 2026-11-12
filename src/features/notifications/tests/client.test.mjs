@@ -85,12 +85,12 @@ test('same-session replacements release old instances and preserve other session
   app.unmount();
 });
 
-test('Electron retained tag history cannot suppress repeated muted or native-sound banners for any trigger', async () => {
+test('local Windows desktop uses the Host for every repeated trigger and preserves native sound routing', async () => {
   for (const preferences of [
     { notificationSoundEnabled: false, notificationSound: 'default' },
     { notificationSoundEnabled: true, notificationSound: 'win:SystemExclamation' },
   ]) {
-    const app = await mount({ windows: true });
+    const app = await mount({ windows: true, desktop: true, notificationsAvailable: false });
     try {
       app.setSessions([notificationSession()]);
       app.set({ notificationsEnabled: true, ...preferences });
@@ -101,27 +101,131 @@ test('Electron retained tag history cannot suppress repeated muted or native-sou
         app.setSessionStatus([['task', { running: true, pendingInteraction: { key: `question:${round}`, kind: 'question' } }]]);
         app.setSessionStatus([['task', { running: true, pendingInteraction: { key: `approval:${round}`, kind: 'approval' } }]]);
       }
-      assert.equal(app.notifications.length, 8);
-      assert.deepEqual(app.notifications.map(notification => notification.title), [
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(app.notifications.length, 0, 'The affected renderer Notification API is never used.');
+      assert.equal(app.nativeNotifications.length, 8);
+      assert.deepEqual(app.nativeNotifications.map(notification => notification.title), [
         'notificationComplete', 'notificationError', 'notificationInput', 'notificationApproval',
         'notificationComplete', 'notificationError', 'notificationInput', 'notificationApproval',
       ]);
-      assert.equal(app.notifications.some(notification => notification.popupSuppressed), false,
-        'Retained tag history must not suppress any later banner.');
-      assert.equal(new Set(app.notifications.map(notification => notification.options.tag)).size, 8);
-      for (const notification of app.notifications) {
-        assert.equal(notification.popupSuppressed, false, 'Retained tag history must not suppress the next banner.');
-        assert.equal(notification.options.renotify, true);
-        assert.equal(notification.options.silent, true, 'Re-alerting must preserve the browser sound preference.');
-        assert.match(notification.options.tag, /^power-dsh:[a-z0-9]+:[a-z0-9]*:[a-z0-9]+$/);
-        assert.ok(notification.options.tag.length < 48, 'Platform tags stay short independently of session ids.');
+      assert.equal(new Set(app.nativeNotifications.map(notification => notification.tag)).size, 1);
+      for (const notification of app.nativeNotifications) {
+        assert.match(notification.group, /^[a-z0-9]{1,16}$/);
+        assert.match(notification.tag, /^[a-z0-9]{1,16}$/);
+        assert.equal(notification.preview, false);
+        assert.equal(Object.hasOwn(notification, 'silent'), false, 'The Host reads the authoritative sound preference.');
       }
+      assert.deepEqual(app.nativeNotifications.map(notification => notification.attention), [false, false, true, true, false, false, true, true]);
       assert.deepEqual(app.soundPlays, preferences.notificationSoundEnabled
         ? Array.from({ length: 8 }, () => ({ id: preferences.notificationSound, preview: false })) : []);
     } finally {
       app.unmount();
     }
   }
+});
+
+test('Windows default-sound preview uses the native channel without renderer permission or saving again', async () => {
+  let saves = 0;
+  const app = await mount({ windows: true, desktop: true, notificationPermission: 'denied', notificationsAvailable: false,
+    formLoad: () => { saves++; } });
+  await notificationSwitch(app).props.onClick();
+  assert.equal(notificationSwitch(app).props['aria-checked'], true);
+  assert.equal(app.permissionRequests(), 0);
+  const previousSaves = saves;
+  await loadedSoundSettings(app);
+  const menu = descendants(app.renderSettings()).find(node => node.type === 'native-menu-fixture');
+  await menu.props.onSelect('default');
+  await menu.props.onSelect('default');
+  assert.equal(saves, previousSaves);
+  assert.equal(app.notifications.length, 0);
+  assert.equal(app.nativeNotifications.length, 2);
+  assert.equal(app.nativeNotifications[0].group, app.nativeNotifications[1].group);
+  assert.equal(app.nativeNotifications[0].tag, 'preview');
+  assert.equal(app.nativeNotifications[0].preview, true);
+  assert.equal(app.nativeNotifications[0].attention, false);
+  assert.deepEqual(app.soundPlays, []);
+  app.resetConnection();
+  assert.deepEqual(app.nativeClears, [{ group: app.nativeNotifications[0].group, tag: '' }]);
+  await loadedSoundSettings(app);
+  await menu.props.onSelect('default');
+  assert.notEqual(app.nativeNotifications[2].group, app.nativeNotifications[0].group);
+  app.set({ notificationSoundEnabled: false });
+  assert.deepEqual(app.nativeClears.at(-1), { group: app.nativeNotifications[2].group, tag: '' });
+  app.unmount();
+});
+
+test('Windows native notification cleanup isolates sessions, rotates groups on reconnect, and does not replay history', async () => {
+  const app = await mount({ windows: true, desktop: true });
+  const other = notificationSession({ id: 'other' });
+  app.setSessions([notificationSession(), other]);
+  app.set({ notificationsEnabled: true, notificationSoundEnabled: false });
+  app.setSessions([notificationSession({ seq: 10, reason: 'completed', running: false }),
+    notificationSession({ id: 'other', seq: 10, reason: 'completed', running: false })]);
+  assert.equal(app.nativeNotifications.length, 2);
+  const first = app.nativeNotifications[0];
+  const second = app.nativeNotifications[1];
+  assert.equal(first.group, second.group);
+  assert.notEqual(first.tag, second.tag);
+  app.setSessions([notificationSession({ id: 'other', seq: 10, reason: 'completed', running: false })]);
+  assert.deepEqual(app.nativeClears, [{ group: first.group, tag: first.tag }]);
+  app.resetConnection();
+  assert.deepEqual(app.nativeClears.at(-1), { group: first.group, tag: '' });
+  assert.equal(app.nativeNotifications.length, 2);
+  app.setSessions([notificationSession({ id: 'other', seq: 20, reason: 'error', running: false })]);
+  const third = app.nativeNotifications[2];
+  assert.notEqual(third.group, first.group);
+  app.set({ notificationsEnabled: false });
+  assert.deepEqual(app.nativeClears.at(-1), { group: third.group, tag: '' });
+  app.setSessions([notificationSession({ id: 'other', seq: 30, reason: 'completed', running: false })]);
+  assert.equal(app.nativeNotifications.length, 3);
+  app.unmount();
+});
+
+test('Windows native send failure reports the notification error and never plays a tone or silently falls back', async () => {
+  const app = await mount({ windows: true, desktop: true,
+    nativeNotificationReply: () => ({ ok: false, error: { message: 'private subprocess details' } }) });
+  app.setSessions([notificationSession()]);
+  app.set({ notificationsEnabled: true, notificationSoundEnabled: true, notificationSound: 'win:SystemExclamation' });
+  app.setSessions([notificationSession({ seq: 10, reason: 'completed', running: false })]);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.settingsProps().notificationsSource.getSnapshot().error, 'notificationFailed');
+  assert.equal(app.notifications.length, 0);
+  assert.deepEqual(app.soundPlays, []);
+  app.unmount();
+});
+
+test('Windows native completion acknowledgements cannot play audio after disable, session removal, reconnect or unload', async () => {
+  for (const dispose of [
+    app => app.set({ notificationsEnabled: false }),
+    app => app.setSessions([]),
+    app => app.resetConnection(),
+    app => app.unmount(),
+  ]) {
+    const delayed = Promise.withResolvers();
+    const app = await mount({ windows: true, desktop: true, nativeNotificationReply: () => delayed.promise });
+    app.setSessions([notificationSession()]);
+    app.set({ notificationsEnabled: true, notificationSoundEnabled: true, notificationSound: 'win:SystemExclamation' });
+    app.setSessions([notificationSession({ seq: 10, reason: 'completed', running: false })]);
+    dispose(app);
+    delayed.resolve({ ok: true, value: { shown: true } });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(app.notifications.length, 0);
+    assert.deepEqual(app.soundPlays, []);
+    assert.equal(app.nativeClears.length, 1);
+    app.unmount();
+  }
+});
+
+test('remote Windows clients keep browser notifications and cannot route a desktop toast or sound to the server', async () => {
+  const app = await mount({ windows: true, desktop: true, localConnection: false });
+  app.setSessions([notificationSession()]);
+  app.set({ notificationsEnabled: true, notificationSoundEnabled: true, notificationSound: 'win:SystemExclamation' });
+  app.setSessions([notificationSession({ seq: 10, reason: 'completed', running: false })]);
+  assert.equal(app.notifications.length, 1);
+  assert.equal(Object.hasOwn(app.notifications[0].options, 'silent'), false);
+  assert.equal(app.nativeNotifications.length, 0);
+  assert.deepEqual(app.soundPlays, []);
+  app.unmount();
 });
 
 test('system sound menu saves a native choice, previews it once, and sends one silent banner plus native playback', async () => {
@@ -435,7 +539,7 @@ test('startup, reconnect and enabling only seed history; disable and unload rele
   assert.equal(app.notifications.length, 1);
   app.setSessions([notificationSession({ seq: 50, reason: 'completed', running: false })]);
   assert.equal(app.notifications.length, 2);
-  assert.equal(app.notificationSubscriptions(), 3);
+  assert.equal(app.notificationSubscriptions(), 4);
   app.unmount();
   assert.equal(app.notifications[1].closed, true);
   assert.equal(app.notificationSubscriptions(), 0);

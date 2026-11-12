@@ -171,3 +171,11 @@ Windows 用户报告启用失败：`EPERM: operation not permitted, stat ...powe
 0.0.2 将 `@deepseek-ai/dsh-tools`、`@deepseek-ai/dsh-typert-protocol` 与 `@deepseek-ai/schemastery` 改为可选 `peerDependencies`，由宿主提供；包内不再声明生产依赖。peer 范围按预发布分支显式书写（`>=0.2.0-rc.1 <0.2.1-0 || >=0.2.1-alpha.1 <0.2.2-0 || >=0.2.2-alpha.1 <0.3.0-0`），避免 npm 默认规则把 rc 版本排除。
 
 验证：`npm run check` 558 项通过、`check:package` 与实际 tarball 通过、`check:install` 在独立项目中确认包内零生产依赖且宿主提供的 peer 可解析；`check:compat` 在 `0.2.0-rc.1` 与 `0.2.1-rc.5` 上各通过 558 项测试与 7 项 Host 装配检查。该验证不包含 Windows 实机复测，Windows 结果待用户反馈。
+
+### 2026-11-12 Windows 通知后续反馈
+
+Issue #1 的新增实测环境为 Win11 24H2（26100）、DSH `0.2.2-rc.2`、PowerDSH `0.0.4`。反馈确认：即使使用独立 tag、`renotify: true` 和静音参数，renderer Web Notification 仍只进入通知中心；去掉这些参数的通知，以及同 AUMID 的 WinRT 直发通知能显示横幅。这是 0.0.4 的实机失败证据，先前的参数与 tag 历史模拟没有覆盖该故障，不再视为实际横幅修复的证明。
+
+后续本地修复将本机 Windows 桌面端通知与默认声音试听交给 Host 的 PowerShell 5.1 / WinRT 通道；复用已核对的 subprocess 能力，不增加依赖、现场编译或系统身份注册。四类触发、静音、声音选择、定向清理、超时、owner 权限和卸载通过自动化回归；新增 Windows 专属检查只解析实际脚本及 XML，不显示通知。macOS 的仓库检查与隔离安装不能替代 Windows 的横幅、驻留、关闭及声音验收；新实现尚未完成这组实机复测。
+
+本地最终检查为 576 项、575 通过、0 失败、1 项 Windows 专属脚本/XML 解析跳过，构建新鲜度、实际包和隔离生产安装通过。`0.2.0-rc.1`、`0.2.1-rc.5` 分别通过相同 576 项仓库检查（同样跳过 1 项）及 7 项固定生产 SDK Host 装配检查。汇总标识为 `summary-1794469999134.json`，隔离目录标识分别为 `0.2.0-rc.1-I3coDY`、`0.2.1-rc.5-HcF39V`。原始证据保留在忽略的兼容检查目录；未运行 Windows runner 或 Windows 桌面安装。

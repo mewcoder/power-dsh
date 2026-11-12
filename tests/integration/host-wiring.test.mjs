@@ -168,6 +168,8 @@ test('feature-owned RPC methods retain the invocation owner check through the ac
     await assert.rejects(async () => service[method](...args), /Only the profile owner can change Mod policies/, method);
   }
   await assert.rejects(async () => service.playSystemSound('default', true), /Only the profile owner can play system sounds/);
+  await assert.rejects(async () => service.showWindowsNotification({}), /Only the profile owner can send native notifications/);
+  await assert.rejects(async () => service.clearWindowsNotifications('group', ''), /Only the profile owner can send native notifications/);
   assert.deepEqual(writes, []);
 });
 

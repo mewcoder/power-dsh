@@ -2,6 +2,21 @@ import { isRecord, isArray, isOneOf, type Codec, type RpcDescriptor } from '../.
 import type { SoundEntry, SystemSoundsCatalog, SystemSounds, SoundPlayback } from '../../shared/types/wire.ts';
 export type { SoundEntry, SystemSoundsCatalog, SystemSounds, SoundPlayback } from '../../shared/types/wire.ts';
 import { stringCodec, booleanCodec } from '../../shared/rpc/codecs.ts';
+import type { WindowsNotification, NotificationDelivery, NotificationCleared } from '../../shared/types/wire.ts';
+
+export function parseWindowsNotification(value: unknown): WindowsNotification {
+  if (!isRecord(value) || typeof value.group !== 'string' || !/^[a-z0-9]{1,16}$/.test(value.group)
+    || typeof value.tag !== 'string' || !/^[a-z0-9]{1,16}$/.test(value.tag)
+    || typeof value.title !== 'string' || !value.title || value.title.length > 80
+    || typeof value.body !== 'string' || value.body.length > 160
+    || typeof value.dismiss !== 'string' || !value.dismiss || value.dismiss.length > 40
+    || typeof value.attention !== 'boolean' || typeof value.preview !== 'boolean'
+    || [value.title, value.body, value.dismiss].some(text => /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(text))) {
+    throw new TypeError('Invalid Windows notification');
+  }
+  return { group: value.group, tag: value.tag, title: value.title, body: value.body,
+    attention: value.attention, preview: value.preview, dismiss: value.dismiss };
+}
 
 const soundCatalogCodec: Codec<SystemSoundsCatalog> = {
   mode: 'strict', typeSymbol: 'power-dsh#SystemSounds',
@@ -28,4 +43,28 @@ export const PLAY_SYSTEM_SOUND_RPC: RpcDescriptor<'playSystemSound', SoundPlayba
   } }) },
 };
 
-export const rpc = [LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC];
+export const SHOW_WINDOWS_NOTIFICATION_RPC: RpcDescriptor<'showWindowsNotification', NotificationDelivery> = {
+  id: 'power-dsh#powerDsh/showWindowsNotification', service: 'powerDsh', namespace: 'powerDsh', method: 'showWindowsNotification',
+  invocation: { kind: 'direct' },
+  parameters: [{ name: 'notification', wire: 'notification', source: 'json', codec: {
+    mode: 'strict', typeSymbol: 'power-dsh#WindowsNotification', create: () => ({ parse: parseWindowsNotification }),
+  } }],
+  result: { mode: 'strict', typeSymbol: 'power-dsh#NotificationDelivery', create: () => ({ parse(value) {
+    if (!isRecord(value) || typeof value.shown !== 'boolean') throw new TypeError('Invalid notification delivery');
+    return { shown: value.shown };
+  } }) },
+};
+export const CLEAR_WINDOWS_NOTIFICATIONS_RPC: RpcDescriptor<'clearWindowsNotifications', NotificationCleared> = {
+  id: 'power-dsh#powerDsh/clearWindowsNotifications', service: 'powerDsh', namespace: 'powerDsh', method: 'clearWindowsNotifications',
+  invocation: { kind: 'direct' },
+  parameters: [
+    { name: 'group', wire: 'group', source: 'json', codec: stringCodec },
+    { name: 'tag', wire: 'tag', source: 'json', codec: stringCodec },
+  ],
+  result: { mode: 'strict', typeSymbol: 'power-dsh#NotificationCleared', create: () => ({ parse(value) {
+    if (!isRecord(value) || typeof value.cleared !== 'boolean') throw new TypeError('Invalid notification cleanup');
+    return { cleared: value.cleared };
+  } }) },
+};
+
+export const rpc = [LIST_SYSTEM_SOUNDS_RPC, PLAY_SYSTEM_SOUND_RPC, SHOW_WINDOWS_NOTIFICATION_RPC, CLEAR_WINDOWS_NOTIFICATIONS_RPC];
