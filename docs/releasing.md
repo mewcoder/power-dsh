@@ -207,7 +207,7 @@ description:
 tarball: https://github.com/mewcoder/power-dsh/releases/latest/download/power-dsh.tgz
 ```
 
-该样例尚未投稿。条目中的 `name` 使用实际 owner/repo；YAML 文件名、url、name 与可选 tarball 必须一致。保存条目后向上游 `main` 提交 PR，只包含自己的 YAML；两个 README 由上游生成，不手动编辑，也不改动其他插件条目。一个 PR 最多新增三个条目，本项目只新增一个。
+首次收录申请已于 2026-11-12 提交为 [PR #14457](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14457)，使用 GitHub 源码来源，未填写不可用的 tarball。后续先核对并接续此 PR，是否已收录以上游合并和市场刷新为准，不重复申请。条目中的 `name` 使用实际 owner/repo；YAML 文件名、url、name 与可选 tarball 必须一致。保存条目后向上游 `main` 提交 PR，只包含自己的 YAML；两个 README 由上游生成，不手动编辑，也不改动其他插件条目。一个 PR 最多新增三个条目，本项目只新增一个。
 
 `dsh-plugin` topic 只是收录条件之一，不会自动将仓库加入 dsh-market 目录。通常由作者提 PR，也可能由维护者主动添加；目录条目合并并完成网站重建后才算收录，不把 GitHub topic、源码推送或 Release 发布视为已收录。此规则针对 dsh-market，不与 DSH 官方参考索引的发现方式混用。
 
