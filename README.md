@@ -3,7 +3,7 @@
 > **优雅克制，专注实效。让你的 DSH 更顺手、更高效。**\
 > *Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.*
 
-<img src="docs/images/0.0.1/settings.webp" alt="PowerDSH 设置页" width="560">
+<img src="docs/images/0.0.1/settings.webp" alt="PowerDSH 管理页" width="560">
 
 ## 功能清单
 
