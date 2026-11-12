@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { resolve, sep } from 'node:path';
 import { SkillPolicy } from '../skill-policy.ts';
 import { OperationQueue } from '../../../shared/host/operation-queue.ts';
 
@@ -16,7 +17,7 @@ function fixture({ initial = [], incomplete = false } = {}) {
   const scopes = [];
   const live = [];
   const lookups = [];
-  const markers = new Set(['/workspace/.git', '/other/.git']);
+  const markers = new Set(['/workspace/.git', '/other/.git'].map(filename => resolve(filename)));
   const native = [
     { name: 'review', description: 'Personal review', source: 'user-dsh', provider: 'filesystem', path: '/user/skills/review/SKILL.md', invocation: { modelInvocable: true, userInvocable: true } },
     { name: 'review', description: 'Review project code', source: 'project-dsh', provider: 'filesystem', path: '/workspace/.dsh/skills/review/SKILL.md', root: '/workspace', invocation: { modelInvocable: true, userInvocable: true } },
@@ -24,7 +25,11 @@ function fixture({ initial = [], incomplete = false } = {}) {
     { name: 'manual', description: 'User-only instructions', source: 'user-agents', provider: 'filesystem', path: '/agents/skills/manual/SKILL.md', invocation: { modelInvocable: false, userInvocable: true } },
     { name: 'blocked-by-author', description: 'Disabled upstream', source: 'runtime', provider: 'runtime', invocation: { modelInvocable: false, userInvocable: false } },
   ];
-  const projectOf = cwd => cwd?.startsWith('/workspace/') || cwd === '/workspace' ? '/workspace' : cwd;
+  const projectOf = cwd => {
+    const directory = cwd ? resolve(cwd) : undefined;
+    const workspace = resolve('/workspace');
+    return directory?.startsWith(workspace + sep) || directory === workspace ? workspace : directory;
+  };
   async function snapshot(options = {}) {
     lookups.push(options);
     const rows = new Map();
@@ -32,7 +37,7 @@ function fixture({ initial = [], incomplete = false } = {}) {
     if (options.scope?.agent) keys.push(options.scope.parent, options.scope);
     else if (options.scope) keys.push(options.scope);
     for (const key of keys) {
-      const candidates = generations.has(key) ? native.filter(row => !row.root || options.cwd !== undefined && row.root === projectOf(options.cwd))
+      const candidates = generations.has(key) ? native.filter(row => !row.root || options.cwd !== undefined && resolve(row.root) === projectOf(options.cwd))
         .map(row => ({ ...row, rank: row.root ? row.source === 'project-dsh' ? 100 : 200 : row.provider === 'runtime' ? 250 : 400 })) : [];
       for (const entry of providers) if (entry.scope === key) candidates.push(...await entry.provider.list(options));
       candidates.sort((a, b) => a.rank - b.rank);
@@ -194,9 +199,9 @@ test('the project catalog lists imported names only and never adds the process d
       { path: '/workspace', title: 'Main app' },
     ];
     const view = await app.policy.list('', 'project');
-    assert.equal(view.cwd, '/other');
+    assert.equal(view.cwd, resolve('/other'));
     assert.deepEqual(view.workspaces, [
-      { path: '/other', title: 'Renamed project' }, { path: '/workspace', title: 'Main app' },
+      { path: resolve('/other'), title: 'Renamed project' }, { path: resolve('/workspace'), title: 'Main app' },
     ]);
     await assert.rejects(app.policy.list('/not-imported', 'project'), /no longer available/);
     app.ctx.workspaceRegistry.list = () => [];
@@ -224,7 +229,7 @@ test('user disable preserves project overrides and project toggles are independe
     assert.equal(row(await app.policy.list('/other', 'project')).enabled, true);
     assert.equal(row(await app.policy.list('', 'user')).enabled, false);
     assert.deepEqual(app.raw.disabledSkills.map(item => [item.scope, item.projectRoot, item.name]).sort(), [
-      ['project', '/workspace', 'review'], ['user', '', 'review'],
+      ['project', resolve('/workspace'), 'review'], ['user', '', 'review'],
     ]);
     assert.equal(app.raw.showVersion, true); assert.equal(app.raw.personalizationEnabled, true);
     assert.ok(app.raw.disabledSkills.every(item => !Object.hasOwn(item, 'content')));
@@ -385,9 +390,9 @@ test('closing while project discovery waits prevents preference writes even if t
 test('project discovery matches native nearest .git and otherwise keeps the requested cwd', async () => {
   const app = fixture();
   try {
-    assert.equal(await app.policy.projectRoot('/workspace/sub'), '/workspace');
-    app.markers.add('/workspace/sub/.git');
-    assert.equal(await app.policy.projectRoot('/workspace/sub'), '/workspace/sub');
-    assert.equal(await app.policy.projectRoot('/no-git'), '/no-git');
+    assert.equal(await app.policy.projectRoot('/workspace/sub'), resolve('/workspace'));
+    app.markers.add(resolve('/workspace/sub/.git'));
+    assert.equal(await app.policy.projectRoot('/workspace/sub'), resolve('/workspace/sub'));
+    assert.equal(await app.policy.projectRoot('/no-git'), resolve('/no-git'));
   } finally { await app.policy.close(); }
 });

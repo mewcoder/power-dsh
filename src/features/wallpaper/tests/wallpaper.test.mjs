@@ -24,7 +24,9 @@ test('a saved wallpaper round-trips through the profile directory', async t => {
   const reread = await store.read();
   assert.deepEqual(reread, saved, 'The stored bytes and metadata survive a reload.');
   const info = await stat(store.binary);
-  assert.equal(info.mode & 0o777, 0o600, 'The wallpaper file stays private to the profile owner.');
+  if (process.platform !== 'win32') {
+    assert.equal(info.mode & 0o777, 0o600, 'The wallpaper file stays private to the profile owner.');
+  }
 });
 
 test('replacing and clearing a wallpaper leaves no temporary files behind', async t => {

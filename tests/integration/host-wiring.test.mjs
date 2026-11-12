@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
 import ToolsService from '@deepseek-ai/dsh-tools';
 const { apply, inject, Config } = await import(process.env.POWER_DSH_HOST_TEST_ENTRY ?? new URL('../../src/index.ts', import.meta.url));
 
@@ -118,7 +119,7 @@ test('the actual Host injector starts skill management with workspaceRegistry an
   assert.equal(result.cwd, '');
   assert.ok(lookups.every(options => !Object.hasOwn(options, 'cwd')), 'Global skill queries must omit the project directory.');
   assert.equal(result.scope, 'user');
-  assert.deepEqual(result.workspaces, [{ path: '/memory-only/project', title: 'Memory project' }]);
+  assert.deepEqual(result.workspaces, [{ path: resolve('/memory-only/project'), title: 'Memory project' }]);
   assert.equal(Object.hasOwn(result, 'preset'), false);
   assert.equal(Object.hasOwn(result, 'presets'), false);
   assert.equal(result.complete, true);

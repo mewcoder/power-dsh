@@ -5,9 +5,10 @@ import { skillOrigin } from '../skill-origin.ts';
 function reader(packages = {}) {
   const calls = [];
   return { calls, readPackage: async path => {
-    calls.push(path);
-    if (!Object.hasOwn(packages, path)) throw new Error('Missing fixture manifest');
-    return JSON.stringify(packages[path]);
+    const filename = path.replaceAll('\\', '/');
+    calls.push(filename);
+    if (!Object.hasOwn(packages, filename)) throw new Error('Missing fixture manifest');
+    return JSON.stringify(packages[filename]);
   } };
 }
 
@@ -59,9 +60,11 @@ test('package-backed paths require matching manifest name and work in asar and p
   const files = reader({
     '/Applications/DSH.app/Contents/Resources/app.asar/dsh/node_modules/@example/skills/package.json': { name: '@example/skills' },
     '/app/node_modules/.pnpm/@example+skills@1.0/node_modules/@example/skills/package.json': { name: '@example/skills' },
+    'C:/app/node_modules/@example/skills/package.json': { name: '@example/skills' },
   });
   assert.equal(await skillOrigin({ provider: 'runtime', source: 'bundled', path: asar }, files), '@example/skills');
   assert.equal(await skillOrigin({ provider: 'runtime', source: 'bundled', resourceBase: { kind: 'directory', path: pnpm } }, files), '@example/skills');
+  assert.equal(await skillOrigin({ provider: 'runtime', source: 'bundled', path: 'C:\\app\\node_modules\\@example\\skills\\assets\\SKILL.md' }, files), '@example/skills');
   assert.ok(files.calls.every(path => path.endsWith('/package.json')));
 });
 
