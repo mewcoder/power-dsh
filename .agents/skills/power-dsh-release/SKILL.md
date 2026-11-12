@@ -7,6 +7,8 @@ description: PowerDSH 的固定发版流程。用户要求准备或执行发版�
 
 把一次发版做成可恢复、可核验的过程，不把每次发版变成重新调查项目。长期约定以仓库的 `docs/releasing.md`、`docs/compatibility.md` 为准；本 Skill 负责执行顺序。需要理解流程来源时再读 [参考实践](references/release-patterns.md)。
 
+当前分发约定：GitHub tag + GitHub Release + 市场收录，每版附件固定为 `power-dsh.tgz`；不发布 npm，保留 `private: true`。本地 `npm run`／`npm pack` 不属于 npm 发布。除非用户以后明确改回 npm 渠道，否则跳过 npm 登录、二次验证及发布，不接续之前已取消的 npm 任务。
+
 ## 1. 接续上下文，确定本次范围
 
 - 先使用本次会话已有结论，再补读 `README.md`、`CHANGELOG.md` 和 `docs/releasing.md` 中缺失或已变化的部分；不要反复重读没有变化的文件。
@@ -40,7 +42,7 @@ description: PowerDSH 的固定发版流程。用户要求准备或执行发版�
 ## 4. 准备版本和最终材料
 
 - 同步包版本、锁文件中的必要版本元数据、更新日志及 README。已发布版本不可复用；首次版本与后续版本按已有约定选择，不临时自创版本规则。
-- npm 发布准备阶段移除 `private: true` 或改为 `false`，保留 MIT、仓库信息、公开导出、`dsh.bundle` 与已提交的三个 `dist` 产物。不要机械移动宿主依赖到 peer，也不增加安装时构建脚本。
+- 当前 GitHub 分发保留 `private: true`，以及 MIT、仓库信息、公开导出、`dsh.bundle` 与已提交的三个 `dist` 产物。不要机械移动宿主依赖到 peer，也不增加安装时构建脚本。只有用户另行明确选择 npm 时，才按发布文档移除 private。
 - 更新日志以最终功能为准，开发过程中的旧入口、已撤销功能和重复条目不要混成最终版本说明；保留应保留的历史事实与升级限制。真实发布日期以执行结果为准，失败时不宣称已经发布。
 - npm 安装字符串可写入待发布包的 README，但远端对外状态在注册表验证后再称“已发布”。市场未收录时不写“市场已可安装”，可保留当前有效的 GitHub 备用来源。
 - 不为发版重写整个项目，也不顺带改动其他功能。缺失截图可保留已明确标注的历史真实截图，不制造预览图。
@@ -67,20 +69,19 @@ git diff --check
 - 审阅包内资源、公开入口、许可和三份构建产物；排除 `.agents`、`.zcode`、开发测试、参考源码、个人路径和诊断日志。
 - 静态检查、实际包独立安装和宿主验证针对同一候选内容。发布前确认工作区未又变化；文件有变则候选失效，重新检查并打包，不默默改用另一个包。
 - 已授权提交推送时把源码、文档与三个产物保存在可追溯提交中，核对 CI 对应的提交。只有明确授权的 GitHub Release 才创建标签和 Release。
-- 使用已审阅 tarball 发布，不在最后临时重新打包源码目录：
-
-```sh
-npm publish <reviewed-tarball> --access public --tag <channel> --registry=https://registry.npmjs.org
-```
-
-正式版通常用 `latest`，预发布用已确定的 `beta` 等独立渠道；不让测试版覆盖 `latest`。遇到人工 OTP／网页登录验证，请用户直接在官方流程完成。
+- 使用已审阅 tarball，复制或重命名为 `power-dsh.tgz` 后确认哈希不变，不在上传前临时重建另一个包。
+- 创建 `v<package.json.version>` 的 annotated tag，指向已通过检查的确切提交；核对远端无同名 tag 再推送，不强推或移动已发布标签。
+- 使用该 tag 创建 GitHub Release 草稿，上传 `power-dsh.tgz`，检查版本、tag 指向、附件名、大小、哈希和 Release notes，再发布。正式版设置为 Latest；测试版标为 Pre-release，不替换正式版入口。
+- GitHub Release notes 使用本次版本说明，写明 DSH 范围、桌面安装方式与真实验证边界；不要把 tag 本身或上传完成报成最终发布成功。
+- 只有用户重新明确选择 npm 时才进入 `docs/releasing.md` 的可选 npm 章节；不是因账号已经登录就改变当前分发约定。
 
 ## 7. 发布后核验与重试
 
-- 查询确切版本的注册表元数据，核对 `version`、`dist.integrity`、下载地址及 dist-tag；integrity 与本地候选一致才算核验通过。必要时下载到新的空目录检查公开安装包。
-- 上传命令成功不等于公开版本已经可读。CDN 或版本元数据延迟时进行有上限的退避查询，分别报告“已上传、元数据待同步”和“已核验”，不为了催刷新反复发布。
-- 上传超时、already-published／staged 或结果不明时先查目标版本和 integrity。结果一致就接续；不一致或仍不确定就停下说明，不覆盖旧版、不擅自换版本号重发。
-- 实际 npm 来源安装与升级按已授权范围经原生管理器验证。没有执行就列为未验证，不能用临时 Node 导入代替。
+- 核对远端 tag 指向、Release 已公开状态、正式版的 Latest 指向，以及附件的真实文件名 `power-dsh.tgz`。
+- 从无认证的公开 URL 下载到新的空目录，验证包版本与 tag 对应、SHA-512／SHA-256 与候选一致；首次正式版还要验证 `releases/latest/download/power-dsh.tgz` 能取得同一附件。未经公开下载验证不把链接加入市场条目。
+- 上传成功不等于匿名用户能下载。短暂缓存或网络延迟时做有上限的查询；结果不明先查 Release 和附件，不重建重复 Release、不覆盖已公开附件或移动 tag。
+- 实际来源安装与升级按已授权范围经原生管理器验证。没有执行就列为未验证，不能用临时 Node 导入代替，也不打断活跃 profile 来补一次无关验收。
+- 用户另行选择 npm 时，再单独核对确切版本、integrity 与渠道；不把 GitHub 发布和 npm 发布混成一个结果。
 
 ## 8. 提交市场
 
@@ -88,10 +89,13 @@ npm publish <reviewed-tarball> --access public --tag <channel> --registry=https:
 - 用当前有效来源；npm 已发布并核验后保留正确 `repository` 便于市场关联，不擅自给 YAML 加 `npm` 字段。没有真实发布的 GitHub Release 附件就不填 `tarball`。
 - 仅在得到市场投稿授权后创建或使用 fork，从最新上游 `main` 建分支，只新增或修改 `data/plugins/mewcoder__power-dsh.yml`。不改其他插件、不手工改生成的 README。
 - 使用 `docs/releasing.md` 的 YAML 为基础，保留 `url`、`name`、`category` 和以句号结尾的准确双语功能描述；按已确认口径只描述桌面增强，不夸大兼容性或添加营销词。
-- 创建 PR 后报告实际 URL 和 CI／人工审核状态。PR 创建、CI 通过、合并、市场刷新是不同阶段；合并并刷新前不报“已收录”。有失败就在同一分支修复，不重复开 PR 或空推催审。
+- 当前已有收录申请 `awesome-dsh-plugin/awesome-dsh-plugin#14457`，先核对其实际状态，再更新同一条目、分支和 PR；不要创建重复申请。
+- 公开附件验证后，在条目中使用固定 `tarball: https://github.com/mewcoder/power-dsh/releases/latest/download/power-dsh.tgz`。以后每版同时增加 `package.json.version`、创建同版本 tag 和正式 Release、提供同名附件，正常更新通常不改市场 YAML。
+- 源码安装按实际 Git 引用和远端包版本检查；只有新提交却未增加版本时，市场可能只显示“未发版的新提交”。Release 更新会核对最新正式 tag、该 tag 的包版本和附件；不承诺即时发现、静默自动升级或自动切换用户安装来源。
+- 创建或更新 PR 后报告实际 URL 和 CI／人工审核状态。PR 创建、CI 通过、合并、市场刷新是不同阶段；合并并刷新前不报“已收录”。有失败就在同一分支修复，不重复开 PR 或空推催审。
 
 ## 9. 交付与可恢复状态
 
-用简短表格报告：版本／源提交、检查、候选包 integrity、npm URL 与渠道、市场 PR URL／状态、实际宿主验收和未验证项。记录下一步即可，不倾倒个人日志。
+用简短表格报告：版本／源提交、检查、tag／GitHub Release URL、公开下载地址与候选包 integrity、市场 PR URL／状态、实际宿主验收和未验证项。当前渠道明确记为“不发布 npm”；只有另行选择 npm 时才报告 npm URL 与渠道。记录下一步即可，不倾倒个人日志。
 
 中途被打断时从已核实的阶段接续；账号登录或网络短暂失败不会作废未变化内容的全部检查。不要在没有运行工具的情况下预告检查成功、版本公开或 PR 已创建。

@@ -4,7 +4,7 @@
 
 ## 固定发版入口
 
-项目级 [power-dsh-release Skill](../.agents/skills/power-dsh-release/SKILL.md)负责接续发布任务：先复用既有兼容记录和本次已通过的检查，再按「账号与工作区 → 版本材料 → 固定检查 → 同一 tarball → npm 公开核验 → 市场 PR」执行。流程来源与取舍见 [参考实践](../.agents/skills/power-dsh-release/references/release-patterns.md)。
+项目级 [power-dsh-release Skill](../.agents/skills/power-dsh-release/SKILL.md)负责接续发布任务：先复用既有兼容记录和本次已通过的检查，再按「工作区与 GitHub 权限 → 版本材料 → 固定检查 → 同一 tarball → tag 与 GitHub Release → 公开附件核验 → 接续市场 PR」执行。流程来源与取舍见 [参考实践](../.agents/skills/power-dsh-release/references/release-patterns.md)。
 
 兼容性不在每次发版时归零：保留历史测试与用户实机使用反馈的证据层次，只针对本次变更补必要回归；不因当前操作机或 SDK 版本而擅自收窄已确认的产品范围。具体证据与约束仍以[版本兼容性](compatibility.md)及[调查记录](compatibility-audit.md)为准。
 
@@ -17,13 +17,13 @@
 | 品牌 | PowerDSH |
 | 技术包名 | `power-dsh` |
 | 设置入口与页面标题 | PowerDSH（中英文一致） |
-| 首版版本号 | `0.0.1`，待发布 |
+| 首版版本号 | `0.0.1`；标签 `v0.0.1`，GitHub Release 分发 |
 | 简介 | 中文「DSH 增强插件。优雅克制，专注实效。让你的 DSH 更顺手、更高效。」；英文「A DeepSeek Harness (DSH) enhancement plugin. Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.」 |
 | 分发附件名 | `power-dsh.tgz`，每版相同 |
 | 仓库地址 | `https://github.com/mewcoder/power-dsh`；origin 为 `https://github.com/mewcoder/power-dsh.git`，已核对实际改名 |
 | DSH 版本 | 最低已测基线 `0.2.0-rc.1`；`engines.dsh` 安装范围为 `>=0.2.0-rc.1 <0.3.0-0`，具体平台与功能验收见兼容记录 |
 
-[包清单](../package.json)已按 npm 发布准备移除 `private` 标志，保留 MIT 与 `dsh.bundle` 声明；Host 使用 ESM，Client 产物预先生成并随源码提交，安装阶段不构建。[更新日志](../CHANGELOG.md)保留「未发布」与首版记录；实际发布状态以注册表核验结果为准。新安装的 Loader 条目、设置命名空间、设置页 id、Host/Client 标识与 RPC 描述符统一为 `power-dsh`，对应技术形式为 `powerDsh`、`power_dsh`。
+[包清单](../package.json)保留 `private: true`，防止误发布到 npm；它不阻止 GitHub 或 tarball 安装。保留 MIT 与 `dsh.bundle` 声明，Host 使用 ESM，Client 产物预先生成并随源码提交，安装阶段不构建。[更新日志](../CHANGELOG.md)保留「未发布」与版本记录；实际发布状态以 GitHub Release 和公开附件核验结果为准。新安装的 Loader 条目、设置命名空间、设置页 id、Host/Client 标识与 RPC 描述符统一为 `power-dsh`，对应技术形式为 `powerDsh`、`power_dsh`。
 
 仓库元数据、Release 下载地址与市场条目统一使用 `mewcoder/power-dsh`。发版前核对实际 remote、标签、Release 与市场状态；待发布样例中的下载地址须在实际产物公开后才作为可用安装来源。
 
@@ -49,9 +49,9 @@ README 面向使用者，标题固定为 `# power-dsh`，首屏使用已确认�
 
 ## 选择分发方式
 
-正式版推荐以 **npm 包 `power-dsh`** 分发，利用确切版本、dist-tag 和原生管理器的注册表查询与升级。GitHub 继续维护源码、标签和变更记录，Git 来源用于开发版或固定提交，Release `.tgz` 可作可选附件。它们使用同一个标准 npm 包和同一份预生成 Client 产物，不另建分发格式。
+当前正式分发方式为 **GitHub tag + GitHub Release**，每版上传同名 `power-dsh.tgz`；GitHub 源码仍可安装，也可通过实际存在的版本标签固定源码。本项目不发布 npm，市场收录不以 npm 为前提。它们复用同一标准包格式和预生成的 Host／Client 产物，不另建分发格式。
 
-开发准备阶段可保留 `private: true`，在明确执行 npm 发布后移除。发布前重新核对名称、账号权限、许可证和目标版本；注册表返回 E404 不是名称预留或发布权限证明，本地打包通过也不等于已经发布。市场本身不强制 npm，源码来源可安装时仍可申请收录。
+`npm run` 用于本地检查，`npm pack` 仅生成本地安装包，都不是向 npm 注册表发布。保留 `private: true`，不再检查 npm 登录、索要 npm 二次验证或重试之前被拦截的发布。只有用户以后重新明确选择 npm 渠道时，才按本文可选 npm 章节准备权限与元数据。
 
 | 方式 | 用户获取版本 | 更新路径 |
 | --- | --- | --- |
@@ -102,9 +102,9 @@ README 面向使用者，标题固定为 `# power-dsh`，首屏使用已确认�
 
 以上许可证、兼容范围与实际产物验收是本项目的发布准备要求；市场自身的收录门槛见下文，不能将两者混为一谈。
 
-## npm 发布与升级
+## npm 发布与升级（非当前渠道）
 
-以下操作在用户明确要求发布后执行；准备代码、打包与检查不执行发布。
+本节仅供以后用户重新明确选择 npm 渠道时参考，当前固定流程跳过整个章节。准备代码、运行 npm 检查命令或本地打包，都不授权 npm 发布。
 
 1. 核对包名、发布账号和权限；由作者确定项目许可证及作者信息。选择实际版本，更新包清单、锁文件、更新日志和兼容说明，再移除 `private: true`。
 2. 在开发环境执行 `npm run build`、`npm run check` 与 `npm run check:package`。审阅实际包内的模块 Spec、编译 Host/Client 产物、公开声明和许可资源，确认没有测试、参考目录或个人日志。
@@ -231,11 +231,15 @@ CI 失败按具体结果修复同一分支，不重复开 PR。被标为 `held: 
 
 可选的市场 `icon` 须为 GitHub 托管的 PNG / JPEG / WebP 位图，不接受 SVG；不填时回退为作者头像。本项目的插件 SVG 图标不直接用作市场 `icon`。截图可在自己的包根目录声明 `screenshots.json`，列出 1–8 张仓库内相对路径图片；不声明时市场可从 README 提取。不要修改目录仓库的旧截图汇总来添加新条目。
 
-Git、npm 与 Release 附件的更新检测不同，不能只创建空 Release 就认定所有来源会升级。[市场文档](https://github.com/dsh-market/dsh-market/blob/main/README.md)说明能检查 npm 版本或 Git 提交，更新入口会提供 Release notes / commits；Release 分发仍需实际核对来源识别、最新版本与旧版升级后的偏好保留。本地目录安装不会因为远端发版就自动变成市场安装。
+每次正式更新先增加 `package.json.version`，提交推送后打同版本 tag，再发布正式 Release 并上传同名 `power-dsh.tgz`；正常版本更新不需要反复修改市场条目或重新投稿。只打 tag、只增加 Git 提交、创建空 Release 或遗漏附件，都不能等同于一个可用的新发行版。
+
+2026-11-12 核对市场的[源码更新实现](https://github.com/dsh-market/dsh-market/blob/main/src/updates.ts)：浮动 GitHub 来源会比较远端包版本与已安装版本，并核对实际 Git 引用；仅有新提交、版本未增加时可显示“未发版的新提交”，不直接提供正式版本升级。显式固定 Git 引用和无法读取版本的情况有不同的提交比较路径，不能将所有 Git 安装简化为只看 tag。
+
+[Release 更新实现](https://github.com/dsh-market/dsh-market/blob/main/src/release-updates.ts)对目录中自己的 `latest/download` 附件解析最新正式 Release，核对 tag、该 tag 的包名／版本与附件可用性，再给出确切版本下载目标。目录刷新、客户端缓存与用户检查时机会带来延迟，不承诺即时发现或自动替用户升级。本地、Git 源码和归档安装继续按各自来源处理，不因发布新 Release 自动切换来源；升级后的偏好保留仍需实际验证。
 
 ## npm 与其他来源的升级边界
 
-npm 作为正式版推荐来源；现有本地目录或 Git 安装不会自动切换到注册表来源。切换时通过原生管理器核对实际安装项、设置命名空间、偏好与入口，不能仅发布同名包就宣称旧安装完成升级。市场识别、GitHub Release 与 npm 的版本状态分别验证。
+当前正式来源是 GitHub Release，现有本地目录或 Git 源码安装不会自动切换成 Release 附件来源。切换时通过原生管理器核对实际安装项、设置命名空间、偏好与入口，不能只因发布新 Release 就宣称旧安装已经升级。npm 不属于当前分发渠道；未来若重新选择，仍需单独验证来源切换。
 
 ## 参考
 

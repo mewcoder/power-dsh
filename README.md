@@ -130,7 +130,7 @@ PowerDSH 是独立社区维护的 DSH 插件，以下为桌面版安装说明。
 
 安装器会下载仓库中预先构建的 Host／Client 产物及运行依赖，**无需手动编译或编辑 profile 配置**。安装需要能访问 GitHub 和依赖注册表，获取的是远端已推送的代码。
 
-npm 发布尚未完成，当前请使用上述 GitHub 来源；包名安装方式将在公开版本核验通过后补充。市场[收录申请](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14457)已提交，正式收录后补充市场安装入口。
+正式版本和预构建安装包通过 [GitHub Releases](https://github.com/mewcoder/power-dsh/releases)分发，附件名固定为 `power-dsh.tgz`；本项目不通过 npm 分发。市场[收录申请](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14457)已提交，正式收录后补充市场安装入口。
 
 ### 宿主要求
 
