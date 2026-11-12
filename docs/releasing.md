@@ -45,7 +45,7 @@ dsh-plugin, deepseek-harness, deepseek, dsh, mcp, notifications, skill-managemen
 
 `dsh-plugin` 同时是市场收录要求之一，其余标签用于准确表达宿主与功能。2026-11-08 的参考样本包括 [dsh-market](https://github.com/dsh-market/dsh-market) 的中英文用途、演示与安装入口，[dsh-unlag](https://github.com/regrevia/dsh-unlag) 的问题与效果说明，以及 [dsh-skill-mcp-manager](https://github.com/alone-tree/dsh-skill-mcp-manager) 的 Skills/MCP 定位与实际截图。参考的是信息表达和发现入口，stars 不作为质量或流量保证。
 
-README 面向使用者，标题固定为 `# power-dsh`，首屏使用已确认的中英品牌引用块，其后展示宽度为 560 的真实截图，保留「分类 / 功能 / 描述」三列功能表与使用入口。功能表使用 HTML `rowspan` 纵向合并「通用」「界面」「管理」「精简」「其他」五类，列出完整功能清单；组内按使用频率和功能关联性排序，以 [分类 Tab](ui.md#分类-tab) 为准。通用只列任务通知；其他依次列界面刷新、重启应用与屏蔽双击重命名，刷新与重启相邻；实际设置页在 Windows、Linux 和 Web 隐藏重启行，macOS 打包桌面端显示该行，功能名称使用纯文本，不附逐项文档超链接；始终反映当前代码，不记录逐项版本号；发版时由 Git 标签保留对应代码与 README 快照，详细变化记录在更新日志与 Release。开发流程、测试命令及 SDK 验收矩阵保留在维护文档中。截图在取得对应实际界面后更新；现有 `0.0.1` 截图保留为旧分组的历史截图并明确标注，不制作模拟预览或改写真实图片。没有已发布产物、CI 或确定许可证时，不添加相应的成功徽章。本地 README 在用户确认推送后才会更新到 GitHub；Release 下载和市场入口待发布、收录后更新。
+README 面向使用者，标题固定为 `# power-dsh`，首屏使用已确认的中英品牌引用块，其后展示宽度为 560 的真实截图，保留「分类 / 功能 / 描述」三列功能表与使用入口。功能表使用 HTML `rowspan` 纵向合并「通用」「界面」「管理」「精简」「其他」五类，列出完整功能清单；组内按使用频率和功能关联性排序，以 [分类 Tab](ui.md#分类-tab) 为准。通用只列任务通知；其他依次列界面刷新、重启应用与屏蔽双击重命名，刷新与重启相邻；实际设置页在 Windows、Linux 和 Web 隐藏重启行，macOS 打包桌面端显示该行，功能名称使用纯文本，不附逐项文档超链接；始终反映当前代码，不记录逐项版本号；发版时由 Git 标签保留对应代码与 README 快照，详细变化记录在更新日志与 Release。开发流程、测试命令及 SDK 验收矩阵保留在维护文档中。截图直接取自实际运行的 DSH 设置页，裁剪到设置窗口并转成 WebP（`docs/images/0.0.1/settings.webp`，由 `screenshots.json` 声明）；不制作模拟预览或改写真实图片。界面结构变化时用新截图替换，并在下次发版时随包更新。没有已发布产物、CI 或确定许可证时，不添加相应的成功徽章。本地 README 在用户确认推送后才会更新到 GitHub；Release 下载和市场入口待发布、收录后更新。
 
 ## 选择分发方式
 

@@ -3,9 +3,7 @@
 > **优雅克制，专注实效。让你的 DSH 更顺手、更高效。**\
 > *Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.*
 
-<img src="docs/images/0.0.1/settings.webp" alt="PowerDSH 0.0.1 通用设置" width="560">
-
-*0.0.1 · 通用设置（历史截图，展示旧分组；当前分类见下表）*
+<img src="docs/images/0.0.1/settings.webp" alt="PowerDSH 设置页" width="560">
 
 ## 功能清单
 
@@ -110,47 +108,35 @@
   </tbody>
 </table>
 
-设置按使用频率和功能关联性排序，每项功能均可独立开启。通知声音紧随任务通知，推理按钮样式紧随快捷推理等级切换。表格列出全部功能；「其他」分类收纳界面刷新、重启应用与屏蔽双击重命名，其中 macOS 打包桌面端显示重启设置行，Windows 和 Linux 桌面端隐藏该设置项及菜单入口，保留已有偏好。刷新与重启入口收在侧栏顶部的横向三点「更多操作」菜单中，重启菜单项还需 Host 能力确认。
+每项功能在 **设置 → PowerDSH** 独立开关，分为通用、界面、管理、精简、其他五类，默认关闭。重启入口仅在 macOS 打包桌面端显示，其他平台保留偏好并隐藏。
 
-## 使用
+## 安装
 
-PowerDSH 是独立社区维护的 DSH 插件，以下为桌面版安装说明。
+PowerDSH 是独立社区维护的 DSH 桌面插件。
 
-### 桌面版安装
+**桌面版**：打开 DSH **插件**页 → **添加插件** → 输入来源，安装后启用，进入 **设置 → PowerDSH** 开启功能。
 
-1. 打开 DSH 的 **插件** 页，从 **添加插件** 中选择第三方插件安装入口；旧版宿主可从 **设置 → 插件** 进入。
-2. 输入以下 GitHub 安装来源并确认：
+```text
+github:mewcoder/power-dsh
+```
 
-   ```text
-   github:mewcoder/power-dsh
-   ```
+也可以安装 Release 提供的预构建包 `power-dsh.tgz`。本项目不发布到 npm；市场收录申请见 [#14457](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14457)。
 
-3. 等待安装完成并启用 PowerDSH；如果宿主提示需要刷新或重启，按提示操作。
-4. 进入 **设置 → PowerDSH**，按需开启各项功能。
-
-安装器会下载仓库中预先构建的 Host／Client 产物及运行依赖，**无需手动编译或编辑 profile 配置**。安装需要能访问 GitHub 和依赖注册表，获取的是远端已推送的代码。
-
-桌面端安装写入 `desktop` 配置档；`dsh web` 使用独立的 `web` 配置档，需另行安装，两者互不影响。
-
-### 命令行安装（可选）
-
-已安装 DSH CLI 时，桌面端对应命令为：
+**命令行安装**（已装 DSH CLI）：
 
 ```sh
 dsh plugin --profile desktop add github:mewcoder/power-dsh
 ```
 
-桌面应用会自行管理 `desktop` 配置档，运行时从命令行改动可能与 App 状态冲突，**优先使用上面的插件管理器**。需要装到 `dsh web` 时，把 `desktop` 换成 `web`。配置档说明见[安装说明](docs/development.md#安装与使用)。
+桌面应用自行管理 `desktop` 配置档，优先使用插件管理器；`dsh web` 使用独立的 `web` 配置档，需另行安装。详见[安装说明](docs/development.md#安装与使用)。
 
-正式版本和预构建安装包通过 [GitHub Releases](https://github.com/mewcoder/power-dsh/releases)分发，附件名固定为 `power-dsh.tgz`；本项目不通过 npm 分发。市场[收录申请](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14457)已提交，正式收录后补充市场安装入口。
+## 要求
 
-### 宿主要求
-
-DSH 最低已测基线为 **`0.2.0-rc.1`**，安装范围为 `>=0.2.0-rc.1 <0.3.0-0`。已有历史版本兼容检查、macOS 桌面安装与运行验证，以及 Windows 使用反馈；各版本、平台与功能的已测范围和限制见[兼容说明](docs/compatibility.md)。本地开发安装与依赖说明见[安装说明](docs/development.md#安装与使用)。
+DSH `>=0.2.0-rc.1 <0.3.0-0`（最低已测基线 `0.2.0-rc.1`），Node.js `>=22`。各版本、平台与功能的验证范围见[兼容说明](docs/compatibility.md)。
 
 ## 更新记录
 
-具体功能和变化随版本记录，详见[更新日志](CHANGELOG.md)与[版本发布记录](https://github.com/mewcoder/power-dsh/releases)。宿主版本要求见[兼容说明](docs/compatibility.md)。
+具体变化见[更新日志](CHANGELOG.md)与[版本发布记录](https://github.com/mewcoder/power-dsh/releases)。
 
 ## 文档与贡献
 
