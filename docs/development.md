@@ -111,6 +111,29 @@ Inspect 是只读发现机制，不能当业务 service 调用。不可用时记
 
 ## 安装与使用
 
+### 配置档（profile）
+
+DSH 按配置档隔离插件、依赖和设置，各自位于 `$DSH_HOME/profiles/<名称>/`。常见两个：
+
+| profile | 使用者 | 目录 |
+| --- | --- | --- |
+| `desktop` | 桌面应用 | `$DSH_HOME/profiles/desktop` |
+| `web` | `dsh web` 启动的网页端 | `$DSH_HOME/profiles/web` |
+
+两个配置档互不影响：装进 `web` 的插件不会出现在桌面端，反之亦然。桌面应用自行管理 `desktop` profile，**桌面端请在应用内的插件管理器安装**，不要在应用运行时从命令行改动该 profile。
+
+命令行安装时用 `--profile` 指明目标，按实际使用者选择：
+
+```sh
+# 桌面端（应用未运行时，谨慎使用；通常改用应用内插件管理器）
+dsh plugin --profile desktop add github:mewcoder/power-dsh
+
+# dsh web
+dsh plugin --profile web add github:mewcoder/power-dsh
+```
+
+自建的其他配置档把 `desktop`／`web` 换成对应名称。安装后按宿主提示刷新或重启，进入 **设置 → PowerDSH** 查看入口。
+
 ### 从 GitHub 安装
 
 在 DSH 插件管理页选择安装第三方插件，输入：
