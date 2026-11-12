@@ -2049,6 +2049,9 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		const { ctx, form, source, t, savePreference } = env;
 		const styles = styles$9;
 		let active = true;
+		const notificationTagPrefix = `power-dsh:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 10)}`;
+		let notificationSequence = 0;
+		const nextNotificationTag = () => `${notificationTagPrefix}:${(++notificationSequence).toString(36)}`;
 		ctx.effect(() => () => {
 			active = false;
 		});
@@ -2075,9 +2078,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					visible.delete(id);
 					const notification = new window.Notification(t(`notification${kind}`), {
 						body: (row.displayTitle || row.title || t("notificationBody")).slice(0, 160),
-						tag: `power-dsh:${id}`,
+						tag: nextNotificationTag(),
+						renotify: true,
 						...kind === "Approval" || kind === "Input" ? { requireInteraction: true } : {},
-						...preferences?.notificationSoundEnabled === true && !localTone ? { renotify: true } : { silent: true }
+						...preferences?.notificationSoundEnabled === true && !localTone ? {} : { silent: true }
 					});
 					visible.set(id, notification);
 					if (localTone) playSound(sound, false).catch(() => {
@@ -2254,7 +2258,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					soundPreview?.close();
 					soundPreview = new window.Notification(t("notificationSoundTestTitle"), {
 						body: t("notificationSoundTestBody"),
-						tag: `power-dsh-sound-test:${Date.now()}`,
+						tag: nextNotificationTag(),
 						renotify: true
 					});
 					soundPreview.onerror = () => {

@@ -29,7 +29,7 @@ PowerDSH 是独立社区维护的 DSH 桌面插件。
 github:mewcoder/power-dsh
 ```
 
-也可以安装 Release 提供的预构建包 `power-dsh.tgz`。本项目不发布到 npm；市场收录申请见 [#14457](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14457)。
+也可以安装 Release 提供的预构建包 `power-dsh.tgz`。市场收录申请见 [#14457](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14457)。
 
 **命令行安装**（已装 DSH CLI）：
 

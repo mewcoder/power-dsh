@@ -96,6 +96,7 @@ SOFTWARE.
 | 仓库与提交 | 许可 | 参考范围 |
 | --- | --- | --- |
 | [omdsh-dev/dsh-notification](https://github.com/omdsh-dev/dsh-notification/tree/675aab9b43d5011738feb6185281596c0365ccba) | [MIT](https://github.com/omdsh-dev/dsh-notification/blob/675aab9b43d5011738feb6185281596c0365ccba/LICENSE) | Host 完成摘要投影、Client 通知权限与对应会话前台抑制 |
+| [chromoany/dsh-notify-me](https://github.com/chromoany/dsh-notify-me/tree/71ffecacbaa49fa03e92463f8eb71b4743336b6c) | [MIT](https://github.com/chromoany/dsh-notify-me/blob/71ffecacbaa49fa03e92463f8eb71b4743336b6c/LICENSE) | 每条通知使用独立 tag、同毫秒计数器防重，以及 Electron 下不依赖 renotify 的重复提醒设计；只读对照，没有复制其通知桥、原生助手或审批代码 |
 | [YoyuDev/dsh-ping](https://github.com/YoyuDev/dsh-ping/tree/bbe2cb4bdf19dac3e4f3e876482ab51086ec6622) | [MIT](https://github.com/YoyuDev/dsh-ping/blob/bbe2cb4bdf19dac3e4f3e876482ab51086ec6622/LICENSE) | 完成、出错、输入和审批四类提醒的触发划分，以及 macOS 使用 afplay 的声音播放方式 |
 | [DeepseekHarnessPlugins/Notification](https://github.com/DeepseekHarnessPlugins/Notification/tree/5da12d12d31e260e22210efa2779b44d71db8891) | [MIT](https://github.com/DeepseekHarnessPlugins/Notification/blob/5da12d12d31e260e22210efa2779b44d71db8891/LICENSE) | 以系统声音名称选择原生提示音的设计 |
 

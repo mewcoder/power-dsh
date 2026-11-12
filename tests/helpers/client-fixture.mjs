@@ -145,14 +145,11 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       this.title = title;
       this.options = options;
       this.closed = false;
+      this.popupSuppressed = windows && Boolean(options.tag)
+        && notifications.some(notification => notification.options.tag === options.tag);
       notifications.push(this);
     }
-    close() {
-      for (const notification of windows ? notifications.filter(item => !item.closed && item.options.tag === this.options.tag) : [this]) {
-        notification.closed = true;
-        notification.onclose?.();
-      }
-    }
+    close() { this.closed = true; this.onclose?.(); }
   }
   const resizeListeners = new Set();
   const focusListeners = new Set();

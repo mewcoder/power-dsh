@@ -10,6 +10,9 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   const { ctx, form, source, t, savePreference } = env;
   const styles = featureStyles;
   let active = true;
+  const notificationTagPrefix = `power-dsh:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 10)}`;
+  let notificationSequence = 0;
+  const nextNotificationTag = () => `${notificationTagPrefix}:${(++notificationSequence).toString(36)}`;
   ctx.effect(() => () => { active = false; });
   // Read native sources in the plugin context; components only receive snapshots and callbacks.
   function notificationRunner(ctx: ClientContext, form: SettingsForm, t: Translate, reportError: (error: string) => void, playSound: (id: string, preview: boolean) => Promise<void>) {
@@ -35,10 +38,11 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         visible.delete(id);
         const notification = new window.Notification(t(`notification${kind}`), {
           body: (row.displayTitle || row.title || t('notificationBody')).slice(0, 160),
-          tag: `power-dsh:${id}`,
+          tag: nextNotificationTag(),
+          renotify: true,
           ...(kind === 'Approval' || kind === 'Input' ? { requireInteraction: true } : {}),
           // Omit silent to respect system defaults; a replacement is still a new reminder.
-          ...(preferences?.notificationSoundEnabled === true && !localTone ? { renotify: true } : { silent: true }),
+          ...(preferences?.notificationSoundEnabled === true && !localTone ? {} : { silent: true }),
         });
         visible.set(id, notification);
         if (localTone) void playSound(sound, false).catch(() => { if (active) reportError('notificationSoundFailed'); });
@@ -147,7 +151,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         if (window.Notification?.permission !== 'granted') throw new Error('notificationPermission');
         soundPreview?.close();
         soundPreview = new window.Notification(t('notificationSoundTestTitle'), {
-          body: t('notificationSoundTestBody'), tag: `power-dsh-sound-test:${Date.now()}`, renotify: true,
+          body: t('notificationSoundTestBody'), tag: nextNotificationTag(), renotify: true,
         });
         soundPreview.onerror = () => { if (active) publishSound({ error: 'notificationSoundFailed' }); };
       } else {

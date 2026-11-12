@@ -62,7 +62,7 @@ test('muted completion and error notifications are silent, deduplicated, and omi
   app.unmount();
 });
 
-test('Windows tag-based closing leaves replacement banners and other sessions visible until cleanup', async () => {
+test('same-session replacements release old instances and preserve other sessions until cleanup', async () => {
   const app = await mount({ windows: true });
   const other = notificationSession({ id: 'other', seq: 10, reason: 'completed', running: false });
   app.setSessions([notificationSession(), notificationSession({ id: 'other' })]);
@@ -75,14 +75,53 @@ test('Windows tag-based closing leaves replacement banners and other sessions vi
   const replacement = app.notifications.at(-1);
   assert.equal(app.notifications.length, 3);
   assert.equal(previous.closed, true);
-  assert.equal(replacement.options.tag, previous.options.tag);
-  assert.equal(replacement.closed, false, 'Closing the previous tag must happen before creating its replacement.');
+  assert.notEqual(replacement.options.tag, previous.options.tag);
+  assert.equal(replacement.closed, false, 'The replacement remains open after the old instance closes.');
   assert.equal(app.notifications[1].closed, false, 'A separate session keeps its own banner.');
   lateClose();
   app.set({ notificationsEnabled: false });
   assert.equal(replacement.closed, true, 'A late close event from the old banner must not lose the replacement.');
   assert.equal(app.notifications[1].closed, true);
   app.unmount();
+});
+
+test('Electron retained tag history cannot suppress repeated muted or native-sound banners for any trigger', async () => {
+  for (const preferences of [
+    { notificationSoundEnabled: false, notificationSound: 'default' },
+    { notificationSoundEnabled: true, notificationSound: 'win:SystemExclamation' },
+  ]) {
+    const app = await mount({ windows: true });
+    try {
+      app.setSessions([notificationSession()]);
+      app.set({ notificationsEnabled: true, ...preferences });
+      for (let round = 1; round <= 2; round++) {
+        app.setSessionStatus([['task', { running: true }]]);
+        app.setSessions([notificationSession({ seq: round * 10, reason: 'completed', running: false })]);
+        app.setSessions([notificationSession({ seq: round * 10 + 1, reason: 'error', running: false })]);
+        app.setSessionStatus([['task', { running: true, pendingInteraction: { key: `question:${round}`, kind: 'question' } }]]);
+        app.setSessionStatus([['task', { running: true, pendingInteraction: { key: `approval:${round}`, kind: 'approval' } }]]);
+      }
+      assert.equal(app.notifications.length, 8);
+      assert.deepEqual(app.notifications.map(notification => notification.title), [
+        'notificationComplete', 'notificationError', 'notificationInput', 'notificationApproval',
+        'notificationComplete', 'notificationError', 'notificationInput', 'notificationApproval',
+      ]);
+      assert.equal(app.notifications.some(notification => notification.popupSuppressed), false,
+        'Retained tag history must not suppress any later banner.');
+      assert.equal(new Set(app.notifications.map(notification => notification.options.tag)).size, 8);
+      for (const notification of app.notifications) {
+        assert.equal(notification.popupSuppressed, false, 'Retained tag history must not suppress the next banner.');
+        assert.equal(notification.options.renotify, true);
+        assert.equal(notification.options.silent, true, 'Re-alerting must preserve the browser sound preference.');
+        assert.match(notification.options.tag, /^power-dsh:[a-z0-9]+:[a-z0-9]*:[a-z0-9]+$/);
+        assert.ok(notification.options.tag.length < 48, 'Platform tags stay short independently of session ids.');
+      }
+      assert.deepEqual(app.soundPlays, preferences.notificationSoundEnabled
+        ? Array.from({ length: 8 }, () => ({ id: preferences.notificationSound, preview: false })) : []);
+    } finally {
+      app.unmount();
+    }
+  }
 });
 
 test('system sound menu saves a native choice, previews it once, and sends one silent banner plus native playback', async () => {
@@ -119,7 +158,7 @@ test('system sound menu saves a native choice, previews it once, and sends one s
 
 test('selecting the current default sound previews without rewriting preferences and cleans up on unload', async () => {
   let saves = 0;
-  const app = await mount({ formLoad: () => { saves++; } });
+  const app = await mount({ windows: true, formLoad: () => { saves++; } });
   app.set({ notificationsEnabled: true });
   await loadedSoundSettings(app);
   const menu = descendants(app.renderSettings()).find(node => node.type === 'native-menu-fixture');
@@ -129,8 +168,14 @@ test('selecting the current default sound previews without rewriting preferences
   assert.equal(Object.hasOwn(app.notifications[0].options, 'requireInteraction'), false);
   assert.equal(Object.hasOwn(app.notifications[0].options, 'silent'), false);
   assert.equal(app.soundPlays.length, 0);
-  app.unmount();
+  await menu.props.onSelect('default');
+  assert.equal(saves, 0);
+  assert.equal(app.notifications.length, 2);
   assert.equal(app.notifications[0].closed, true);
+  assert.notEqual(app.notifications[0].options.tag, app.notifications[1].options.tag);
+  assert.equal(app.notifications[1].popupSuppressed, false);
+  app.unmount();
+  assert.equal(app.notifications[1].closed, true);
 });
 
 test('a rejected sound selection does not autoplay and disabled sound ignores a stale menu', async () => {
@@ -242,7 +287,7 @@ test('notification sound follows system defaults, can mute every trigger, and up
   app.setSessionStatus([['task', { running: true, pendingInteraction: { key: 'sound-approval', kind: 'approval' } }]]);
   for (const notice of app.notifications.slice(1)) {
     assert.equal(notice.options.silent, true);
-    assert.equal(Object.hasOwn(notice.options, 'renotify'), false);
+    assert.equal(notice.options.renotify, true);
   }
   await notificationSoundSwitch(app).props.onClick();
   app.setSessionStatus([['task', { running: true, pendingInteraction: { key: 'sound-approval-next', kind: 'approval' } }]]);
