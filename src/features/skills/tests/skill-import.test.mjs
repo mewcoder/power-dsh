@@ -84,18 +84,18 @@ test('roots cover the supported external agents in user and project scope', () =
   for (const id of ['claude-code', 'codex', 'cursor', 'gemini', 'opencode', 'copilot', 'windsurf', 'roo', 'trae', 'qoder', 'lingma', 'cc-switch', 'agents']) {
     assert.ok(sources.has(id), `Missing user root for ${id}`);
   }
-  assert.equal(user.find(root => root.source === 'claude-code').path, '/home/user/.claude/skills');
-  assert.equal(user.find(root => root.source === 'opencode').path, '/home/user/.config/opencode/skills');
-  assert.equal(user.find(root => root.source === 'gemini').path, '/home/user/.gemini/antigravity/skills');
-  assert.equal(roots.find(root => root.source === 'codex' && root.scope === 'project').path, '/work/project/.codex/skills');
+  assert.equal(user.find(root => root.source === 'claude-code').path, join('/home/user', '.claude', 'skills'));
+  assert.equal(user.find(root => root.source === 'opencode').path, join('/home/user', '.config', 'opencode', 'skills'));
+  assert.equal(user.find(root => root.source === 'gemini').path, join('/home/user', '.gemini', 'antigravity', 'skills'));
+  assert.equal(roots.find(root => root.source === 'codex' && root.scope === 'project').path, join('/work/project', '.codex', 'skills'));
 });
 
 test('tool home overrides relocate the user root and blank overrides are ignored', () => {
   const overridden = resolveSkillRoots('/home/user', '', { CODEX_HOME: '/custom/codex', CLAUDE_CONFIG_DIR: '/custom/claude' });
-  assert.equal(overridden.find(root => root.source === 'codex' && root.scope === 'user').path, '/custom/codex/skills');
-  assert.equal(overridden.find(root => root.source === 'claude-code' && root.scope === 'user').path, '/custom/claude/skills');
+  assert.equal(overridden.find(root => root.source === 'codex' && root.scope === 'user').path, join('/custom/codex', 'skills'));
+  assert.equal(overridden.find(root => root.source === 'claude-code' && root.scope === 'user').path, join('/custom/claude', 'skills'));
   const blank = resolveSkillRoots('/home/user', '', { CODEX_HOME: '   ' });
-  assert.equal(blank.find(root => root.source === 'codex' && root.scope === 'user').path, '/home/user/.codex/skills');
+  assert.equal(blank.find(root => root.source === 'codex' && root.scope === 'user').path, join('/home/user', '.codex', 'skills'));
 });
 
 test('two tools serving the same linked directory describe one skill', async () => {
