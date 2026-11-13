@@ -23,6 +23,8 @@ test('native skill codecs expose current data without returning legacy import hi
   assert.deepEqual(codec.parse(detail), detail);
   const parsed = codec.parse({ ...detail, installation: { private: 'legacy-record' }, sourceContent: 'private source' });
   assert.deepEqual(parsed, detail);
+  assert.deepEqual(codec.parse({ ...detail, linkTarget: '/shared/guide/SKILL.md' }), { ...detail, linkTarget: '/shared/guide/SKILL.md' });
+  for (const linkTarget of [null, '', true]) assert.throws(() => codec.parse({ ...detail, linkTarget }), /Invalid skill detail/);
   assert.throws(() => codec.parse({ ...detail, content: {} }), /Invalid skill detail/);
   const list = LIST_SKILLS_RPC.result.create();
   assert.throws(() => list.parse({ cwd: '', scope: 'user', complete: true, workspaces: [],

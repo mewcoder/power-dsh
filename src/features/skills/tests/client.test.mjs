@@ -513,6 +513,7 @@ test('skill detail reads the body on demand and shows description, metadata and 
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(page.dialog().props.title, 'skillDetailTitle');
   assert.equal(page.dialog().props.description, 'code-review');
+  assert.ok(!descendants(page.dialog()).some(node => node.props.className === 'power-dsh-skill-link'));
   const text = skillDetailText(page.dialog());
   // Description, a short metadata list, then the body.
   assert.ok(text.includes('Review code and boundary cases'));
@@ -955,6 +956,10 @@ test('multiple source paths share one label and confirm a destination before imp
   assert.deepEqual(descendants(page.dialog()).filter(node => node.type === 'dt').flatMap(node => node.props.children), ['skillDetailPath', 'skillDetailDescription']);
   assert.ok(!descendants(page.dialog()).some(node => node.type === 'input' || node.type === 'native-menu-fixture'));
   assert.ok(!skillDetailText(page.dialog()).includes('skillSourcesHint'));
+  assert.equal(descendants(page.dialog()).filter(node => node.props.className === 'power-dsh-skill-link').length, 3);
+  const linkTip = descendants(page.dialog()).find(node => node.type === 'native-tooltip-fixture' && node.props.label.includes(entry.sources[0].realPath));
+  assert.ok(linkTip);
+  assert.equal(linkTip.props.portal, true);
   assert.deepEqual(app.externalDetailReads, [{ cwd: '', scope: 'user', id: 'variant-one' }]);
   page.dialog().props.onClose();
   descendants(card).find(node => node.props['data-import-action']).props.onClick();await settle();
@@ -1040,6 +1045,21 @@ test('skill details ignore legacy import metadata and expose only path, descript
   assert.deepEqual(descendants(page.dialog()).filter(node => node.type === 'dt').flatMap(node => node.props.children), ['skillDetailPath', 'skillDetailDescription']);
   assert.deepEqual(descendants(page.dialog()).filter(node => node.props['data-native-button']).map(node => node.props.children[0]), ['close']);
   assert.deepEqual(descendants(page.dialog()).filter(node => node.type === 'native-markdown-fixture').map(node => node.props.text), ['Current DSH instructions']);
+  assert.deepEqual(app.skillWrites, []);
+  app.unmount();
+});
+
+test('native linked paths show a focusable link icon with the confirmed target', async () => {
+  const value = { ...skillFixture(), content: 'Instructions', linkTarget: '/shared/code-review/SKILL.md' };
+  const app = await mount({ featureIds: ['skills'], localeLanguage: 'zh', skillDetailReply: () => ({ ok: true, value }) });
+  const page = await skillsPage(app);
+  page.detail('code-review').props.onClick({ currentTarget: null });await settle();
+  const icon = descendants(page.dialog()).find(node => node.props.className === 'power-dsh-skill-link');
+  assert.equal(icon.props.tabIndex, 0);
+  assert.equal(icon.props['aria-label'], `skillSymbolicLink → ${value.linkTarget}`);
+  const tooltip = descendants(page.dialog()).find(node => node.type === 'native-tooltip-fixture' && node.props.label === icon.props['aria-label']);
+  assert.equal(tooltip.props.portal, true);
+  assert.ok(descendants(page.dialog()).some(node => node.props.className === 'power-dsh-skill-detail-code' && node.props.children.includes(value.path)));
   assert.deepEqual(app.skillWrites, []);
   app.unmount();
 });

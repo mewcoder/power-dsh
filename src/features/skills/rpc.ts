@@ -42,10 +42,12 @@ const skillDetailCodec: Codec<SkillDetail | null> = {
   create: () => ({ parse(value) {
     if (value === null) return null;
     if (!isRecord(value) || !hasStrings(value, ['name', 'description', 'content', 'source', 'path', 'origin'])
-      || !hasBooleans(value, ['enabled', 'modelInvocable', 'userInvocable'])) throw new TypeError('Invalid skill detail');
+      || !hasBooleans(value, ['enabled', 'modelInvocable', 'userInvocable'])
+      || (value.linkTarget !== undefined && (typeof value.linkTarget !== 'string' || !value.linkTarget))) throw new TypeError('Invalid skill detail');
     return { name: value.name, description: value.description, content: value.content, source: value.source,
       path: value.path, origin: value.origin, enabled: value.enabled,
       modelInvocable: value.modelInvocable, userInvocable: value.userInvocable,
+      ...(value.linkTarget === undefined ? {} : { linkTarget: value.linkTarget }),
       ...(value.deletion === undefined ? {} : { deletion: parseDeletion(value.deletion) }) };
   } }),
 };

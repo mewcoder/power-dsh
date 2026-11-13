@@ -84,6 +84,7 @@ export interface SkillDetail {
   /** Native discovery source, kept verbatim so the dialog can name it. */
   source: string;
   path: string;
+  linkTarget?: string;
   origin: string;
   enabled: boolean;
   modelInvocable: boolean;

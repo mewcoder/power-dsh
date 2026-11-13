@@ -323,9 +323,13 @@ export class SkillPolicy {
     }
     this.active();
     const deletion = before.complete ? await this.deletionFor(view, row).catch(() => null) : null;
+    const actualPath = row.path && isAbsolute(row.path) ? await realpath(row.path).catch(() => '') : '';
+    const samePath = (first: string, second: string) => process.platform === 'win32'
+      ? resolve(first).toLowerCase() === resolve(second).toLowerCase() : resolve(first) === resolve(second);
     this.active();
     return { name: row.name, description: row.description, content, source: row.source, path: row.path,
       origin: row.origin, enabled: row.enabled, modelInvocable: row.modelInvocable, userInvocable: row.userInvocable,
+      ...(actualPath && !samePath(row.path, actualPath) ? { linkTarget: actualPath } : {}),
       ...(deletion ? { deletion } : {}) };
   }
 

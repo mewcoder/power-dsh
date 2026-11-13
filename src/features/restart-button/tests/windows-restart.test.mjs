@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { readFile, writeFile, rm, access } from 'node:fs/promises';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { WindowsRestart, WINDOWS_RESTART_HELPER, WINDOWS_RESTART_IDENTITY, windowsTargetScript, windowsDispatchScript } from '../windows-restart.ts';
+import { WindowsRestart, WINDOWS_RESTART_HELPER, WINDOWS_RESTART_IDENTITY, WINDOWS_RESTART_OPEN, windowsTargetScript, windowsDispatchScript } from '../windows-restart.ts';
 
 const powershell = process.platform === 'win32' ? 'powershell.exe' : process.env.POWER_DSH_TEST_POWERSHELL;
 const target = { executable: 'C:\\Apps\\DeepSeek Harness.exe', mainPid: 123, hostPid: 456,
@@ -135,6 +135,62 @@ test('PowerShell parses all Windows restart scripts without launching or killing
     assert.equal(result.error, undefined);
     assert.equal(result.status, 0, result.stderr);
   }
+});
+
+test('Windows reopens the verified application through Explorer without inheriting the helper console or falling back to a direct launch', { skip: !powershell }, () => {
+  const directory = path.join(path.parse(process.cwd()).root, "restart test's 中文");
+  const executable = path.join(directory, 'app', 'DeepSeek Harness.exe');
+  const systemRoot = path.join(directory, 'Windows');
+  const data = Buffer.from(JSON.stringify({ directory, executable, systemRoot,
+    shortcut: path.join(directory, 'application.lnk'), workingDirectory: path.dirname(executable), explorer: path.join(systemRoot, 'explorer.exe') })).toString('base64');
+  const script = `$ErrorActionPreference = 'Stop'\n${WINDOWS_RESTART_OPEN}\n` + String.raw`
+$data = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('` + data + String.raw`')) | ConvertFrom-Json
+$env:SystemRoot = $data.systemRoot
+$script:calls = @()
+$script:saved = $false
+$script:failSave = $false
+$script:failLaunch = $false
+$script:shortcut = [pscustomobject]@{ TargetPath = ''; WorkingDirectory = ''; WindowStyle = 0 }
+$script:shortcut | Add-Member -MemberType ScriptMethod -Name Save -Value {
+  if ($script:failSave) { throw 'shortcut failed' }
+  $script:saved = $true
+}
+$script:shell = [pscustomobject]@{}
+$script:shell | Add-Member -MemberType ScriptMethod -Name CreateShortcut -Value {
+  param([string]$shortcutPath)
+  if ($shortcutPath -cne $data.shortcut) { throw 'incorrect shortcut path' }
+  return $script:shortcut
+}
+function New-Object([string]$ComObject) {
+  if ($ComObject -cne 'WScript.Shell') { throw 'unexpected COM object' }
+  return $script:shell
+}
+function Start-Process([string]$FilePath, [string]$ArgumentList) {
+  if (-not $script:saved) { throw 'shortcut was not saved' }
+  $script:calls += @{ path = $FilePath; arguments = $ArgumentList }
+  if ($script:failLaunch) { throw 'shell failed' }
+}
+Open-Application $data.directory $data.executable
+if ($script:shortcut.TargetPath -cne $data.executable -or $script:shortcut.WorkingDirectory -cne $data.workingDirectory -or
+  $script:shortcut.WindowStyle -ne 1) { throw 'application shortcut changed identity or hid the application' }
+if ($script:calls.Count -ne 1 -or $script:calls[0].path -cne $data.explorer -or
+  $script:calls[0].arguments -cne ('"' + $data.shortcut + '"')) { throw 'application did not use one quoted Explorer launch' }
+foreach ($failure in @('save', 'launch')) {
+  $script:calls = @()
+  $script:saved = $false
+  $script:failSave = $failure -eq 'save'
+  $script:failLaunch = $failure -eq 'launch'
+  $rejected = $false
+  try { Open-Application $data.directory $data.executable } catch { $rejected = $true }
+  if (-not $rejected) { throw 'failed relaunch was accepted' }
+  $expectedCalls = if ($failure -eq 'save') { 0 } else { 1 }
+  if ($script:calls.Count -ne $expectedCalls) { throw 'failed relaunch retried or started the application directly' }
+}
+`;
+  const result = spawnSync(powershell, ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')],
+    { encoding: 'utf8', timeout: 15000, windowsHide: true });
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 0, result.stderr);
 });
 
 test('PowerShell identity validation binds the actual ancestry, path and creation time instead of matching an application name', { skip: !powershell }, () => {

@@ -47,7 +47,7 @@ interface ImportConfirmation {
 interface SkillsPageProps extends PageSlotProps { source: SnapshotSource<FormSnapshot>; skillsSource: SnapshotSource<SkillsState>; loadSkills(cwd?: string, scope?: SkillScope): Promise<void>; setSkillEnabled(cwd: string, name: string, enabled: boolean): Promise<SkillCatalog | null>; readSkill(cwd: string, name: string): Promise<SkillDetail | null>; deleteSkill(cwd: string, name: string, revision: string): Promise<SkillCatalog>; listWorkspaceSkills(path: string): Promise<SkillCatalog>; discoverSkills(cwd: string, scope: SkillScope): Promise<ExternalSkillCatalog>; readExternalSkill(cwd: string, id: string): Promise<ExternalSkillDetail | null>; readImportDestination(cwd: string, name: string, flat: boolean): Promise<SkillImportDestination>; importSkills(cwd: string, ids: string[], mode?: SkillImportMode, revision?: string, targetCwd?: string): Promise<SkillImportResult>; }
 
 export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironment) {
-  const { React, h, Menu, Modal, Button, Tooltip, MarkdownText, observable, useSnapshot, useMounted, errorFeedback, loadingFeedback } = runtime;
+  const { React, h, Menu, Modal, Button, Tooltip, MarkdownText, NativeIcon, observable, useSnapshot, useMounted, errorFeedback, loadingFeedback } = runtime;
   const { ctx, form, source, t, savePreference, preferenceSlot, namespace } = env;
   const styles = shellStyles + catalogStyles + featureStyles;
   const { SkillSearchIcon, SkillChevron } = createCatalogUI(runtime);
@@ -283,8 +283,11 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       return entry.variants?.length ? entry.variants : [{ id: entry.id, description: entry.description, path: entry.path, flat: entry.flat,
         revision: '', sources: [{ agent: entry.source, path: entry.path, realPath: entry.path, linked: false }] }];
     }
+    function sourcesOf(entry: ExternalSkillEntry) {
+      return entry.sources?.length ? entry.sources : variantsOf(entry).flatMap(variant => variant.sources);
+    }
     function pathsOf(entry: ExternalSkillEntry) {
-      const sources = entry.sources?.length ? entry.sources : variantsOf(entry).flatMap(variant => variant.sources);
+      const sources = sourcesOf(entry);
       const paths = [...new Set(sources.map(source => source.path).filter(Boolean))];
       return paths.length ? paths : entry.path ? [entry.path] : [];
     }
@@ -583,6 +586,18 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
 
     const detailField = (key: string, value: import('react').ReactNode) => h('div', { key, className: 'power-dsh-skill-detail-row' },
       h('dt', { className: 'power-dsh-skill-detail-label' }, t(key)), h('dd', { className: 'power-dsh-skill-detail-value' }, value));
+    const renderPath = (path: string, linkTarget = '', linked = Boolean(linkTarget), focusable = true) => {
+      const label = linkTarget ? `${t('skillSymbolicLink')} → ${linkTarget}` : t('skillSymbolicLink');
+      return h('span', { key: path, className: 'power-dsh-skill-detail-path' },
+        h('code', { className: 'power-dsh-skill-detail-code' }, path),
+        linked && h(Tooltip, { label, side: 'top', portal: true, delayMs: 0, maxWidth: 520 },
+          h('span', { className: 'power-dsh-skill-link', tabIndex: focusable ? 0 : undefined, 'aria-label': label },
+            h(NativeIcon, { glyph: 'link-outline', size: 14 }))));
+    };
+    const renderSourcePath = (entry: ExternalSkillEntry, path: string, focusable = true) => {
+      const source = sourcesOf(entry).find(source => source.path === path);
+      return renderPath(path, source?.linked ? source.realPath : '', source?.linked, focusable);
+    };
     const renderMetadata = (description: string, path: import('react').ReactNode) => (description || path)
       ? h('dl', { className: 'power-dsh-skill-detail-list' },
         path && detailField('skillDetailPath', path),
@@ -654,9 +669,9 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         anchor: h('button', { type: 'button', className: 'power-dsh-skill-path-select', disabled: importing !== '',
           'aria-haspopup': 'menu', 'aria-expanded': pathMenuOpen, 'aria-label': t('skillChoosePath'),
           onClick: () => { if (!pending.current) setPathMenuOpen(open => !open); } },
-          h('code', { className: 'power-dsh-skill-detail-code' }, selected?.path ?? t('skillChoosePath')),
+          renderSourcePath(current.entry, selected?.path ?? t('skillChoosePath'), false),
           h(SkillChevron)),
-      }) : h('code', { className: 'power-dsh-skill-detail-code' }, pathsOf(current.entry).join('\n'));
+      }) : pathsOf(current.entry).map(path => renderSourcePath(current.entry, path));
       return h(Modal, {
         open: true, onClose: () => closeExternalDetail(), title: t('skillDetailTitle'), closeLabel: t('close'),
         className: 'power-dsh-skill-detail', description: current.entry.name,
@@ -709,7 +724,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         operation: 'readSkill', retry: () => { const row = (current.cwd ? workspaceState[current.cwd]?.catalog?.skills : catalog?.skills)?.find(candidate => candidate.name === current.name); if (row) void openDetail(row, current.cwd); } }),
       current.status === 'ready' && skill === null && h('p', { className: 'power-dsh-notice', role: 'status' }, t('skillDetailMissing')),
       current.status === 'ready' && skill && h('div', { className: 'power-dsh-skill-detail-body', tabIndex: 0 },
-        renderMetadata(skill.description, skill.path ? h('code', { className: 'power-dsh-skill-detail-code' }, skill.path) : null),
+        renderMetadata(skill.description, skill.path ? renderPath(skill.path, skill.linkTarget, Boolean(skill.linkTarget || deletion?.linked)) : null),
         renderMarkdown(skill.content)));
     };
     const renderGroup = (group: 'preinstalled' | 'personal', label: string, selectedRows: SkillEntry[]) => {

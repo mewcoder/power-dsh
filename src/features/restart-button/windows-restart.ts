@@ -50,9 +50,22 @@ function Resolve-Target([string]$executable, [int]$hostPid) {
     hostPid = $hostPid; hostStart = (Start-Stamp $hostProcess) }
 }`;
 
+export const WINDOWS_RESTART_OPEN = String.raw`
+function Open-Application([string]$directory, [string]$executable) {
+  $shell = New-Object -ComObject WScript.Shell
+  $shortcutPath = [IO.Path]::Combine($directory, 'application.lnk')
+  $shortcut = $shell.CreateShortcut($shortcutPath)
+  $shortcut.TargetPath = $executable
+  $shortcut.WorkingDirectory = [IO.Path]::GetDirectoryName($executable)
+  $shortcut.WindowStyle = 1
+  $shortcut.Save()
+  Start-Process -FilePath ([IO.Path]::Combine($env:SystemRoot, 'explorer.exe')) -ArgumentList ('"' + $shortcutPath + '"') | Out-Null
+}`;
+
 export const WINDOWS_RESTART_HELPER = String.raw`param([Parameter(Mandatory = $true)][string]$Directory)
 $ErrorActionPreference = 'Stop'
 ${WINDOWS_RESTART_IDENTITY}
+${WINDOWS_RESTART_OPEN}
 $env:ELECTRON_RUN_AS_NODE = $null
 $env:NODE_OPTIONS = $null
 $env:NODE_PATH = $null
@@ -130,7 +143,7 @@ try {
   if ($alive) { throw 'timeout' }
   Publish-State 'opening'
   Require-Time
-  Start-Process -FilePath ([string]$target.executable) -WorkingDirectory ([IO.Path]::GetDirectoryName([string]$target.executable))
+  Open-Application $Directory ([string]$target.executable)
   $deadline = [DateTime]::UtcNow.AddSeconds(25)
   while ([DateTime]::UtcNow -lt $deadline) {
     $processes = @(Get-CimInstance Win32_Process -Filter "Name = 'DeepSeek Harness.exe'")

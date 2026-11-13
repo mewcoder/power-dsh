@@ -622,9 +622,21 @@ function Resolve-Target([string]$executable, [int]$hostPid) {
   return @{ executable = $executable; mainPid = [int]$main.ProcessId; mainStart = (Start-Stamp $main)
     hostPid = $hostPid; hostStart = (Start-Stamp $hostProcess) }
 }`;
+const WINDOWS_RESTART_OPEN = String.raw`
+function Open-Application([string]$directory, [string]$executable) {
+  $shell = New-Object -ComObject WScript.Shell
+  $shortcutPath = [IO.Path]::Combine($directory, 'application.lnk')
+  $shortcut = $shell.CreateShortcut($shortcutPath)
+  $shortcut.TargetPath = $executable
+  $shortcut.WorkingDirectory = [IO.Path]::GetDirectoryName($executable)
+  $shortcut.WindowStyle = 1
+  $shortcut.Save()
+  Start-Process -FilePath ([IO.Path]::Combine($env:SystemRoot, 'explorer.exe')) -ArgumentList ('"' + $shortcutPath + '"') | Out-Null
+}`;
 const WINDOWS_RESTART_HELPER = String.raw`param([Parameter(Mandatory = $true)][string]$Directory)
 $ErrorActionPreference = 'Stop'
 ${WINDOWS_RESTART_IDENTITY}
+${WINDOWS_RESTART_OPEN}
 $env:ELECTRON_RUN_AS_NODE = $null
 $env:NODE_OPTIONS = $null
 $env:NODE_PATH = $null
@@ -702,7 +714,7 @@ try {
   if ($alive) { throw 'timeout' }
   Publish-State 'opening'
   Require-Time
-  Start-Process -FilePath ([string]$target.executable) -WorkingDirectory ([IO.Path]::GetDirectoryName([string]$target.executable))
+  Open-Application $Directory ([string]$target.executable)
   $deadline = [DateTime]::UtcNow.AddSeconds(25)
   while ([DateTime]::UtcNow -lt $deadline) {
     $processes = @(Get-CimInstance Win32_Process -Filter "Name = 'DeepSeek Harness.exe'")
@@ -1711,7 +1723,7 @@ var WindowsToasts = class {
 };
 
 // package.json
-var version = "0.0.9";
+var version = "0.0.10";
 
 // src/features/notifications/host.ts
 var host_exports$13 = /* @__PURE__ */ __exportAll({
@@ -3068,6 +3080,8 @@ var SkillPolicy = class {
 		}
 		this.active();
 		const deletion = before.complete ? await this.deletionFor(view, row).catch(() => null) : null;
+		const actualPath = row.path && isAbsolute(row.path) ? await realpath(row.path).catch(() => "") : "";
+		const samePath = (first, second) => process.platform === "win32" ? resolve(first).toLowerCase() === resolve(second).toLowerCase() : resolve(first) === resolve(second);
 		this.active();
 		return {
 			name: row.name,
@@ -3079,6 +3093,7 @@ var SkillPolicy = class {
 			enabled: row.enabled,
 			modelInvocable: row.modelInvocable,
 			userInvocable: row.userInvocable,
+			...actualPath && !samePath(row.path, actualPath) ? { linkTarget: actualPath } : {},
 			...deletion ? { deletion } : {}
 		};
 	}
@@ -3532,7 +3547,7 @@ const skillDetailCodec = {
 			"enabled",
 			"modelInvocable",
 			"userInvocable"
-		])) throw new TypeError("Invalid skill detail");
+		]) || value.linkTarget !== void 0 && (typeof value.linkTarget !== "string" || !value.linkTarget)) throw new TypeError("Invalid skill detail");
 		return {
 			name: value.name,
 			description: value.description,
@@ -3543,6 +3558,7 @@ const skillDetailCodec = {
 			enabled: value.enabled,
 			modelInvocable: value.modelInvocable,
 			userInvocable: value.userInvocable,
+			...value.linkTarget === void 0 ? {} : { linkTarget: value.linkTarget },
 			...value.deletion === void 0 ? {} : { deletion: parseDeletion(value.deletion) }
 		};
 	} })

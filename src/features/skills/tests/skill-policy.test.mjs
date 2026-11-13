@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { resolve, sep, join } from 'node:path';
-import { mkdtemp, mkdir, writeFile, readFile, rm, access } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, access, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { SkillPolicy } from '../skill-policy.ts';
 import { skillMarkdown } from '../skill-content.ts';
@@ -591,6 +591,19 @@ test('owned DSH skills expose a deletion token and deletion restores discovery i
   await assert.rejects(access(target));
   assert.equal(await readFile(join(source, 'SKILL.md'), 'utf8'), '---\nname: guide\ndescription: Guide instructions\n---\nOriginal guide');
   assert.equal((await app.policy.discoverExternalSkills('', 'user')).entries[0].available, false);
+}));
+
+test('native skill details resolve a linked file target without requiring deletion access', async () => importedFixture(async ({ app, entry, source, target }) => {
+  const variant = entry.variants[0];
+  await app.policy.addSkill('', 'user', variant.id, 'link', variant.revision);
+  const detail = await app.policy.read('', 'user', 'guide');
+  assert.equal(detail.path, join(target, 'SKILL.md'));
+  assert.equal(detail.linkTarget, await realpath(join(source, 'SKILL.md')));
+  app.native.push({ name: 'shared-guide', description: 'Read-only linked skill', source: 'user-agents', provider: 'filesystem',
+    path: join(target, 'SKILL.md'), content: 'Instructions', invocation: { modelInvocable: true, userInvocable: true } });
+  const shared = await app.policy.read('', 'user', 'shared-guide');
+  assert.equal(shared.deletion, undefined);
+  assert.equal(shared.linkTarget, detail.linkTarget);
 }));
 
 test('deleting a disabled project skill removes only its own policy and keeps the global copy', async () => importedFixture(async ({ app, entry, target, projectA, projectB }) => {

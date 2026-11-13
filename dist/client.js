@@ -4641,6 +4641,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 .power-dsh-skill-detail .power-dsh-skill-detail-label { color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; white-space:nowrap; }
 .power-dsh-skill-detail .power-dsh-skill-detail-value { min-width:0; margin:0; color:var(--dsw-alias-label-secondary); font-size:12px; line-height:18px; overflow-wrap:anywhere; }
 .power-dsh-skill-detail .power-dsh-skill-detail-code { color:inherit; font-family:var(--ds-font-family-code); font-size:12px; line-height:18px; white-space:pre-wrap; overflow-wrap:anywhere; }
+.power-dsh-skill-detail .power-dsh-skill-detail-path { display:flex; align-items:flex-start; gap:4px; min-width:0; }
+.power-dsh-skill-detail .power-dsh-skill-detail-path > code { min-width:0; }
+.power-dsh-skill-detail .power-dsh-skill-link { display:inline-flex; align-items:center; flex:none; height:18px; color:var(--dsw-alias-label-tertiary); }
+.power-dsh-skill-detail .power-dsh-skill-link:focus-visible { outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; border-radius:var(--dsw-radius-xs); }
 .power-dsh-skill-detail .power-dsh-skill-detail-markdown { min-width:0; padding-top:16px; border-top:.5px solid var(--dsw-alias-border-l2); user-select:text; }
 .power-dsh-skill-detail .power-dsh-skill-detail-body:focus-visible { outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:-2px; }
 .power-dsh-skill-detail .power-dsh-skill-detail-empty { margin:0; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
@@ -4649,7 +4653,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 .power-dsh-skill-import-empty-title { margin:0; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
 .power-dsh-skill-import-notice { display:flex; flex-wrap:wrap; align-items:center; gap:8px; color:var(--dsw-alias-label-secondary); font-size:12px; }
 .power-dsh-skill-detail .power-dsh-skill-path-select { display:flex; align-items:baseline; justify-content:space-between; gap:8px; width:100%; min-width:0; border:0; border-radius:var(--dsw-radius-xs); padding:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
-.power-dsh-skill-detail .power-dsh-skill-path-select > code { min-width:0; }
+.power-dsh-skill-detail .power-dsh-skill-path-select > .power-dsh-skill-detail-path { flex:1; }
 .power-dsh-skill-detail .power-dsh-skill-path-select > svg { flex:none; }
 .power-dsh-skill-detail .power-dsh-skill-path-select:focus-visible { outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:3px; }
 .power-dsh-skill-detail .power-dsh-skill-path-select:disabled { cursor:default; opacity:.5; }
@@ -4661,7 +4665,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 
 // src/features/skills/client.ts
 	function createClientFeature$11(runtime, env) {
-		const { React, h, Menu, Modal, Button, Tooltip, MarkdownText, observable, useSnapshot, useMounted, errorFeedback, loadingFeedback } = runtime;
+		const { React, h, Menu, Modal, Button, Tooltip, MarkdownText, NativeIcon, observable, useSnapshot, useMounted, errorFeedback, loadingFeedback } = runtime;
 		const { ctx, form, source, t, savePreference, preferenceSlot, namespace } = env;
 		const styles = styles$14 + styles$11 + styles$7;
 		const { SkillSearchIcon, SkillChevron } = createCatalogUI(runtime);
@@ -4985,8 +4989,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					}]
 				}];
 			}
+			function sourcesOf(entry) {
+				return entry.sources?.length ? entry.sources : variantsOf(entry).flatMap((variant) => variant.sources);
+			}
 			function pathsOf(entry) {
-				const sources = entry.sources?.length ? entry.sources : variantsOf(entry).flatMap((variant) => variant.sources);
+				const sources = sourcesOf(entry);
 				const paths = [...new Set(sources.map((source) => source.path).filter(Boolean))];
 				return paths.length ? paths : entry.path ? [entry.path] : [];
 			}
@@ -5478,6 +5485,30 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				key,
 				className: "power-dsh-skill-detail-row"
 			}, h("dt", { className: "power-dsh-skill-detail-label" }, t(key)), h("dd", { className: "power-dsh-skill-detail-value" }, value));
+			const renderPath = (path, linkTarget = "", linked = Boolean(linkTarget), focusable = true) => {
+				const label = linkTarget ? `${t("skillSymbolicLink")} → ${linkTarget}` : t("skillSymbolicLink");
+				return h("span", {
+					key: path,
+					className: "power-dsh-skill-detail-path"
+				}, h("code", { className: "power-dsh-skill-detail-code" }, path), linked && h(Tooltip, {
+					label,
+					side: "top",
+					portal: true,
+					delayMs: 0,
+					maxWidth: 520
+				}, h("span", {
+					className: "power-dsh-skill-link",
+					tabIndex: focusable ? 0 : void 0,
+					"aria-label": label
+				}, h(NativeIcon, {
+					glyph: "link-outline",
+					size: 14
+				}))));
+			};
+			const renderSourcePath = (entry, path, focusable = true) => {
+				const source = sourcesOf(entry).find((source) => source.path === path);
+				return renderPath(path, source?.linked ? source.realPath : "", source?.linked, focusable);
+			};
 			const renderMetadata = (description, path) => description || path ? h("dl", { className: "power-dsh-skill-detail-list" }, path && detailField("skillDetailPath", path), description && detailField("skillDetailDescription", h("p", { className: "power-dsh-skill-detail-description" }, description))) : null;
 			const renderMarkdown = (content) => content ? h("div", { className: "power-dsh-skill-detail-markdown" }, h(MarkdownText, {
 				text: content,
@@ -5600,8 +5631,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 						onClick: () => {
 							if (!pending.current) setPathMenuOpen((open) => !open);
 						}
-					}, h("code", { className: "power-dsh-skill-detail-code" }, selected?.path ?? t("skillChoosePath")), h(SkillChevron))
-				}) : h("code", { className: "power-dsh-skill-detail-code" }, pathsOf(current.entry).join("\n"));
+					}, renderSourcePath(current.entry, selected?.path ?? t("skillChoosePath"), false), h(SkillChevron))
+				}) : pathsOf(current.entry).map((path) => renderSourcePath(current.entry, path));
 				return h(Modal, {
 					open: true,
 					onClose: () => closeExternalDetail(),
@@ -5730,7 +5761,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				}, t("skillDetailMissing")), current.status === "ready" && skill && h("div", {
 					className: "power-dsh-skill-detail-body",
 					tabIndex: 0
-				}, renderMetadata(skill.description, skill.path ? h("code", { className: "power-dsh-skill-detail-code" }, skill.path) : null), renderMarkdown(skill.content)));
+				}, renderMetadata(skill.description, skill.path ? renderPath(skill.path, skill.linkTarget, Boolean(skill.linkTarget || deletion?.linked)) : null), renderMarkdown(skill.content)));
 			};
 			const renderGroup = (group, label, selectedRows) => {
 				if (selectedRows.length === 0) return null;
@@ -6056,6 +6087,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"skillDetailNoContent": "This skill has no instruction body.",
 			"skillDetailDescription": "Description",
 			"skillDetailPath": "Path",
+			"skillSymbolicLink": "Symbolic link",
 			"skillDetailSource": "Source",
 			"skillCopyCode": "Copy code",
 			"skillCopiedCode": "Copied",
@@ -6173,6 +6205,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"skillDetailNoContent": "此技能没有正文内容。",
 			"skillDetailDescription": "描述",
 			"skillDetailPath": "路径",
+			"skillSymbolicLink": "软链接",
 			"skillDetailSource": "来源",
 			"skillCopyCode": "复制代码",
 			"skillCopiedCode": "已复制",
@@ -6355,7 +6388,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				"enabled",
 				"modelInvocable",
 				"userInvocable"
-			])) throw new TypeError("Invalid skill detail");
+			]) || value.linkTarget !== void 0 && (typeof value.linkTarget !== "string" || !value.linkTarget)) throw new TypeError("Invalid skill detail");
 			return {
 				name: value.name,
 				description: value.description,
@@ -6366,6 +6399,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				enabled: value.enabled,
 				modelInvocable: value.modelInvocable,
 				userInvocable: value.userInvocable,
+				...value.linkTarget === void 0 ? {} : { linkTarget: value.linkTarget },
 				...value.deletion === void 0 ? {} : { deletion: parseDeletion(value.deletion) }
 			};
 		} })
@@ -12327,7 +12361,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 							t,
 							version,
 							namespace,
-							pluginVersion: "0.0.9",
+							pluginVersion: "0.0.10",
 							savePreference,
 							preferenceSlot: preferenceSlot$1,
 							get footerBusy() {
