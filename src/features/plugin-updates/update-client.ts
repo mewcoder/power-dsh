@@ -11,6 +11,7 @@ export interface UpdateTarget {
   version: string; url: string; source: string; installed: string; latest: string; bootId: string;
 }
 interface PendingUpdate { operationId: string; target: UpdateTarget; beforeVersion: string }
+interface CompletedUpdate { target: UpdateTarget; beforeVersion: string; restartRequired: boolean; refreshRequired: boolean }
 export interface UpdateState {
   phase: 'idle' | 'checking' | 'available' | 'current' | 'unconfirmed' | 'updating' | 'done' | 'error';
   target: UpdateTarget | null; error: string; notice: string;
@@ -20,6 +21,8 @@ export interface UpdateState {
 interface UpdateOptions {
   baseURI: string; version: string; canUse(): boolean; notify(): void;
   fetch: typeof fetch; storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+  completionStorage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+  runtimeVersion?(): Promise<string>;
   schedule(callback: () => void, milliseconds: number): number; cancel(timer: number): void;
   now?(): number;
   release(signal: AbortSignal): Promise<PluginRelease>;
@@ -28,6 +31,10 @@ function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 function problem(key: string): never { throw new Error(key); }
+function reached(version: string, target: string) {
+  const comparison = compareVersions(version, target);
+  return comparison !== null && comparison >= 0;
+}
 function validTarget(value: unknown): value is UpdateTarget {
   return record(value) && typeof value.version === 'string' && versionParts(value.version) !== null
     && value.url === `${RELEASES}/tag/v${value.version}` && ['github', 'npm'].includes(String(value.source))
@@ -47,9 +54,11 @@ export class PluginUpdateClient {
   polls = 0;
   githubRetryAt = 0;
   readonly storageKey: string;
+  readonly completionKey: string;
   constructor(options: UpdateOptions) {
     this.options = options;
     this.storageKey = `power-dsh:update:${new URL('.', options.baseURI).href}`;
+    this.completionKey = `${this.storageKey}:completed`;
   }
   publish(patch: Partial<UpdateState>) {
     if (this.closed) return;
@@ -165,7 +174,7 @@ export class PluginUpdateClient {
       ? key : 'pluginUpdateCheckFailed';
   }
   async check() {
-    if (this.closed || this.busy || this.state.pending || !this.options.canUse()) return;
+    if (this.closed || this.busy || this.state.pending || this.state.phase === 'done' || !this.options.canUse()) return;
     this.busy = true;
     const sequence = ++this.sequence;
     const controller = this.controller = new AbortController();
@@ -184,13 +193,53 @@ export class PluginUpdateClient {
       else this.options.storage.removeItem(this.storageKey);
     } catch (_error) { if (pending) this.publish({ notice: 'pluginUpdateStorage' }); }
   }
+  saveCompleted(completed: CompletedUpdate | null) {
+    try {
+      const storage = this.options.completionStorage;
+      if (!storage) problem('pluginUpdateStorage');
+      if (completed) storage.setItem(this.completionKey, JSON.stringify(completed));
+      else storage.removeItem(this.completionKey);
+    } catch (_error) { this.publish({ notice: 'pluginUpdateStorage' }); }
+  }
+  async restoreCompleted(): Promise<boolean> {
+    let saved: unknown;
+    try {
+      const text = this.options.completionStorage?.getItem(this.completionKey);
+      if (!text) return false;
+      if (text.length > 4096) throw new Error('Invalid completion');
+      saved = JSON.parse(text);
+    } catch (_error) { this.saveCompleted(null); return false; }
+    if (!record(saved) || !validTarget(saved.target) || typeof saved.beforeVersion !== 'string' || !versionParts(saved.beforeVersion)
+      || typeof saved.restartRequired !== 'boolean' || typeof saved.refreshRequired !== 'boolean') {
+      this.saveCompleted(null); return false;
+    }
+    const completed: CompletedUpdate = { target: saved.target, beforeVersion: saved.beforeVersion,
+      restartRequired: saved.restartRequired, refreshRequired: saved.refreshRequired };
+    await this.activateCompleted(completed);
+    return true;
+  }
+  async activateCompleted(completed: CompletedUpdate) {
+    const sequence = this.sequence;
+    this.publish({ phase: 'done', target: completed.target, restartRequired: completed.restartRequired,
+      refreshRequired: completed.refreshRequired || !completed.restartRequired, error: '' });
+    if (reached(this.options.version, completed.target.version)) {
+      try {
+        const hostVersion = await this.options.runtimeVersion?.();
+        if (this.closed || sequence !== this.sequence || !this.options.canUse()) return;
+        if (hostVersion && reached(hostVersion, completed.target.version)) {
+          this.saveCompleted(null);
+          this.publish({ phase: 'current', target: null, restartRequired: false, refreshRequired: false, error: '', notice: '' });
+        }
+      } catch (_error) {}
+    }
+  }
   async update(expected: UpdateTarget) {
     if (this.closed || this.busy || this.state.pending || this.state.target !== expected || !this.options.canUse()) return;
     this.busy = true;
     const sequence = ++this.sequence;
     const controller = this.controller = new AbortController();
     let submitted = false;
-    this.publish({ phase: 'checking', error: '' });
+    this.publish({ phase: 'updating', error: '' });
     try {
       const fresh = await this.inspect(controller.signal);
       if (sequence !== this.sequence || !this.options.canUse()) return;
@@ -228,9 +277,14 @@ export class PluginUpdateClient {
       && value.beforeVersion === pending.beforeVersion && compareVersions(value.installedVersion, pending.target.version) !== null
       && compareVersions(value.installedVersion, pending.target.version)! >= 0
       && typeof value.outcome.refreshRequired === 'boolean' && typeof value.outcome.restartRequired === 'boolean') {
+      const target = { ...pending.target, version: value.installedVersion, url: `${RELEASES}/tag/v${value.installedVersion}` };
+      const completed = { target, beforeVersion: pending.beforeVersion, restartRequired: value.outcome.restartRequired,
+        refreshRequired: value.outcome.refreshRequired };
+      this.saveCompleted(completed);
       this.savePending(null);
       this.publish({ phase: 'done', pending: null, error: '', restartRequired: value.outcome.restartRequired,
-        refreshRequired: value.outcome.refreshRequired, target: { ...pending.target, version: value.installedVersion } });
+        refreshRequired: value.outcome.refreshRequired || !value.outcome.restartRequired, target });
+      void this.activateCompleted(completed);
     } else if (['failed', 'cancelled', 'rolled-back'].includes(String(value.state))) {
       this.savePending(null);
       this.publish({ phase: 'error', pending: null, target: null, error: value.state === 'rolled-back'
@@ -254,6 +308,10 @@ export class PluginUpdateClient {
     if (this.closed || this.busy || !this.options.canUse()) return;
     if (this.timer !== null) this.options.cancel(this.timer);
     this.timer = null;
+    const restoringSequence = this.sequence;
+    const completed = await this.restoreCompleted();
+    if (this.closed || restoringSequence !== this.sequence || !this.options.canUse()) return;
+    if (completed) { this.savePending(null); this.publish({ pending: null }); return; }
     let pending: unknown = this.state.pending;
     if (!pending) {
       try { pending = JSON.parse(this.options.storage?.getItem(this.storageKey) || 'null'); }
@@ -289,7 +347,7 @@ export class PluginUpdateClient {
     if (this.timer !== null) this.options.cancel(this.timer);
     this.timer = null;
     this.busy = false;
-    if (this.state.phase === 'checking') this.publish({ phase: this.state.pending ? 'error' : 'idle',
+    if (this.state.phase === 'checking' || (this.state.phase === 'updating' && !this.state.pending)) this.publish({ phase: this.state.pending ? 'error' : 'idle',
       error: this.state.pending ? 'pluginUpdateUnknown' : '', target: null });
   }
   close() { this.pause(); this.closed = true; }

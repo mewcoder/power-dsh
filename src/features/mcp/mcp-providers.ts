@@ -1,7 +1,8 @@
 import type { NativeContext, NativeFiber, NativePayload, LifecycleOptions } from '../../shared/host/native.ts';
-import type { McpServer, McpRuntimeState, McpTransport } from './rpc.ts';
+import type { McpServer, McpRuntimeState, McpTransport, McpConnection, McpProbe } from './rpc.ts';
 import { isOneOf, isRecord } from '../../shared/types/protocol.ts';
-export interface ConfiguredMcp { entryId: string; uid?: number; name: string; tools: string[]; runtimeState: McpRuntimeState; transport: McpTransport }
+import { sanitizeDiagnosticText } from '../../shared/types/diagnostics.ts';
+export interface ConfiguredMcp { entryId: string; uid?: number; name: string; tools: string[]; runtimeState: McpRuntimeState; transport: McpTransport; connection?: McpConnection }
 interface ManagedTarget { id: string; name: string; namespace: string; owner: NativeFiber | undefined; enabled: boolean }
 const MCP_CLIENT = '@deepseek-ai/dsh-mcp-client';
 const identifier = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
@@ -18,6 +19,40 @@ function fiberRuntimeState(fiber: NativeFiber | undefined | null): McpRuntimeSta
 
 function configuredRuntimeState(state: McpRuntimeState, enabled: unknown): McpRuntimeState {
   return state === 'inactive' && enabled === false ? 'disabled' : state;
+}
+
+const CONNECTION_STATES = ['connected', 'connecting', 'reconnecting', 'waiting-credentials', 'failed', 'closed'] as const;
+
+/** Project the native connection status onto the small wire shape; unknown or unreadable values stay absent. */
+function normalizeConnection(value: unknown): McpConnection | null {
+  try {
+    if (!isRecord(value) || !isOneOf(value.state, CONNECTION_STATES)) return null;
+    const connection: McpConnection = { state: value.state };
+    for (const key of ['toolCount', 'connectedAt', 'attempt', 'maxAttempts'] as const) {
+      const number = value[key];
+      if (typeof number === 'number' && Number.isFinite(number)) connection[key] = number;
+    }
+    if (isOneOf(value.reason, ['gave-up', 'reconnect-disabled', 'unclosed-generation'])) connection.reason = value.reason;
+    return connection;
+  } catch { return null; }
+}
+
+/** Bound and redact the free-form native probe outcome; only whitelisted fields cross the wire. */
+function normalizeProbe(value: unknown): McpProbe {
+  const record = isRecord(value) ? value : {};
+  const durationMs = typeof record.durationMs === 'number' && Number.isFinite(record.durationMs) ? record.durationMs : 0;
+  const cleanupFailed = record.closeConfirmed === false || typeof record.cleanupError === 'string';
+  if (record.ok === true) {
+    const toolNames = Array.isArray(record.toolNames)
+      ? record.toolNames.filter((name): name is string => typeof name === 'string' && name.length > 0)
+        .slice(0, 200).map(name => name.slice(0, 200)) : [];
+    const info = isRecord(record.serverInfo) && typeof record.serverInfo.name === 'string' && typeof record.serverInfo.version === 'string'
+      ? { name: record.serverInfo.name.slice(0, 200), version: record.serverInfo.version.slice(0, 200) } : undefined;
+    return { ok: true, ...(info ? { serverInfo: info } : {}), toolNames, truncated: record.truncated === true, durationMs, cleanupFailed };
+  }
+  const stage = isOneOf(record.stage, ['connect', 'list']) ? record.stage : 'connect';
+  const message = typeof record.message === 'string' ? sanitizeDiagnosticText(record.message) : '';
+  return { ok: false, stage, message, durationMs, cleanupFailed };
 }
 
 /** Project only the native transport discriminator, without inspecting connection credentials or targets. */
@@ -103,6 +138,17 @@ export class McpProviders {
     });
   }
 
+  /** Read one live instance's connection status from the native MCP client, when it registers a handle. */
+  connectionOf(fiber: NativeFiber | undefined | null): McpConnection | null {
+    if (!fiber) return null;
+    try {
+      const native = this.native as { connectionStatusOf?: (fiber: unknown) => { current(): unknown } | undefined } | undefined;
+      if (typeof native?.connectionStatusOf !== 'function') return null;
+      const handle = native.connectionStatusOf(fiber);
+      return handle ? normalizeConnection(handle.current()) : null;
+    } catch { return null; }
+  }
+
   configured(): ConfiguredMcp[] {
     this.active();
     return [...this.ctx.loader.entries()].flatMap(entry => {
@@ -114,8 +160,9 @@ export class McpProviders {
       const name = fiber?.effectiveConfig?.serverName ?? fiber?.config?.serverName ?? fiber?.rawConfig?.serverName ?? entry.options.config?.serverName;
       const tools = identifier(name) && fiber?.ctx && ['pending', 'loading', 'active', 'failed'].includes(runtimeState)
         ? this.toolNames(name, fiber.ctx) : [];
+      const connection = this.connectionOf(fiber);
       return [{ entryId: entry.id, uid: fiber?.uid, name: identifier(name) ? name : '', tools, runtimeState,
-        transport: transportOf(fiber?.effectiveConfig, fiber?.config, entry.options.config) }];
+        transport: transportOf(fiber?.effectiveConfig, fiber?.config, entry.options.config), ...(connection ? { connection } : {}) }];
     });
   }
 
@@ -185,16 +232,96 @@ export class McpProviders {
     return found.length === 1 ? found[0] : undefined;
   }
 
+  /**
+   * Resolve the raw declared config and its owning context so one server can be probed.
+   * Mirrors `configFor`/`declared` resolution but keeps the context needed for credential templates.
+   */
+  private probeTarget(id: string): { config: NativePayload | undefined; ctx: NativeContext | undefined } {
+    this.active();
+    const preset = /^preset:([^:]+):(.+)$/.exec(id);
+    if (preset) {
+      const [, presetId, rowId] = preset;
+      const owners = [...this.ctx.loader.entries()].filter(entry => entry.options.name === '@deepseek-ai/dsh-agent-preset'
+        && (entry.fiber?.effectiveConfig?.id ?? entry.fiber?.config?.id) === presetId);
+      if (owners.length !== 1) return { config: undefined, ctx: undefined };
+      const found: NativePayload[] = [];
+      const walk = (rows: unknown): void => {
+        if (!Array.isArray(rows)) return;
+        for (const row of rows) {
+          if (!isRecord(row)) continue;
+          if (row.group === true) { walk(row.config); continue; }
+          if (row.name === MCP_CLIENT && row.id === rowId) found.push(row.config as NativePayload);
+        }
+      };
+      walk(owners[0].options.config?.plugins);
+      const raw = found.length === 1 ? found[0] : undefined;
+      if (!raw) return { config: undefined, ctx: undefined };
+      // Prefer the child instance's resolved config (schema defaults applied) when it is unambiguous.
+      let resolvedFiber: NativeFiber | undefined;
+      try {
+        const owner = owners[0].fiber;
+        const serverName = raw.serverName;
+        if (owner) resolvedFiber = [...(this.ctx.registry.get(this.native)?.fibers ?? [])].find(fiber =>
+          belongsTo(fiber, owner) && (fiber.effectiveConfig?.serverName ?? fiber.config?.serverName ?? fiber.rawConfig?.serverName) === serverName);
+      } catch { resolvedFiber = undefined; }
+      return { config: (resolvedFiber?.effectiveConfig ?? raw) as NativePayload, ctx: resolvedFiber?.ctx ?? owners[0].fiber?.ctx };
+    }
+    if (id.startsWith('manager:')) {
+      const manager = this.ctx.get('mcpManager');
+      const target = this.managed().targets.find(row => row.id === id);
+      if (!manager || !target) return { config: undefined, ctx: undefined };
+      try {
+        const configs = manager.config.servers.get();
+        return { config: Object.hasOwn(configs, target.name) ? configs[target.name] as NativePayload : undefined, ctx: target.owner?.ctx };
+      } catch { return { config: undefined, ctx: undefined }; }
+    }
+    if (id.startsWith('runtime:')) {
+      const uid = Number(id.slice('runtime:'.length));
+      if (!Number.isSafeInteger(uid)) return { config: undefined, ctx: undefined };
+      try {
+        const fiber = [...(this.ctx.registry.get(this.native)?.fibers ?? [])].find(row => row.uid === uid);
+        return { config: (fiber?.effectiveConfig ?? fiber?.config ?? fiber?.rawConfig) as NativePayload | undefined, ctx: fiber?.ctx };
+      } catch { return { config: undefined, ctx: undefined }; }
+    }
+    const matches = [...this.ctx.loader.entries()].filter(entry => entry.id === id && entry.options.name === MCP_CLIENT);
+    if (matches.length !== 1) return { config: undefined, ctx: undefined };
+    // Prefer the instance's resolved config so schema defaults (env/cwd/args) reach the probe.
+    return {
+      config: (matches[0].fiber?.effectiveConfig ?? matches[0].fiber?.config ?? matches[0].options.config) as NativePayload | undefined,
+      ctx: matches[0].fiber?.ctx,
+    };
+  }
+
+  /**
+   * Run a read-only connectivity probe for one server: it connects, lists tools, and closes.
+   * @param id - the projected server id from the catalog.
+   * @returns the bounded, sanitized probe outcome.
+   */
+  async probe(id: string): Promise<McpProbe> {
+    this.active();
+    const { config, ctx } = this.probeTarget(id);
+    const native = this.native as {
+      probeServer?: (context: NativeContext, config: NativePayload, options?: { timeoutMs?: number }) => Promise<unknown>;
+    } | undefined;
+    if (!config || typeof native?.probeServer !== 'function') throw failure('mcpProbeFailed');
+    let raw: unknown;
+    try { raw = await native.probeServer(ctx ?? this.ctx, config, { timeoutMs: 15000 }); }
+    catch { this.active(); throw failure('mcpProbeFailed'); }
+    this.active();
+    return normalizeProbe(raw);
+  }
+
   /** Read only the manager's exact native child instance, never its connection-status payload. */
-  managedMetadata(name: string, owner: NativeFiber | undefined): { runtimeState: McpRuntimeState; transport: McpTransport } {
-    const unknown: { runtimeState: McpRuntimeState; transport: McpTransport } = { runtimeState: 'unknown', transport: 'unknown' };
+  managedMetadata(name: string, owner: NativeFiber | undefined): { runtimeState: McpRuntimeState; transport: McpTransport; connection?: McpConnection } {
+    const unknown: { runtimeState: McpRuntimeState; transport: McpTransport; connection?: McpConnection } = { runtimeState: 'unknown', transport: 'unknown' };
     if (!owner) return unknown;
     try {
       const matches = [...(this.ctx.registry.get(this.native)?.fibers ?? [])].filter(fiber =>
         belongsTo(fiber, owner) && (fiber.effectiveConfig?.serverName ?? fiber.config?.serverName ?? fiber.rawConfig?.serverName) === name);
       if (matches.length !== 1) return unknown;
       const fiber = matches[0];
-      return { runtimeState: fiberRuntimeState(fiber), transport: transportOf(fiber.effectiveConfig, fiber.config) };
+      const connection = this.connectionOf(fiber);
+      return { runtimeState: fiberRuntimeState(fiber), transport: transportOf(fiber.effectiveConfig, fiber.config), ...(connection ? { connection } : {}) };
     } catch { return unknown; }
   }
 
@@ -230,6 +357,7 @@ export class McpProviders {
         group: configured ? 'user' : 'builtin', enabled: enabled === true, stateKnown, canToggle,
         runtimeState: configuredRuntimeState(metadata.runtimeState, enabled),
         transport: metadata.transport !== 'unknown' ? metadata.transport : configured ? transportOf(configs[row.name]) : 'unknown',
+        ...(metadata.connection ? { connection: metadata.connection } : {}),
         tools: enabled === true ? this.toolNames(row.name, owner?.ctx ?? this.ctx) : [],
         reason: canToggle ? '' : configured ? 'manager-managed' : 'plugin-managed' };
     });
@@ -252,9 +380,11 @@ export class McpProviders {
       const name = fiber.effectiveConfig?.serverName ?? fiber.config?.serverName ?? fiber.rawConfig?.serverName;
       if (!identifier(name)) continue;
       const origin = providingPlugin(fiber.parent.fiber);
+      const connection = this.connectionOf(fiber);
       servers.push({ id: `runtime:${fiber.uid}`, name, source: 'plugin', origin, group: 'builtin',
         enabled: true, stateKnown: true, canToggle: false, reason: 'plugin-managed', runtimeState,
         transport: transportOf(fiber.effectiveConfig, fiber.config),
+        ...(connection ? { connection } : {}),
         tools: ['pending', 'loading', 'active', 'failed'].includes(runtimeState) ? this.toolNames(name, fiber.ctx) : [] });
     }
     this.active();

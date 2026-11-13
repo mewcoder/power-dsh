@@ -72,7 +72,7 @@ git diff --check
 - 正常路径是自动的：`.github/workflows/release.yml` 在推送 `v*` tag 后重新跑固定检查、打包 `power-dsh.tgz` 并创建 GitHub Release。先确认 `package.json.version` 已增加、更新日志已写、发版提交已进入 `main`，再创建 annotated `v<version>` tag。核对远端无同名 tag，不强推或移动已发布标签。
 - 推送 tag 后等待该 tag 的 Release workflow 成功；失败时在同一提交修复流程或补充元数据，用新版本发布，不覆盖已发布附件。
 - 正式版设置 Latest，带预发布标识的 tag 生成 Pre-release，不替换正式版入口。只有自动流程不可用或用户明确要求手工时，才用已审阅 tarball 手工上传同名附件；上传前确认哈希未变。
-- GitHub Release notes 写明 DSH 范围、桌面安装方式与真实验证边界；不要把 tag 推送、附件上传或 workflow 成功直接报成用户已可安装升级。
+- GitHub Release notes 只写该版本简短的用户可感知变化，不写「待确认」「待验证」、验证范围或实机验收说明，不自动追加安装与验证章节；安装要求见 README，验证证据留在兼容性调查。不要把 tag 推送、附件上传或 workflow 成功直接报成用户已可安装升级。
 - 只有用户重新明确选择 npm 时才进入 `docs/releasing.md` 的可选 npm 章节；不是因账号已经登录就改变当前分发约定。
 
 ## 7. 发布后核验与重试

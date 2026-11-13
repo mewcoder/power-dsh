@@ -89,9 +89,9 @@ README 面向使用者，标题使用显示名 `# PowerDSH`，并在首屏说明
 
 开发时把用户可感知的变化写入[更新日志](../CHANGELOG.md)的「未发布」，按需使用「新增」「修复」「变更」「兼容性」小节。发版时移入版本小节，填写实际发布日期。说明改了什么、影响谁、是否需要操作；省略没有内容的小节。
 
-更新日志与 GitHub Release 面向用户，保持简短：每类通常 1–3 条，每条一句，只说最终功能或修复结果，同类调整合并。不逐项罗列控件、路径、内部接口、防护措施、开发过程或测试数字；详细行为留在主 Spec，验证证据留在兼容性调查。兼容性说明只保留影响安装、升级或使用的必要限制。
+更新日志与 GitHub Release 面向用户，保持简短：每类通常 1–3 条，每条一句，只说最终功能或修复结果，同类调整合并。不写「待确认」「待验证」、验证范围、实机验收说明或测试数字，不逐项罗列控件、路径、内部接口、防护措施和开发过程；详细行为留在主 Spec，验证证据与待验事项留在兼容性调查。兼容性说明只保留影响安装、升级或使用的必要限制。
 
-包版本写 `0.0.1`，Git 标签写 `v0.0.1`，GitHub Release 标题写 `power-dsh v0.0.1`，对应同一个提交。Release 正文使用该版本的更新日志，加上宿主要求、安装方式与升级操作。已发布的 tag、版本和附件保持不变，修复另发新版本。
+包版本写 `0.0.1`，Git 标签写 `v0.0.1`，GitHub Release 标题写 `power-dsh v0.0.1`，对应同一个提交。Release 正文只使用该版本的更新日志，必要升级操作随条目说明，不自动追加安装与验证范围章节；安装方式和宿主要求见 README。已发布的 tag、版本和附件保持不变，修复另发新版本。
 
 插件运行版本已内联至 Host 与 Client，供通知通道握手和设置页更新入口核对。修改 `package.json.version` 后须执行 `npm run build` 并交付新的三个构建产物；随后再做产物新鲜度和实际包检查，不能沿用旧版产物或候选哈希。
 
@@ -176,7 +176,7 @@ https://github.com/mewcoder/power-dsh/releases/latest/download/power-dsh.tgz
 
 `latest/download` 只动态解析标签，附件名是固定文本；因此每版都上传 `power-dsh.tgz`，不要把版本号放进这个固定链接的文件名。以上地址采用已改名的仓库，在实际发布前不可用。
 
-发版已由 [Release workflow](../.github/workflows/release.yml)固定：推送与 `package.json` 版本一致的 annotated `v*` 标签后，CI 重新运行产物新鲜度、类型、行为、实际 tarball 与独立安装检查，再打包附件、创建 GitHub Release 并上传 `power-dsh.tgz`。Release 正文提取更新日志中对应版本的完整条目，附安装方式与验证边界；缺少版本条目时停止发布。正式标签生成 Latest 版本，带预发布标识的标签生成 Pre-release；不带附件或版本不一致时任务失败。
+发版已由 [Release workflow](../.github/workflows/release.yml)固定：推送与 `package.json` 版本一致的 annotated `v*` 标签后，CI 重新运行产物新鲜度、类型、行为、实际 tarball 与独立安装检查，再打包附件、创建 GitHub Release 并上传 `power-dsh.tgz`。Release 正文仅提取更新日志中对应版本的完整条目；缺少版本条目时停止发布。正式标签生成 Latest 版本，带预发布标识的标签生成 Pre-release；不带附件或版本不一致时任务失败。
 
 [现有 CI](../.github/workflows/ci.yml)继续在每次 push 和 PR 上做同样的检查，不触发发布。该流水线不执行 npm 发布、不读取 npm 凭据；npm 不属于当前分发渠道。
 

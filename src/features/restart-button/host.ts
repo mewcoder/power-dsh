@@ -14,4 +14,7 @@ export const methods = {
   restartApp() {
     return this.run(() => this.restart.restart());
   },
+  restartAfterUpdate() {
+    return this.run(() => this.restart.restart(true));
+  },
 } satisfies ThisType<HostService & ReturnType<typeof createHost>>;

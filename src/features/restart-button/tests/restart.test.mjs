@@ -76,6 +76,20 @@ test('failed or cancelled quit releases the lock, exposes failure and allows ret
   assert.equal(f.calls.length, 2);
 });
 
+test('update restart ignores only the menu preference, retaining identity, busy and unload guards', async () => {
+  const app = fixture();
+  app.disable();
+  await assert.rejects(app.service.restart(), /restartUnavailable/);
+  await app.service.restart(true);
+  assert.equal(app.calls.length, 1);
+  await assert.rejects(app.service.restart(true), /restartBusy/);
+  app.service.close();
+  await assert.rejects(app.service.restart(true), /restartUnavailable/);
+  const other = fixture({ executable: '/usr/bin/node' });
+  await assert.rejects(other.service.restart(true), /restartUnavailable/);
+  assert.equal(other.calls.length, 0);
+});
+
 test('unload or disabling during path validation cancels before handoff', async () => {
   let resolve;
   const f = fixture({ realpath: () => new Promise(done => { resolve = done; }) });

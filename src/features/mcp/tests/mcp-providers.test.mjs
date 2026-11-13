@@ -410,3 +410,66 @@ test('native Settings errors are masked and persisted failures are read back ins
   await assert.rejects(app.catalog.setEnabled(row.id, true), { code: 'mod/unloaded' });
   assert.equal(writes, 0);
 });
+
+test('live connection state comes from the native client supervisor, never from the load lifecycle', async t => {
+  const app = await fixture(t);
+  const provider = await app.provider();
+  const fiber = await provider.plugin(app.native, { serverName: 'live', transport: 'stdio' });
+  // No registered status handle: the connection stays absent, not invented.
+  assert.equal(app.catalog.list().servers[0].connection, undefined);
+  // The supervisor projects only whitelisted fields; the last error text never crosses the wire.
+  app.native.connectionStatusOf = candidate => candidate === fiber
+    ? { current: () => ({ state: 'connected', toolCount: 3, connectedAt: 10, lastError: SECRET }) } : undefined;
+  assert.deepEqual(app.catalog.list().servers[0].connection, { state: 'connected', toolCount: 3, connectedAt: 10 });
+  app.native.connectionStatusOf = () => ({ current: () => ({ state: 'online', toolCount: '3' }) });
+  assert.equal(app.catalog.list().servers[0].connection, undefined, 'An unknown state is not guessed.');
+  app.native.connectionStatusOf = () => { throw new Error(SECRET); };
+  assert.equal(app.catalog.list().servers[0].connection, undefined);
+  assert.ok(!JSON.stringify(app.catalog.list()).includes(SECRET));
+});
+
+test('probe runs read-only through the native client and only exposes a bounded sanitized outcome', async t => {
+  const app = await fixture(t);
+  const provider = await app.provider();
+  await provider.plugin(app.native, { serverName: 'probe-me', transport: 'stdio' });
+  const id = app.catalog.list().servers.find(row => row.name === 'probe-me').id;
+  // A host without the probe export cannot pretend the test succeeded.
+  await assert.rejects(app.catalog.probe(id), /mcpProbeFailed/);
+
+  const calls = [];
+  app.native.probeServer = async (ctx, config) => {
+    calls.push(config.serverName);
+    return { ok: true, serverInfo: { name: 'probe-me', version: '1' }, toolNames: ['a', 'b'], truncated: false, durationMs: 7, closeConfirmed: true, cleanupError: SECRET };
+  };
+  assert.deepEqual(await app.catalog.probe(id), {
+    ok: true, serverInfo: { name: 'probe-me', version: '1' }, toolNames: ['a', 'b'], truncated: false, durationMs: 7, cleanupFailed: true,
+  });
+  assert.deepEqual(calls, ['probe-me']);
+
+  app.native.probeServer = async () => ({ ok: false, stage: 'connect',
+    message: `spawn https://user:${SECRET}@host/x /Users/me/${SECRET} token=${SECRET}`, durationMs: 2, closeConfirmed: true });
+  const failed = await app.catalog.probe(id);
+  assert.equal(failed.ok, false);
+  assert.equal(failed.stage, 'connect');
+  assert.ok(!failed.message.includes(SECRET), 'No credential, URL or path survives the projection.');
+  assert.ok(/\[url\]|\[path\]|\[redacted\]/.test(failed.message));
+
+  let invoked = false;
+  app.native.probeServer = async () => { invoked = true; return { ok: true, toolNames: [], truncated: false, durationMs: 0, closeConfirmed: true }; };
+  await assert.rejects(app.catalog.probe('missing-server'), /mcpProbeFailed/);
+  assert.equal(invoked, false, 'A stale id never probes another server.');
+});
+
+test('probe prefers an instance resolved config so schema defaults reach the native client', async t => {
+  const app = await fixture(t);
+  const provider = await app.provider();
+  const fiber = await provider.plugin(app.native, { serverName: 'resolved', transport: 'stdio', command: 'npx', args: ['serve'], env: { SAFE: '1' } });
+  // The declared Loader config omits the schema defaults; the live fiber has them resolved.
+  app.entries.push({ id: 'include:resolved', options: { name: '@deepseek-ai/dsh-mcp-client', config: { serverName: 'resolved', transport: 'stdio' } }, fiber });
+  let received;
+  app.native.probeServer = async (ctx, config) => { received = config; return { ok: true, toolNames: [], truncated: false, durationMs: 0, closeConfirmed: true }; };
+  await app.catalog.probe('include:resolved');
+  assert.equal(received.serverName, 'resolved');
+  assert.deepEqual(received.env, { SAFE: '1' });
+  assert.deepEqual(received.args, ['serve']);
+});

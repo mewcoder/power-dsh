@@ -367,6 +367,9 @@ var PluginReleases = class {
 	}
 };
 
+// package.json
+var version = "0.0.11";
+
 // src/features/plugin-updates/host.ts
 var host_exports$15 = /* @__PURE__ */ __exportAll({
 	createHost: () => createHost$15,
@@ -375,9 +378,14 @@ var host_exports$15 = /* @__PURE__ */ __exportAll({
 function createHost$15(ctx) {
 	return { pluginReleases: new PluginReleases(ctx) };
 }
-const methods$15 = { readPluginRelease() {
-	return this.run(() => this.pluginReleases.read());
-} };
+const methods$15 = {
+	pluginRuntimeVersion() {
+		return this.run(() => version);
+	},
+	readPluginRelease() {
+		return this.run(() => this.pluginReleases.read());
+	}
+};
 
 // src/shared/types/protocol.ts
 function isArray(value) {
@@ -431,7 +439,23 @@ const READ_PLUGIN_RELEASE_RPC = {
 		} })
 	}
 };
-const rpc$15 = [READ_PLUGIN_RELEASE_RPC];
+const PLUGIN_RUNTIME_VERSION_RPC = {
+	id: "power-dsh#powerDsh/pluginRuntimeVersion",
+	service: "powerDsh",
+	namespace: "powerDsh",
+	method: "pluginRuntimeVersion",
+	invocation: { kind: "direct" },
+	parameters: [],
+	result: {
+		mode: "strict",
+		typeSymbol: "power-dsh#PluginRuntimeVersion",
+		create: () => ({ parse(value) {
+			if (typeof value !== "string" || !versionParts(value)) throw new TypeError("Invalid plugin runtime version");
+			return value;
+		} })
+	}
+};
+const rpc$15 = [READ_PLUGIN_RELEASE_RPC, PLUGIN_RUNTIME_VERSION_RPC];
 
 // src/features/version-display/definition.ts
 const definition$20 = Object.freeze({
@@ -858,15 +882,16 @@ var WindowsRestart = class {
 			error: this.error
 		};
 	}
-	async restart() {
-		if (this.closed || !this.config.showRestartButton.get()) throw new Error("restartUnavailable");
+	async restart(afterUpdate = false) {
+		const allowed = () => afterUpdate || this.config.showRestartButton.get() === true;
+		if (this.closed || !allowed()) throw new Error("restartUnavailable");
 		if (this.pending || this.current) throw new Error("restartBusy");
 		this.pending = true;
 		this.error = "";
 		let operation;
 		try {
 			const target = await this.target();
-			if (!target || this.closed || !this.config.showRestartButton.get()) throw new Error("restartUnavailable");
+			if (!target || this.closed || !allowed()) throw new Error("restartUnavailable");
 			operation = {
 				directory: await mkdtemp(path.join(tmpdir(), "power-dsh-restart-")),
 				nonce: randomUUID(),
@@ -880,16 +905,16 @@ var WindowsRestart = class {
 				expiresAt: operation.expiresAt
 			}), { mode: 384 });
 			await writeFile(path.join(operation.directory, "helper.ps1"), WINDOWS_RESTART_HELPER, { mode: 384 });
-			if (this.closed || !this.config.showRestartButton.get()) throw new Error("restartUnavailable");
+			if (this.closed || !allowed()) throw new Error("restartUnavailable");
 			await this.run(windowsDispatchScript(operation.directory, this.powershell()));
 			const deadline = Date.now() + (this.options.handoffMs ?? 8e3);
 			while (Date.now() < deadline) {
-				if (this.closed || !this.config.showRestartButton.get()) throw new Error("restartUnavailable");
+				if (this.closed || !allowed()) throw new Error("restartUnavailable");
 				const phase = await this.state(operation);
 				if (phase === "failed") throw new Error("restartFailed");
 				if (phase === "ready") {
 					await writeFile(path.join(operation.directory, "commit.next"), operation.nonce, { mode: 384 });
-					if (this.closed || !this.config.showRestartButton.get()) throw new Error("restartUnavailable");
+					if (this.closed || !allowed()) throw new Error("restartUnavailable");
 					await rename(path.join(operation.directory, "commit.next"), path.join(operation.directory, "commit"));
 					operation.committed = true;
 					return { accepted: true };
@@ -988,9 +1013,10 @@ var DesktopRestart = class {
 			error: this.error
 		};
 	}
-	async restart() {
-		if (this.windows) return this.windows.restart();
-		if (this.closed || this.config.showRestartButton.get() !== true) throw new Error("restartUnavailable");
+	async restart(afterUpdate = false) {
+		const allowed = () => afterUpdate || this.config.showRestartButton.get() === true;
+		if (this.windows) return this.windows.restart(afterUpdate);
+		if (this.closed || !allowed()) throw new Error("restartUnavailable");
 		if (this.current) throw new Error("restartBusy");
 		const operation = {
 			handle: null,
@@ -1000,7 +1026,7 @@ var DesktopRestart = class {
 		this.error = "";
 		try {
 			const app = await this.target();
-			if (this.closed || !app || this.config.showRestartButton.get() !== true) throw new Error("restartUnavailable");
+			if (this.closed || !app || !allowed()) throw new Error("restartUnavailable");
 			const env = { ...this.env };
 			for (const key of [
 				"ELECTRON_RUN_AS_NODE",
@@ -1064,6 +1090,9 @@ const methods$14 = {
 	},
 	restartApp() {
 		return this.run(() => this.restart.restart());
+	},
+	restartAfterUpdate() {
+		return this.run(() => this.restart.restart(true));
 	}
 };
 
@@ -1104,7 +1133,16 @@ const RESTART_APP_RPC = {
 		} })
 	}
 };
-const rpc$14 = [RESTART_STATUS_RPC, RESTART_APP_RPC];
+const RESTART_AFTER_UPDATE_RPC = {
+	...RESTART_APP_RPC,
+	id: "power-dsh#powerDsh/restartAfterUpdate",
+	method: "restartAfterUpdate"
+};
+const rpc$14 = [
+	RESTART_STATUS_RPC,
+	RESTART_APP_RPC,
+	RESTART_AFTER_UPDATE_RPC
+];
 
 // src/features/notifications/definition.ts
 const definition$16 = Object.freeze({
@@ -1721,9 +1759,6 @@ var WindowsToasts = class {
 		} catch (_error) {}
 	}
 };
-
-// package.json
-var version = "0.0.10";
 
 // src/features/notifications/host.ts
 var host_exports$13 = /* @__PURE__ */ __exportAll({
@@ -3097,12 +3132,37 @@ var SkillPolicy = class {
 			...deletion ? { deletion } : {}
 		};
 	}
-	deletionBase(view) {
-		return view.scope === "user" ? this.owner.profileContext.home : view.projectRoot;
+	deletionLocation(view, row) {
+		if (!row.path || !isAbsolute(row.path)) return null;
+		if (view.scope === "project") {
+			if (!["project-dsh", "project-agents"].includes(row.source) || !view.projectRoot) return null;
+			return {
+				base: view.projectRoot,
+				root: join(view.projectRoot, row.source === "project-dsh" ? ".dsh" : ".agents", "skills")
+			};
+		}
+		if (row.source === "user-dsh") return {
+			base: this.owner.profileContext.home,
+			root: this.importTarget(view)
+		};
+		if (!["user-agents", "custom"].includes(row.source)) return null;
+		const source = resolve(row.path);
+		const bundle = basename(source) === "SKILL.md" ? dirname(source) : source;
+		const root = basename(bundle) === row.name || basename(source) === `${row.name}.md` ? dirname(bundle) : "";
+		if (!root || root === dirname(root) || row.source === "user-agents" && basename(root) !== "skills") return null;
+		return {
+			base: dirname(root),
+			root
+		};
 	}
-	deletionFor(view, row) {
-		if (row.source !== (view.scope === "user" ? "user-dsh" : "project-dsh") || !row.path) return Promise.resolve(null);
-		return skillDeletion(this.deletionBase(view), this.importTarget(view), row.name, row.path);
+	async deletionFor(view, row) {
+		const location = this.deletionLocation(view, row);
+		if (!location) return null;
+		const deletion = await skillDeletion(location.base, location.root, row.name, row.path);
+		return deletion && {
+			...deletion,
+			revision: skillIdentity(view.scope, view.projectRoot, row.source, row.path, deletion.revision)
+		};
 	}
 	async deleteSkill(cwd, scope, name, revision) {
 		if (typeof name !== "string" || !NAME.test(name) || typeof revision !== "string" || !/^[a-f0-9]{64}$/.test(revision)) throw new Error("skill-delete-unavailable");
@@ -3112,8 +3172,12 @@ var SkillPolicy = class {
 		if (!before.complete || !row) throw new Error("skill-delete-unavailable");
 		const deletion = await this.deletionFor(view, row);
 		if (!deletion || deletion.revision !== revision) throw new Error("skill-delete-changed");
+		const location = this.deletionLocation(view, row);
+		if (!location) throw new Error("skill-delete-changed");
+		const current = await skillDeletion(location.base, location.root, name, row.path);
+		if (!current || skillIdentity(view.scope, view.projectRoot, row.source, row.path, current.revision) !== revision) throw new Error("skill-delete-changed");
 		const key = keyOf(view.scope, view.projectRoot, name);
-		await deleteOwnedSkill(this.deletionBase(view), this.importTarget(view), name, row.path, revision, () => this.active(), async () => {
+		await deleteOwnedSkill(location.base, location.root, name, row.path, current.revision, () => this.active(), async () => {
 			let removed;
 			if (!this.preferences().has(key)) return;
 			await this.ctx.configEditor.edit(this.owner.fiber.entry, (raw) => {
@@ -3879,6 +3943,41 @@ function sensitive(name) {
 }
 
 // src/features/mcp/rpc.ts
+const connectionCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#McpConnection",
+	create: () => ({ parse(value) {
+		if (!isRecord$1(value) || !isOneOf(value.state, [
+			"connected",
+			"connecting",
+			"reconnecting",
+			"waiting-credentials",
+			"failed",
+			"closed"
+		])) throw new TypeError("Invalid MCP connection");
+		const connection = { state: value.state };
+		for (const key of [
+			"toolCount",
+			"connectedAt",
+			"attempt",
+			"maxAttempts"
+		]) {
+			const number = value[key];
+			if (number === void 0) continue;
+			if (typeof number !== "number" || !Number.isFinite(number)) throw new TypeError("Invalid MCP connection");
+			connection[key] = number;
+		}
+		if (value.reason !== void 0) {
+			if (!isOneOf(value.reason, [
+				"gave-up",
+				"reconnect-disabled",
+				"unclosed-generation"
+			])) throw new TypeError("Invalid MCP connection");
+			connection.reason = value.reason;
+		}
+		return connection;
+	} })
+};
 const serverCodec = {
 	mode: "strict",
 	typeSymbol: "power-dsh#McpServer",
@@ -3907,7 +4006,7 @@ const serverCodec = {
 			"stateKnown",
 			"canToggle"
 		])) throw new TypeError("Invalid MCP entry");
-		return {
+		const server = {
 			id: value.id,
 			name: value.name,
 			source: value.source,
@@ -3921,6 +4020,8 @@ const serverCodec = {
 			reason: value.reason,
 			tools: value.tools.slice()
 		};
+		if (value.connection !== void 0) server.connection = connectionCodec.create().parse(value.connection);
+		return server;
 	} })
 };
 const mcpCatalogCodec = {
@@ -4006,6 +4107,40 @@ const detailCodec = {
 	} })
 };
 const parseMcpServerDetail = detailCodec.create().parse;
+const probeCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#McpProbe",
+	create: () => ({ parse(value) {
+		if (!isRecord$1(value) || typeof value.ok !== "boolean" || typeof value.cleanupFailed !== "boolean" || typeof value.durationMs !== "number" || !Number.isFinite(value.durationMs)) throw new TypeError("Invalid MCP probe");
+		if (value.ok) {
+			if (!isStringArray(value.toolNames) || typeof value.truncated !== "boolean") throw new TypeError("Invalid MCP probe");
+			const probe = {
+				ok: true,
+				toolNames: value.toolNames.slice(),
+				truncated: value.truncated,
+				durationMs: value.durationMs,
+				cleanupFailed: value.cleanupFailed
+			};
+			if (value.serverInfo !== void 0) {
+				if (!isRecord$1(value.serverInfo) || !hasStrings(value.serverInfo, ["name", "version"])) throw new TypeError("Invalid MCP probe");
+				probe.serverInfo = {
+					name: value.serverInfo.name,
+					version: value.serverInfo.version
+				};
+			}
+			return probe;
+		}
+		if (!isOneOf(value.stage, ["connect", "list"]) || typeof value.message !== "string") throw new TypeError("Invalid MCP probe");
+		return {
+			ok: false,
+			stage: value.stage,
+			message: value.message,
+			durationMs: value.durationMs,
+			cleanupFailed: value.cleanupFailed
+		};
+	} })
+};
+const parseMcpProbe = probeCodec.create().parse;
 function mcpRpc(method, fields, result) {
 	return {
 		id: `power-dsh#powerDsh/${method}`,
@@ -4025,10 +4160,12 @@ function mcpRpc(method, fields, result) {
 const LIST_MCP_SERVERS_RPC = mcpRpc("listMcpServers", [], mcpCatalogCodec);
 const READ_MCP_SERVER_RPC = mcpRpc("readMcpServer", ["id"], detailCodec);
 const SET_MCP_SERVER_ENABLED_RPC = mcpRpc("setMcpServerEnabled", ["id", "enabled"], mcpCatalogCodec);
+const PROBE_MCP_SERVER_RPC = mcpRpc("probeMcpServer", ["id"], probeCodec);
 const rpc$10 = [
 	LIST_MCP_SERVERS_RPC,
 	READ_MCP_SERVER_RPC,
-	SET_MCP_SERVER_ENABLED_RPC
+	SET_MCP_SERVER_ENABLED_RPC,
+	PROBE_MCP_SERVER_RPC
 ];
 
 // src/features/mcp/mcp-config.ts
@@ -4172,6 +4309,7 @@ function profileServers(entries, complete, origins, configured) {
 			group: origins.has(row.entryId) ? "builtin" : "user",
 			enabled: row.enabled === true,
 			runtimeState: runtimeState(row, metadata),
+			...metadata?.connection ? { connection: metadata.connection } : {},
 			stateKnown,
 			canToggle,
 			reason: canToggle ? "" : addressable ? "incomplete" : reason
@@ -4317,6 +4455,24 @@ var McpPolicy = class {
 			config: projectMcpConfig(raw, server.transport)
 		};
 	}
+	/**
+	* Probe one catalog entry's connectivity without registering tools or keeping a process.
+	* The entry must still exist in the current catalog so a stale id cannot probe another server.
+	* @param id - projected server id from the catalog.
+	* @returns the bounded probe outcome.
+	*/
+	async probe(id) {
+		if (!identifier$1(id)) throw new TypeError("mcpProbeFailed");
+		this.ensureActive();
+		const catalog = await this.list();
+		this.ensureActive();
+		if (!catalog.servers.some((row) => row.id === id)) throw failure$1("mcpProbeFailed");
+		const manager = await this.providerContext();
+		if (!manager) throw failure$1("mcpProbeFailed");
+		const result = await manager.probe(id);
+		this.ensureActive();
+		return result;
+	}
 	async setEnabled(id, enabled) {
 		if (!identifier$1(id) || typeof enabled !== "boolean") throw new TypeError("mcpChangeFailed");
 		this.ensureActive();
@@ -4371,6 +4527,12 @@ var McpPolicy = class {
 	}
 };
 
+// src/shared/types/diagnostics.ts
+/** Bound and redact the small text fields admitted to user-visible diagnostics. */
+function sanitizeDiagnosticText(text) {
+	return text.slice(0, 4096).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").replace(/\b(?:authorization|proxy-authorization|cookie|set-cookie)\s*[:=][^\r\n]*/gi, "[redacted]").replace(/\b(?:bearer|basic)\s+[^\s,;]+/gi, "[redacted]").replace(/\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password|passwd|credential)\b\s*["']?\s*[:=][^\r\n]*/gi, "[redacted]").replace(/\b(?:https?|file|wss?):\/\/[^\s<>"']+/gi, "[url]").replace(/(?:[A-Za-z]:[\\/]|\\\\)[^\s<>"']+/g, "[path]").replace(/\/(?:[^\s/<>"']+\/)+[^\s<>"']*/g, "[path]").slice(0, 2048);
+}
+
 // src/features/mcp/mcp-providers.ts
 const MCP_CLIENT = "@deepseek-ai/dsh-mcp-client";
 const identifier = (value) => typeof value === "string" && value.length > 0;
@@ -4394,6 +4556,66 @@ function fiberRuntimeState(fiber) {
 }
 function configuredRuntimeState(state, enabled) {
 	return state === "inactive" && enabled === false ? "disabled" : state;
+}
+const CONNECTION_STATES = [
+	"connected",
+	"connecting",
+	"reconnecting",
+	"waiting-credentials",
+	"failed",
+	"closed"
+];
+/** Project the native connection status onto the small wire shape; unknown or unreadable values stay absent. */
+function normalizeConnection(value) {
+	try {
+		if (!isRecord$1(value) || !isOneOf(value.state, CONNECTION_STATES)) return null;
+		const connection = { state: value.state };
+		for (const key of [
+			"toolCount",
+			"connectedAt",
+			"attempt",
+			"maxAttempts"
+		]) {
+			const number = value[key];
+			if (typeof number === "number" && Number.isFinite(number)) connection[key] = number;
+		}
+		if (isOneOf(value.reason, [
+			"gave-up",
+			"reconnect-disabled",
+			"unclosed-generation"
+		])) connection.reason = value.reason;
+		return connection;
+	} catch {
+		return null;
+	}
+}
+/** Bound and redact the free-form native probe outcome; only whitelisted fields cross the wire. */
+function normalizeProbe(value) {
+	const record = isRecord$1(value) ? value : {};
+	const durationMs = typeof record.durationMs === "number" && Number.isFinite(record.durationMs) ? record.durationMs : 0;
+	const cleanupFailed = record.closeConfirmed === false || typeof record.cleanupError === "string";
+	if (record.ok === true) {
+		const toolNames = Array.isArray(record.toolNames) ? record.toolNames.filter((name) => typeof name === "string" && name.length > 0).slice(0, 200).map((name) => name.slice(0, 200)) : [];
+		const info = isRecord$1(record.serverInfo) && typeof record.serverInfo.name === "string" && typeof record.serverInfo.version === "string" ? {
+			name: record.serverInfo.name.slice(0, 200),
+			version: record.serverInfo.version.slice(0, 200)
+		} : void 0;
+		return {
+			ok: true,
+			...info ? { serverInfo: info } : {},
+			toolNames,
+			truncated: record.truncated === true,
+			durationMs,
+			cleanupFailed
+		};
+	}
+	return {
+		ok: false,
+		stage: isOneOf(record.stage, ["connect", "list"]) ? record.stage : "connect",
+		message: typeof record.message === "string" ? sanitizeDiagnosticText(record.message) : "",
+		durationMs,
+		cleanupFailed
+	};
 }
 /** Project only the native transport discriminator, without inspecting connection credentials or targets. */
 function transportOf(...configs) {
@@ -4473,6 +4695,18 @@ var McpProviders = class {
 			return [fullName.slice(prefix.length)];
 		});
 	}
+	/** Read one live instance's connection status from the native MCP client, when it registers a handle. */
+	connectionOf(fiber) {
+		if (!fiber) return null;
+		try {
+			const native = this.native;
+			if (typeof native?.connectionStatusOf !== "function") return null;
+			const handle = native.connectionStatusOf(fiber);
+			return handle ? normalizeConnection(handle.current()) : null;
+		} catch {
+			return null;
+		}
+	}
 	configured() {
 		this.active();
 		return [...this.ctx.loader.entries()].flatMap((entry) => {
@@ -4492,13 +4726,15 @@ var McpProviders = class {
 				"active",
 				"failed"
 			].includes(runtimeState) ? this.toolNames(name, fiber.ctx) : [];
+			const connection = this.connectionOf(fiber);
 			return [{
 				entryId: entry.id,
 				uid: fiber?.uid,
 				name: identifier(name) ? name : "",
 				tools,
 				runtimeState,
-				transport: transportOf(fiber?.effectiveConfig, fiber?.config, entry.options.config)
+				transport: transportOf(fiber?.effectiveConfig, fiber?.config, entry.options.config),
+				...connection ? { connection } : {}
 			}];
 		});
 	}
@@ -4572,6 +4808,120 @@ var McpProviders = class {
 		walk(owners[0].options.config?.plugins);
 		return found.length === 1 ? found[0] : void 0;
 	}
+	/**
+	* Resolve the raw declared config and its owning context so one server can be probed.
+	* Mirrors `configFor`/`declared` resolution but keeps the context needed for credential templates.
+	*/
+	probeTarget(id) {
+		this.active();
+		const preset = /^preset:([^:]+):(.+)$/.exec(id);
+		if (preset) {
+			const [, presetId, rowId] = preset;
+			const owners = [...this.ctx.loader.entries()].filter((entry) => entry.options.name === "@deepseek-ai/dsh-agent-preset" && (entry.fiber?.effectiveConfig?.id ?? entry.fiber?.config?.id) === presetId);
+			if (owners.length !== 1) return {
+				config: void 0,
+				ctx: void 0
+			};
+			const found = [];
+			const walk = (rows) => {
+				if (!Array.isArray(rows)) return;
+				for (const row of rows) {
+					if (!isRecord$1(row)) continue;
+					if (row.group === true) {
+						walk(row.config);
+						continue;
+					}
+					if (row.name === MCP_CLIENT && row.id === rowId) found.push(row.config);
+				}
+			};
+			walk(owners[0].options.config?.plugins);
+			const raw = found.length === 1 ? found[0] : void 0;
+			if (!raw) return {
+				config: void 0,
+				ctx: void 0
+			};
+			let resolvedFiber;
+			try {
+				const owner = owners[0].fiber;
+				const serverName = raw.serverName;
+				if (owner) resolvedFiber = [...this.ctx.registry.get(this.native)?.fibers ?? []].find((fiber) => belongsTo(fiber, owner) && (fiber.effectiveConfig?.serverName ?? fiber.config?.serverName ?? fiber.rawConfig?.serverName) === serverName);
+			} catch {
+				resolvedFiber = void 0;
+			}
+			return {
+				config: resolvedFiber?.effectiveConfig ?? raw,
+				ctx: resolvedFiber?.ctx ?? owners[0].fiber?.ctx
+			};
+		}
+		if (id.startsWith("manager:")) {
+			const manager = this.ctx.get("mcpManager");
+			const target = this.managed().targets.find((row) => row.id === id);
+			if (!manager || !target) return {
+				config: void 0,
+				ctx: void 0
+			};
+			try {
+				const configs = manager.config.servers.get();
+				return {
+					config: Object.hasOwn(configs, target.name) ? configs[target.name] : void 0,
+					ctx: target.owner?.ctx
+				};
+			} catch {
+				return {
+					config: void 0,
+					ctx: void 0
+				};
+			}
+		}
+		if (id.startsWith("runtime:")) {
+			const uid = Number(id.slice(8));
+			if (!Number.isSafeInteger(uid)) return {
+				config: void 0,
+				ctx: void 0
+			};
+			try {
+				const fiber = [...this.ctx.registry.get(this.native)?.fibers ?? []].find((row) => row.uid === uid);
+				return {
+					config: fiber?.effectiveConfig ?? fiber?.config ?? fiber?.rawConfig,
+					ctx: fiber?.ctx
+				};
+			} catch {
+				return {
+					config: void 0,
+					ctx: void 0
+				};
+			}
+		}
+		const matches = [...this.ctx.loader.entries()].filter((entry) => entry.id === id && entry.options.name === MCP_CLIENT);
+		if (matches.length !== 1) return {
+			config: void 0,
+			ctx: void 0
+		};
+		return {
+			config: matches[0].fiber?.effectiveConfig ?? matches[0].fiber?.config ?? matches[0].options.config,
+			ctx: matches[0].fiber?.ctx
+		};
+	}
+	/**
+	* Run a read-only connectivity probe for one server: it connects, lists tools, and closes.
+	* @param id - the projected server id from the catalog.
+	* @returns the bounded, sanitized probe outcome.
+	*/
+	async probe(id) {
+		this.active();
+		const { config, ctx } = this.probeTarget(id);
+		const native = this.native;
+		if (!config || typeof native?.probeServer !== "function") throw failure("mcpProbeFailed");
+		let raw;
+		try {
+			raw = await native.probeServer(ctx ?? this.ctx, config, { timeoutMs: 15e3 });
+		} catch {
+			this.active();
+			throw failure("mcpProbeFailed");
+		}
+		this.active();
+		return normalizeProbe(raw);
+	}
 	/** Read only the manager's exact native child instance, never its connection-status payload. */
 	managedMetadata(name, owner) {
 		const unknown = {
@@ -4583,9 +4933,11 @@ var McpProviders = class {
 			const matches = [...this.ctx.registry.get(this.native)?.fibers ?? []].filter((fiber) => belongsTo(fiber, owner) && (fiber.effectiveConfig?.serverName ?? fiber.config?.serverName ?? fiber.rawConfig?.serverName) === name);
 			if (matches.length !== 1) return unknown;
 			const fiber = matches[0];
+			const connection = this.connectionOf(fiber);
 			return {
 				runtimeState: fiberRuntimeState(fiber),
-				transport: transportOf(fiber.effectiveConfig, fiber.config)
+				transport: transportOf(fiber.effectiveConfig, fiber.config),
+				...connection ? { connection } : {}
 			};
 		} catch {
 			return unknown;
@@ -4645,6 +4997,7 @@ var McpProviders = class {
 					canToggle,
 					runtimeState: configuredRuntimeState(metadata.runtimeState, enabled),
 					transport: metadata.transport !== "unknown" ? metadata.transport : configured ? transportOf(configs[row.name]) : "unknown",
+					...metadata.connection ? { connection: metadata.connection } : {},
 					tools: enabled === true ? this.toolNames(row.name, owner?.ctx ?? this.ctx) : [],
 					reason: canToggle ? "" : configured ? "manager-managed" : "plugin-managed"
 				};
@@ -4668,6 +5021,7 @@ var McpProviders = class {
 			const name = fiber.effectiveConfig?.serverName ?? fiber.config?.serverName ?? fiber.rawConfig?.serverName;
 			if (!identifier(name)) continue;
 			const origin = providingPlugin(fiber.parent.fiber);
+			const connection = this.connectionOf(fiber);
 			servers.push({
 				id: `runtime:${fiber.uid}`,
 				name,
@@ -4680,6 +5034,7 @@ var McpProviders = class {
 				reason: "plugin-managed",
 				runtimeState,
 				transport: transportOf(fiber.effectiveConfig, fiber.config),
+				...connection ? { connection } : {},
 				tools: [
 					"pending",
 					"loading",
@@ -4774,6 +5129,9 @@ const methods$10 = {
 	},
 	setMcpServerEnabled(id, enabled) {
 		return this.run(() => this.mcp.setEnabled(id, enabled));
+	},
+	probeMcpServer(id) {
+		return this.run(() => this.mcp.probe(id));
 	}
 };
 
@@ -7602,9 +7960,11 @@ function composeRpc(descriptors) {
 }
 const MOD_RPC = composeRpc([
 	READ_PLUGIN_RELEASE_RPC,
+	PLUGIN_RUNTIME_VERSION_RPC,
 	NOTIFICATION_TRANSPORT_RPC,
 	RESTART_STATUS_RPC,
 	RESTART_APP_RPC,
+	RESTART_AFTER_UPDATE_RPC,
 	LIST_SYSTEM_SOUNDS_RPC,
 	PLAY_SYSTEM_SOUND_RPC,
 	SHOW_WINDOWS_NOTIFICATION_RPC,
@@ -7630,6 +7990,7 @@ const MOD_RPC = composeRpc([
 	LIST_MCP_SERVERS_RPC,
 	READ_MCP_SERVER_RPC,
 	SET_MCP_SERVER_ENABLED_RPC,
+	PROBE_MCP_SERVER_RPC,
 	LIST_ARCHIVED_SESSIONS_RPC,
 	RESTORE_ARCHIVED_SESSION_RPC,
 	DELETE_ARCHIVED_SESSION_RPC,

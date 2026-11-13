@@ -173,6 +173,21 @@ interface SkillDeletion {
 }
 type McpRuntimeState = 'pending' | 'loading' | 'active' | 'failed' | 'unloading' | 'inactive' | 'disabled' | 'unknown';
 type McpTransport = 'stdio' | 'streamable-http' | 'unknown';
+/** Live connection state reported by the native MCP client supervisor, not the load lifecycle. */
+type McpConnectionState = 'connected' | 'connecting' | 'reconnecting' | 'waiting-credentials' | 'failed' | 'closed';
+interface McpConnection {
+  state: McpConnectionState;
+  /** Connected: registered tools in the live generation. */
+  toolCount?: number;
+  /** Connected: epoch milliseconds when connect plus the initial tool sync completed. */
+  connectedAt?: number;
+  /** Connecting / reconnecting: consecutive failed attempts in the current outage. */
+  attempt?: number;
+  /** Reconnecting: the per-outage attempt budget. */
+  maxAttempts?: number;
+  /** Failed: which terminal stop produced this state. */
+  reason?: 'gave-up' | 'reconnect-disabled' | 'unclosed-generation';
+}
 interface McpServer {
   id: string;
   name: string;
@@ -182,11 +197,35 @@ interface McpServer {
   group: 'user' | 'builtin';
   transport: McpTransport;
   runtimeState: McpRuntimeState;
+  /** Present only when a live native connection handle reports a state. */
+  connection?: McpConnection;
   tools: string[];
   enabled: boolean;
   stateKnown: boolean;
   canToggle: boolean;
 }
+/** Read-only connectivity probe of one server; it never registers tools or keeps a process. */
+type McpProbe = {
+  ok: true;
+  /** Identity the server reported during negotiation, when it sent one. */
+  serverInfo?: {
+    name: string;
+    version: string;
+  };
+  /** Raw advertised tool names, capped by the native probe. */
+  toolNames: string[];
+  truncated: boolean;
+  durationMs: number;
+  /** The connection succeeded but transport closure or local cleanup was not confirmed. */
+  cleanupFailed: boolean;
+} | {
+  ok: false;
+  stage: 'connect' | 'list';
+  /** Sanitized diagnostic text; never carries credentials or machine paths. */
+  message: string;
+  durationMs: number;
+  cleanupFailed: boolean;
+};
 interface McpCatalog {
   complete: boolean;
   servers: McpServer[];
@@ -399,6 +438,8 @@ interface ProjectCatalog {
 interface PowerDshMethods {
   restartStatus(): Promise<RestartStatus>;
   restartApp(): Promise<RestartAccepted>;
+  restartAfterUpdate(): Promise<RestartAccepted>;
+  pluginRuntimeVersion(): Promise<string>;
   listSystemSounds(): Promise<SystemSoundsCatalog>;
   playSystemSound(id: string, preview: boolean): Promise<SoundPlayback>;
   showWindowsNotification(notification: WindowsNotification): Promise<NotificationDelivery>;
@@ -429,6 +470,7 @@ interface PowerDshMethods {
   listMcpServers(): Promise<McpCatalog>;
   readMcpServer(id: string): Promise<McpServerDetail | null>;
   setMcpServerEnabled(id: string, enabled: boolean): Promise<McpCatalog>;
+  probeMcpServer(id: string): Promise<McpProbe>;
   listArchivedSessions(): Promise<ArchiveCatalog>;
   restoreArchivedSession(sessionId: string): Promise<ArchiveCatalog>;
   deleteArchivedSession(sessionId: string): Promise<ArchiveCatalog>;

@@ -19,8 +19,9 @@ function fixture({ source = 'npm', installed = '0.0.5', latest = '0.0.6', storag
   let result = operation();
   const config = { source, installed, latest, boot: 'boot', available: true };
   const options = {
-    version, baseURI: 'https://dsh.example/prefix/', canUse: () => allowed, notify() {},
+    version, baseURI: 'https://dsh.example/prefix/', canUse: () => allowed, notify() {}, runtimeVersion: async () => version,
     storage: { getItem: key => storageMap.get(key) ?? null, setItem: (key, value) => storageMap.set(key, value), removeItem: key => storageMap.delete(key) },
+    completionStorage: { getItem: key => storageMap.get(key) ?? null, setItem: (key, value) => storageMap.set(key, value), removeItem: key => storageMap.delete(key) },
     schedule(callback, milliseconds) { timers.set(++nextTimer, { callback, milliseconds }); return nextTimer; },
     cancel(timer) { timers.delete(timer); },
     async release(signal) { releaseCalls.push(signal); return releaseRead ? releaseRead(signal) : releaseResult; },
@@ -230,7 +231,8 @@ test('an accepted operation is stored and polled; queued is never success and in
   assert.equal(f.client.state.phase, 'done');
   assert.equal(f.client.state.refreshRequired, true);
   assert.equal(f.client.state.restartRequired, true);
-  assert.equal(f.storageMap.size, 0);
+  assert.equal(f.storageMap.has(f.client.storageKey), false);
+  assert.equal(f.storageMap.has(f.client.completionKey), true);
   assert.equal(f.timers.size, 0);
 });
 
@@ -256,13 +258,84 @@ test('reload resumes the same operation even when new code is running, while a d
   const next = fixture({ storageMap: f.storageMap, version: '0.0.6' });
   next.setResult(operation({ state: 'succeeded', installedVersion: '0.0.6' }));
   await next.client.resume();
-  assert.equal(next.client.state.phase, 'done');
+  assert.equal(next.client.state.phase, 'current');
   assert.equal(next.calls.some(call => call.init.method === 'POST'), false);
   const changed = fixture({ storageMap: new Map([[f.client.storageKey, JSON.stringify(f.client.state.pending)]]) });
   changed.config.boot = 'newboot';
   await changed.client.resume();
   assert.equal(changed.client.state.error, 'pluginUpdateUnknown');
   assert.equal(changed.calls.some(call => call.url.includes('/operations?')), false);
+});
+
+test('completed updates survive reload and only current Client plus current Host clear the activation receipt', async () => {
+  const first = fixture();
+  await first.client.check();
+  await first.client.update(first.client.state.target);
+  first.setResult(operation({ state: 'succeeded', installedVersion: '0.0.6', outcome: { restartRequired: true, refreshRequired: true } }));
+  await first.tick();
+  first.client.close();
+  const older = fixture({ storageMap: first.storageMap });
+  await older.client.resume();
+  assert.equal(older.client.state.phase, 'done');
+  assert.equal(older.client.state.restartRequired, true);
+  assert.equal(older.calls.length, 0);
+  await older.client.check();
+  assert.equal(older.releaseCalls.length, 0);
+  const newClient = fixture({ storageMap: first.storageMap, version: '0.0.6' });
+  newClient.options.runtimeVersion = async () => '0.0.5';
+  await newClient.client.resume();
+  assert.equal(newClient.client.state.phase, 'done');
+  assert.equal(first.storageMap.has(first.client.completionKey), true);
+  newClient.options.runtimeVersion = async () => 'invalid';
+  await newClient.client.resume();
+  assert.equal(newClient.client.state.phase, 'done');
+  newClient.options.runtimeVersion = async () => '0.0.6';
+  await newClient.client.resume();
+  assert.equal(newClient.client.state.phase, 'current');
+  assert.equal(first.storageMap.has(first.client.completionKey), false);
+  assert.equal(newClient.calls.length, 0);
+});
+
+test('persisted success takes precedence over a stale pending record and storage failures retain the in-memory outcome', async () => {
+  const app = fixture();
+  await app.client.check();
+  await app.client.update(app.client.state.target);
+  const pending = app.storageMap.get(app.client.storageKey);
+  app.setResult(operation({ state: 'succeeded', installedVersion: '0.0.6' }));
+  await app.tick();
+  app.storageMap.set(app.client.storageKey, pending);
+  const reload = fixture({ storageMap: app.storageMap });
+  await reload.client.resume();
+  assert.equal(reload.client.state.phase, 'done');
+  assert.equal(reload.calls.length, 0);
+  assert.equal(reload.storageMap.has(reload.client.storageKey), false);
+  const broken = fixture();
+  broken.options.completionStorage = { getItem: () => null, setItem() { throw new Error('full'); }, removeItem() {} };
+  await broken.client.check();
+  await broken.client.update(broken.client.state.target);
+  broken.setResult(operation({ state: 'succeeded', installedVersion: '0.0.6' }));
+  await broken.tick();
+  assert.equal(broken.client.state.phase, 'done');
+  assert.equal(broken.client.state.notice, 'pluginUpdateStorage');
+});
+
+test('completion survives a new session and late Host version reads cannot change a closed page', async () => {
+  const app = fixture();
+  await app.client.check();
+  await app.client.update(app.client.state.target);
+  app.setResult(operation({ state: 'succeeded', installedVersion: '0.0.6', outcome: { restartRequired: true, refreshRequired: false } }));
+  await app.tick();
+  const next = fixture({ version: '0.0.6' });
+  next.options.completionStorage = app.options.completionStorage;
+  const version = Promise.withResolvers();
+  next.options.runtimeVersion = () => version.promise;
+  const restoring = next.client.resume();
+  next.client.close();
+  version.resolve('0.0.6');
+  await restoring;
+  assert.equal(next.client.state.phase, 'done');
+  assert.equal(app.storageMap.has(app.client.completionKey), true);
+  assert.equal(next.calls.length, 0);
 });
 
 test('failed, cancelled and rolled-back operations retain honest terminal state and remove only their own record', async () => {

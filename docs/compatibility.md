@@ -66,6 +66,10 @@ DSH `0.2.2-rc.1` 安装包已核对会话行事件标记，作为有限 DOM 例�
 
 [使用统计](../src/features/usage-stats/spec.md)只读依赖原生 `sessionPersistence`：`list({signal})` 的 `header.{id,createdAt,cwd}` 与 `revision`、`open(id,'read',{signal})` 的 `read()`/`close()`，以及 `assistant/message.data.usage`（`TokenUsage`）与 `message.source.{provider,model}`、`turn/start`、`tool/call` 的 `time`。接口依据为本机 DSH `0.2.2-rc.1` 桌面安装包与官方仓库提交 `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` 的 `packages/session/session-persistence`、`session-persistence-jsonl` 与 `dsh-llm` 类型；本机 224 个真实会话日志的只读实测确认了日志分帧、事件形状与逐会话 `revision` 的存在。它不继承历史矩阵结论，也未在旧版或 Windows 上复测；实际安装、页面数字核对与缺服务降级尚待验收。
 
+## MCP 连接状态与测试连接的新增范围与证据
+
+[MCP 管理](../src/features/mcp/spec.md)新增的真实连接状态与「测试连接」依赖 `@deepseek-ai/dsh-mcp-client` 的公开导出 `connectionStatusOf(fiber)`（句柄 `current()` / `onChange()`）与 `probeServer(ctx, config, options)`。接口依据为本机 DSH `0.2.2-rc.1` 桌面安装包中该包的构建产物与导出列表；`probeServer` 独立超时、只读连接、读取服务器身份与工具名后关闭、不注册工具，且不依赖 `mcpManager`，因此对 profile／preset／manager／运行时实例均可探测。旧宿主缺少这两个导出时，连接态回退到装载生命周期，`probeServer` 缺席或探测无法开始统一报 `mcpProbeFailed`，不影响目录、启停与详情。它不继承历史矩阵结论；本轮只完成源码、构建与行为测试，实际远端连接、真实页面的连接态与探测结果仍待实机验收，且不会为测试擅自启停用户真实 MCP。
+
 ## 接口核对清单
 
 下表来自本项目实际调用点。接口最早出现在哪个版本仍需对照确切发行版确认；当前版本有同名方法不能证明旧版具有相同参数、返回字段、事件和清理行为。

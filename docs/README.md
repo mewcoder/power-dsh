@@ -34,7 +34,7 @@
 | [退役流动背景兼容与挂载授权](../src/features/flowing-background/spec.md) | 五个隐藏旧键的无 UI 兼容、公共结构表面适配边界及既有流动图案算法依据；现行入口归壁纸 |
 | [显示版本号](../src/features/version-display/spec.md) | 宿主版本展示、桌面更新入口与侧栏定位 |
 | [技能管理](../src/features/skills/spec.md) | 全局与逐项目分组、目录堆叠展示、多来源导入、仅对 DSH 生效的启停 |
-| [MCP 管理](../src/features/mcp/spec.md) | 全局服务器、原生启停、运行状态与工具列表 |
+| [MCP 管理](../src/features/mcp/spec.md) | 全局服务器、原生启停、真实连接状态与只读测试连接、工具列表与脱敏详情 |
 | [全局指令](../src/features/personalization/spec.md) | 全局指令编辑、原生文件保存与入口关闭行为 |
 | [归档](../src/features/archive/spec.md) | 归档会话的可折叠分组列表（含工作区路径）、搜索、排序、工作区筛选与恢复、永久删除与自动归档 |
 | [使用统计](../src/features/usage-stats/spec.md) | 本地会话 Token 汇总、53 周活动热力图、每日趋势与模型用量，只读聚合与缓存边界 |

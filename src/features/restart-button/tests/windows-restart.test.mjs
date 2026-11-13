@@ -68,6 +68,19 @@ test('Windows only commits after the matching external helper is ready and prese
   } finally { await f.cleanup(); }
 });
 
+test('Windows update restart bypasses menu visibility but preserves the handoff and unload guards', async () => {
+  const app = fixture();
+  try {
+    app.disable();
+    await assert.rejects(app.service.restart(), /restartUnavailable/);
+    assert.deepEqual(await app.service.restart(true), { accepted: true });
+    assert.equal(app.directories.length, 1);
+    await assert.rejects(app.service.restart(true), /restartBusy/);
+    app.service.close();
+    await assert.rejects(app.service.restart(true), /restartUnavailable/);
+  } finally { await app.cleanup(); }
+});
+
 test('failed, missing or mismatched helper readiness never commits, cleans files, and permits retry', async () => {
   for (const phase of ['failed', 'missing', 'wrong-nonce']) {
     const f = fixture({ dispatch: async ({ directory, request }) => {

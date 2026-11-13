@@ -5,11 +5,11 @@ import { isRecord, hasStrings, isOneOf } from '../../shared/types/protocol.ts';
 interface SkillView { cwd: string; scope: SkillScope; workspaces: SkillWorkspace[]; projectRoot: string; scopeKey: unknown }
 type SkillIdentity = Pick<NativeSkill, 'name' | 'description' | 'source' | 'provider' | 'path' | 'origin' | 'resourceBase'>;
 import { access, realpath } from 'node:fs/promises';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { skillOrigin } from './skill-origin.ts';
 import { SKILL_SOURCES, discoverExternal, readDiscoveredSkill, resolveSelection, resolveSkillRoots, packageLocation } from './skill-import.ts';
 import { addDiscoveredSkill } from './skill-install.ts';
-import { pathExists, skillRevision } from './skill-content.ts';
+import { pathExists, skillIdentity, skillRevision } from './skill-content.ts';
 import { deleteOwnedSkill, skillDeletion } from './skill-delete.ts';
 import { homedir } from 'node:os';
 
@@ -333,11 +333,27 @@ export class SkillPolicy {
       ...(deletion ? { deletion } : {}) };
   }
 
-  deletionBase(view: SkillView) { return view.scope === 'user' ? this.owner.profileContext.home : view.projectRoot; }
+  deletionLocation(view: SkillView, row: SkillCatalog['skills'][number]) {
+    if (!row.path || !isAbsolute(row.path)) return null;
+    if (view.scope === 'project') {
+      if (!['project-dsh', 'project-agents'].includes(row.source) || !view.projectRoot) return null;
+      return { base: view.projectRoot, root: join(view.projectRoot, row.source === 'project-dsh' ? '.dsh' : '.agents', 'skills') };
+    }
+    if (row.source === 'user-dsh') return { base: this.owner.profileContext.home, root: this.importTarget(view) };
+    if (!['user-agents', 'custom'].includes(row.source)) return null;
+    const source = resolve(row.path);
+    const bundle = basename(source) === 'SKILL.md' ? dirname(source) : source;
+    const root = basename(bundle) === row.name || basename(source) === `${row.name}.md`
+      ? dirname(bundle) : '';
+    if (!root || root === dirname(root) || (row.source === 'user-agents' && basename(root) !== 'skills')) return null;
+    return { base: dirname(root), root };
+  }
 
-  deletionFor(view: SkillView, row: SkillCatalog['skills'][number]) {
-    if (row.source !== (view.scope === 'user' ? 'user-dsh' : 'project-dsh') || !row.path) return Promise.resolve(null);
-    return skillDeletion(this.deletionBase(view), this.importTarget(view), row.name, row.path);
+  async deletionFor(view: SkillView, row: SkillCatalog['skills'][number]) {
+    const location = this.deletionLocation(view, row);
+    if (!location) return null;
+    const deletion = await skillDeletion(location.base, location.root, row.name, row.path);
+    return deletion && { ...deletion, revision: skillIdentity(view.scope, view.projectRoot, row.source, row.path, deletion.revision) };
   }
 
   async deleteSkill(cwd: string, scope: string, name: string, revision: string): Promise<SkillCatalog> {
@@ -348,8 +364,12 @@ export class SkillPolicy {
     if (!before.complete || !row) throw new Error('skill-delete-unavailable');
     const deletion = await this.deletionFor(view, row);
     if (!deletion || deletion.revision !== revision) throw new Error('skill-delete-changed');
+    const location = this.deletionLocation(view, row);
+    if (!location) throw new Error('skill-delete-changed');
+    const current = await skillDeletion(location.base, location.root, name, row.path);
+    if (!current || skillIdentity(view.scope, view.projectRoot, row.source, row.path, current.revision) !== revision) throw new Error('skill-delete-changed');
     const key = keyOf(view.scope, view.projectRoot, name);
-    await deleteOwnedSkill(this.deletionBase(view), this.importTarget(view), name, row.path, revision, () => this.active(), async () => {
+    await deleteOwnedSkill(location.base, location.root, name, row.path, current.revision, () => this.active(), async () => {
       let removed: NativeSkillRecord | undefined;
       if (!this.preferences().has(key)) return;
       await this.ctx.configEditor.edit(this.owner.fiber.entry, raw => {

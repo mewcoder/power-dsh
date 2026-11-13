@@ -1,4 +1,4 @@
-import type { SkillCatalog, SkillDetail, ExternalSkillCatalog, ExternalSkillDetail, SkillImportResult, SkillImportDestination, McpCatalog, McpServerDetail, PersonalizationFile, SystemSoundsCatalog, SoundPlayback, RestartStatus, RestartAccepted, ArchiveCatalog, WallpaperAsset, WallpaperCleared, UsageSnapshot, ProjectCatalog } from './wire.ts';
+import type { SkillCatalog, SkillDetail, ExternalSkillCatalog, ExternalSkillDetail, SkillImportResult, SkillImportDestination, McpCatalog, McpServerDetail, McpProbe, PersonalizationFile, SystemSoundsCatalog, SoundPlayback, RestartStatus, RestartAccepted, ArchiveCatalog, WallpaperAsset, WallpaperCleared, UsageSnapshot, ProjectCatalog } from './wire.ts';
 import type { WindowsNotification, NotificationDelivery, NotificationCleared } from './wire.ts';
 import type { NotificationTransport, PluginRelease } from './wire.ts';
 
@@ -6,6 +6,8 @@ import type { NotificationTransport, PluginRelease } from './wire.ts';
 export interface PowerDshMethods {
   restartStatus(): Promise<RestartStatus>;
   restartApp(): Promise<RestartAccepted>;
+  restartAfterUpdate(): Promise<RestartAccepted>;
+  pluginRuntimeVersion(): Promise<string>;
   listSystemSounds(): Promise<SystemSoundsCatalog>;
   playSystemSound(id: string, preview: boolean): Promise<SoundPlayback>;
   showWindowsNotification(notification: WindowsNotification): Promise<NotificationDelivery>;
@@ -36,6 +38,7 @@ export interface PowerDshMethods {
   listMcpServers(): Promise<McpCatalog>;
   readMcpServer(id: string): Promise<McpServerDetail | null>;
   setMcpServerEnabled(id: string, enabled: boolean): Promise<McpCatalog>;
+  probeMcpServer(id: string): Promise<McpProbe>;
   listArchivedSessions(): Promise<ArchiveCatalog>;
   restoreArchivedSession(sessionId: string): Promise<ArchiveCatalog>;
   deleteArchivedSession(sessionId: string): Promise<ArchiveCatalog>;

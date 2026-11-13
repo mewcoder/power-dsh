@@ -232,7 +232,8 @@ test('MCP second-row tags use verified local and HTTP transports, omit unknown t
       assert.equal(actions.props.className, 'power-dsh-mcp-card-actions');
       assert.equal(page.detail(name).props.children[0], language === 'en' ? 'Details' : '详情');
       const filled = actions.props.children.filter(Boolean);
-      assert.equal(filled.length, name === 'network-server' ? 1 : 2, 'A closed server shows the action only.');
+      assert.equal(filled.length, name === 'network-server' ? 2 : 3, 'The row holds the test and detail actions, plus the count when present.');
+      assert.ok(descendants(actions).some(node => node.props.className === 'power-dsh-mcp-card-probe'));
       if (name !== 'network-server') assert.equal(filled[0].props.className, 'power-dsh-mcp-tools-summary');
       if (name === 'network-server') {
         assert.equal(lines[1].props.children[1].props.children[1], language === 'en' ? 'Disabled' : '已关闭');
@@ -823,11 +824,13 @@ test('MCP action row keeps the detail button flush right with or without a tool 
   const actions = name => page.row(name).props.children.find(node => node?.props?.className === 'power-dsh-skill-card-content')
     .props.children.filter(Boolean).at(-1);
   const parts = name => actions(name).props.children.filter(Boolean)
-    .map(node => node.props.className === 'power-dsh-mcp-tools-summary' ? 'count' : node.props['data-detail'] ? 'action' : 'other');
-  // The button is always the last child of the row, so it stays flush right.
-  assert.deepEqual(parts('with-tools'), ['count', 'action']);
-  assert.deepEqual(parts('no-tools'), ['action'], 'Without a count the row holds only the button.');
-  assert.deepEqual(parts('off-server'), ['action'], 'A closed server hides its cached count.');
+    .map(node => node.props.className === 'power-dsh-mcp-tools-summary' ? 'count'
+      : node.props.className === 'power-dsh-mcp-card-probe' ? 'probe'
+      : node.props['data-detail'] ? 'action' : 'other');
+  // The detail button is always the last child of the row, so it stays flush right.
+  assert.deepEqual(parts('with-tools'), ['count', 'probe', 'action']);
+  assert.deepEqual(parts('no-tools'), ['probe', 'action'], 'Without a count the row keeps the test and detail actions.');
+  assert.deepEqual(parts('off-server'), ['probe', 'action'], 'A closed server hides its cached count.');
   assert.equal(actions('with-tools').props.children.filter(Boolean).at(-1).props['data-detail'], 'include:with');
   assert.equal(actions('no-tools').props.children.filter(Boolean).at(-1).props['data-detail'], 'include:without');
   assert.equal(page.summary('no-tools'), undefined);
@@ -1012,5 +1015,151 @@ test('MCP detail ignores a late answer after closing and follows the latest requ
   const dialog = () => page.render().find(node => node.type === 'native-modal-fixture');
   assert.equal(dialog().props.description, 'browser');
   assert.deepEqual(app.mcpWrites, []);
+  app.unmount();
+});
+
+test('MCP cards show the live connection state reported by the native supervisor', async () => {
+  const dictionaries = {
+    en: { connected: 'Connected', connecting: 'Connecting', reconnecting: 'Reconnecting 2/5', waiting: 'Waiting for credentials',
+      failed: 'Connection failed', closed: 'Disconnected', disabled: 'Disabled' },
+    zh: { connected: '已连接', connecting: '连接中', reconnecting: '重连中 2/5', waiting: '等待凭据',
+      failed: '连接失败', closed: '未连接', disabled: '已关闭' },
+  };
+  for (const language of ['en', 'zh']) {
+    const app = await mount({ mcpCatalog: mcpCatalogFixture({ servers: [
+      mcpFixture({ id: 'conn:connected', name: 'connected', connection: { state: 'connected', toolCount: 2, connectedAt: 10 } }),
+      mcpFixture({ id: 'conn:connecting', name: 'connecting', connection: { state: 'connecting', attempt: 0 } }),
+      mcpFixture({ id: 'conn:reconnecting', name: 'reconnecting', connection: { state: 'reconnecting', attempt: 2, maxAttempts: 5 } }),
+      mcpFixture({ id: 'conn:waiting', name: 'waiting', connection: { state: 'waiting-credentials' } }),
+      mcpFixture({ id: 'conn:failed', name: 'failed', connection: { state: 'failed', reason: 'gave-up' } }),
+      mcpFixture({ id: 'conn:closed', name: 'closed', connection: { state: 'closed' } }),
+      mcpFixture({ id: 'conn:off', name: 'off', enabled: false, runtimeState: 'disabled', connection: { state: 'connected', toolCount: 9 } }),
+    ] }) });
+    const page = await mcpPage(app, language);
+    const status = name => descendants(page.row(name)).find(node => node.props.className === 'power-dsh-mcp-runtime');
+    assert.equal(status('connected').props['data-state'], 'connected');
+    assert.equal(status('connected').props.children[0].props.state, 'done');
+    assert.equal(status('connected').props.children[1], dictionaries[language].connected);
+    assert.equal(status('connecting').props.children[0].props.state, 'ongoing');
+    assert.equal(status('connecting').props.children[1], dictionaries[language].connecting);
+    assert.equal(status('reconnecting').props['data-state'], 'reconnecting');
+    assert.equal(status('reconnecting').props.children[0].props.state, 'ongoing');
+    assert.equal(status('reconnecting').props.children[1], dictionaries[language].reconnecting);
+    assert.equal(status('waiting').props.children[0].props.state, 'warning');
+    assert.equal(status('waiting').props.children[1], dictionaries[language].waiting);
+    assert.equal(status('failed').props.children[0].props.state, 'error');
+    assert.equal(status('failed').props.children[1], dictionaries[language].failed);
+    assert.equal(status('closed').props.children[0].props.state, 'idle');
+    assert.equal(status('closed').props.children[1], dictionaries[language].closed);
+    // The switch wins over a stale connection handle: a closed server reads Disabled.
+    assert.equal(status('off').props['data-state'], 'disabled');
+    assert.equal(status('off').props.children[0].props.state, 'idle');
+    assert.equal(status('off').props.children[1], dictionaries[language].disabled);
+    for (const name of ['connected', 'connecting', 'reconnecting', 'waiting', 'failed', 'closed', 'off']) {
+      assert.equal(status(name).props.role, 'status');
+    }
+    app.unmount();
+  }
+});
+
+test('MCP test connection reports the probe result and never changes the server', async () => {
+  const success = { ok: true, serverInfo: { name: 'browser', version: '1.2.0' }, toolNames: ['navigate', 'snapshot'], truncated: false, durationMs: 12, cleanupFailed: false };
+  const app = await mount({ mcpCatalog: mcpCatalogFixture({ servers: [mcpFixture()] }), mcpProbe: success });
+  const page = await mcpPage(app);
+  const probeButton = () => descendants(page.row('browser')).find(node => node.props.className === 'power-dsh-mcp-card-probe');
+  assert.ok(probeButton(), 'Every card offers a connection test.');
+  await probeButton().props.onClick();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(app.mcpProbes, [{ id: 'include:browser' }]);
+  const result = descendants(page.row('browser')).find(node => node.props.className === 'power-dsh-mcp-probe-result');
+  assert.ok(result);
+  assert.equal(result.props['data-ok'], 'true');
+  assert.equal(result.props.role, 'status');
+  const text = textOf(result).join(' ');
+  assert.ok(text.includes('mcpProbeSuccess'));
+  assert.ok(text.includes('browser 1.2.0'));
+  assert.ok(!page.render().some(node => node.props['data-error-code'] === 'PD-MCP-PROBE'));
+  assert.deepEqual(app.mcpWrites, [], 'Testing a connection never changes the server.');
+  app.unmount();
+
+  // A failure keeps a product summary and exposes the sanitized native text only in the copyable details.
+  const failed = await mount({
+    mcpCatalog: mcpCatalogFixture({ servers: [mcpFixture()] }),
+    mcpProbeReply: () => ({ ok: true, value: { ok: false, stage: 'connect', message: 'spawn failed at /Users/me/secret', durationMs: 8, cleanupFailed: false } }),
+  });
+  const failedPage = await mcpPage(failed);
+  const failedButton = () => descendants(failedPage.row('browser')).find(node => node.props.className === 'power-dsh-mcp-card-probe');
+  await failedButton().props.onClick();
+  await new Promise(resolve => setImmediate(resolve));
+  const failure = descendants(failedPage.row('browser')).find(node => node.props['data-error-code'] === 'PD-MCP-PROBE');
+  assert.ok(failure);
+  assert.ok(failure.props.children.includes('mcpProbeConnectFailed'));
+  assert.ok(!failedPage.render().some(node => node.props.children.some?.(child => typeof child === 'string' && child.includes('/Users/me/secret'))));
+  assert.deepEqual(failed.mcpWrites, []);
+  failed.unmount();
+
+  // A probe still running blocks a duplicate click and shows its busy label.
+  const pending = Promise.withResolvers();
+  const slow = await mount({ mcpCatalog: mcpCatalogFixture({ servers: [mcpFixture()] }), mcpProbeReply: () => pending.promise });
+  const slowPage = await mcpPage(slow);
+  const slowButton = () => descendants(slowPage.row('browser')).find(node => node.props.className === 'power-dsh-mcp-card-probe');
+  const running = slowButton().props.onClick();
+  const busy = descendants(slowPage.row('browser')).find(node => node.props.className === 'power-dsh-mcp-card-probe');
+  assert.equal(busy.props['aria-busy'], true);
+  assert.equal(busy.props.disabled, true);
+  await busy.props.onClick();
+  assert.equal(slow.mcpProbes.length, 1, 'A running probe ignores duplicate clicks.');
+  pending.resolve({ ok: true, value: success });
+  await running;
+  assert.equal(slow.mcpProbes.length, 1);
+  slow.unmount();
+});
+
+test('MCP probe warnings and cleanup results stay bounded without hiding success', async () => {
+  const app = await mount({ mcpCatalog: mcpCatalogFixture({ servers: [mcpFixture()] }),
+    mcpProbe: { ok: true, toolNames: Array.from({ length: 3 }, (_, index) => `tool_${index}`), truncated: true, durationMs: 4, cleanupFailed: true } });
+  const page = await mcpPage(app);
+  const button = () => descendants(page.row('browser')).find(node => node.props.className === 'power-dsh-mcp-card-probe');
+  await button().props.onClick();
+  await new Promise(resolve => setImmediate(resolve));
+  const result = descendants(page.row('browser')).find(node => node.props.className === 'power-dsh-mcp-probe-result');
+  assert.equal(result.props.children[0].props.state, 'warning');
+  const text = textOf(result).join(' ');
+  assert.ok(text.includes('mcpProbeTruncated'));
+  assert.ok(text.includes('mcpProbeCleanup'));
+  app.unmount();
+});
+
+test('MCP wire codecs accept a live connection and validate probe results', async () => {
+  const app = await mount();
+  const list = app.rpcDescriptors.find(row => row.method === 'listMcpServers').result.create();
+  const valid = list.parse(mcpCatalogFixture({ servers: [mcpFixture({ connection: { state: 'connected', toolCount: 2, connectedAt: 5 } })] })).servers[0];
+  assert.equal(valid.connection.state, 'connected');
+  assert.equal(valid.connection.toolCount, 2);
+  assert.equal(valid.connection.connectedAt, 5);
+  for (const connection of [{ state: 'online' }, { state: 'failed', reason: 'boom' }, { state: 'connected', toolCount: '2' }]) {
+    assert.throws(() => list.parse(mcpCatalogFixture({ servers: [mcpFixture({ connection })] })), /Invalid MCP/);
+  }
+  const descriptor = app.rpcDescriptors.find(row => row.method === 'probeMcpServer');
+  assert.ok(descriptor);
+  assert.deepEqual(Array.from(descriptor.parameters, item => item.name), ['id']);
+  const probe = descriptor.result.create();
+  assert.equal(JSON.stringify(probe.parse({ ok: true, toolNames: ['a'], truncated: false, durationMs: 3, cleanupFailed: false })),
+    JSON.stringify({ ok: true, toolNames: ['a'], truncated: false, durationMs: 3, cleanupFailed: false }));
+  const withInfo = probe.parse({ ok: true, serverInfo: { name: 'n', version: '1' }, toolNames: [], truncated: true, durationMs: 0, cleanupFailed: true });
+  assert.equal(withInfo.serverInfo.name, 'n');
+  assert.equal(withInfo.serverInfo.version, '1');
+  assert.deepEqual(Array.from(withInfo.toolNames), []);
+  assert.equal(withInfo.truncated, true);
+  assert.equal(withInfo.cleanupFailed, true);
+  assert.equal(JSON.stringify(probe.parse({ ok: false, stage: 'list', message: 'x', durationMs: 0, cleanupFailed: true })),
+    JSON.stringify({ ok: false, stage: 'list', message: 'x', durationMs: 0, cleanupFailed: true }));
+  for (const invalid of [{ ok: true }, { ok: 'yes' }, { ok: true, toolNames: ['a'], truncated: false, durationMs: '1', cleanupFailed: false },
+    { ok: true, toolNames: [1], truncated: false, durationMs: 1, cleanupFailed: false },
+    { ok: true, toolNames: [], truncated: false, durationMs: 1 },
+    { ok: false, stage: 'other', message: 'm', durationMs: 1, cleanupFailed: false },
+    { ok: false, stage: 'connect', durationMs: 1, cleanupFailed: false }]) {
+    assert.throws(() => probe.parse(invalid), /Invalid MCP probe/);
+  }
   app.unmount();
 });

@@ -37,4 +37,7 @@ export const methods = {
   setMcpServerEnabled(id: string, enabled: boolean) {
     return this.run(() => this.mcp.setEnabled(id, enabled));
   },
+  probeMcpServer(id: string) {
+    return this.run(() => this.mcp.probe(id));
+  },
 } satisfies ThisType<HostService & ReturnType<typeof createHost>>;

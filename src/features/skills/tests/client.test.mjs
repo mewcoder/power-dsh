@@ -1295,9 +1295,9 @@ test('delete failure retains the confirmation and requires refreshed details bef
 });
 
 test('workspace deletion uses its own identity and links clearly preserve the source', async () => {
-  const deletion = { path: '/work/b/.dsh/skills/code-review', linked: true, revision: 'd'.repeat(64) };
+  const deletion = { path: '/work/b/.agents/skills/code-review', linked: true, revision: 'd'.repeat(64) };
   const app = await mount({ featureIds: ['skills'], skillCatalog: catalogFixture({ skills: [skillFixture(),
-    skillFixture({ source: 'project-dsh', path: deletion.path + '/SKILL.md', targetCwd: '/work/b', deletion })] }) });
+    skillFixture({ source: 'project-agents', path: deletion.path + '/SKILL.md', targetCwd: '/work/b', deletion })] }) });
   const page = await skillsPage(app);
   page.tab('project').props.onClick();await settle();
   expandWorkspaceGroups(page);

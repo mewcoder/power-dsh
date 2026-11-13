@@ -109,7 +109,7 @@ export function usageSnapshotFixture(overrides = {}) {
   };
 }
 
-export async function mount({ featureIds, localeLanguage, restartStatus = { supported: true, running: false, error: '' }, restartReply, desktop = false, themeAvailable = true, updates, rpcError, rpcReply, formReply, formLoad, fileText = '', fileReply, fileReadError, wallpaper, wallpaperReply, wallpaperReadError, wallpaperClearError, skillCatalog, skillList, skillReply, skillReadError, skillDetail, skillDetailReply, skillDetailError, externalSkillCatalog, externalSkillList, externalSkillReply, externalDetailReply, importDestinationReply, mcpCatalog, mcpList, mcpReply, mcpReadError, mcpDetail, mcpDetailReply, mcpDetailError, archiveCatalog, archiveList, archiveReply, archiveReadError, usageSnapshot, usageList, usageReply, usageReadError, projectCatalog, projectList, projectReply, projectReadError, writable = true, reload = () => {}, windows = false, notificationPermission = 'granted', notificationRequest, notificationFailure = false, notificationServices = true, notificationsAvailable = true, nativeNotificationReply, nativeClearReply, notificationTransportReply, platformMarker = true, localConnection = true, soundCatalog, soundReply, soundListError, updateFetch, updateStorage, modelDirectory, modelSelectReply, modelDirectoriesAvailable = true } = {}) {
+export async function mount({ featureIds, localeLanguage, restartStatus = { supported: true, running: false, error: '' }, restartReply, desktop = false, themeAvailable = true, updates, rpcError, rpcReply, formReply, formLoad, fileText = '', fileReply, fileReadError, wallpaper, wallpaperReply, wallpaperReadError, wallpaperClearError, skillCatalog, skillList, skillReply, skillReadError, skillDetail, skillDetailReply, skillDetailError, externalSkillCatalog, externalSkillList, externalSkillReply, externalDetailReply, importDestinationReply, mcpCatalog, mcpList, mcpReply, mcpReadError, mcpDetail, mcpDetailReply, mcpDetailError, mcpProbe, mcpProbeReply, mcpProbeError, archiveCatalog, archiveList, archiveReply, archiveReadError, usageSnapshot, usageList, usageReply, usageReadError, projectCatalog, projectList, projectReply, projectReadError, writable = true, reload = () => {}, windows = false, notificationPermission = 'granted', notificationRequest, notificationFailure = false, notificationServices = true, notificationsAvailable = true, nativeNotificationReply, nativeClearReply, notificationTransportReply, platformMarker = true, localConnection = true, soundCatalog, soundReply, soundListError, updateFetch, updateStorage, modelDirectory, modelSelectReply, modelDirectoriesAvailable = true } = {}) {
   let plugin;
   const nativeLauncher = { native: true };
   const entries = new Map([['settings.launcher:single', nativeLauncher]]);
@@ -224,6 +224,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   const mcpReads = [];
   const mcpDetailReads = [];
   const mcpWrites = [];
+  const mcpProbes = [];
   let mcpValue = mcpCatalog ?? mcpCatalogFixture();
   const mcpView = () => ({ ...mcpValue });
   const archiveReads = [];
@@ -489,12 +490,13 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
           const [blocked, revision, name, enabled] = rpcArgs;
           const third = rpcArgs[2];
           if (descriptor.method === 'readPluginRelease') return { ok: true, value: { status: 'ready', version: '0.0.999', commit: 'a'.repeat(40) } };
+          if (descriptor.method === 'pluginRuntimeVersion') return { ok: true, value: pluginVersion };
           if (descriptor.method === 'notificationTransport') return notificationTransportReply ? await notificationTransportReply() : {
             ok: true, value: { platform: windows ? 'win32' : 'darwin', nativeAvailable: windows, version: pluginVersion },
           };
           if (descriptor.method === 'restartStatus') return { ok: true, value: restartStatus };
-          if (descriptor.method === 'restartApp') {
-            restartCalls.push([]);
+          if (descriptor.method === 'restartApp' || descriptor.method === 'restartAfterUpdate') {
+            restartCalls.push(descriptor.method === 'restartAfterUpdate' ? ['after-update'] : []);
             return restartReply ? await restartReply() : { ok: true, value: { accepted: true } };
           }
           if (descriptor.method === 'showWindowsNotification') {
@@ -538,6 +540,13 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
             }
             mcpValue = { ...mcpValue, servers: mcpValue.servers.map(server => server.id === id ? { ...server, enabled: targetEnabled } : server) };
             return { ok: true, value: mcpView() };
+          }
+          if (descriptor.method === 'probeMcpServer') {
+            const [serverId] = rpcArgs;
+            mcpProbes.push({ id: serverId });
+            if (mcpProbeReply) return mcpProbeReply(serverId);
+            if (mcpProbeError) return { ok: false, error: { message: mcpProbeError } };
+            return { ok: true, value: mcpProbe || { ok: true, toolNames: ['navigate'], truncated: false, durationMs: 5, cleanupFailed: false } };
           }
           if (descriptor.method === 'listSkills') {
             skillReads.push({ cwd: blocked, scope: revision });
@@ -771,7 +780,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     setConnectionState(state) { connectionState = state; connectionStateListeners.forEach(fn => fn()); },
     timers,
     connectionStateListeners,
-    entries, calls, dictionaries, nativeLauncher, rpcCalls, rpcDescriptors, fileWrites, skillReads, skillDetailReads, skillWrites, mcpReads, mcpDetailReads, mcpWrites, archiveReads, archiveWrites, projectReads, projectWrites, usageReads,
+    entries, calls, dictionaries, nativeLauncher, rpcCalls, rpcDescriptors, fileWrites, skillReads, skillDetailReads, skillWrites, mcpReads, mcpDetailReads, mcpWrites, mcpProbes, archiveReads, archiveWrites, projectReads, projectWrites, usageReads,
     soundPlays, soundLists: () => soundLists,
     notifications, nativeNotifications, nativeClears,
     permissionRequests: () => permissionRequests,

@@ -22,4 +22,13 @@ export const READ_PLUGIN_RELEASE_RPC: RpcDescriptor<'readPluginRelease', PluginR
   } }) },
 };
 
-export const rpc = [READ_PLUGIN_RELEASE_RPC];
+export const PLUGIN_RUNTIME_VERSION_RPC: RpcDescriptor<'pluginRuntimeVersion', string> = {
+  id: 'power-dsh#powerDsh/pluginRuntimeVersion', service: 'powerDsh', namespace: 'powerDsh', method: 'pluginRuntimeVersion',
+  invocation: { kind: 'direct' }, parameters: [],
+  result: { mode: 'strict', typeSymbol: 'power-dsh#PluginRuntimeVersion', create: () => ({ parse(value) {
+    if (typeof value !== 'string' || !versionParts(value)) throw new TypeError('Invalid plugin runtime version');
+    return value;
+  } }) },
+};
+
+export const rpc = [READ_PLUGIN_RELEASE_RPC, PLUGIN_RUNTIME_VERSION_RPC];

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { resolve, sep, join } from 'node:path';
-import { mkdtemp, mkdir, writeFile, readFile, rm, access, realpath } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, access, realpath, symlink, rename } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { SkillPolicy } from '../skill-policy.ts';
 import { skillMarkdown } from '../skill-content.ts';
@@ -624,7 +624,7 @@ test('deleting a disabled project skill removes only its own policy and keeps th
   await assert.rejects(access(join(projectB, '.dsh')));
 }));
 
-test('delete refuses stale content, incomplete catalogs, removed projects and shared sources', async () => importedFixture(async ({ app, entry, target, projectA }) => {
+test('delete refuses stale content, incomplete catalogs, removed projects and bundled sources', async () => importedFixture(async ({ app, entry, target, projectA }) => {
   const variant = entry.variants[0];
   await app.policy.addSkill('', 'user', variant.id, 'copy', variant.revision);
   const detail = await app.policy.read('', 'user', 'guide');
@@ -637,10 +637,98 @@ test('delete refuses stale content, incomplete catalogs, removed projects and sh
   app.ctx.workspaceRegistry.list = () => [];
   await assert.rejects(app.policy.deleteSkill(projectA, 'project', 'guide', detail.deletion.revision), /no longer available/);
   app.policy.registry.snapshot = async () => ({ complete: true, skills: [{ name: 'guide', description: 'Shared',
-    source: 'user-agents', provider: 'filesystem', path: join(target, 'SKILL.md'), invocation: { modelInvocable: true, userInvocable: true } }] });
+    source: 'bundled', provider: 'filesystem', path: join(target, 'SKILL.md'), invocation: { modelInvocable: true, userInvocable: true } }] });
   assert.equal((await app.policy.read('', 'user', 'guide')).deletion, undefined);
   await assert.rejects(app.policy.deleteSkill('', 'user', 'guide', detail.deletion.revision), /changed/);
   await access(join(target, 'SKILL.md'));
+}));
+
+async function localDeletionFixture(source, run) {
+  const directory = await realpath(await mkdtemp(join(tmpdir(), 'power-dsh-shared-delete-')));
+  const project = join(directory, 'project');
+  const root = source === 'custom' ? join(directory, 'custom') : source.startsWith('project-')
+    ? join(project, source === 'project-dsh' ? '.dsh' : '.agents', 'skills') : join(directory, '.agents', 'skills');
+  const bundle = join(root, 'shared-guide');
+  await mkdir(bundle, { recursive: true });
+  await writeFile(join(bundle, 'SKILL.md'), 'Shared guide instructions');
+  const app = fixture({ profileHome: join(directory, '.dsh') });
+  app.ctx.workspaceRegistry.list = () => [{ path: project, title: 'Project' }];
+  app.markers.add(join(project, '.git'));
+  const entry = { name: 'shared-guide', description: 'Shared guide', source, provider: 'filesystem',
+    path: join(bundle, 'SKILL.md'), invocation: { modelInvocable: true, userInvocable: true } };
+  const nativeSnapshot = app.policy.registry.snapshot;
+  app.policy.registry.snapshot = async options => {
+    const snapshot = await nativeSnapshot(options);
+    if (!source.startsWith('project-') || options.cwd === project) {
+      try { await access(entry.path); snapshot.skills.push({ ...entry }); } catch {}
+    }
+    return snapshot;
+  };
+  app.policy.registry.get = async () => ({ content: await readFile(entry.path, 'utf8') });
+  try { await run({ app, entry, directory, project, root, bundle, cwd: source.startsWith('project-') ? project : '', scope: source.startsWith('project-') ? 'project' : 'user' }); }
+  finally { await app.policy.close(); await rm(directory, { recursive: true, force: true }); }
+}
+
+test('global shared, project shared and custom native skills expose deletion and remove exactly the displayed bundle', async () => {
+  for (const source of ['user-agents', 'project-agents', 'project-dsh', 'custom']) {
+    await localDeletionFixture(source, async ({ app, entry, root, bundle, cwd, scope }) => {
+      await writeFile(join(root, 'keep.md'), 'Keep another skill');
+      const detail = await app.policy.read(cwd, scope, entry.name);
+      assert.equal(detail.deletion.path, bundle);
+      const after = await app.policy.deleteSkill(cwd, scope, entry.name, detail.deletion.revision);
+      assert.equal(after.skills.some(skill => skill.name === entry.name), false);
+      await assert.rejects(access(bundle));
+      assert.equal(await readFile(join(root, 'keep.md'), 'utf8'), 'Keep another skill');
+    });
+  }
+});
+
+test('shared skill links only unlink the selected entry and source changes invalidate confirmation', async () => localDeletionFixture('user-agents', async ({ app, entry, directory, bundle }) => {
+  const target = join(directory, 'original');
+  await rename(bundle, target);
+  await symlink(target, bundle, process.platform === 'win32' ? 'junction' : 'dir');
+  const detail = await app.policy.read('', 'user', entry.name);
+  assert.equal(detail.deletion.linked, true);
+  entry.source = 'custom';
+  await assert.rejects(app.policy.deleteSkill('', 'user', entry.name, detail.deletion.revision), /changed/);
+  const custom = await app.policy.read('', 'user', entry.name);
+  await app.policy.deleteSkill('', 'user', entry.name, custom.deletion.revision);
+  assert.equal(await readFile(join(target, 'SKILL.md'), 'utf8'), 'Shared guide instructions');
+}));
+
+test('custom flat Markdown skills delete just the displayed file', async () => localDeletionFixture('custom', async ({ app, entry, root, bundle }) => {
+  entry.path = join(root, `${entry.name}.md`);
+  await writeFile(entry.path, 'Flat guide instructions');
+  const detail = await app.policy.read('', 'user', entry.name);
+  assert.equal(detail.deletion.path, entry.path);
+  await app.policy.deleteSkill('', 'user', entry.name, detail.deletion.revision);
+  await assert.rejects(access(entry.path));
+  assert.equal(await readFile(join(bundle, 'SKILL.md'), 'utf8'), 'Shared guide instructions');
+}));
+
+test('bundled, runtime, plugin and unknown native sources never expose filesystem deletion', async () => {
+  for (const source of ['bundled', 'runtime', 'plugin', 'bundled-office', 'unknown']) {
+    await localDeletionFixture(source, async ({ app, entry, bundle }) => {
+      assert.equal((await app.policy.read('', 'user', entry.name)).deletion, undefined);
+      await assert.rejects(app.policy.deleteSkill('', 'user', entry.name, 'a'.repeat(64)), /changed/);
+      await access(bundle);
+    });
+  }
+});
+
+test('project shared roots through a symlink remain read-only, and another project cannot reuse a deletion token', async () => localDeletionFixture('project-agents', async ({ app, entry, directory, project, root }) => {
+  const detail = await app.policy.read(project, 'project', entry.name);
+  const other = join(directory, 'other-project');
+  await mkdir(other);
+  app.ctx.workspaceRegistry.list = () => [{ path: project, title: 'Project' }, { path: other, title: 'Other' }];
+  app.markers.add(join(other, '.git'));
+  await assert.rejects(app.policy.deleteSkill(other, 'project', entry.name, detail.deletion.revision), /unavailable/);
+  const shared = join(directory, 'shared-root');
+  await rename(root, shared);
+  await symlink(shared, root, process.platform === 'win32' ? 'junction' : 'dir');
+  assert.equal((await app.policy.read(project, 'project', entry.name)).deletion, undefined);
+  await assert.rejects(app.policy.deleteSkill(project, 'project', entry.name, detail.deletion.revision), /changed/);
+  await access(join(shared, entry.name, 'SKILL.md'));
 }));
 
 test('a rejected policy write restores the skill and retains its disabled state', async () => importedFixture(async ({ app, entry, target }) => {

@@ -1,6 +1,6 @@
 import { errorMessage, type NativeContext, type NativePlugin, type NativePresets, type NativeComposition, type LifecycleOptions } from '../../shared/host/native.ts';
 import { isOneOf } from '../../shared/types/protocol.ts';
-import type { McpCatalog, McpServer, McpRuntimeState } from './rpc.ts';
+import type { McpCatalog, McpServer, McpRuntimeState, McpProbe } from './rpc.ts';
 import type { McpServerDetail } from '../../shared/types/wire.ts';
 import { projectMcpConfig } from './mcp-config.ts';
 import type { McpProviders, ConfiguredMcp } from './mcp-providers.ts';
@@ -63,6 +63,7 @@ function profileServers(entries: NativePlugin[], complete: boolean, origins: Map
       group: origins.has(row.entryId) ? 'builtin' : 'user',
       enabled: row.enabled === true,
       runtimeState: runtimeState(row, metadata),
+      ...(metadata?.connection ? { connection: metadata.connection } : {}),
       stateKnown,
       canToggle,
       reason: canToggle ? '' : addressable ? 'incomplete' : reason,
@@ -181,6 +182,25 @@ export class McpPolicy {
     } catch { this.ensureActive(); throw failure('mcpMetadataLoadFailed'); }
     this.ensureActive();
     return { server, config: projectMcpConfig(raw, server.transport) };
+  }
+
+  /**
+   * Probe one catalog entry's connectivity without registering tools or keeping a process.
+   * The entry must still exist in the current catalog so a stale id cannot probe another server.
+   * @param id - projected server id from the catalog.
+   * @returns the bounded probe outcome.
+   */
+  async probe(id: string): Promise<McpProbe> {
+    if (!identifier(id)) throw new TypeError('mcpProbeFailed');
+    this.ensureActive();
+    const catalog = await this.list();
+    this.ensureActive();
+    if (!catalog.servers.some(row => row.id === id)) throw failure('mcpProbeFailed');
+    const manager = await this.providerContext();
+    if (!manager) throw failure('mcpProbeFailed');
+    const result = await manager.probe(id);
+    this.ensureActive();
+    return result;
   }
 
   async setEnabled(id: string, enabled: boolean) {

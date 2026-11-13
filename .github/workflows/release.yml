@@ -71,11 +71,11 @@ jobs:
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           import { readFile, writeFile } from 'node:fs/promises';
-          const { version, engines } = JSON.parse(await readFile('package.json', 'utf8'));
+          const { version } = JSON.parse(await readFile('package.json', 'utf8'));
           const changelog = await readFile('CHANGELOG.md', 'utf8');
           const section = changelog.split(/^## /m).find(text => text.startsWith(`${version}（`));
           assert.ok(section, `Missing changelog section for ${version}`);
-          const notes = `# PowerDSH ${section.trim()}\n\n### 安装与验证范围\n\n- DSH：\`${engines.dsh}\`；Node.js：\`${engines.node}\`。\n- 桌面插件管理器安装：\`github:mewcoder/power-dsh\`，或安装附件 \`power-dsh.tgz\`。\n- 验证范围与实机限制见本版本的版本兼容性文档；自动化检查不代替系统通知和声音的实机验收。\n`;
+          const notes = `# PowerDSH ${section.trim()}\n`;
           await writeFile('release/notes.md', notes);
           NODE
 

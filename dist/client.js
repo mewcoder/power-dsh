@@ -819,6 +819,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	function problem(key) {
 		throw new Error(key);
 	}
+	function reached(version, target) {
+		const comparison = compareVersions(version, target);
+		return comparison !== null && comparison >= 0;
+	}
 	function validTarget(value) {
 		return record(value) && typeof value.version === "string" && versionParts(value.version) !== null && value.url === `${RELEASES}/tag/v${value.version}` && ["github", "npm"].includes(String(value.source)) && typeof value.installed === "string" && value.installed.length <= 128 && typeof value.latest === "string" && value.latest.length <= 128 && typeof value.bootId === "string" && value.bootId.length > 0 && value.bootId.length <= 128;
 	}
@@ -842,9 +846,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		polls = 0;
 		githubRetryAt = 0;
 		storageKey;
+		completionKey;
 		constructor(options) {
 			this.options = options;
 			this.storageKey = `power-dsh:update:${new URL(".", options.baseURI).href}`;
+			this.completionKey = `${this.storageKey}:completed`;
 		}
 		publish(patch) {
 			if (this.closed) return;
@@ -998,7 +1004,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			].includes(key) ? key : "pluginUpdateCheckFailed";
 		}
 		async check() {
-			if (this.closed || this.busy || this.state.pending || !this.options.canUse()) return;
+			if (this.closed || this.busy || this.state.pending || this.state.phase === "done" || !this.options.canUse()) return;
 			this.busy = true;
 			const sequence = ++this.sequence;
 			const controller = this.controller = new AbortController();
@@ -1036,6 +1042,65 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				if (pending) this.publish({ notice: "pluginUpdateStorage" });
 			}
 		}
+		saveCompleted(completed) {
+			try {
+				const storage = this.options.completionStorage;
+				if (!storage) problem("pluginUpdateStorage");
+				if (completed) storage.setItem(this.completionKey, JSON.stringify(completed));
+				else storage.removeItem(this.completionKey);
+			} catch (_error) {
+				this.publish({ notice: "pluginUpdateStorage" });
+			}
+		}
+		async restoreCompleted() {
+			let saved;
+			try {
+				const text = this.options.completionStorage?.getItem(this.completionKey);
+				if (!text) return false;
+				if (text.length > 4096) throw new Error("Invalid completion");
+				saved = JSON.parse(text);
+			} catch (_error) {
+				this.saveCompleted(null);
+				return false;
+			}
+			if (!record(saved) || !validTarget(saved.target) || typeof saved.beforeVersion !== "string" || !versionParts(saved.beforeVersion) || typeof saved.restartRequired !== "boolean" || typeof saved.refreshRequired !== "boolean") {
+				this.saveCompleted(null);
+				return false;
+			}
+			const completed = {
+				target: saved.target,
+				beforeVersion: saved.beforeVersion,
+				restartRequired: saved.restartRequired,
+				refreshRequired: saved.refreshRequired
+			};
+			await this.activateCompleted(completed);
+			return true;
+		}
+		async activateCompleted(completed) {
+			const sequence = this.sequence;
+			this.publish({
+				phase: "done",
+				target: completed.target,
+				restartRequired: completed.restartRequired,
+				refreshRequired: completed.refreshRequired || !completed.restartRequired,
+				error: ""
+			});
+			if (reached(this.options.version, completed.target.version)) try {
+				const hostVersion = await this.options.runtimeVersion?.();
+				if (this.closed || sequence !== this.sequence || !this.options.canUse()) return;
+				if (hostVersion && reached(hostVersion, completed.target.version)) {
+					this.saveCompleted(null);
+					this.publish({
+						phase: "current",
+						target: null,
+						restartRequired: false,
+						refreshRequired: false,
+						error: "",
+						notice: ""
+					});
+				}
+			} catch (_error) {}
+		}
 		async update(expected) {
 			if (this.closed || this.busy || this.state.pending || this.state.target !== expected || !this.options.canUse()) return;
 			this.busy = true;
@@ -1043,7 +1108,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			const controller = this.controller = new AbortController();
 			let submitted = false;
 			this.publish({
-				phase: "checking",
+				phase: "updating",
 				error: ""
 			});
 			try {
@@ -1104,18 +1169,28 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				return;
 			}
 			if (value.state === "succeeded" && record(value.outcome) && typeof value.installedVersion === "string" && value.beforeVersion === pending.beforeVersion && compareVersions(value.installedVersion, pending.target.version) !== null && compareVersions(value.installedVersion, pending.target.version) >= 0 && typeof value.outcome.refreshRequired === "boolean" && typeof value.outcome.restartRequired === "boolean") {
+				const target = {
+					...pending.target,
+					version: value.installedVersion,
+					url: `${RELEASES}/tag/v${value.installedVersion}`
+				};
+				const completed = {
+					target,
+					beforeVersion: pending.beforeVersion,
+					restartRequired: value.outcome.restartRequired,
+					refreshRequired: value.outcome.refreshRequired
+				};
+				this.saveCompleted(completed);
 				this.savePending(null);
 				this.publish({
 					phase: "done",
 					pending: null,
 					error: "",
 					restartRequired: value.outcome.restartRequired,
-					refreshRequired: value.outcome.refreshRequired,
-					target: {
-						...pending.target,
-						version: value.installedVersion
-					}
+					refreshRequired: value.outcome.refreshRequired || !value.outcome.restartRequired,
+					target
 				});
+				this.activateCompleted(completed);
 			} else if ([
 				"failed",
 				"cancelled",
@@ -1156,6 +1231,14 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			if (this.closed || this.busy || !this.options.canUse()) return;
 			if (this.timer !== null) this.options.cancel(this.timer);
 			this.timer = null;
+			const restoringSequence = this.sequence;
+			const completed = await this.restoreCompleted();
+			if (this.closed || restoringSequence !== this.sequence || !this.options.canUse()) return;
+			if (completed) {
+				this.savePending(null);
+				this.publish({ pending: null });
+				return;
+			}
 			let pending = this.state.pending;
 			if (!pending) try {
 				pending = JSON.parse(this.options.storage?.getItem(this.storageKey) || "null");
@@ -1220,7 +1303,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			if (this.timer !== null) this.options.cancel(this.timer);
 			this.timer = null;
 			this.busy = false;
-			if (this.state.phase === "checking") this.publish({
+			if (this.state.phase === "checking" || this.state.phase === "updating" && !this.state.pending) this.publish({
 				phase: this.state.pending ? "error" : "idle",
 				error: this.state.pending ? "pluginUpdateUnknown" : "",
 				target: null
@@ -1236,20 +1319,47 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	function createClientFeature$21(runtime, env) {
 		const { React, h, Button, Modal, observable, useSnapshot, errorFeedback } = runtime;
 		const { ctx, source, t, pluginVersion } = env;
+		let active = true;
 		let settingsVisible = false;
 		const canUse = () => {
 			const snapshot = source.getSnapshot();
-			return settingsVisible && snapshot.status === "ready" && snapshot.writable;
+			return active && settingsVisible && snapshot.status === "ready" && snapshot.writable;
 		};
 		let storage;
+		let completionStorage;
 		try {
 			storage = window.sessionStorage;
 		} catch (_error) {}
+		try {
+			completionStorage = window.localStorage;
+		} catch (_error) {}
+		let connection = null;
+		let generation = 0;
+		const connectionSource = observable(() => generation);
+		ctx.inject(["connection"], (child) => child.effect(() => {
+			connection = child.connection;
+			const changed = () => {
+				generation++;
+				connectionSource.notify();
+			};
+			changed();
+			return () => {
+				connection = null;
+				changed();
+			};
+		}));
+		const localDesktop = () => window.dshDesktop?.protocolVersion === 1 && window.location.protocol === "dsh-app:" && ["darwin", "win32"].includes(document.documentElement.getAttribute("data-platform") || "") && connection?.isLoopback === true && connection.generation.getSnapshot() !== void 0;
 		const updates = new PluginUpdateClient({
 			version: pluginVersion,
 			baseURI: document.baseURI,
 			canUse,
 			storage,
+			completionStorage,
+			runtimeVersion: async () => {
+				const reply = await ctx.remote.powerDsh.pluginRuntimeVersion();
+				if (!reply.ok) throw new Error("pluginUpdateUnknown");
+				return reply.value;
+			},
 			fetch: (...args) => fetch(...args),
 			notify: () => updateSource.notify(),
 			release: async (signal) => {
@@ -1262,11 +1372,24 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			cancel: (timer) => window.clearTimeout(timer)
 		});
 		const updateSource = observable(() => updates.state);
-		ctx.effect(() => () => updates.close());
+		ctx.effect(() => () => {
+			active = false;
+			settingsVisible = false;
+			updates.close();
+		});
 		function useSettingsFooter({ snapshot, activeTab, id }) {
 			const state = useSnapshot(updateSource);
+			const connectionGeneration = useSnapshot(connectionSource);
 			const [confirming, setConfirming] = React.useState(null);
 			const confirmation = React.useRef(null);
+			const [restart, setRestart] = React.useState({
+				supported: false,
+				running: false,
+				error: ""
+			});
+			const [restartError, setRestartError] = React.useState("");
+			const restarting = React.useRef(false);
+			const restartSubmitting = React.useRef(false);
 			const visible = activeTab === "general" && snapshot.status === "ready";
 			settingsVisible = visible;
 			const writable = visible && snapshot.writable;
@@ -1275,33 +1398,137 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				setConfirming(null);
 			};
 			React.useEffect(() => {
+				if (!writable || state.phase !== "done" || !connection) return;
+				return connection.generation.subscribe(() => {
+					generation++;
+					connectionSource.notify();
+				});
+			}, [
+				writable,
+				state.phase,
+				connectionGeneration
+			]);
+			React.useEffect(() => {
 				if (writable) updates.resume();
 				return () => {
 					updates.pause();
 					confirmation.current = null;
 				};
-			}, [writable]);
+			}, [writable, connectionGeneration]);
 			React.useEffect(() => {
 				close();
-			}, [writable, state.target]);
+			}, [
+				writable,
+				state.target,
+				connectionGeneration
+			]);
+			React.useEffect(() => {
+				if (confirmation.current?.kind === "restart" && (!restart.supported || restart.running)) close();
+			}, [restart.supported, restart.running]);
+			const needsRestart = state.phase === "done" && state.restartRequired;
+			React.useEffect(() => {
+				setRestart({
+					supported: false,
+					running: false,
+					error: ""
+				});
+				setRestartError("");
+				restarting.current = false;
+				if (!writable || !needsRestart || !localDesktop()) return;
+				let active = true;
+				let reading = false;
+				const read = async () => {
+					if (!active || reading || restartSubmitting.current) return;
+					reading = true;
+					try {
+						const reply = await ctx.remote.powerDsh.restartStatus();
+						if (!active) return;
+						if (!reply.ok) throw new Error("pluginUpdateRestartUnavailable");
+						setRestart(reply.value);
+						if (restarting.current && !reply.value.running) {
+							restarting.current = false;
+							setRestartError("pluginUpdateRestartFailed");
+						} else if (reply.value.error) setRestartError("pluginUpdateRestartFailed");
+					} catch (_error) {
+						if (active) {
+							restarting.current = false;
+							setRestart({
+								supported: false,
+								running: false,
+								error: ""
+							});
+							setRestartError("pluginUpdateRestartUnavailable");
+						}
+					} finally {
+						reading = false;
+					}
+				};
+				read();
+				const timer = window.setInterval(read, 2e3);
+				return () => {
+					active = false;
+					window.clearInterval(timer);
+				};
+			}, [
+				writable,
+				needsRestart,
+				connectionGeneration
+			]);
 			if (!visible) return null;
 			const busy = state.phase === "checking" || state.phase === "updating";
+			const available = state.phase === "available" && Boolean(state.target);
 			const request = confirmation.current;
-			const confirm = () => {
+			const confirm = async () => {
 				const expected = request?.target;
-				if (!expected || confirmation.current !== request || !canUse() || state.target !== expected || updates.busy) return;
+				if (!expected || !request || confirmation.current !== request || !canUse() || updates.state.target !== expected || updates.busy || request.generation !== generation) return;
 				close();
-				updates.update(expected);
+				if (request.kind === "update") {
+					await updates.update(expected);
+					return;
+				}
+				if (!localDesktop() || !restart.supported || updates.state.phase !== "done" || !updates.state.restartRequired || restarting.current || restart.running) return;
+				restarting.current = true;
+				restartSubmitting.current = true;
+				setRestartError("");
+				setRestart((previous) => ({
+					...previous,
+					running: true
+				}));
+				try {
+					if (!(await ctx.remote.powerDsh.restartAfterUpdate()).ok) throw new Error("pluginUpdateRestartFailed");
+				} catch (_error) {
+					restarting.current = false;
+					if (canUse() && request.generation === generation) {
+						setRestart((previous) => ({
+							...previous,
+							running: false
+						}));
+						setRestartError("pluginUpdateRestartFailed");
+					}
+				} finally {
+					restartSubmitting.current = false;
+				}
+			};
+			const done = state.phase === "done";
+			const canRestart = needsRestart && localDesktop() && restart.supported;
+			const openConfirmation = (kind) => {
+				if (!canUse() || !updates.state.target || restarting.current || restart.running) return;
+				confirmation.current = {
+					target: updates.state.target,
+					kind,
+					generation
+				};
+				setConfirming(kind);
 			};
 			return h("div", {
 				className: "power-dsh-setting-row power-dsh-plugin-update",
 				key: "plugin-updates",
 				role: "group",
 				"aria-label": t("pluginUpdateVersion")
-			}, h("div", { className: "power-dsh-setting-copy" }, h("div", { className: "power-dsh-setting-label" }, t("pluginUpdateVersion")), h("div", { className: "power-dsh-description power-dsh-plugin-version" }, h("span", null, pluginVersion), state.phase === "current" && h("span", {
+			}, h("div", { className: "power-dsh-setting-copy" }, h("div", { className: "power-dsh-setting-label" }, t("pluginUpdateVersion")), h("div", { className: "power-dsh-description power-dsh-plugin-version" }, h("span", null, done && state.target ? `${pluginVersion} → ${state.target.version}` : pluginVersion), state.phase === "current" && h("span", {
 				className: "power-dsh-plugin-status",
 				role: "status"
-			}, t("pluginUpdateCurrent"))), state.target && h("a", {
+			}, t("pluginUpdateCurrent")), state.target && h("a", {
 				href: state.target.url,
 				target: "_blank",
 				rel: "noopener noreferrer"
@@ -1309,66 +1536,79 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				href: "https://github.com/mewcoder/power-dsh/releases",
 				target: "_blank",
 				rel: "noopener noreferrer"
-			}, t("pluginUpdateReleaseNotes")), [
-				"unconfirmed",
-				"updating",
-				"done"
-			].includes(state.phase) && h("p", {
-				className: "power-dsh-description",
+			}, t("pluginUpdateReleaseNotes"))), (state.phase === "unconfirmed" || done) && h("p", {
+				className: `power-dsh-description${done ? " power-dsh-plugin-status" : ""}`,
 				role: "status"
-			}, state.phase === "done" ? `${t("pluginUpdateDone")} ${state.target?.version || ""}` : t(state.phase === "unconfirmed" ? "pluginUpdateUnconfirmed" : "pluginUpdateRunning")), state.notice && h("p", { className: "power-dsh-description" }, t(state.notice)), state.phase === "done" && state.restartRequired && h("p", { className: "power-dsh-description" }, t("pluginUpdateRestart")), state.phase === "done" && state.refreshRequired && h(Button, {
-				size: "sm",
-				variant: "outline",
-				onClick: () => window.location.reload()
-			}, t("pluginUpdateRefresh")), state.error && errorFeedback({
+			}, t(done ? needsRestart ? canRestart ? "pluginUpdateInstalledRestart" : "pluginUpdateRestart" : "pluginUpdateInstalledRefresh" : "pluginUpdateUnconfirmed")), state.notice && h("p", { className: "power-dsh-description" }, t(state.notice)), state.phase === "updating" && h("div", {
+				className: "power-dsh-plugin-progress",
+				role: "progressbar",
+				"aria-label": t("pluginUpdateUpdating")
+			}, h("span")), restartError && errorFeedback({
+				t,
+				id: `${id}-plugin-restart-error`,
+				message: t(restartError),
+				code: "PD-PLUGIN-RESTART",
+				operation: "pluginUpdate.restart"
+			}), state.error && errorFeedback({
 				t,
 				id: `${id}-plugin-update-error`,
 				message: t(state.error),
 				code: "PD-PLUGIN-UPDATE",
 				operation: state.pending ? "pluginUpdate.observe" : "pluginUpdate.check",
 				observedAt: state.diagnostic?.observedAt,
-				context: updateDiagnosticContext(state.diagnostic, pluginVersion, state.phase, t),
-				retry: state.pending ? () => updates.resume() : void 0
-			})), h("div", { className: "power-dsh-plugin-update-actions" }, h(Button, {
+				context: updateDiagnosticContext(state.diagnostic, pluginVersion, state.phase, t)
+			})), h("div", { className: "power-dsh-plugin-update-actions" }, !available && !done && h(Button, {
 				size: "md",
 				variant: "outline",
-				disabled: !writable || busy || Boolean(state.pending) || state.error === "pluginUpdateUnknown",
-				"aria-busy": state.phase === "checking",
-				onClick: () => updates.check()
-			}, t(state.phase === "checking" ? "pluginUpdateChecking" : "pluginUpdateCheck")), state.phase === "available" && state.target && h(Button, {
+				disabled: !writable || busy,
+				"aria-busy": busy,
+				onClick: () => state.pending ? updates.resume() : updates.check()
+			}, t(state.phase === "updating" ? "pluginUpdateUpdating" : state.phase === "checking" ? "pluginUpdateChecking" : state.pending ? "pluginUpdateResume" : "pluginUpdateCheck")), available && state.target && h(Button, {
 				size: "md",
 				variant: "primary",
 				disabled: !writable || busy,
+				onClick: () => openConfirmation("update")
+			}, `${t("pluginUpdateAction")} ${state.target.version}`), canRestart && h(Button, {
+				size: "md",
+				variant: "primary",
+				disabled: !writable || restart.running,
+				"aria-busy": restart.running,
+				onClick: () => openConfirmation("restart")
+			}, t(restart.running ? "pluginUpdateRestarting" : "pluginUpdateRestartAction")), done && !needsRestart && h(Button, {
+				size: "md",
+				variant: "primary",
+				disabled: !writable,
 				onClick: () => {
-					if (canUse() && updates.state.target) {
-						confirmation.current = { target: updates.state.target };
-						setConfirming(updates.state.target);
-					}
+					if (canUse() && updates.state.phase === "done" && updates.state.target === state.target && !updates.state.restartRequired) window.location.reload();
 				}
-			}, `${t("pluginUpdateAction")} ${state.target.version}`)), h(Modal, {
-				open: Boolean(confirming) && writable && state.target === confirming,
+			}, t("pluginUpdateRefresh"))), h(Modal, {
+				open: Boolean(confirming) && writable && state.target === confirmation.current?.target && (!needsRestart || !restart.running),
 				onClose: close,
-				title: t("pluginUpdateConfirm"),
+				title: t(confirming === "restart" ? "pluginUpdateRestartAction" : "pluginUpdateConfirm"),
 				closeLabel: t("close"),
-				description: t("pluginUpdateConfirmDescription"),
+				description: t(confirming === "restart" ? document.documentElement.getAttribute("data-platform") === "win32" ? "pluginUpdateRestartWindowsConfirm" : "pluginUpdateRestartConfirm" : "pluginUpdateConfirmDescription"),
 				footer: h(React.Fragment, null, h(Button, {
 					variant: "outline",
 					"data-modal-autofocus": true,
 					onClick: close
 				}, t("cancel")), h(Button, {
 					variant: "primary",
-					disabled: !writable || busy,
+					disabled: !writable || busy || confirming === "restart" && restart.running,
 					onClick: confirm
-				}, t("pluginUpdateAction")))
-			}, h("p", null, `${pluginVersion} → ${confirming?.version || ""}`)));
+				}, t(confirming === "restart" ? "pluginUpdateRestartAction" : "pluginUpdateAction")))
+			}, confirming === "update" && h("p", null, `${pluginVersion} → ${state.target?.version || ""}`)));
 		}
 		return {
 			settings: [],
 			useSettingsFooter,
 			styles: `.power-dsh-plugin-update-actions { display:flex; align-items:center; align-self:flex-start; margin-top:3px; justify-content:flex-end; flex-wrap:wrap; flex:none; max-width:50%; gap:8px; }
 .power-dsh-plugin-version { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 8px; }
-.power-dsh-plugin-status { color:#4ade80; background:rgba(74,222,128,.14); border-radius:999px; padding:1px 8px; font-weight:600; }
-.power-dsh-plugin-update a { display:inline-block; margin-top:8px; color:var(--dsw-alias-state-business-primary); }`,
+.power-dsh-page .power-dsh-plugin-update .power-dsh-plugin-status { color:var(--dsw-alias-state-success-primary); }
+.power-dsh-plugin-progress { height:3px; margin-top:12px; overflow:hidden; background:var(--dsw-alias-border-l2); border-radius:3px; }
+.power-dsh-plugin-progress > span { display:block; height:100%; width:35%; background:var(--dsw-alias-label-tertiary); animation:power-dsh-plugin-progress 1.4s ease-in-out infinite alternate; }
+@keyframes power-dsh-plugin-progress { to { transform:translateX(185%); } }
+@media(prefers-reduced-motion:reduce) { .power-dsh-plugin-progress > span { animation:none; width:100%; } }
+.power-dsh-plugin-update a { color:var(--dsw-alias-state-business-primary); }`,
 			api: {
 				pluginUpdateSource: updateSource,
 				pluginUpdates: updates
@@ -1400,7 +1640,16 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			pluginUpdateRunning: "插件市场正在处理更新…",
 			pluginUpdateDone: "已安装",
 			pluginUpdateRefresh: "刷新界面",
-			pluginUpdateRestart: "请通过 DSH 的原生入口重启应用后使用新版。",
+			pluginUpdateRestart: "已安装，请手动重启应用",
+			pluginUpdateInstalledRestart: "已安装，重启后生效",
+			pluginUpdateInstalledRefresh: "已安装，刷新后生效",
+			pluginUpdateUpdating: "正在更新…",
+			pluginUpdateRestartAction: "重启应用",
+			pluginUpdateRestarting: "正在重启…",
+			pluginUpdateRestartConfirm: "运行中的任务会停止，未保存的内容可能丢失",
+			pluginUpdateRestartWindowsConfirm: "将强制关闭当前 DSH 及其子进程后重新打开，运行中的任务会停止，未保存的内容可能丢失",
+			pluginUpdateRestartFailed: "未能重启应用，可再次确认重启，或手动重新打开 DSH",
+			pluginUpdateRestartUnavailable: "暂时无法重启，请手动重新打开 DSH",
 			pluginUpdateApiUnavailable: "当前插件市场不支持公开更新接口，请启用或升级市场后重试，也可在市场中更新。",
 			pluginUpdateDenied: "无法访问更新服务，请检查当前登录和管理权限。",
 			pluginUpdateRateLimited: "接口请求过于频繁，请稍后重试，也可在 GitHub 发布页查看版本。",
@@ -1467,7 +1716,16 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			pluginUpdateRunning: "The plugin market is processing the update…",
 			pluginUpdateDone: "Installed",
 			pluginUpdateRefresh: "Refresh interface",
-			pluginUpdateRestart: "Restart DSH using its native controls to use the new version.",
+			pluginUpdateRestart: "Installed. Restart the application manually",
+			pluginUpdateInstalledRestart: "Installed. Restart to apply",
+			pluginUpdateInstalledRefresh: "Installed. Refresh to apply",
+			pluginUpdateUpdating: "Updating…",
+			pluginUpdateRestartAction: "Restart application",
+			pluginUpdateRestarting: "Restarting…",
+			pluginUpdateRestartConfirm: "Running tasks will stop and unsaved content may be lost",
+			pluginUpdateRestartWindowsConfirm: "This will force-close the current DSH instance and its child processes, then reopen it. Running tasks will stop and unsaved content may be lost",
+			pluginUpdateRestartFailed: "Could not restart. Confirm again to retry, or reopen DSH manually",
+			pluginUpdateRestartUnavailable: "Restart is unavailable. Reopen DSH manually",
 			pluginUpdateApiUnavailable: "The plugin market update API is unavailable. Enable or update the market and retry, or update there.",
 			pluginUpdateDenied: "Cannot access the update service. Check your session and management permissions.",
 			pluginUpdateRateLimited: "Too many requests to the update service. Try again later or check the GitHub releases page.",
@@ -1575,7 +1833,23 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			} })
 		}
 	};
-	const rpc$15 = [READ_PLUGIN_RELEASE_RPC];
+	const PLUGIN_RUNTIME_VERSION_RPC = {
+		id: "power-dsh#powerDsh/pluginRuntimeVersion",
+		service: "powerDsh",
+		namespace: "powerDsh",
+		method: "pluginRuntimeVersion",
+		invocation: { kind: "direct" },
+		parameters: [],
+		result: {
+			mode: "strict",
+			typeSymbol: "power-dsh#PluginRuntimeVersion",
+			create: () => ({ parse(value) {
+				if (typeof value !== "string" || !versionParts(value)) throw new TypeError("Invalid plugin runtime version");
+				return value;
+			} })
+		}
+	};
+	const rpc$15 = [READ_PLUGIN_RELEASE_RPC, PLUGIN_RUNTIME_VERSION_RPC];
 
 // src/features/account-blocking/client.ts
 	function createClientFeature$20(runtime, env) {
@@ -2043,6 +2317,41 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	}
 
 // src/features/mcp/rpc.ts
+	const connectionCodec = {
+		mode: "strict",
+		typeSymbol: "power-dsh#McpConnection",
+		create: () => ({ parse(value) {
+			if (!isRecord(value) || !isOneOf(value.state, [
+				"connected",
+				"connecting",
+				"reconnecting",
+				"waiting-credentials",
+				"failed",
+				"closed"
+			])) throw new TypeError("Invalid MCP connection");
+			const connection = { state: value.state };
+			for (const key of [
+				"toolCount",
+				"connectedAt",
+				"attempt",
+				"maxAttempts"
+			]) {
+				const number = value[key];
+				if (number === void 0) continue;
+				if (typeof number !== "number" || !Number.isFinite(number)) throw new TypeError("Invalid MCP connection");
+				connection[key] = number;
+			}
+			if (value.reason !== void 0) {
+				if (!isOneOf(value.reason, [
+					"gave-up",
+					"reconnect-disabled",
+					"unclosed-generation"
+				])) throw new TypeError("Invalid MCP connection");
+				connection.reason = value.reason;
+			}
+			return connection;
+		} })
+	};
 	const serverCodec = {
 		mode: "strict",
 		typeSymbol: "power-dsh#McpServer",
@@ -2071,7 +2380,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				"stateKnown",
 				"canToggle"
 			])) throw new TypeError("Invalid MCP entry");
-			return {
+			const server = {
 				id: value.id,
 				name: value.name,
 				source: value.source,
@@ -2085,6 +2394,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				reason: value.reason,
 				tools: value.tools.slice()
 			};
+			if (value.connection !== void 0) server.connection = connectionCodec.create().parse(value.connection);
+			return server;
 		} })
 	};
 	const mcpCatalogCodec = {
@@ -2170,6 +2481,40 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		} })
 	};
 	const parseMcpServerDetail = detailCodec.create().parse;
+	const probeCodec = {
+		mode: "strict",
+		typeSymbol: "power-dsh#McpProbe",
+		create: () => ({ parse(value) {
+			if (!isRecord(value) || typeof value.ok !== "boolean" || typeof value.cleanupFailed !== "boolean" || typeof value.durationMs !== "number" || !Number.isFinite(value.durationMs)) throw new TypeError("Invalid MCP probe");
+			if (value.ok) {
+				if (!isStringArray(value.toolNames) || typeof value.truncated !== "boolean") throw new TypeError("Invalid MCP probe");
+				const probe = {
+					ok: true,
+					toolNames: value.toolNames.slice(),
+					truncated: value.truncated,
+					durationMs: value.durationMs,
+					cleanupFailed: value.cleanupFailed
+				};
+				if (value.serverInfo !== void 0) {
+					if (!isRecord(value.serverInfo) || !hasStrings(value.serverInfo, ["name", "version"])) throw new TypeError("Invalid MCP probe");
+					probe.serverInfo = {
+						name: value.serverInfo.name,
+						version: value.serverInfo.version
+					};
+				}
+				return probe;
+			}
+			if (!isOneOf(value.stage, ["connect", "list"]) || typeof value.message !== "string") throw new TypeError("Invalid MCP probe");
+			return {
+				ok: false,
+				stage: value.stage,
+				message: value.message,
+				durationMs: value.durationMs,
+				cleanupFailed: value.cleanupFailed
+			};
+		} })
+	};
+	const parseMcpProbe = probeCodec.create().parse;
 	function mcpRpc(method, fields, result) {
 		return {
 			id: `power-dsh#powerDsh/${method}`,
@@ -2189,10 +2534,12 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	const LIST_MCP_SERVERS_RPC = mcpRpc("listMcpServers", [], mcpCatalogCodec);
 	const READ_MCP_SERVER_RPC = mcpRpc("readMcpServer", ["id"], detailCodec);
 	const SET_MCP_SERVER_ENABLED_RPC = mcpRpc("setMcpServerEnabled", ["id", "enabled"], mcpCatalogCodec);
+	const PROBE_MCP_SERVER_RPC = mcpRpc("probeMcpServer", ["id"], probeCodec);
 	const rpc$13 = [
 		LIST_MCP_SERVERS_RPC,
 		READ_MCP_SERVER_RPC,
-		SET_MCP_SERVER_ENABLED_RPC
+		SET_MCP_SERVER_ENABLED_RPC,
+		PROBE_MCP_SERVER_RPC
 	];
 
 // src/features/mcp/styles.ts
@@ -2208,10 +2555,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
    space-between would park that single child at the row start. */
 .power-dsh-mcp-page .power-dsh-mcp-card-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-top:auto; padding-top:6px; }
 .power-dsh-mcp-page .power-dsh-mcp-tools-summary { min-width:0; margin-right:auto; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
-.power-dsh-mcp-page .power-dsh-mcp-card-detail { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; height:28px; padding:0 10px; border:.5px solid var(--dsw-alias-border-l3); border-radius:var(--dsw-radius-sm); background:transparent; color:var(--dsw-alias-label-primary); font:inherit; font-size:12px; line-height:18px; cursor:pointer; }
-.power-dsh-mcp-page .power-dsh-mcp-card-detail:active { background:var(--dsw-alias-interactive-bg-hover-solid); }
-@media (hover:hover) { .power-dsh-mcp-page .power-dsh-mcp-card-detail:hover { background:var(--dsw-alias-interactive-bg-hover-solid); } }
-.power-dsh-mcp-page .power-dsh-mcp-card-detail:focus-visible { outline:none; box-shadow:0 0 0 2px var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); }
+.power-dsh-mcp-page .power-dsh-mcp-card-detail, .power-dsh-mcp-page .power-dsh-mcp-card-probe { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; height:28px; padding:0 10px; border:.5px solid var(--dsw-alias-border-l3); border-radius:var(--dsw-radius-sm); background:transparent; color:var(--dsw-alias-label-primary); font:inherit; font-size:12px; line-height:18px; cursor:pointer; }
+.power-dsh-mcp-page .power-dsh-mcp-card-detail:active, .power-dsh-mcp-page .power-dsh-mcp-card-probe:active { background:var(--dsw-alias-interactive-bg-hover-solid); }
+@media (hover:hover) { .power-dsh-mcp-page .power-dsh-mcp-card-detail:hover, .power-dsh-mcp-page .power-dsh-mcp-card-probe:hover { background:var(--dsw-alias-interactive-bg-hover-solid); } }
+.power-dsh-mcp-page .power-dsh-mcp-card-detail:focus-visible, .power-dsh-mcp-page .power-dsh-mcp-card-probe:focus-visible { outline:none; box-shadow:0 0 0 2px var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); }
 /* Read-only detail dialog: native Modal geometry with a wide, scrolling body. */
 .power-dsh-mcp-detail { width:min(420px,100%); }
 .power-dsh-mcp-detail .power-dsh-mcp-detail-list { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:baseline; gap:6px 16px; margin:0; }
@@ -2227,6 +2574,9 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 .power-dsh-mcp-detail .power-dsh-mcp-detail-empty { margin:0; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
 /* The dialog is portaled out of the page, so it carries its own notice spacing. */
 .power-dsh-mcp-detail .power-dsh-notice { margin:0; color:var(--dsw-alias-label-tertiary); font-size:13px; line-height:20px; }
+.power-dsh-mcp-page .power-dsh-mcp-card-probe[aria-busy="true"] { opacity:.6; cursor:default; }
+.power-dsh-mcp-page .power-dsh-mcp-probe-result { display:flex; align-items:center; gap:6px; margin:6px 0 0; min-width:0; color:var(--dsw-alias-label-secondary); font-size:12px; line-height:18px; overflow-wrap:anywhere; }
+.power-dsh-mcp-page .power-dsh-mcp-probe-result > span { min-width:0; }
 `;
 
 // src/features/mcp/client.ts
@@ -2240,6 +2590,23 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		disabled: "idle",
 		unknown: "idle"
 	};
+	const connectionDots = {
+		connected: "done",
+		connecting: "ongoing",
+		reconnecting: "ongoing",
+		"waiting-credentials": "warning",
+		failed: "error",
+		closed: "idle"
+	};
+	const connectionKeys = {
+		connected: "mcpConnConnected",
+		connecting: "mcpConnConnecting",
+		reconnecting: "mcpConnReconnecting",
+		"waiting-credentials": "mcpConnWaitingCredentials",
+		failed: "mcpConnFailed",
+		closed: "mcpConnClosed"
+	};
+	const transitionConnection = (state) => state === "connecting" || state === "reconnecting";
 	const milliseconds = (value) => `${String(value)} ms`;
 	function createClientFeature$17(runtime, env) {
 		const { React, h, Tooltip, StateDot, Modal, Button, observable, useSnapshot, useMounted, errorFeedback, loadingFeedback } = runtime;
@@ -2263,7 +2630,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		function canChangeMcp(server) {
 			return Boolean(server && server.stateKnown && server.canToggle && ["profile", "manager"].includes(server.source) && !server.reason);
 		}
-		function McpPage({ t, source, mcpSource, loadMcpServers, setMcpServerEnabled, readMcpServer }) {
+		function McpPage({ t, source, mcpSource, loadMcpServers, setMcpServerEnabled, readMcpServer, probeMcpServer }) {
 			const config = useSnapshot(source);
 			const snapshot = useSnapshot(mcpSource);
 			const catalog = snapshot.value;
@@ -2274,9 +2641,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			});
 			const [error, setError] = React.useState(null);
 			const [detail, setDetail] = React.useState(null);
+			const [probe, setProbe] = React.useState(null);
 			const mounted = useMounted();
 			const pending = React.useRef(false);
 			const detailGeneration = React.useRef(0);
+			const probeGeneration = React.useRef(0);
 			const detailTrigger = React.useRef(null);
 			const id = React.useId();
 			const busy = snapshot.status === "loading" || Boolean(snapshot.saving);
@@ -2307,6 +2676,17 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				"streamable-http": t("mcpHttpType")
 			})[transport] || "";
 			const groupLabel = (group) => t(group === "builtin" ? "skillPreinstalledGroup" : "skillPersonalGroup");
+			const connectionLabel = (connection) => {
+				const key = connectionKeys[connection.state];
+				const raw = t(key);
+				return {
+					key,
+					label: connection.state === "reconnecting" ? raw.replace("{attempt}", String(connection.attempt ?? 0)).replace("{max}", String(connection.maxAttempts ?? 0)) : raw,
+					dot: connectionDots[connection.state],
+					transitioning: transitionConnection(connection.state),
+					state: connection.state
+				};
+			};
 			const needle = query.trim().toLocaleLowerCase();
 			const rows = (catalog?.servers ?? []).filter((server) => `${server.name} ${server.tools.join(" ")} ${server.origin} ${server.source} ${safeSourceLabel(server.source)} ${groupLabel(server.group)} ${typeLabel(server.transport)}`.toLocaleLowerCase().includes(needle));
 			function contextAvailable() {
@@ -2327,6 +2707,40 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					});
 				} finally {
 					pending.current = false;
+				}
+			}
+			function probeContextAvailable() {
+				const latest = mcpSource.getSnapshot();
+				const config = source.getSnapshot();
+				return mounted.current && latest.status === "ready" && latest.value === catalog && config.status === "ready" && config.value?.mcpManagerEnabled === true;
+			}
+			async function runProbe(server) {
+				if (!probeContextAvailable()) return;
+				if (probe?.id === server.id && probe.status === "running") return;
+				const generation = ++probeGeneration.current;
+				setProbe({
+					id: server.id,
+					status: "running",
+					value: null,
+					error: ""
+				});
+				try {
+					const value = await probeMcpServer(server.id);
+					if (!mounted.current || generation !== probeGeneration.current) return;
+					setProbe({
+						id: server.id,
+						status: "ready",
+						value,
+						error: ""
+					});
+				} catch (failure) {
+					if (!mounted.current || generation !== probeGeneration.current) return;
+					setProbe({
+						id: server.id,
+						status: "error",
+						value: null,
+						error: mcpErrorMessage(errorMessage(failure), "mcpProbeFailed")
+					});
 				}
 			}
 			async function openDetail(server, trigger) {
@@ -2367,21 +2781,36 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			const renderCard = (server) => {
 				const transportLabel = typeLabel(server.transport);
 				const off = server.stateKnown && !server.enabled;
-				const displayState = off ? "disabled" : server.runtimeState;
-				const runtimeLabel = {
+				const connection = !off && server.connection ? connectionLabel(server.connection) : null;
+				const lifecycleKey = {
 					pending: "mcpRuntimePending",
 					loading: "mcpRuntimeLoading",
 					active: "mcpRuntimeActive",
 					failed: "mcpRuntimeFailed",
 					unloading: "mcpRuntimeUnloading",
-					inactive: "mcpRuntimeInactive",
-					disabled: "mcpDisabled"
-				}[displayState];
-				const transitioning = [
+					inactive: "mcpRuntimeInactive"
+				}[server.runtimeState];
+				const lifecycleTransitioning = [
 					"pending",
 					"loading",
 					"unloading"
-				].includes(displayState);
+				].includes(server.runtimeState);
+				const status = off ? {
+					label: t("mcpDisabled"),
+					dot: "idle",
+					state: "disabled",
+					transition: false
+				} : connection ? {
+					label: connection.label,
+					dot: connection.dot,
+					state: connection.state,
+					transition: false
+				} : lifecycleKey ? {
+					label: t(lifecycleKey),
+					dot: runtimeDots[server.runtimeState],
+					state: server.runtimeState,
+					transition: lifecycleTransitioning
+				} : null;
 				const summary = off || server.tools.length === 0 ? "" : server.tools.length === 1 ? t("mcpSingleTool") : t("mcpToolCount").replace("{count}", () => String(server.tools.length));
 				const control = `${id}-mcp-${catalog.servers.indexOf(server)}`;
 				const reasonKey = {
@@ -2394,6 +2823,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				}[server.reason];
 				const reason = !server.stateKnown ? t("mcpStateUnknown") : reasonKey ? t(reasonKey) : !canChangeMcp(server) ? t("mcpReadOnly") : "";
 				const describedBy = [reason && `${control}-reason`, error?.id === server.id && `${control}-error`].filter(Boolean).join(" ") || void 0;
+				const currentProbe = probe?.id === server.id ? probe : null;
+				const probing = currentProbe?.status === "running";
 				return h("li", {
 					key: server.id,
 					className: "power-dsh-skill-card",
@@ -2428,16 +2859,16 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				})) : h("span", {
 					className: "power-dsh-description",
 					"aria-hidden": true
-				}, "—")), (transportLabel || runtimeLabel) && h("div", { className: "power-dsh-mcp-card-meta" }, transportLabel && h("span", {
+				}, "—")), (transportLabel || status) && h("div", { className: "power-dsh-mcp-card-meta" }, transportLabel && h("span", {
 					id: `${control}-transport`,
 					className: "power-dsh-mcp-transport",
 					"data-transport": server.transport
-				}, transportLabel), runtimeLabel && h("span", {
+				}, transportLabel), status && h("span", {
 					className: "power-dsh-mcp-runtime",
-					"data-state": displayState,
+					"data-state": status.state,
 					role: "status",
-					"aria-label": transitioning ? t(runtimeLabel) : void 0
-				}, h(StateDot, { state: runtimeDots[displayState] }), !transitioning && t(runtimeLabel))), reason && h("p", {
+					"aria-label": status.transition ? status.label : void 0
+				}, h(StateDot, { state: status.dot }), !status.transition && status.label)), reason && h("p", {
 					id: `${control}-reason`,
 					className: "power-dsh-skill-reason"
 				}, reason), error?.id === server.id && errorFeedback({
@@ -2451,6 +2882,16 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					className: "power-dsh-mcp-tools-summary"
 				}, summary), h("button", {
 					type: "button",
+					className: "power-dsh-mcp-card-probe",
+					"data-probe": server.id,
+					"aria-label": `${t("mcpProbe")}: ${server.name}`,
+					"aria-busy": probing || void 0,
+					disabled: Boolean(busy || snapshot.status !== "ready" || !catalog?.complete || probing),
+					onClick: () => {
+						runProbe(server);
+					}
+				}, probing ? t("mcpProbing") : t("mcpProbe")), h("button", {
+					type: "button",
 					className: "power-dsh-mcp-card-detail",
 					"data-detail": server.id,
 					"aria-haspopup": "dialog",
@@ -2459,7 +2900,45 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					onClick: () => {
 						openDetail(server, detailTrigger.current);
 					}
-				}, t("mcpDetail")))));
+				}, t("mcpDetail"))), currentProbe?.status === "ready" && currentProbe.value && probeResult(currentProbe.value), currentProbe?.status === "error" && errorFeedback({
+					t,
+					id: `${control}-probe-error`,
+					message: currentProbe.error,
+					code: "PD-MCP-PROBE",
+					operation: "probeMcpServer",
+					placement: "inline",
+					retry: () => {
+						runProbe(server);
+					},
+					disabled: probing
+				})));
+			};
+			const probeResult = (value) => {
+				if (value.ok) {
+					const label = t("mcpProbeSuccess").replace("{count}", String(value.toolNames.length)).replace("{ms}", String(Math.round(value.durationMs)));
+					const detail = [
+						value.serverInfo && `${value.serverInfo.name} ${value.serverInfo.version}`,
+						value.truncated && t("mcpProbeTruncated"),
+						value.cleanupFailed && t("mcpProbeCleanup")
+					].filter(Boolean).join(" · ");
+					return h("p", {
+						className: "power-dsh-mcp-probe-result",
+						role: "status",
+						"data-ok": "true"
+					}, h(StateDot, { state: value.cleanupFailed ? "warning" : "done" }), h("span", null, detail ? `${label} · ${detail}` : label));
+				}
+				return errorFeedback({
+					t,
+					message: t(value.stage === "list" ? "mcpProbeListFailed" : "mcpProbeConnectFailed"),
+					code: "PD-MCP-PROBE",
+					operation: "probeMcpServer",
+					placement: "inline",
+					context: {
+						stage: value.stage,
+						result: value.cleanupFailed ? "cleanup-unconfirmed" : "failed",
+						actual: value.message || void 0
+					}
+				});
 			};
 			const renderGroup = (group) => {
 				const selectedRows = rows.filter((server) => server.group === group);
@@ -2499,7 +2978,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				const off = server?.stateKnown === true && server.enabled === false;
 				const transport = server && server.transport !== "unknown" ? server.transport : config?.transport ?? "unknown";
 				const transportLabel = typeLabel(transport) || t("mcpDetailUnknown");
-				const runtimeLabel = t((off ? "mcpDisabled" : {
+				const connection = !off && server?.connection ? connectionLabel(server.connection) : null;
+				const runtimeKey = off ? "mcpDisabled" : {
 					pending: "mcpRuntimePending",
 					loading: "mcpRuntimeLoading",
 					active: "mcpRuntimeActive",
@@ -2507,7 +2987,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					unloading: "mcpRuntimeUnloading",
 					inactive: "mcpRuntimeInactive",
 					disabled: "mcpDisabled"
-				}[server?.runtimeState ?? ""]) ?? "mcpDetailUnknown");
+				}[server?.runtimeState ?? ""];
+				const runtimeLabel = off ? t("mcpDisabled") : connection ? connection.label : t(runtimeKey ?? "mcpDetailUnknown");
 				const reconnect = config?.reconnect;
 				const reconnectParts = [];
 				if (typeof reconnect?.enabled === "boolean") reconnectParts.push(t(reconnect.enabled ? "mcpDetailOn" : "mcpDetailReconnectOff"));
@@ -2625,7 +3106,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"mcpChangeUncertain",
 			"mcpUnavailable",
 			"mcpDetailFailed",
-			"mcpDetailOutdated"
+			"mcpDetailOutdated",
+			"mcpProbeFailed"
 		].includes(message ?? "") ? message : fallback);
 		const mirrorMcpCatalog = (value) => {
 			mcpCatalog = {
@@ -2703,6 +3185,12 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			if (!result.ok) throw new Error(result.error.message);
 			return parseMcpServerDetail(result.value);
 		};
+		const probeMcpServer = async (id) => {
+			if (!active || typeof id !== "string" || id === "") throw new Error(t("mcpProbeFailed"));
+			const result = await ctx.remote.powerDsh.probeMcpServer(id);
+			if (!result.ok) throw new Error(result.error.message);
+			return parseMcpProbe(result.value);
+		};
 		preferenceSlot("mcpManagerEnabled", "settings.section", {
 			id: "power-dsh-mcp",
 			order: 53,
@@ -2714,7 +3202,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			mcpSource,
 			loadMcpServers,
 			setMcpServerEnabled,
-			readMcpServer
+			readMcpServer,
+			probeMcpServer
 		}));
 		preferenceSlot("mcpManagerEnabled", "settings.section.icon", { id: "power-dsh-mcp" }, McpIcon);
 		return {
@@ -2727,7 +3216,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				mcpSource,
 				loadMcpServers,
 				setMcpServerEnabled,
-				readMcpServer
+				readMcpServer,
+				probeMcpServer
 			}
 		};
 	}
@@ -2777,6 +3267,20 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"mcpRuntimeFailed": "Failed to load",
 			"mcpRuntimeUnloading": "Unloading",
 			"mcpRuntimeInactive": "Not running",
+			"mcpConnConnected": "Connected",
+			"mcpConnConnecting": "Connecting",
+			"mcpConnReconnecting": "Reconnecting {attempt}/{max}",
+			"mcpConnWaitingCredentials": "Waiting for credentials",
+			"mcpConnFailed": "Connection failed",
+			"mcpConnClosed": "Disconnected",
+			"mcpProbe": "Test connection",
+			"mcpProbing": "Testing…",
+			"mcpProbeSuccess": "Connected · {count} tools · {ms} ms",
+			"mcpProbeTruncated": "tool list truncated",
+			"mcpProbeCleanup": "cleanup not confirmed",
+			"mcpProbeConnectFailed": "Could not connect to this MCP server.",
+			"mcpProbeListFailed": "Connected but could not list tools.",
+			"mcpProbeFailed": "Could not test this connection. Please try again.",
 			"mcpStateUnknown": "State unavailable",
 			"mcpPresetManaged": "Managed by its mode",
 			"mcpConditional": "Enabled state is controlled by a condition",
@@ -2858,6 +3362,20 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"mcpRuntimeFailed": "加载失败",
 			"mcpRuntimeUnloading": "卸载中",
 			"mcpRuntimeInactive": "未运行",
+			"mcpConnConnected": "已连接",
+			"mcpConnConnecting": "连接中",
+			"mcpConnReconnecting": "重连中 {attempt}/{max}",
+			"mcpConnWaitingCredentials": "等待凭据",
+			"mcpConnFailed": "连接失败",
+			"mcpConnClosed": "未连接",
+			"mcpProbe": "测试连接",
+			"mcpProbing": "测试中…",
+			"mcpProbeSuccess": "已连接 · {count} 个工具 · {ms} ms",
+			"mcpProbeTruncated": "工具列表已截断",
+			"mcpProbeCleanup": "清理未确认",
+			"mcpProbeConnectFailed": "无法连接到此 MCP 服务器。",
+			"mcpProbeListFailed": "已连接，但无法列出工具。",
+			"mcpProbeFailed": "无法测试此连接，请重试。",
 			"mcpStateUnknown": "状态不可用",
 			"mcpPresetManaged": "由模式管理",
 			"mcpConditional": "启用状态由条件控制",
@@ -4560,7 +5078,16 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			} })
 		}
 	};
-	const rpc$10 = [RESTART_STATUS_RPC, RESTART_APP_RPC];
+	const RESTART_AFTER_UPDATE_RPC = {
+		...RESTART_APP_RPC,
+		id: "power-dsh#powerDsh/restartAfterUpdate",
+		method: "restartAfterUpdate"
+	};
+	const rpc$10 = [
+		RESTART_STATUS_RPC,
+		RESTART_APP_RPC,
+		RESTART_AFTER_UPDATE_RPC
+	];
 
 // src/features/search-blocking/client.ts
 	function createClientFeature$12(runtime, env) {
@@ -6103,7 +6630,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"skillDelete": "Delete",
 			"skillRemoveLink": "Remove link",
 			"skillDeleting": "Deleting…",
-			"skillDeleteHint": "Delete this skill and its resources? This cannot be undone.",
+			"skillDeleteHint": "Delete this skill and its resources? This cannot be undone. Other agents using these files will also be affected.",
 			"skillRemoveLinkHint": "Remove this link from DSH? The source files will be kept.",
 			"skillDeleteFailed": "Could not delete this skill. Refresh its details and try again.",
 			"skillDeleteChanged": "The skill changed. Refresh its details before deleting.",
@@ -6221,7 +6748,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"skillDelete": "删除",
 			"skillRemoveLink": "移除链接",
 			"skillDeleting": "正在删除…",
-			"skillDeleteHint": "确定删除此技能及其资源文件？此操作不可撤销。",
+			"skillDeleteHint": "确定删除此技能及其资源文件？此操作不可撤销，也会影响使用这些文件的其他 Agent。",
 			"skillRemoveLinkHint": "确定从 DSH 移除此链接？源文件会保留。",
 			"skillDeleteFailed": "删除技能失败，请刷新详情后重试。",
 			"skillDeleteChanged": "技能已发生变化，请刷新详情后重新确认删除。",
@@ -12258,9 +12785,11 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 	}
 	const MOD_RPC = composeRpc([
 		READ_PLUGIN_RELEASE_RPC,
+		PLUGIN_RUNTIME_VERSION_RPC,
 		NOTIFICATION_TRANSPORT_RPC,
 		RESTART_STATUS_RPC,
 		RESTART_APP_RPC,
+		RESTART_AFTER_UPDATE_RPC,
 		LIST_SYSTEM_SOUNDS_RPC,
 		PLAY_SYSTEM_SOUND_RPC,
 		SHOW_WINDOWS_NOTIFICATION_RPC,
@@ -12286,6 +12815,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		LIST_MCP_SERVERS_RPC,
 		READ_MCP_SERVER_RPC,
 		SET_MCP_SERVER_ENABLED_RPC,
+		PROBE_MCP_SERVER_RPC,
 		LIST_ARCHIVED_SESSIONS_RPC,
 		RESTORE_ARCHIVED_SESSION_RPC,
 		DELETE_ARCHIVED_SESSION_RPC,
@@ -12361,7 +12891,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 							t,
 							version,
 							namespace,
-							pluginVersion: "0.0.10",
+							pluginVersion: "0.0.11",
 							savePreference,
 							preferenceSlot: preferenceSlot$1,
 							get footerBusy() {

@@ -89,6 +89,9 @@ test('checking and opening the confirmation never installs; only the current con
   const view = () => descendants(app.renderSettings());
   await view().find(node => node.type === 'button' && node.props.children.includes('pluginUpdateCheck')).props.onClick();
   assert.equal(posts, 0);
+  assert.equal(view().some(node => node.type === 'button' && node.props.children.includes('pluginUpdateCheck')), false);
+  const versionLine = view().find(node => node.props.className === 'power-dsh-description power-dsh-plugin-version');
+  assert.ok(descendants(versionLine).some(node => node.type === 'a' && node.props.href === 'https://github.com/mewcoder/power-dsh/releases/tag/v0.0.999'));
   const open = () => view().find(node => node.type === 'button' && node.props.children.includes('pluginUpdateAction 0.0.999'));
   open().props.onClick();
   let dialog = view().find(node => node.type === 'native-modal-fixture');
@@ -105,12 +108,132 @@ test('checking and opening the confirmation never installs; only the current con
   await hiddenConfirm();
   assert.equal(posts, 0);
   app.selectSettingsTab('general');
-  await view().find(node => node.type === 'button' && node.props.children.includes('pluginUpdateCheck')).props.onClick();
+  assert.equal(view().some(node => node.type === 'button' && node.props.children.includes('pluginUpdateCheck')), false);
   open().props.onClick();
   dialog = view().find(node => node.type === 'native-modal-fixture');
   descendants(dialog).find(node => node.type === 'button' && node.props.children.includes('pluginUpdateAction')).props.onClick();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(posts, 1);
   assert.equal(app.settingsProps().pluginUpdates.state.phase, 'updating');
+  app.unmount();
+});
+
+const updateTarget = { version: '0.0.999', url: 'https://github.com/mewcoder/power-dsh/releases/tag/v0.0.999',
+  source: 'github', installed: 'b'.repeat(40), latest: 'a'.repeat(40), bootId: 'boot' };
+const updateView = app => descendants(app.renderSettings());
+const updateButton = (app, label) => updateView(app).find(node => node.type === 'button' && node.props.children.includes(label));
+const updateDialog = app => updateView(app).find(node => node.type === 'native-modal-fixture');
+async function installed(app, patch = {}) {
+  app.renderSettings();
+  app.settingsProps().pluginUpdates.publish({ phase: 'done', target: updateTarget, restartRequired: true, refreshRequired: true, ...patch });
+  app.renderSettings();
+  await new Promise(resolve => setImmediate(resolve));
+}
+
+test('installed updates reuse restart with the menu switch off, confirm once and prefer restart over refresh', async () => {
+  const app = await mount({ desktop: true });
+  app.set({ showRestartButton: false });
+  await installed(app);
+  assert.ok(updateButton(app, 'pluginUpdateRestartAction'));
+  assert.equal(updateButton(app, 'pluginUpdateCheck'), undefined);
+  assert.equal(updateButton(app, 'pluginUpdateRefresh'), undefined);
+  assert.equal(app.restartCalls.length, 0);
+  updateButton(app, 'pluginUpdateRestartAction').props.onClick();
+  assert.equal(updateDialog(app).props.description, 'pluginUpdateRestartConfirm');
+  const stale = descendants(updateDialog(app)).find(node => node.props.children.includes('pluginUpdateRestartAction') && node.type === 'button').props.onClick;
+  updateDialog(app).props.onClose();
+  await stale();
+  assert.equal(app.restartCalls.length, 0);
+  updateButton(app, 'pluginUpdateRestartAction').props.onClick();
+  const confirm = descendants(updateDialog(app)).find(node => node.props.children.includes('pluginUpdateRestartAction') && node.type === 'button').props.onClick;
+  await Promise.all([confirm(), confirm()]);
+  assert.deepEqual(app.restartCalls, [['after-update']]);
+  assert.equal(updateButton(app, 'pluginUpdateRestarting').props.disabled, true);
+  assert.equal(app.settingsValue().showRestartButton, false);
+  app.unmount();
+  assert.deepEqual(app.intervals(), []);
+});
+
+test('update restart rejects stale confirmation after leaving settings, losing authority or changing Host generation', async () => {
+  for (const change of [app => app.selectSettingsTab('interface'), app => app.setFormStatus('unavailable'), app => app.setConnectionGeneration({ id: 2 })]) {
+    const app = await mount({ desktop: true });
+    await installed(app);
+    updateButton(app, 'pluginUpdateRestartAction').props.onClick();
+    const confirm = descendants(updateDialog(app)).find(node => node.props.children.includes('pluginUpdateRestartAction') && node.type === 'button').props.onClick;
+    change(app);
+    await confirm();
+    assert.equal(app.restartCalls.length, 0);
+    app.unmount();
+  }
+});
+
+test('unsupported and remote pages retain manual restart, while refresh is the only action for a refresh-only result', async () => {
+  for (const options of [{ desktop: false }, { desktop: true, localConnection: false }, { desktop: true, restartStatus: { supported: false, running: false, error: '' } }]) {
+    const app = await mount(options);
+    await installed(app);
+    assert.equal(updateButton(app, 'pluginUpdateRestartAction'), undefined);
+    assert.equal(updateButton(app, 'pluginUpdateRefresh'), undefined);
+    assert.ok(updateView(app).some(node => node.props.role === 'status' && node.props.children.includes('pluginUpdateRestart')));
+    assert.equal(app.restartCalls.length, 0);
+    app.unmount();
+  }
+  let reloads = 0;
+  const app = await mount({ reload: () => { reloads++; } });
+  await installed(app, { restartRequired: false });
+  assert.equal(reloads, 0);
+  assert.equal(updateButton(app, 'pluginUpdateCheck'), undefined);
+  updateButton(app, 'pluginUpdateRefresh').props.onClick();
+  assert.equal(reloads, 1);
+  app.unmount();
+});
+
+test('Windows restart confirmation describes forced exit and a restart failure preserves the installed result', async () => {
+  const app = await mount({ desktop: true, windows: true, restartReply: async () => ({ ok: false, error: { message: 'restartFailed' } }) });
+  await installed(app);
+  updateButton(app, 'pluginUpdateRestartAction').props.onClick();
+  assert.equal(updateDialog(app).props.description, 'pluginUpdateRestartWindowsConfirm');
+  await descendants(updateDialog(app)).find(node => node.props.children.includes('pluginUpdateRestartAction') && node.type === 'button').props.onClick();
+  assert.ok(updateView(app).some(node => node.props.role === 'alert' && node.props.children.includes('pluginUpdateRestartFailed')));
+  assert.equal(app.settingsProps().pluginUpdates.state.phase, 'done');
+  assert.equal(updateButton(app, 'pluginUpdateRestartAction').props.disabled, false);
+  app.unmount();
+});
+
+test('lost restart support closes confirmation and captured refresh callbacks cannot act after unmount', async () => {
+  const status = { supported: true, running: false, error: '' };
+  const app = await mount({ desktop: true, restartStatus: status });
+  await installed(app);
+  updateButton(app, 'pluginUpdateRestartAction').props.onClick();
+  const confirm = descendants(updateDialog(app)).find(node => node.props.children.includes('pluginUpdateRestartAction') && node.type === 'button').props.onClick;
+  status.supported = false;
+  await app.tickIntervals();
+  assert.equal(updateDialog(app), undefined);
+  await confirm();
+  assert.equal(app.restartCalls.length, 0);
+  app.unmount();
+  let reloads = 0;
+  const browser = await mount({ reload: () => { reloads++; } });
+  await installed(browser, { restartRequired: false });
+  const refresh = updateButton(browser, 'pluginUpdateRefresh').props.onClick;
+  browser.unmount();
+  refresh();
+  assert.equal(reloads, 0);
+});
+
+test('only one action is shown while updating and an unknown task resumes reads without offering another installation', async () => {
+  const app = await mount();
+  app.renderSettings();
+  const updates = app.settingsProps().pluginUpdates;
+  updates.publish({ phase: 'updating', target: updateTarget });
+  assert.equal(updateButton(app, 'pluginUpdateUpdating').props.disabled, true);
+  assert.equal(updateButton(app, 'pluginUpdateCheck'), undefined);
+  const pending = { operationId: 'operation', target: updateTarget, beforeVersion: '0.0.10' };
+  updates.publish({ phase: 'error', pending, error: 'pluginUpdateUnknown' });
+  let resumed = 0;
+  updates.resume = async () => { resumed++; };
+  assert.equal(updateButton(app, 'pluginUpdateCheck'), undefined);
+  assert.equal(updateView(app).some(node => node.props.className === 'power-dsh-error-retry'), false);
+  await updateButton(app, 'pluginUpdateResume').props.onClick();
+  assert.equal(resumed, 1);
   app.unmount();
 });

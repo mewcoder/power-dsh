@@ -260,29 +260,30 @@ export class WindowsRestart {
     if (this.closed) throw new Error('restartUnavailable');
     return { supported: this.availability.supported, running: this.pending || this.current !== null, error: this.error };
   }
-  async restart(): Promise<RestartAccepted> {
-    if (this.closed || !this.config.showRestartButton.get()) throw new Error('restartUnavailable');
+  async restart(afterUpdate = false): Promise<RestartAccepted> {
+    const allowed = () => afterUpdate || this.config.showRestartButton.get() === true;
+    if (this.closed || !allowed()) throw new Error('restartUnavailable');
     if (this.pending || this.current) throw new Error('restartBusy');
     this.pending = true;
     this.error = '';
     let operation: Operation | undefined;
     try {
       const target = await this.target();
-      if (!target || this.closed || !this.config.showRestartButton.get()) throw new Error('restartUnavailable');
+      if (!target || this.closed || !allowed()) throw new Error('restartUnavailable');
       operation = { directory: await mkdtemp(path.join(tmpdir(), 'power-dsh-restart-')), nonce: randomUUID(), committed: false, expiresAt: Date.now() + 90_000 };
       this.current = operation;
       await writeFile(path.join(operation.directory, 'request.json'), JSON.stringify({ target, nonce: operation.nonce, expiresAt: operation.expiresAt }), { mode: 0o600 });
       await writeFile(path.join(operation.directory, 'helper.ps1'), WINDOWS_RESTART_HELPER, { mode: 0o600 });
-      if (this.closed || !this.config.showRestartButton.get()) throw new Error('restartUnavailable');
+      if (this.closed || !allowed()) throw new Error('restartUnavailable');
       await this.run(windowsDispatchScript(operation.directory, this.powershell()));
       const deadline = Date.now() + (this.options.handoffMs ?? 8000);
       while (Date.now() < deadline) {
-        if (this.closed || !this.config.showRestartButton.get()) throw new Error('restartUnavailable');
+        if (this.closed || !allowed()) throw new Error('restartUnavailable');
         const phase = await this.state(operation);
         if (phase === 'failed') throw new Error('restartFailed');
         if (phase === 'ready') {
           await writeFile(path.join(operation.directory, 'commit.next'), operation.nonce, { mode: 0o600 });
-          if (this.closed || !this.config.showRestartButton.get()) throw new Error('restartUnavailable');
+          if (this.closed || !allowed()) throw new Error('restartUnavailable');
           await rename(path.join(operation.directory, 'commit.next'), path.join(operation.directory, 'commit'));
           operation.committed = true;
           return { accepted: true };

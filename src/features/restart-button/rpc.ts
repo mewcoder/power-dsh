@@ -19,4 +19,8 @@ export const RESTART_APP_RPC: RpcDescriptor<'restartApp', RestartAccepted> = {
   } }) },
 };
 
-export const rpc = [RESTART_STATUS_RPC, RESTART_APP_RPC];
+export const RESTART_AFTER_UPDATE_RPC: RpcDescriptor<'restartAfterUpdate', RestartAccepted> = {
+  ...RESTART_APP_RPC, id: 'power-dsh#powerDsh/restartAfterUpdate', method: 'restartAfterUpdate',
+};
+
+export const rpc = [RESTART_STATUS_RPC, RESTART_APP_RPC, RESTART_AFTER_UPDATE_RPC];

@@ -86,16 +86,17 @@ export class DesktopRestart {
     return { supported, running: this.current !== null, error: this.error };
   }
 
-  async restart(): Promise<RestartAccepted> {
-    if (this.windows) return this.windows.restart();
-    if (this.closed || this.config.showRestartButton.get() !== true) throw new Error('restartUnavailable');
+  async restart(afterUpdate = false): Promise<RestartAccepted> {
+    const allowed = () => afterUpdate || this.config.showRestartButton.get() === true;
+    if (this.windows) return this.windows.restart(afterUpdate);
+    if (this.closed || !allowed()) throw new Error('restartUnavailable');
     if (this.current) throw new Error('restartBusy');
     const operation: RestartOperation = { handle: null, handedOff: false };
     this.current = operation;
     this.error = '';
     try {
       const app = await this.target();
-      if (this.closed || !app || this.config.showRestartButton.get() !== true) throw new Error('restartUnavailable');
+      if (this.closed || !app || !allowed()) throw new Error('restartUnavailable');
       const env = { ...this.env };
       for (const key of ['ELECTRON_RUN_AS_NODE', 'NODE_OPTIONS', 'NODE_PATH']) delete env[key];
       const child = this.spawn('/usr/bin/osascript', ['-e', MAC_RESTART_SCRIPT, app], {
