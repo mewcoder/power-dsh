@@ -4622,10 +4622,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 .power-dsh-skill-existing { flex:none; align-self:center; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
 .power-dsh-skill-detail .power-dsh-skill-delete { color:var(--dsw-alias-state-error-primary); }
 @media (hover:hover) { .power-dsh-skill-delete:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover-danger); } }
-.power-dsh-skills-page .power-dsh-skill-path-stack { position:relative; isolation:isolate; display:inline-block; max-width:calc(100% - 8px); padding:0 8px 8px 0; vertical-align:middle; }
+.power-dsh-skills-page .power-dsh-skill-path-stack { position:relative; isolation:isolate; display:inline-block; max-width:calc(100% - 8px); padding:8px 8px 0 0; vertical-align:middle; }
 .power-dsh-skills-page .power-dsh-skill-path-stack::before,.power-dsh-skills-page .power-dsh-skill-path-stack::after { position:absolute; z-index:-1; border:.5px solid var(--dsw-alias-border-l3); border-radius:var(--dsw-radius-xs); content:""; pointer-events:none; }
 .power-dsh-skills-page .power-dsh-skill-path-stack::before { inset:4px; }
-.power-dsh-skills-page .power-dsh-skill-path-stack::after { inset:8px 0 0 8px; opacity:.6; }
+.power-dsh-skills-page .power-dsh-skill-path-stack::after { inset:0 0 8px 8px; opacity:.6; }
 .power-dsh-skills-page .power-dsh-skill-path-label { display:block; overflow:hidden; border:.5px solid var(--dsw-alias-border-l3); border-radius:var(--dsw-radius-xs); background:var(--dsw-alias-settings-card-fill); padding:0 4px; text-overflow:ellipsis; }
 .power-dsh-skills-page .power-dsh-skill-card-detail { box-sizing:border-box; display:inline-flex; flex:none; align-items:center; justify-content:center; height:28px; padding:0 10px; border:.5px solid var(--dsw-alias-border-l3); border-radius:var(--dsw-radius-sm); background:transparent; color:var(--dsw-alias-label-primary); font:inherit; font-size:12px; line-height:18px; cursor:pointer; }
 .power-dsh-skills-page .power-dsh-skill-card-detail:active { background:var(--dsw-alias-interactive-bg-hover-solid); }
@@ -5761,18 +5761,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			return h("section", {
 				className: "power-dsh-page power-dsh-skills-page",
 				"aria-label": t("skillsTab")
-			}, h("style", null, styles), h("header", null, h("h2", { className: "power-dsh-title" }, t("skillsTab")), h("p", { className: "power-dsh-description" }, t(tab === "sources" ? "skillDiscoverDescription" : "skillsDescription"))), snapshot.status === "loading" && loadingFeedback({
-				label: t("loading"),
-				...catalog ? { compact: true } : {}
-			}), snapshot.error && errorFeedback({
-				t,
-				message: snapshot.error,
-				code: "PD-SKILLS-LOAD",
-				operation: "listSkills",
-				placement: "page",
-				retry: () => loadSkills(),
-				disabled: busy
-			}), h("div", { className: "power-dsh-skill-navigation" }, h("div", {
+			}, h("style", null, styles), h("header", null, h("h2", { className: "power-dsh-title" }, t("skillsTab")), h("p", { className: "power-dsh-description" }, t(tab === "sources" ? "skillDiscoverDescription" : "skillsDescription"))), h("div", { className: "power-dsh-skill-navigation" }, h("div", {
 				className: "power-dsh-tabs",
 				role: "tablist",
 				"aria-label": t("skillScope")
@@ -5793,7 +5782,18 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					setQuery(event.target.value);
 					if (tab === "project" && event.target.value.trim()) queueWorkspaceLoads();
 				}
-			})), tab === "user" && catalog && !catalog.complete && h("p", {
+			})), snapshot.status === "loading" && loadingFeedback({
+				label: t("loading"),
+				...catalog ? { compact: true } : {}
+			}), snapshot.error && errorFeedback({
+				t,
+				message: snapshot.error,
+				code: "PD-SKILLS-LOAD",
+				operation: "listSkills",
+				placement: "page",
+				retry: () => loadSkills(),
+				disabled: busy
+			}), tab === "user" && catalog && !catalog.complete && h("p", {
 				className: "power-dsh-description power-dsh-skill-notice",
 				role: "status"
 			}, t("skillIncomplete")), config.status === "ready" && !config.writable && h("p", { className: "power-dsh-description power-dsh-skill-notice" }, t("readOnly")), tab === "sources" ? renderImport() : tab === "project" ? renderWorkspaces() : catalog && [renderGroup("personal", "skillPersonalGroup", rows.filter((skill) => displaySource(skill) !== "skillBundledSource")), renderGroup("preinstalled", "skillPreinstalledGroup", rows.filter((skill) => displaySource(skill) === "skillBundledSource"))], tab === "user" && catalog && snapshot.status === "ready" && catalog.complete && rows.length === 0 && h("p", { className: "power-dsh-skill-empty" }, t(query ? "skillNoMatches" : "skillEmpty")), detail && renderDetail(), externalDetail && renderExternalDetail(), confirmation && renderConfirmation()));
@@ -9336,6 +9336,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		function ArchivePage({ t, archiveSource, settingsSource, savePreference, loadArchivedSessions, restoreArchivedSession, deleteArchivedSessions }) {
 			const snapshot = useSnapshot(archiveSource);
 			const settings = useSnapshot(settingsSource);
+			const generationSource = useSnapshot(connectionSource);
 			const catalog = snapshot.value;
 			const [query, setQuery] = React.useState("");
 			const [sortBy, setSortBy] = React.useState("updated");
@@ -9361,13 +9362,13 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				const refresh = () => {
 					loadArchivedSessions();
 				};
-				const offConnection = ctx.connection.generation.subscribe(refresh);
+				const offConnection = generationSource?.subscribe(refresh);
 				window.addEventListener("focus", refresh);
 				return () => {
-					offConnection();
+					offConnection?.();
 					window.removeEventListener("focus", refresh);
 				};
-			}, []);
+			}, [generationSource]);
 			const groups = catalog ? groupArchivedSessions(catalog, query, t("archiveUngrouped"), {
 				sortBy,
 				projectId
@@ -9643,26 +9644,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				className: "power-dsh-archive-action power-dsh-archive-action-danger power-dsh-archive-delete-all",
 				disabled: disabled || snapshot.refreshing,
 				onClick: () => openConfirmation("all")
-			}, t("archiveDeleteAll")))), autoArchiveCard, (snapshot.status === "loading" || snapshot.refreshing) && loadingFeedback({
-				label: t("loading"),
-				compact: Boolean(catalog)
-			}), catalog?.complete === false && snapshot.status === "ready" && errorFeedback({
-				t,
-				message: t("archiveRefreshRequired"),
-				code: "PD-ARCHIVE-REFRESH",
-				operation: "listArchivedSessions",
-				placement: "page",
-				retry: loadArchivedSessions,
-				disabled: busy
-			}), snapshot.status === "error" && errorFeedback({
-				t,
-				message: snapshot.error || t("archiveLoadFailed"),
-				code: "PD-ARCHIVE-LOAD",
-				operation: "listArchivedSessions",
-				placement: "page",
-				retry: loadArchivedSessions,
-				disabled: busy
-			}), h("div", { className: "power-dsh-skill-panel" }, catalog && h("div", { className: "power-dsh-archive-toolbar" }, h("label", { className: "power-dsh-skill-search-field" }, h(SkillSearchIcon), h("input", {
+			}, t("archiveDeleteAll")))), autoArchiveCard, h("div", { className: "power-dsh-skill-panel" }, catalog && h("div", { className: "power-dsh-archive-toolbar" }, h("label", { className: "power-dsh-skill-search-field" }, h(SkillSearchIcon), h("input", {
 				type: "search",
 				value: query,
 				disabled: busy,
@@ -9687,7 +9669,26 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				onChange: (value) => {
 					if (mounted.current) setProjectId(value === "all" ? "" : value);
 				}
-			})), catalog && snapshot.status === "ready" && groups.map(renderGroup), catalog && snapshot.status === "ready" && groups.length === 0 && h("p", { className: "power-dsh-skill-empty" }, t(query || projectId ? "archiveNoMatches" : "archiveEmpty"))), error && !(catalog?.sessions ?? []).some((row) => row.sessionId === error.id) && errorFeedback({
+			})), (snapshot.status === "loading" || snapshot.refreshing) && loadingFeedback({
+				label: t("loading"),
+				compact: Boolean(catalog)
+			}), catalog?.complete === false && snapshot.status === "ready" && errorFeedback({
+				t,
+				message: t("archiveRefreshRequired"),
+				code: "PD-ARCHIVE-REFRESH",
+				operation: "listArchivedSessions",
+				placement: "page",
+				retry: loadArchivedSessions,
+				disabled: busy
+			}), snapshot.status === "error" && errorFeedback({
+				t,
+				message: snapshot.error || t("archiveLoadFailed"),
+				code: "PD-ARCHIVE-LOAD",
+				operation: "listArchivedSessions",
+				placement: "page",
+				retry: loadArchivedSessions,
+				disabled: busy
+			}), catalog && snapshot.status === "ready" && groups.map(renderGroup), catalog && snapshot.status === "ready" && groups.length === 0 && h("p", { className: "power-dsh-skill-empty" }, t(query || projectId ? "archiveNoMatches" : "archiveEmpty"))), error && !(catalog?.sessions ?? []).some((row) => row.sessionId === error.id) && errorFeedback({
 				t,
 				message: error.message,
 				code: "PD-ARCHIVE-ACTION",
@@ -9720,9 +9721,21 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		const archiveSource = observable(() => archive);
 		let generation = 0;
 		let archiveWritePending = false;
+		let connectionGeneration = null;
+		const connectionSource = observable(() => connectionGeneration);
 		ctx.effect(() => () => {
 			active = false;
 			generation++;
+		});
+		ctx.inject(["connection"], (child) => {
+			child.effect(() => {
+				connectionGeneration = child.connection.generation;
+				connectionSource.notify();
+				return () => {
+					connectionGeneration = null;
+					connectionSource.notify();
+				};
+			});
 		});
 		const loadArchivedSessions = async () => {
 			if (!active || archiveWritePending) return;
@@ -12314,7 +12327,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 							t,
 							version,
 							namespace,
-							pluginVersion: "0.0.8",
+							pluginVersion: "0.0.9",
 							savePreference,
 							preferenceSlot: preferenceSlot$1,
 							get footerBusy() {

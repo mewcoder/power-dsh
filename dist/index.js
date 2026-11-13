@@ -1711,7 +1711,7 @@ var WindowsToasts = class {
 };
 
 // package.json
-var version = "0.0.8";
+var version = "0.0.9";
 
 // src/features/notifications/host.ts
 var host_exports$13 = /* @__PURE__ */ __exportAll({

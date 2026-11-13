@@ -458,6 +458,13 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       return true;
     },
   };
+  const connection = { isLoopback: localConnection, state: {
+    getSnapshot: () => connectionState,
+    subscribe(fn) { connectionStateListeners.add(fn); return () => connectionStateListeners.delete(fn); },
+  }, generation: {
+    getSnapshot: () => connectionGeneration,
+    subscribe(fn) { connectionListeners.add(fn); return () => connectionListeners.delete(fn); },
+  } };
   const ctx = {
     remote: {
       async $mount(contribution) { rpcDescriptors = contribution.descriptors; },
@@ -465,13 +472,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     modelDirectories: modelDirectoriesAvailable ? {
       directoryFor(sessionId) { effortSessions.push(sessionId); return effortDirectory; },
     } : undefined,
-    connection: { isLoopback: localConnection, state: {
-      getSnapshot: () => connectionState,
-      subscribe(fn) { connectionStateListeners.add(fn); return () => connectionStateListeners.delete(fn); },
-    }, generation: {
-      getSnapshot: () => connectionGeneration,
-      subscribe(fn) { connectionListeners.add(fn); return () => connectionListeners.delete(fn); },
-    } },
+    get connection() { throw new Error('cannot get property "connection" without inject'); },
     sessions: { list: {
       getSnapshot: () => sessionList,
       subscribe(fn) { sessionListeners.add(fn); return () => sessionListeners.delete(fn); },
@@ -731,7 +732,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
           return result;
         }]));
       }
-      fn(ctx);
+      fn(dependencies.includes('connection') ? Object.create(ctx, { connection: { value: connection } }) : ctx);
     },
     configForms: { get: () => form, describe: () => ({ async load() {
       const patch = await formLoad?.();

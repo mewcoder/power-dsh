@@ -733,9 +733,6 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       h('header', null,
         h('h2', { className: 'power-dsh-title' }, t('skillsTab')),
         h('p', { className: 'power-dsh-description' }, t(tab === 'sources' ? 'skillDiscoverDescription' : 'skillsDescription'))),
-      snapshot.status === 'loading' && loadingFeedback({ label: t('loading'), ...(catalog ? { compact: true } : {}) }),
-      snapshot.error && errorFeedback({ t, message: snapshot.error, code: 'PD-SKILLS-LOAD',
-        operation: 'listSkills', placement: 'page', retry: () => loadSkills(), disabled: busy }),
       h('div', { className: 'power-dsh-skill-navigation' },
         h('div', { className: 'power-dsh-tabs', role: 'tablist', 'aria-label': t('skillScope') },
           tabButton('user', 'skillUserScope'), tabButton('project', 'skillProjectScope'), tabButton('sources', 'skillImport'))),
@@ -750,6 +747,9 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
               if (tab === 'project' && event.target.value.trim()) queueWorkspaceLoads();
             },
           })),
+        snapshot.status === 'loading' && loadingFeedback({ label: t('loading'), ...(catalog ? { compact: true } : {}) }),
+        snapshot.error && errorFeedback({ t, message: snapshot.error, code: 'PD-SKILLS-LOAD',
+          operation: 'listSkills', placement: 'page', retry: () => loadSkills(), disabled: busy }),
         tab === 'user' && catalog && !catalog.complete && h('p', { className: 'power-dsh-description power-dsh-skill-notice', role: 'status' }, t('skillIncomplete')),
         config.status === 'ready' && !config.writable && h('p', { className: 'power-dsh-description power-dsh-skill-notice' }, t('readOnly')),
         tab === 'sources' ? renderImport()

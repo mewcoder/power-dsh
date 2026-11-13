@@ -82,6 +82,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   function ArchivePage({ t, archiveSource, settingsSource, savePreference, loadArchivedSessions, restoreArchivedSession, deleteArchivedSessions }: ArchivePageProps) {
     const snapshot = useSnapshot(archiveSource);
     const settings = useSnapshot(settingsSource);
+    const generationSource = useSnapshot(connectionSource);
     const catalog = snapshot.value;
     const [query, setQuery] = React.useState('');
     const [sortBy, setSortBy] = React.useState<ArchiveSort>('updated');
@@ -107,13 +108,13 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     React.useEffect(() => {
       void loadArchivedSessions();
       const refresh = () => { void loadArchivedSessions(); };
-      const offConnection = ctx.connection.generation.subscribe(refresh);
+      const offConnection = generationSource?.subscribe(refresh);
       window.addEventListener('focus', refresh);
       return () => {
-        offConnection();
+        offConnection?.();
         window.removeEventListener('focus', refresh);
       };
-    }, []);
+    }, [generationSource]);
     const groups = catalog ? groupArchivedSessions(catalog, query, t('archiveUngrouped'), { sortBy, projectId }) : [];
     const sortOptions = [
       { id: 'updated', label: t('archiveSortUpdated') },
@@ -297,11 +298,6 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
              disabled: disabled || snapshot.refreshing, onClick: () => openConfirmation('all'),
            }, t('archiveDeleteAll')))),
       autoArchiveCard,
-      (snapshot.status === 'loading' || snapshot.refreshing) && loadingFeedback({ label: t('loading'), compact: Boolean(catalog) }),
-      catalog?.complete === false && snapshot.status === 'ready' && errorFeedback({ t, message: t('archiveRefreshRequired'),
-        code: 'PD-ARCHIVE-REFRESH', operation: 'listArchivedSessions', placement: 'page', retry: loadArchivedSessions, disabled: busy }),
-      snapshot.status === 'error' && errorFeedback({ t, message: snapshot.error || t('archiveLoadFailed'),
-        code: 'PD-ARCHIVE-LOAD', operation: 'listArchivedSessions', placement: 'page', retry: loadArchivedSessions, disabled: busy }),
       h('div', { className: 'power-dsh-skill-panel' },
         catalog && h('div', { className: 'power-dsh-archive-toolbar' },
           h('label', { className: 'power-dsh-skill-search-field' }, h(SkillSearchIcon), h('input', {
@@ -313,6 +309,11 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             onChange: value => { if (mounted.current) setSortBy(value as ArchiveSort); } }),
           h(ArchiveSelect, { label: t('archiveProjectLabel'), value: projectValue, options: projectOptions, disabled: busy,
             onChange: value => { if (mounted.current) setProjectId(value === 'all' ? '' : value); } })),
+        (snapshot.status === 'loading' || snapshot.refreshing) && loadingFeedback({ label: t('loading'), compact: Boolean(catalog) }),
+        catalog?.complete === false && snapshot.status === 'ready' && errorFeedback({ t, message: t('archiveRefreshRequired'),
+          code: 'PD-ARCHIVE-REFRESH', operation: 'listArchivedSessions', placement: 'page', retry: loadArchivedSessions, disabled: busy }),
+        snapshot.status === 'error' && errorFeedback({ t, message: snapshot.error || t('archiveLoadFailed'),
+          code: 'PD-ARCHIVE-LOAD', operation: 'listArchivedSessions', placement: 'page', retry: loadArchivedSessions, disabled: busy }),
         catalog && snapshot.status === 'ready' && groups.map(renderGroup),
         catalog && snapshot.status === 'ready' && groups.length === 0
           && h('p', { className: 'power-dsh-skill-empty' }, t(query || projectId ? 'archiveNoMatches' : 'archiveEmpty'))),
@@ -337,7 +338,16 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   const archiveSource = observable(() => archive);
   let generation = 0;
   let archiveWritePending = false;
+  let connectionGeneration: SnapshotSource<object | undefined> | null = null;
+  const connectionSource = observable(() => connectionGeneration);
   ctx.effect(() => () => { active = false; generation++; });
+  ctx.inject(['connection'], child => {
+    child.effect(() => {
+      connectionGeneration = child.connection.generation;
+      connectionSource.notify();
+      return () => { connectionGeneration = null; connectionSource.notify(); };
+    });
+  });
 
   const loadArchivedSessions = async () => {
     if (!active || archiveWritePending) return;

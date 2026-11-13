@@ -14,10 +14,10 @@ export const styles = `
 .power-dsh-skill-existing { flex:none; align-self:center; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
 .power-dsh-skill-detail .power-dsh-skill-delete { color:var(--dsw-alias-state-error-primary); }
 @media (hover:hover) { .power-dsh-skill-delete:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover-danger); } }
-.power-dsh-skills-page .power-dsh-skill-path-stack { position:relative; isolation:isolate; display:inline-block; max-width:calc(100% - 8px); padding:0 8px 8px 0; vertical-align:middle; }
+.power-dsh-skills-page .power-dsh-skill-path-stack { position:relative; isolation:isolate; display:inline-block; max-width:calc(100% - 8px); padding:8px 8px 0 0; vertical-align:middle; }
 .power-dsh-skills-page .power-dsh-skill-path-stack::before,.power-dsh-skills-page .power-dsh-skill-path-stack::after { position:absolute; z-index:-1; border:.5px solid var(--dsw-alias-border-l3); border-radius:var(--dsw-radius-xs); content:""; pointer-events:none; }
 .power-dsh-skills-page .power-dsh-skill-path-stack::before { inset:4px; }
-.power-dsh-skills-page .power-dsh-skill-path-stack::after { inset:8px 0 0 8px; opacity:.6; }
+.power-dsh-skills-page .power-dsh-skill-path-stack::after { inset:0 0 8px 8px; opacity:.6; }
 .power-dsh-skills-page .power-dsh-skill-path-label { display:block; overflow:hidden; border:.5px solid var(--dsw-alias-border-l3); border-radius:var(--dsw-radius-xs); background:var(--dsw-alias-settings-card-fill); padding:0 4px; text-overflow:ellipsis; }
 .power-dsh-skills-page .power-dsh-skill-card-detail { box-sizing:border-box; display:inline-flex; flex:none; align-items:center; justify-content:center; height:28px; padding:0 10px; border:.5px solid var(--dsw-alias-border-l3); border-radius:var(--dsw-radius-sm); background:transparent; color:var(--dsw-alias-label-primary); font:inherit; font-size:12px; line-height:18px; cursor:pointer; }
 .power-dsh-skills-page .power-dsh-skill-card-detail:active { background:var(--dsw-alias-interactive-bg-hover-solid); }

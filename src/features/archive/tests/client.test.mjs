@@ -149,11 +149,23 @@ test('the trailing group uses the native ungrouped wording without a path toolti
 });
 
 test('archive load and action failures stay recoverable and localized', async () => {
-  const app = await mount({ archiveCatalog: catalog, archiveReadError: 'archiveUnavailable' });
+  let reply = Promise.withResolvers();
+  const app = await mount({ archiveList: () => reply.promise });
   app.set({ archiveManagerEnabled: true });
-  app.renderArchive('zh');
-  await app.reloadArchive();
   const render = () => descendants(app.renderArchive('zh'));
+  const panel = () => render().find(node => node.props.className === 'power-dsh-skill-panel');
+  assert.ok(descendants(panel()).some(node => node.props.className === 'power-dsh-loading'));
+  reply.resolve({ ok: true, value: catalog });
+  await new Promise(setImmediate);
+  reply = Promise.withResolvers();
+  const refresh = app.reloadArchive();
+  const content = descendants(panel());
+  assert.ok(content.some(node => node.props.className === 'power-dsh-archive-toolbar'));
+  assert.ok(content.findIndex(node => node.props.className === 'power-dsh-archive-toolbar')
+    < content.findIndex(node => node.props.className === 'power-dsh-loading'));
+  reply.resolve({ ok: false, error: { message: 'archiveUnavailable' } });
+  await refresh;
+  assert.ok(descendants(panel()).some(node => node.props['data-error-code'] === 'PD-ARCHIVE-LOAD'));
   assert.ok(render().some(node => node.props.role === 'alert' || descendants(node).some(child => child.props.children === '归档管理暂不可用')));
   assert.ok(render().some(node => node.type === 'button' && node.props.children.includes('重试')));
   app.unmount();
@@ -167,20 +179,28 @@ test('archive load and action failures stay recoverable and localized', async ()
   failing.unmount();
 });
 
-test('a Host reconnect refreshes the archive and clears the stale load error', async () => {
+test('injected Host reconnects refresh only an open archive page and clear stale load errors', async () => {
   let fail = true;
   const app = await mount({ archiveCatalog: catalog, archiveList: () => fail
     ? { ok: false, error: { message: 'archiveUnavailable' } }
     : { ok: true, value: { ...catalog, sessions: [...catalog.sessions], workspaces: [...catalog.workspaces] } } });
   app.set({ archiveManagerEnabled: true });
+  app.setConnectionGeneration({ id: 2 });
+  assert.equal(app.archiveReads.length, 0);
   app.renderArchive('zh');
   await app.reloadArchive();
   const render = () => descendants(app.renderArchive('zh'));
   assert.ok(render().some(node => node.props.role === 'alert'));
   fail = false;
-  app.setConnectionGeneration({ id: 2 });
+  app.setConnectionGeneration({ id: 3 });
   await new Promise(setImmediate);
   assert.ok(!render().some(node => node.props.role === 'alert'));
+  app.disposeComponent(app.entries.get('settings.section:power-dsh-archive').component({ t: key => key }).type);
+  const reads = app.archiveReads.length;
+  app.setConnectionGeneration({ id: 4 });
+  app.focus();
+  await new Promise(setImmediate);
+  assert.equal(app.archiveReads.length, reads);
   app.unmount();
 });
 
