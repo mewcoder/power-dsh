@@ -31,7 +31,7 @@ export function createRuntime(React: ReactModule, primitives: PublicPrimitives):
     return h('svg', { width: size, height: size, 'data-icon': id, 'aria-hidden': true, focusable: false },
       h('use', { href: `#${id}` }));
   }
-  return { React, h, ...primitives, observable, useSnapshot, useMounted, NativeIcon, loadingFeedback, errorFeedback: createErrorFeedback(React, primitives.Button) };
+  return { React, h, ...primitives, observable, useSnapshot, useMounted, NativeIcon, loadingFeedback, errorFeedback: createErrorFeedback(React, primitives.Button, primitives.Modal) };
 }
 
 export function errorMessage(error: unknown): string | undefined {

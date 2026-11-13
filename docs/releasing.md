@@ -45,7 +45,7 @@ dsh-plugin, deepseek-harness, deepseek, dsh, mcp, notifications, skill-managemen
 
 `dsh-plugin` 同时是市场收录要求之一，其余标签用于准确表达宿主与功能。2026-11-08 的参考样本包括 [dsh-market](https://github.com/dsh-market/dsh-market) 的中英文用途、演示与安装入口，[dsh-unlag](https://github.com/regrevia/dsh-unlag) 的问题与效果说明，以及 [dsh-skill-mcp-manager](https://github.com/alone-tree/dsh-skill-mcp-manager) 的 Skills/MCP 定位与实际截图。参考的是信息表达和发现入口，stars 不作为质量或流量保证。
 
-README 面向使用者，标题使用显示名 `# PowerDSH`，并在首屏说明 `power-dsh` 是包名与仓库名；首屏使用已确认的中英品牌引用块，其后展示宽度为 560 的真实截图，保留「分类 / 功能 / 描述」三列功能表与使用入口。功能表按「通用」「界面」「管理」「精简」「其他」五类各占一行，行内逐项列出功能名称与一句说明；组内按使用频率和功能关联性排序，以 [分类 Tab](ui.md#分类-tab) 为准。通用只列任务通知；其他依次列界面刷新、重启应用与屏蔽双击重命名，刷新与重启相邻；实际设置页在 Windows、Linux 和 Web 隐藏重启行，macOS 打包桌面端显示该行，功能名称使用纯文本，不附逐项文档超链接；始终反映当前代码，不记录逐项版本号；发版时由 Git 标签保留对应代码与 README 快照，详细变化记录在更新日志与 Release。开发流程、测试命令及 SDK 验收矩阵保留在维护文档中。截图直接取自实际运行的 DSH 设置页，裁剪到设置窗口并转成 WebP（`docs/images/0.0.1/settings.webp`，由 `screenshots.json` 声明）；不制作模拟预览或改写真实图片。界面结构变化时用新截图替换，并在下次发版时随包更新。没有已发布产物、CI 或确定许可证时，不添加相应的成功徽章。本地 README 在用户确认推送后才会更新到 GitHub；Release 下载和市场入口待发布、收录后更新。
+README 面向使用者，标题使用显示名 `# PowerDSH`，并在首屏说明 `power-dsh` 是包名与仓库名；首屏使用已确认的中英品牌引用块，其后展示宽度为 560 的真实截图，保留「分类 / 功能 / 描述」三列功能表与使用入口。功能表按「通用」「界面」「管理」「精简」「其他」五类各占一行，行内逐项列出功能名称与一句说明；组内按使用频率和功能关联性排序，以 [分类 Tab](ui.md#分类-tab) 为准。通用只列任务通知；其他依次列界面刷新、重启应用与屏蔽双击重命名，刷新与重启相邻；实际设置页在 Linux 和 Web 隐藏重启行，macOS／Windows 打包桌面端显示该行，动作仍需本机 Host 能力确认，功能名称使用纯文本，不附逐项文档超链接；始终反映当前代码，不记录逐项版本号；发版时由 Git 标签保留对应代码与 README 快照，详细变化记录在更新日志与 Release。开发流程、测试命令及 SDK 验收矩阵保留在维护文档中。截图直接取自实际运行的 DSH 设置页，裁剪到设置窗口并转成 WebP（`docs/images/0.0.1/settings.webp`，由 `screenshots.json` 声明）；不制作模拟预览或改写真实图片。界面结构变化时用新截图替换，并在下次发版时随包更新。没有已发布产物、CI 或确定许可证时，不添加相应的成功徽章。本地 README 在用户确认推送后才会更新到 GitHub；Release 下载和市场入口待发布、收录后更新。
 
 ## 选择分发方式
 
@@ -212,6 +212,8 @@ tarball: https://github.com/mewcoder/power-dsh/releases/latest/download/power-ds
 ```
 
 首次收录申请已于 2026-11-12 提交为 [PR #14457](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14457)，使用 GitHub 源码来源，未填写不可用的 tarball。后续先核对并接续此 PR，是否已收录以上游合并和市场刷新为准，不重复申请。条目中的 `name` 使用实际 owner/repo；YAML 文件名、url、name 与可选 tarball 必须一致。保存条目后向上游 `main` 提交 PR，只包含自己的 YAML；两个 README 由上游生成，不手动编辑，也不改动其他插件条目。一个 PR 最多新增三个条目，本项目只新增一个。
+
+2026-11-13 发版前已核对该 PR 合并，当前上游条目包含 `tarball: https://github.com/mewcoder/power-dsh/releases/latest/download/power-dsh.tgz`。后续常规发版沿用这一来源，无需重新投稿；市场刷新与具体安装项的更新检查仍按下文分别验证。
 
 `dsh-plugin` topic 只是收录条件之一，不会自动将仓库加入 dsh-market 目录。通常由作者提 PR，也可能由维护者主动添加；目录条目合并并完成网站重建后才算收录，不把 GitHub topic、源码推送或 Release 发布视为已收录。此规则针对 dsh-market，不与 DSH 官方参考索引的发现方式混用。
 

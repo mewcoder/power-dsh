@@ -96,3 +96,24 @@ test('spawn errors release the restart lock without accepting a handoff', async 
   await assert.rejects(f.service.restart(), /restartFailed/);
   assert.equal((await f.service.status()).running, false);
 });
+
+test('the Host selects the Windows identity probe and disposes it without invoking the macOS helper', async () => {
+  let probes = 0;
+  let signal;
+  const executable = 'C:\\Apps\\DeepSeek Harness.exe';
+  const f = fixture({ platform: 'win32', executable, env: { DSH_CLIENT_VERSION: 'test', SystemRoot: 'C:\\Windows' },
+    windows: { hostPid: 456, run: async (_script, abort) => {
+      probes++;
+      signal = abort;
+      return JSON.stringify({ executable, mainPid: 123, hostPid: 456,
+        mainStart: '639354000001234560', hostStart: '639354000011234560' });
+    } },
+  });
+  assert.deepEqual(await f.service.status(), { supported: true, running: false, error: '' });
+  await f.service.status();
+  assert.equal(probes, 1, 'Status polling reuses the bounded identity cache.');
+  assert.equal(f.calls.length, 0);
+  f.effects.forEach(dispose => dispose());
+  assert.equal(signal.aborted, true);
+  await assert.rejects(f.service.status(), /restartUnavailable/);
+});

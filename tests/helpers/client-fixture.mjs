@@ -109,7 +109,7 @@ export function usageSnapshotFixture(overrides = {}) {
   };
 }
 
-export async function mount({ featureIds, localeLanguage, restartStatus = { supported: true, running: false, error: '' }, restartReply, desktop = false, themeAvailable = true, updates, rpcError, rpcReply, formReply, formLoad, fileText = '', fileReply, fileReadError, wallpaper, wallpaperReply, wallpaperReadError, wallpaperClearError, skillCatalog, skillList, skillReply, skillReadError, skillDetail, skillDetailReply, skillDetailError, mcpCatalog, mcpList, mcpReply, mcpReadError, mcpDetail, mcpDetailReply, mcpDetailError, archiveCatalog, archiveList, archiveReply, archiveReadError, usageSnapshot, usageList, usageReply, usageReadError, projectCatalog, projectList, projectReply, projectReadError, writable = true, reload = () => {}, windows = false, notificationPermission = 'granted', notificationRequest, notificationFailure = false, notificationServices = true, notificationsAvailable = true, nativeNotificationReply, nativeClearReply, notificationTransportReply, platformMarker = true, localConnection = true, soundCatalog, soundReply, soundListError, updateFetch, updateStorage, modelDirectory, modelSelectReply, modelDirectoriesAvailable = true } = {}) {
+export async function mount({ featureIds, localeLanguage, restartStatus = { supported: true, running: false, error: '' }, restartReply, desktop = false, themeAvailable = true, updates, rpcError, rpcReply, formReply, formLoad, fileText = '', fileReply, fileReadError, wallpaper, wallpaperReply, wallpaperReadError, wallpaperClearError, skillCatalog, skillList, skillReply, skillReadError, skillDetail, skillDetailReply, skillDetailError, externalSkillCatalog, externalSkillList, externalSkillReply, externalDetailReply, importDestinationReply, mcpCatalog, mcpList, mcpReply, mcpReadError, mcpDetail, mcpDetailReply, mcpDetailError, archiveCatalog, archiveList, archiveReply, archiveReadError, usageSnapshot, usageList, usageReply, usageReadError, projectCatalog, projectList, projectReply, projectReadError, writable = true, reload = () => {}, windows = false, notificationPermission = 'granted', notificationRequest, notificationFailure = false, notificationServices = true, notificationsAvailable = true, nativeNotificationReply, nativeClearReply, notificationTransportReply, platformMarker = true, localConnection = true, soundCatalog, soundReply, soundListError, updateFetch, updateStorage, modelDirectory, modelSelectReply, modelDirectoriesAvailable = true } = {}) {
   let plugin;
   const nativeLauncher = { native: true };
   const entries = new Map([['settings.launcher:single', nativeLauncher]]);
@@ -198,7 +198,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   let observeCount = 0;
   let disconnectCount = 0;
   let edge = 280;
-  let settings = { status: 'ready', writable, value: { pluginUpdatesEnabled: true, notificationMode: 'background', blockDoubleClickRename: false, notificationsEnabled: false, notificationSoundEnabled: true, notificationSound: 'default', blockTodo: false, blockPlan: false, blockGoal: false, showThemeSwitcher: false, personalizationEnabled: false, skillManagerEnabled: false, mcpManagerEnabled: false, globalPrompt: '', thinkingEffortGlyph: 'arc', flowingBackgroundKind: 'pattern', flowingBackgroundOpacity: 100, flowingBackgroundBlur: 0, autoArchiveDays: 0 } };
+  let settings = { status: 'ready', writable, value: { notificationMode: 'background', blockDoubleClickRename: false, notificationsEnabled: false, notificationSoundEnabled: true, notificationSound: 'default', blockTodo: false, blockPlan: false, blockGoal: false, showThemeSwitcher: false, personalizationEnabled: false, skillManagerEnabled: false, mcpManagerEnabled: false, globalPrompt: '', thinkingEffortGlyph: 'arc', flowingBackgroundKind: 'pattern', flowingBackgroundOpacity: 100, flowingBackgroundBlur: 0, autoArchiveDays: 0 } };
   let theme = { preference: 'system' };
   const calls = [];
   const rpcCalls = [];
@@ -206,12 +206,19 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   const skillReads = [];
   const skillDetailReads = [];
   const skillWrites = [];
+  const skillDeletes = [];
   let skillValue = skillCatalog ?? catalogFixture();
+  const externalReads = [];
+  const externalImports = [];
+  const externalDetailReads = [];
+  const importDestinationReads = [];
+  let externalValue = externalSkillCatalog ?? { complete: true, entries: [] };
+  const externalAvailability = new Set();
   const skillView = (cwd, scope = 'user') => ({
     ...skillValue, cwd: scope === 'project' ? cwd || skillValue.cwd || skillValue.workspaces[0]?.path || '' : '', scope: scope || 'user',
     skills: skillValue.skills.filter(skill => {
       const project = skill.source === 'project' || skill.source.startsWith('project-');
-      return scope === 'project' ? project : !project;
+      return (scope === 'project' ? project : !project) && (skill.targetCwd === undefined || skill.targetCwd === cwd);
     }),
   });
   const mcpReads = [];
@@ -479,6 +486,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       if (dependencies.includes('remote.powerDsh')) {
         ctx.remote.powerDsh = Object.fromEntries(rpcDescriptors.map(descriptor => [descriptor.method, async (...rpcArgs) => {
           const [blocked, revision, name, enabled] = rpcArgs;
+          const third = rpcArgs[2];
           if (descriptor.method === 'readPluginRelease') return { ok: true, value: { status: 'ready', version: '0.0.999', commit: 'a'.repeat(40) } };
           if (descriptor.method === 'notificationTransport') return notificationTransportReply ? await notificationTransportReply() : {
             ok: true, value: { platform: windows ? 'win32' : 'darwin', nativeAvailable: windows, version: pluginVersion },
@@ -546,6 +554,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
               name: row.name, description: row.description, content: skillDetail?.content ?? 'Body of ' + row.name,
               source: row.source, path: row.path, origin: row.origin, enabled: row.enabled,
               modelInvocable: row.modelInvocable, userInvocable: row.userInvocable,
+              ...(row.deletion ? { deletion: row.deletion } : {}),
             } : null };
           }
           if (descriptor.method === 'setSkillEnabled') {
@@ -557,6 +566,82 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
             }
             skillValue = { ...skillValue, skills: skillValue.skills.map(skill => skill.name === name ? { ...skill, enabled, modelInvocable: enabled, userInvocable: enabled } : skill) };
             return { ok: true, value: skillView(blocked, revision) };
+          }
+          if (descriptor.method === 'deleteSkill') {
+            const [cwd, scope, name, revision] = rpcArgs;
+            skillDeletes.push({ cwd, scope, name, revision });
+            if (skillReply) {
+              const result = await skillReply(cwd, scope, name, revision);
+              if (!result.ok) return result;
+            }
+            skillValue = { ...skillValue, skills: skillValue.skills.filter(skill => skill.name !== name || (skill.source.startsWith('project') ? 'project' : 'user') !== scope || skill.targetCwd !== undefined && skill.targetCwd !== cwd) };
+            externalAvailability.delete(JSON.stringify([cwd, scope, name]));
+            return { ok: true, value: skillView(cwd, scope) };
+          }
+          if (descriptor.method === 'discoverExternalSkills') {
+            externalReads.push({ cwd: blocked, scope: revision });
+            const result = externalSkillList ? await externalSkillList(blocked, revision) : { ok: true, value: externalValue };
+            return result.ok ? { ...result, value: { ...result.value, entries: result.value.entries.map(entry => ({
+              ...entry, available: Boolean(entry.available || externalAvailability.has(JSON.stringify([blocked, revision, entry.name]))
+                || externalAvailability.has(JSON.stringify([blocked, revision, entry.id]))),
+            })) } } : result;
+          }
+          if (descriptor.method === 'readExternalSkill') {
+            const id = third;
+            const entry = externalValue.entries.find(item => item.id === id || item.variants?.some(variant => variant.id === id));
+            const selected = entry?.variants?.find(variant => variant.id === id);
+            externalDetailReads.push({ cwd: blocked, scope: revision, id });
+            if (externalDetailReply) return externalDetailReply(id);
+            return { ok: true, value: entry === undefined ? null : {
+              name: entry.name, description: selected?.description ?? entry.description,
+              content: '# ' + entry.name + '\n\nBody of ' + (selected?.id ?? entry.name), source: selected?.sources?.[0]?.agent ?? entry.source, path: selected?.path ?? entry.path,
+            } };
+          }
+          if (descriptor.method === 'importExternalSkills') {
+            const ids = third;
+            externalImports.push({ cwd: blocked, scope: revision, ids });
+            const imported = ids.filter(id => externalValue.entries.some(entry => entry.id === id));
+            const result = externalSkillReply ? await externalSkillReply(blocked, revision, ids) : { ok: true, value: { imported, skipped: [] } };
+            if (result.ok) for (const name of result.value.imported) externalAvailability.add(JSON.stringify([blocked, revision, name]));
+            return result;
+          }
+          if (descriptor.method === 'addSkill') {
+            const [cwd, scope, id, mode, revision] = rpcArgs;
+            externalImports.push({ cwd, scope, ids: [id], mode, revision });
+            const entry = externalValue.entries.find(item => item.variants?.some(variant => variant.id === id));
+            const result = externalSkillReply ? await externalSkillReply(cwd, scope, [id], mode, revision)
+              : { ok: true, value: { imported: entry ? [entry.name] : [], skipped: [] } };
+            if (result.ok) {
+              for (const name of result.value.imported) externalAvailability.add(JSON.stringify([cwd, scope, name]));
+              if (entry && result.value.imported.includes(entry.name)) skillValue = { ...skillValue, skills: [...skillValue.skills, skillFixture({ name: entry.name, source: scope === 'project' ? 'project-dsh' : 'user-dsh' })] };
+            }
+            return result;
+          }
+          if (descriptor.method === 'readSkillImportDestination') {
+            const [cwd, scope, name, flat] = rpcArgs;
+            importDestinationReads.push({ cwd, scope, name, flat });
+            if (importDestinationReply) return importDestinationReply(cwd, scope, name, flat);
+            return { ok: true, value: {
+              path: `${cwd ? cwd + '/.dsh' : '/profile'}/skills/${name}${flat ? '.md' : ''}`,
+              complete: true, inherited: false,
+              available: externalAvailability.has(JSON.stringify([cwd, scope, name])),
+            } };
+          }
+          if (descriptor.method === 'importSkillTo') {
+            const [cwd, scope, id, revision, targetCwd] = rpcArgs;
+            externalImports.push({ cwd, scope, ids: [id], mode: 'copy', revision, targetCwd });
+            const entry = externalValue.entries.find(item => item.id === id || item.variants?.some(variant => variant.id === id));
+            const targetScope = targetCwd ? 'project' : 'user';
+            const result = externalSkillReply ? await externalSkillReply(targetCwd, targetScope, [id], 'copy', revision)
+              : { ok: true, value: { imported: entry ? [entry.name] : [], skipped: [] } };
+            if (result.ok) for (const name of result.value.imported) {
+              externalAvailability.add(JSON.stringify([targetCwd, targetScope, name]));
+              skillValue = { ...skillValue, skills: [...skillValue.skills, skillFixture({
+                name, targetCwd, source: targetCwd ? 'project-dsh' : 'user-dsh',
+                path: `${targetCwd ? targetCwd + '/.dsh' : '/profile'}/skills/${name}/SKILL.md`,
+              })] };
+            }
+            return result;
           }
           if (descriptor.method === 'listArchivedSessions') {
             archiveReads.push({});
@@ -792,6 +877,8 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       return app.renderSettings();
     },
     effortSelects,
+    externalReads, externalImports, externalDetailReads, importDestinationReads, skillDeletes,
+    setExternalSkills(value) { externalValue = value; externalAvailability.clear(); },
     effortSessions,
     effortListeners: () => effortListeners.size,
     setModelDirectory(value) { effortState = value; effortListeners.forEach(listener => listener()); },
@@ -925,25 +1012,26 @@ export async function personalization(app) {
 export async function skillsPage(app, scope = 'user') {
   app.set({ skillManagerEnabled: true });
   app.renderSkills();
-  await app.reloadSkills('', scope);
+  await app.reloadSkills('', 'user');
   const render = () => descendants(app.renderSkills());
   for (const group of render().filter(node => node.type === 'button' && node.props.id?.startsWith('settings-test-group-') && !node.props['aria-expanded'])) group.props.onClick();
-  const row = name => render().find(node => node.type === 'li' && node.props['data-skill'] === name);
-  const control = name => descendants(row(name)).find(node => node.props.role === 'switch');
+  const workspace = path => render().find(node => node.type === 'section' && node.props['data-workspace'] === path);
+  const workspaceToggle = path => descendants(workspace(path)).find(node => node.type === 'button' && node.props['aria-controls']);
+  const row = (name, path) => (path ? descendants(workspace(path)) : render()).find(node => node.type === 'li' && node.props['data-skill'] === name);
+  const control = (name, path) => descendants(row(name, path)).find(node => node.props.role === 'switch');
   const search = () => render().find(node => node.type === 'input' && node.props.type === 'search');
   const select = label => render().find(node => node.type === 'select' && node.props['aria-label'] === label);
   const tab = scope => render().find(node => node.props.role === 'tab' && node.props.id === `settings-test-scope-${scope}`);
   const projectTrigger = () => render().find(node => node.type === 'button' && node.props['aria-label'] === 'skillWorkspace');
   const projectMenu = () => render().find(node => node.type === 'native-menu-fixture');
-  const chooseProject = async path => {
-    if (!projectMenu()?.props.open) projectTrigger()?.props.onClick();
-    const item = render().find(node => node.props.role === 'menuitem' && node.props['data-id'] === path);
-    assert.ok(item, `Expected an open project menu item for ${path}`);
-    return item.props.onClick();
-  };
   const detail = name => descendants(row(name)).find(node => node.props['data-detail'] === name);
   const dialog = () => render().find(node => node.type === 'native-modal-fixture');
-  return { render, row, control, search, select, tab, projectTrigger, projectMenu, chooseProject, detail, dialog };
+  if (scope === 'project') {
+    tab('project').props.onClick();
+    render();
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  return { render, row, control, search, select, tab, projectTrigger, projectMenu, workspace, workspaceToggle, detail, dialog };
 }
 
 export async function mcpPage(app, language) {

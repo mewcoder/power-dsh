@@ -95,7 +95,7 @@ export interface ClientEnvironment {
 }
 export interface SavingSetting { field: PreferenceKey; value: PreferenceValue; }
 export interface SettingError { field: PreferenceKey; message: string; }
-export interface SettingsViewContext { snapshot: FormSnapshot; disabled: boolean; saving: SavingSetting | null; error: SettingError | null; save(field: PreferenceKey, next: PreferenceValue): Promise<void>; id: string; leaveSettings?: () => void; }
+export interface SettingsViewContext { snapshot: FormSnapshot; activeTab: string; disabled: boolean; saving: SavingSetting | null; error: SettingError | null; save(field: PreferenceKey, next: PreferenceValue): Promise<void>; id: string; leaveSettings?: () => void; }
 export interface SettingFailure {
   message: string; code: string; operation: string;
   context?: import('../types/diagnostics.ts').DiagnosticContext;

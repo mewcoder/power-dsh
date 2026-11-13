@@ -98,7 +98,8 @@ export interface NativeSettings {
   mutate(namespace: string, mutations: { op: 'set'; path: string[]; value: unknown }[], revision?: number): Promise<unknown>;
 }
 export interface NativeSubprocessHandle {
-  collected?: { stdout?: { readFrom(offset: number): { text: string; lossy: boolean } } };
+  collected?: { stdout?: { readFrom(offset: number): { text: string; lossy: boolean } };
+    stderr?: { readFrom(offset: number): { text: string; lossy: boolean } } };
   done: Promise<{ exitCode: number | null; signal: string | null }>;
   waitForExit(signal: AbortSignal): Promise<boolean>;
   terminate(): void;

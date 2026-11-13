@@ -24,16 +24,16 @@
 
 | 功能 | 主要职责 |
 | --- | --- |
-| [插件更新](../src/features/plugin-updates/spec.md) | 设置页底部手动检查、正式目标校验、确认后交给市场更新与进度读回 |
+| [插件更新](../src/features/plugin-updates/spec.md) | 通用设置的插件版本行、手动检查、正式目标校验、确认后交给市场更新与进度读回 |
 | [壁纸](../src/features/wallpaper/spec.md) | 界面首行「开启自定义壁纸」、原生设置左侧壁纸入口（全局指令上方）、四项缩略图选择、自定义图片卡片底部操作、共享可见度／模糊、拖动预览与提交、Host 存储校验及旧背景兼容 |
 | [任务通知](../src/features/notifications/spec.md) | 事件触发、权限、前台抑制与系统提示音 |
 | [界面刷新](../src/features/refresh-button/spec.md) | 原生页面重载、状态边界与按钮显隐 |
-| [重启应用](../src/features/restart-button/spec.md) | macOS 打包桌面端的设置入口、确认、退出与同路径重开，以及平台和验收限制 |
+| [重启应用](../src/features/restart-button/spec.md) | macOS／Windows 桌面的设置入口、确认、当前实例退出与同路径重开，以及平台和验收限制 |
 | [快捷推理等级切换](../src/features/thinking-effort/spec.md) | 模型选择右侧的信号格／仪表盘切换、档位序列、读回与失败边界 |
 | [外观快捷切换](../src/features/appearance-shortcut/spec.md) | 原生主题同步、按钮定位与生命周期 |
 | [退役流动背景兼容与挂载授权](../src/features/flowing-background/spec.md) | 五个隐藏旧键的无 UI 兼容、公共结构表面适配边界及既有流动图案算法依据；现行入口归壁纸 |
 | [显示版本号](../src/features/version-display/spec.md) | 宿主版本展示、桌面更新入口与侧栏定位 |
-| [技能管理](../src/features/skills/spec.md) | 全局与工作区来源、仅对 DSH 生效的启停与共享文件保护 |
+| [技能管理](../src/features/skills/spec.md) | 全局与逐项目分组、目录堆叠展示、多来源导入、仅对 DSH 生效的启停 |
 | [MCP 管理](../src/features/mcp/spec.md) | 全局服务器、原生启停、运行状态与工具列表 |
 | [全局指令](../src/features/personalization/spec.md) | 全局指令编辑、原生文件保存与入口关闭行为 |
 | [归档](../src/features/archive/spec.md) | 归档会话的可折叠分组列表（含工作区路径）、搜索、排序、工作区筛选与恢复、永久删除与自动归档 |
@@ -54,6 +54,7 @@
 | 资料 | 用途与边界 |
 | --- | --- |
 | [首版兼容性调查](compatibility-audit.md) | 同类插件声明、官方标签差异、隔离 SDK 与 Host 装配结果；正式支持范围以[版本兼容性](compatibility.md)为准 |
+| [DSH 市场插件调研（2026-11-12）](market-research-2026-11-12.md) | 市场分类与热度、原生覆盖核对、同类插件参考、P 级候选、ASCII UI 与功能路径及不建议方向；不是已批准需求 |
 | [更新日志](../CHANGELOG.md) | 已有版本记录、待发布功能、用户可感知变化与升级说明 |
 
 每项事实保留一个主要出处，其他文档链接引用。现行规范记录已采用的约定；设计提案、历史备选与未验证结论明确标注。验证记录保留方法和限制，不累积逐版本试验日记。

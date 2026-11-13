@@ -107,8 +107,12 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     React.useEffect(() => {
       void loadArchivedSessions();
       const refresh = () => { void loadArchivedSessions(); };
+      const offConnection = ctx.connection.generation.subscribe(refresh);
       window.addEventListener('focus', refresh);
-      return () => window.removeEventListener('focus', refresh);
+      return () => {
+        offConnection();
+        window.removeEventListener('focus', refresh);
+      };
     }, []);
     const groups = catalog ? groupArchivedSessions(catalog, query, t('archiveUngrouped'), { sortBy, projectId }) : [];
     const sortOptions = [

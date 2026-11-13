@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { listFiles, matches } from './lib/files.mjs';
 import { buildArtifacts } from './build.mjs';
+import { runtimeImports } from './lib/runtime-imports.mjs';
 import ts from 'typescript';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -137,7 +138,9 @@ for (const name of codeFiles) {
   for (const [, key] of text.matchAll(/\bt\('([^']+)'\)/g)) {
     if (runtime) assert.ok(Object.hasOwn(dictionaries.en, key), `Missing translation: ${name} → ${key}`);
   }
-  for (const [, specifier] of text.matchAll(/(?:from\s*|import\s*)['"](\.[^'"]+)['"]/g)) {
+  const specifiers = name.endsWith('.ts') ? [...text.matchAll(/(?:from\s*|import\s*)['"](\.[^'"]+)['"]/g)].map(match => match[1])
+    : runtimeImports(text, name).filter(specifier => specifier.startsWith('.'));
+  for (const specifier of specifiers) {
     const resolved = path.relative(root, path.resolve(root, path.dirname(name), specifier)).replaceAll(path.sep, '/');
     assert.ok(await isFile(resolved), `Missing local import: ${name} → ${specifier}`);
     if (runtime && name.startsWith('src/features/')) {

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { clientFeatures } from '../../src/app/client-features.ts';
 import { skillFixture, catalogFixture, mount, descendants, skillsPage, mcpPage } from '../helpers/client-fixture.mjs';
 
-test('skill cards expose switches directly, reject old project actions and keep MCP independent', async () => {
+test('skill cards expose switches directly, reject stale tab actions and keep project groups and MCP independent', async () => {
   const app = await mount({ skillCatalog: catalogFixture({ skills: [
     skillFixture({ name: 'same-name', source: 'user-dsh' }),
     skillFixture({ name: 'same-name', source: 'project-dsh' }),
@@ -13,12 +13,17 @@ test('skill cards expose switches directly, reject old project actions and keep 
   const oldGlobalAction = page.control('same-name').props.onClick;
   assert.ok(!descendants(page.row('same-name')).some(node => node.props['aria-expanded'] !== undefined));
   await page.tab('project').props.onClick();
+  page.render();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(page.workspaceToggle('/work/a').props['aria-expanded'], true);
+  assert.equal(page.workspaceToggle('/work/b').props['aria-expanded'], true);
   assert.ok(page.row('same-name'));
   assert.equal(page.control('same-name').props['aria-checked'], true);
   await oldGlobalAction();
   assert.deepEqual(app.skillWrites, []);
-  const oldProjectAction = page.control('same-name').props.onClick;
-  await page.chooseProject('/work/b');
+  const oldProjectAction = page.control('same-name', '/work/a').props.onClick;
+  assert.ok(page.control('same-name', '/work/b'));
+  await page.tab('user').props.onClick();
   assert.equal(page.control('same-name').props['aria-checked'], true);
   await oldProjectAction();
   assert.deepEqual(app.skillWrites, []);
@@ -47,7 +52,9 @@ test('MCP has no project controls while skills retain their independent project 
   assert.equal(skills.tab('user').props['aria-selected'], true);
   await skills.tab('project').props.onClick();
   assert.equal(skills.tab('project').props['aria-selected'], true);
-  assert.ok(skills.projectTrigger());
+  assert.equal(skills.projectTrigger(), undefined);
+  assert.ok(skills.workspace('/work/a'));
+  assert.ok(skills.workspace('/work/b'));
   app.unmount();
 });
 

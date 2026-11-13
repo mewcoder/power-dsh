@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { resolve, sep } from 'node:path';
+import { resolve, sep, join } from 'node:path';
+import { mkdtemp, mkdir, writeFile, readFile, rm, access } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { SkillPolicy } from '../skill-policy.ts';
+import { skillMarkdown } from '../skill-content.ts';
 import { OperationQueue } from '../../../shared/host/operation-queue.ts';
 
-function fixture({ initial = [], incomplete = false } = {}) {
+function fixture({ initial = [], incomplete = false, profileHome = resolve('/power-dsh-test-no-profile') } = {}) {
   let raw = { showVersion: true, personalizationEnabled: true, skillManagerEnabled: true, disabledSkills: initial };
   let complete = !incomplete;
   let rejectWrite = false;
@@ -63,6 +66,7 @@ function fixture({ initial = [], incomplete = false } = {}) {
   }
   const fs = { resolve: async path => path, stat: async path => markers.has(path) ? { type: 'directory' } : undefined };
   const ctx = {
+    profileContext: { home: profileHome },
     fiber: { entry: { options: { id: 'power-dsh' } } },
     get(name) { if (name === 'skills') return registryFor(this); if (name === 'fs') return fs; return undefined; },
     on(name, fn) {
@@ -396,3 +400,244 @@ test('project discovery matches native nearest .git and otherwise keeps the requ
     assert.equal(await app.policy.projectRoot('/no-git'), resolve('/no-git'));
   } finally { await app.policy.close(); }
 });
+
+async function importedFixture(run) {
+  const directory = await mkdtemp(join(tmpdir(), 'power-dsh-policy-'));
+  const sourceRoot = join(directory, 'codex');
+  const source = join(sourceRoot, 'guide');
+  const home = join(directory, 'profile');
+  const projectA = join(directory, 'project-a');
+  const projectB = join(directory, 'project-b');
+  const target = join(home, 'skills', 'guide');
+  const otherSource = join(directory, 'unrelated', 'guide');
+  await mkdir(source, { recursive: true });
+  await mkdir(otherSource, { recursive: true });
+  const writeSource = body => writeFile(join(source, 'SKILL.md'), `---\nname: guide\ndescription: Guide instructions\n---\n${body}`);
+  await writeSource('Original guide');
+  await writeFile(join(otherSource, 'SKILL.md'), await readFile(join(source, 'SKILL.md')));
+  const app = fixture({ profileHome: home });
+  app.ctx.workspaceRegistry.list = () => [
+    { path: projectA, title: 'Project A' }, { path: join(projectA, 'sub'), title: 'Subproject' },
+    { path: projectB, title: 'Project B' },
+  ];
+  app.markers.add(join(projectA, '.git'));
+  app.markers.add(join(projectB, '.git'));
+  let registration = 'target';
+  app.policy.externalRoots = () => [{ source: 'codex', path: sourceRoot, scope: 'user' }];
+  const nativeSnapshot = app.policy.registry.snapshot;
+  app.policy.registry.snapshot = async options => {
+    const snapshot = await nativeSnapshot(options);
+    const locations = [{ path: target, root: '', source: 'user-dsh' },
+      ...[projectA, projectB].map(root => ({ path: join(root, '.dsh', 'skills', 'guide'), root, source: 'project-dsh' }))];
+    for (const location of locations) {
+      if (location.root && options.cwd !== location.root && options.cwd !== join(location.root, 'sub')) continue;
+      try {
+        await access(join(location.path, 'SKILL.md'));
+        if (registration !== 'missing') {
+          const masked = snapshot.skills.find(skill => skill.name === 'guide' && skill.provider === 'power-dsh-disabled-skills'
+            && (location.root ? skill.scope === 'project' && skill.projectRoot === location.root : skill.scope === 'user'));
+          if (location.root) snapshot.skills = snapshot.skills.filter(skill => skill.name !== 'guide' || skill === masked);
+          if (!masked) snapshot.skills.push({
+            name: 'guide', description: 'Guide instructions', source: location.source, provider: 'filesystem',
+            path: join(registration === 'target' ? location.path : otherSource, 'SKILL.md'),
+            invocation: { modelInvocable: true, userInvocable: true },
+          });
+        }
+      } catch {}
+    }
+    return snapshot;
+  };
+  app.policy.registry.get = async (name, options) => {
+    const skill = (await app.policy.registry.snapshot(options)).skills.find(row => row.name === name);
+    return skill ? { ...skill, content: await skillMarkdown(target, false) } : undefined;
+  };
+  try {
+    const [entry] = (await app.policy.discoverExternalSkills('', 'user')).entries;
+    await run({ app, entry, source, target, home, projectA, projectB, writeSource, setRegistration: value => { registration = value; } });
+  } finally {
+    await app.policy.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
+test('native availability follows actual files and needs no persistent import record', async () => importedFixture(async ({ app, entry, target, home, writeSource }) => {
+  const variant = entry.variants[0];
+  assert.deepEqual(await app.policy.addSkill('', 'user', variant.id, 'copy', variant.revision), { imported: ['guide'], skipped: [] });
+  const [existing] = (await app.policy.discoverExternalSkills('', 'user')).entries;
+  assert.equal(existing.available, true);
+  assert.equal(existing.conflict, false);
+  await assert.rejects(access(join(home, 'power-dsh', 'skill-imports.json')), { code: 'ENOENT' });
+  await assert.rejects(app.policy.addSkill('', 'user', variant.id, 'copy', variant.revision), /name-conflict/);
+  await writeSource('Updated guide');
+  const detail = await app.policy.read('', 'user', 'guide');
+  assert.equal(detail.content, 'Original guide');
+  assert.equal(Object.hasOwn(detail, 'installation'), false);
+  assert.equal((await app.policy.discoverExternalSkills('', 'user')).entries[0].conflict, true);
+  await rm(target, { recursive: true });
+  const [removed] = (await app.policy.discoverExternalSkills('', 'user')).entries;
+  assert.equal(removed.available, false);
+  assert.equal(removed.conflict, false);
+}));
+
+test('missing native registration is neither a successful add nor a fabricated catalog row', async () => importedFixture(async ({ app, entry, target, setRegistration }) => {
+  setRegistration('missing');
+  const variant = entry.variants[0];
+  await assert.rejects(app.policy.addSkill('', 'user', variant.id, 'copy', variant.revision), /readback-failed/);
+  assert.match(await readFile(join(target, 'SKILL.md'), 'utf8'), /Original guide/);
+  assert.equal(row(await app.policy.list(), 'guide'), undefined);
+  const [remaining] = (await app.policy.discoverExternalSkills('', 'user')).entries;
+  assert.equal(remaining.name, 'guide');
+  assert.equal(remaining.conflict, true);
+  assert.equal(remaining.available, false);
+}));
+
+test('a same-name provider at another path cannot confirm link installation', async () => importedFixture(async ({ app, entry, target, setRegistration }) => {
+  setRegistration('other');
+  const variant = entry.variants[0];
+  await assert.rejects(app.policy.addSkill('', 'user', variant.id, 'link', variant.revision), /readback-failed/);
+  assert.match(await readFile(join(target, 'SKILL.md'), 'utf8'), /Original guide/);
+}));
+
+test('stale selections and incomplete native discovery never write a skill', async () => importedFixture(async ({ app, entry, target, writeSource }) => {
+  const variant = entry.variants[0];
+  await writeSource('Changed after discovery');
+  await assert.rejects(app.policy.addSkill('', 'user', variant.id, 'copy', variant.revision), /source-changed/);
+  app.setComplete(false);
+  await assert.rejects(app.policy.addSkill('', 'user', variant.id, 'copy', variant.revision), /catalog-incomplete/);
+  await assert.rejects(access(target), { code: 'ENOENT' });
+}));
+
+test('native skills not imported by PowerDSH are already present even when invocation is disabled', async () => importedFixture(async ({ app, source }) => {
+  app.native.push({ name: 'guide', description: 'Existing shared guide', source: 'user-agents', provider: 'filesystem',
+    path: join(source, 'SKILL.md'), invocation: { modelInvocable: false, userInvocable: false } });
+  const [existing] = (await app.policy.discoverExternalSkills('', 'user')).entries;
+  assert.equal(existing.available, true);
+  assert.equal(existing.conflict, false);
+  assert.equal(row(await app.policy.list(), 'guide').enabled, false);
+  await assert.rejects(app.policy.addSkill('', 'user', existing.variants[0].id, 'copy', existing.variants[0].revision), /name-conflict/);
+}));
+
+test('a corrupt legacy import history cannot block native listing or a new import', async () => importedFixture(async ({ app, entry, home }) => {
+  const history = join(home, 'power-dsh', 'skill-imports.json');
+  await mkdir(join(history, '..'), { recursive: true });
+  await writeFile(history, '{corrupt legacy history');
+  assert.equal((await app.policy.list()).complete, true);
+  const variant = entry.variants[0];
+  await app.policy.addSkill('', 'user', variant.id, 'copy', variant.revision);
+  assert.equal(await readFile(history, 'utf8'), '{corrupt legacy history');
+  assert.equal((await app.policy.discoverExternalSkills('', 'user')).entries[0].available, true);
+}));
+
+test('destination previews resolve project roots and flat filenames without writing files', async () => importedFixture(async ({ app, projectA, home, source }) => {
+  assert.deepEqual(await app.policy.readSkillImportDestination('', 'user', 'guide', false),
+    { path: join(home, 'skills', 'guide'), complete: true, available: false, inherited: false });
+  assert.equal((await app.policy.readSkillImportDestination(join(projectA, 'sub'), 'project', 'guide', true)).path,
+    join(projectA, '.dsh', 'skills', 'guide.md'));
+  await assert.rejects(access(join(projectA, '.dsh')));
+  await assert.rejects(access(join(home, 'skills')));
+  await assert.rejects(app.policy.readSkillImportDestination('', 'user', '../escape', false), /Invalid/);
+  await assert.rejects(app.policy.readSkillImportDestination(source, 'project', 'guide', false), /no longer available/);
+}));
+
+test('an existing global skill can be copied to a chosen project without affecting other targets', async () => importedFixture(async ({ app, entry, target, projectA, projectB }) => {
+  const variant = entry.variants[0];
+  await app.policy.addSkill('', 'user', variant.id, 'copy', variant.revision);
+  const destination = await app.policy.readSkillImportDestination(projectB, 'project', 'guide', false);
+  assert.equal(destination.available, false);
+  assert.equal(destination.inherited, true);
+  await app.policy.importSkillTo('', 'user', variant.id, variant.revision, projectB);
+  assert.equal(await readFile(join(projectB, '.dsh', 'skills', 'guide', 'SKILL.md'), 'utf8'), await readFile(join(target, 'SKILL.md'), 'utf8'));
+  await assert.rejects(access(join(projectA, '.dsh')));
+  assert.equal((await app.policy.readSkillImportDestination(projectB, 'project', 'guide', false)).available, true);
+  assert.equal((await app.policy.discoverExternalSkills('', 'user')).entries[0].available, true);
+}));
+
+test('project sources import to global or another project even without discovery roots at the destination', async () => importedFixture(async ({ app, entry, source, target, projectA, projectB }) => {
+  const variant = entry.variants[0];
+  app.policy.externalRoots = view => view.cwd === projectA ? [{ source: 'codex', path: join(source, '..'), scope: 'project' }] : [];
+  await app.policy.importSkillTo(projectA, 'project', variant.id, variant.revision, '');
+  await app.policy.importSkillTo(projectA, 'project', variant.id, variant.revision, projectB);
+  assert.equal(await readFile(join(target, 'SKILL.md'), 'utf8'), await readFile(join(source, 'SKILL.md'), 'utf8'));
+  assert.equal((await app.policy.readSkillImportDestination(projectB, 'project', 'guide', false)).available, true);
+  await assert.rejects(access(join(projectA, '.dsh')));
+  await app.policy.addSkill('', 'project', variant.id, 'copy', variant.revision);
+  assert.equal((await app.policy.readSkillImportDestination(projectA, 'project', 'guide', false)).available, true);
+}));
+
+test('confirmation refuses occupied destinations, stale sources and removed workspaces', async () => importedFixture(async ({ app, entry, projectA, projectB, writeSource }) => {
+  const variant = entry.variants[0];
+  assert.equal((await app.policy.readSkillImportDestination(projectA, 'project', 'guide', false)).available, false);
+  const destination = join(projectA, '.dsh', 'skills', 'guide.md');
+  await mkdir(join(destination, '..'), { recursive: true });
+  await writeFile(destination, 'Keep these instructions');
+  await assert.rejects(app.policy.importSkillTo('', 'user', variant.id, variant.revision, projectA), /name-conflict/);
+  assert.equal(await readFile(destination, 'utf8'), 'Keep these instructions');
+  assert.equal((await app.policy.readSkillImportDestination(projectA, 'project', 'guide', false)).available, true);
+  app.ctx.workspaceRegistry.list = () => [{ path: projectA, title: 'Project A' }];
+  await assert.rejects(app.policy.importSkillTo('', 'user', variant.id, variant.revision, projectB), /no longer available/);
+  await writeSource('Changed after opening confirmation');
+  await assert.rejects(app.policy.importSkillTo('', 'user', variant.id, variant.revision, projectA), /source-changed/);
+  await assert.rejects(access(join(projectB, '.dsh')));
+}));
+
+test('owned DSH skills expose a deletion token and deletion restores discovery imports', async () => importedFixture(async ({ app, entry, source, target }) => {
+  const variant = entry.variants[0];
+  await app.policy.addSkill('', 'user', variant.id, 'copy', variant.revision);
+  const detail = await app.policy.read('', 'user', 'guide');
+  assert.equal(detail.deletion.path, target);
+  assert.equal(detail.deletion.linked, false);
+  const after = await app.policy.deleteSkill('', 'user', 'guide', detail.deletion.revision);
+  assert.ok(!after.skills.some(skill => skill.name === 'guide'));
+  await assert.rejects(access(target));
+  assert.equal(await readFile(join(source, 'SKILL.md'), 'utf8'), '---\nname: guide\ndescription: Guide instructions\n---\nOriginal guide');
+  assert.equal((await app.policy.discoverExternalSkills('', 'user')).entries[0].available, false);
+}));
+
+test('deleting a disabled project skill removes only its own policy and keeps the global copy', async () => importedFixture(async ({ app, entry, target, projectA, projectB }) => {
+  const variant = entry.variants[0];
+  await app.policy.addSkill('', 'user', variant.id, 'copy', variant.revision);
+  await app.policy.importSkillTo('', 'user', variant.id, variant.revision, projectA);
+  await app.policy.setEnabled('', 'user', 'guide', false);
+  await app.policy.setEnabled(projectA, 'project', 'guide', false);
+  const detail = await app.policy.read(projectA, 'project', 'guide');
+  assert.ok(detail.deletion);
+  await app.policy.deleteSkill(projectA, 'project', 'guide', detail.deletion.revision);
+  assert.ok(!app.raw.disabledSkills.some(skill => skill.scope === 'project' && skill.name === 'guide'));
+  assert.ok(app.raw.disabledSkills.some(skill => skill.scope === 'user' && skill.name === 'guide'));
+  assert.equal(app.raw.showVersion, true);
+  assert.equal(app.raw.personalizationEnabled, true);
+  await access(join(target, 'SKILL.md'));
+  await assert.rejects(access(join(projectA, '.dsh', 'skills', 'guide')));
+  await assert.rejects(access(join(projectB, '.dsh')));
+}));
+
+test('delete refuses stale content, incomplete catalogs, removed projects and shared sources', async () => importedFixture(async ({ app, entry, target, projectA }) => {
+  const variant = entry.variants[0];
+  await app.policy.addSkill('', 'user', variant.id, 'copy', variant.revision);
+  const detail = await app.policy.read('', 'user', 'guide');
+  await writeFile(join(target, 'new.txt'), 'New local instructions');
+  await assert.rejects(app.policy.deleteSkill('', 'user', 'guide', detail.deletion.revision), /changed/);
+  app.setComplete(false);
+  assert.equal((await app.policy.read('', 'user', 'guide')).deletion, undefined);
+  await assert.rejects(app.policy.deleteSkill('', 'user', 'guide', detail.deletion.revision), /unavailable/);
+  app.setComplete(true);
+  app.ctx.workspaceRegistry.list = () => [];
+  await assert.rejects(app.policy.deleteSkill(projectA, 'project', 'guide', detail.deletion.revision), /no longer available/);
+  app.policy.registry.snapshot = async () => ({ complete: true, skills: [{ name: 'guide', description: 'Shared',
+    source: 'user-agents', provider: 'filesystem', path: join(target, 'SKILL.md'), invocation: { modelInvocable: true, userInvocable: true } }] });
+  assert.equal((await app.policy.read('', 'user', 'guide')).deletion, undefined);
+  await assert.rejects(app.policy.deleteSkill('', 'user', 'guide', detail.deletion.revision), /changed/);
+  await access(join(target, 'SKILL.md'));
+}));
+
+test('a rejected policy write restores the skill and retains its disabled state', async () => importedFixture(async ({ app, entry, target }) => {
+  const variant = entry.variants[0];
+  await app.policy.addSkill('', 'user', variant.id, 'copy', variant.revision);
+  await app.policy.setEnabled('', 'user', 'guide', false);
+  const detail = await app.policy.read('', 'user', 'guide');
+  app.setRejectWrite(true);
+  await assert.rejects(app.policy.deleteSkill('', 'user', 'guide', detail.deletion.revision), /Write rejected/);
+  await access(join(target, 'SKILL.md'));
+  assert.equal(row(await app.policy.list(), 'guide').enabled, false);
+  assert.equal((await app.policy.read('', 'user', 'guide')).deletion.revision, detail.deletion.revision);
+}));

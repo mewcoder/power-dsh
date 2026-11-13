@@ -1,6 +1,21 @@
 // Pure wire data models. Feature modules retain their codecs and runtime ownership.
 
 export type SkillScope = 'user' | 'project';
+export type SkillImportMode = 'copy' | 'link';
+export interface SkillOccurrence {
+  agent: string;
+  path: string;
+  realPath: string;
+  linked: boolean;
+}
+export interface SkillVariant {
+  id: string;
+  description: string;
+  path: string;
+  flat: boolean;
+  revision: string;
+  sources: SkillOccurrence[];
+}
 export interface SkillWorkspace {
   path: string;
   title: string;
@@ -25,6 +40,42 @@ export interface SkillCatalog {
   complete: boolean;
   skills: SkillRow[];
 }
+export interface ExternalSkillEntry {
+  id: string;
+  name: string;
+  description: string;
+  source: string;
+  path: string;
+  flat: boolean;
+  variants?: SkillVariant[];
+  sources?: SkillOccurrence[];
+  comparison?: 'same' | 'different' | 'unknown';
+  available?: boolean;
+  conflict?: boolean;
+  inherited?: boolean;
+}
+export interface ExternalSkillDetail {
+  name: string;
+  description: string;
+  /** Markdown body from the skill's `SKILL.md`, read on demand. */
+  content: string;
+  source: string;
+  path: string;
+}
+export interface ExternalSkillCatalog {
+  complete: boolean;
+  entries: ExternalSkillEntry[];
+}
+export interface SkillImportResult {
+  imported: string[];
+  skipped: { name: string; reason: string }[];
+}
+export interface SkillImportDestination {
+  path: string;
+  complete: boolean;
+  available: boolean;
+  inherited: boolean;
+}
 export interface SkillDetail {
   name: string;
   description: string;
@@ -37,6 +88,12 @@ export interface SkillDetail {
   enabled: boolean;
   modelInvocable: boolean;
   userInvocable: boolean;
+  deletion?: SkillDeletion;
+}
+export interface SkillDeletion {
+  path: string;
+  linked: boolean;
+  revision: string;
 }
 
 export type McpRuntimeState = 'pending' | 'loading' | 'active' | 'failed' | 'unloading' | 'inactive' | 'disabled' | 'unknown';
@@ -124,8 +181,21 @@ export interface WindowsNotification {
 export interface NotificationDelivery { shown: boolean; reason?: 'identity' | 'disabled' }
 export interface NotificationCleared { cleared: boolean }
 export interface NotificationTransport { platform: 'win32' | 'darwin' | 'other'; nativeAvailable: boolean; version: string }
+export interface PluginUpdateDiagnostic {
+  stage: 'release.rpc' | 'git.resolve' | 'git.tags' | 'release.latest' | 'release.asset'
+    | 'market.capabilities' | 'market.updates' | 'market.submit' | 'market.operation' | 'update.validation' | 'update.resume';
+  reason: 'unavailable' | 'not-found' | 'process-exit' | 'incomplete-output' | 'http' | 'invalid-response'
+    | 'tag-mismatch' | 'timeout' | 'cancelled' | 'network' | 'rate-limited' | 'identity-changed' | 'unknown-result'
+    | 'dns' | 'proxy' | 'certificate' | 'authentication' | 'connection';
+  observedAt: string;
+  httpStatus?: number;
+  exitCode?: number;
+  systemCode?: string;
+  elapsedMs?: number;
+}
 export type PluginRelease = { status: 'ready'; version: string; commit: string }
-  | { status: 'unavailable' | 'git-unavailable' } | { status: 'rate-limited'; retryAt: number };
+  | { status: 'unavailable' | 'git-unavailable'; diagnostic?: PluginUpdateDiagnostic }
+  | { status: 'rate-limited'; retryAt: number; diagnostic?: PluginUpdateDiagnostic };
 
 export interface RestartStatus {
   supported: boolean;

@@ -1,6 +1,7 @@
 import { isRecord, isOneOf, type RpcDescriptor } from '../../shared/types/protocol.ts';
 import type { PluginRelease } from '../../shared/types/wire.ts';
 import { versionParts } from './versions.ts';
+import { parseUpdateDiagnostic } from './diagnostics.ts';
 
 export const READ_PLUGIN_RELEASE_RPC: RpcDescriptor<'readPluginRelease', PluginRelease> = {
   id: 'power-dsh#powerDsh/readPluginRelease', service: 'powerDsh', namespace: 'powerDsh', method: 'readPluginRelease',
@@ -11,9 +12,11 @@ export const READ_PLUGIN_RELEASE_RPC: RpcDescriptor<'readPluginRelease', PluginR
       && typeof value.commit === 'string' && /^[a-f0-9]{40}$/.test(value.commit)) {
       return { status: 'ready', version: value.version, commit: value.commit };
     }
-    if (isOneOf(value.status, ['unavailable', 'git-unavailable'])) return { status: value.status };
+    if (isOneOf(value.status, ['unavailable', 'git-unavailable'])) return { status: value.status,
+      ...(value.diagnostic === undefined ? {} : { diagnostic: parseUpdateDiagnostic(value.diagnostic) }) };
     if (value.status === 'rate-limited' && Number.isSafeInteger(value.retryAt) && Number(value.retryAt) > 0) {
-      return { status: value.status, retryAt: Number(value.retryAt) };
+      return { status: value.status, retryAt: Number(value.retryAt),
+        ...(value.diagnostic === undefined ? {} : { diagnostic: parseUpdateDiagnostic(value.diagnostic) }) };
     }
     throw new TypeError('Invalid plugin release');
   } }) },

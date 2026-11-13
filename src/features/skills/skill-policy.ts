@@ -1,12 +1,17 @@
 import { errorCode, type NativeContext, type NativeAgent, type NativeSkill, type NativeSkillRecord, type NativeSkillControl, type NativeSkills, type NativeLease, type NativeScope, type CreateScope, type LifecycleOptions, type Release } from '../../shared/host/native.ts';
 import type { LivePreferences } from '../../shared/types/preferences.ts';
-import type { SkillCatalog, SkillDetail, SkillScope, SkillWorkspace } from './rpc.ts';
+import type { SkillCatalog, SkillDetail, SkillScope, SkillWorkspace, ExternalSkillCatalog, ExternalSkillDetail, SkillImportResult } from './rpc.ts';
 import { isRecord, hasStrings, isOneOf } from '../../shared/types/protocol.ts';
 interface SkillView { cwd: string; scope: SkillScope; workspaces: SkillWorkspace[]; projectRoot: string; scopeKey: unknown }
 type SkillIdentity = Pick<NativeSkill, 'name' | 'description' | 'source' | 'provider' | 'path' | 'origin' | 'resourceBase'>;
-import { access } from 'node:fs/promises';
+import { access, realpath } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { skillOrigin } from './skill-origin.ts';
+import { SKILL_SOURCES, discoverExternal, readDiscoveredSkill, resolveSelection, resolveSkillRoots, packageLocation } from './skill-import.ts';
+import { addDiscoveredSkill } from './skill-install.ts';
+import { pathExists, skillRevision } from './skill-content.ts';
+import { deleteOwnedSkill, skillDeletion } from './skill-delete.ts';
+import { homedir } from 'node:os';
 
 const PROVIDER = 'power-dsh-disabled-skills';
 const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -317,8 +322,54 @@ export class SkillPolicy {
       throw new Error('The skill body could not be read.');
     }
     this.active();
+    const deletion = before.complete ? await this.deletionFor(view, row).catch(() => null) : null;
+    this.active();
     return { name: row.name, description: row.description, content, source: row.source, path: row.path,
-      origin: row.origin, enabled: row.enabled, modelInvocable: row.modelInvocable, userInvocable: row.userInvocable };
+      origin: row.origin, enabled: row.enabled, modelInvocable: row.modelInvocable, userInvocable: row.userInvocable,
+      ...(deletion ? { deletion } : {}) };
+  }
+
+  deletionBase(view: SkillView) { return view.scope === 'user' ? this.owner.profileContext.home : view.projectRoot; }
+
+  deletionFor(view: SkillView, row: SkillCatalog['skills'][number]) {
+    if (row.source !== (view.scope === 'user' ? 'user-dsh' : 'project-dsh') || !row.path) return Promise.resolve(null);
+    return skillDeletion(this.deletionBase(view), this.importTarget(view), row.name, row.path);
+  }
+
+  async deleteSkill(cwd: string, scope: string, name: string, revision: string): Promise<SkillCatalog> {
+    if (typeof name !== 'string' || !NAME.test(name) || typeof revision !== 'string' || !/^[a-f0-9]{64}$/.test(revision)) throw new Error('skill-delete-unavailable');
+    const view = await this.context(cwd, scope);
+    const before = await this.readView(view);
+    const row = before.skills.find(skill => skill.name === name);
+    if (!before.complete || !row) throw new Error('skill-delete-unavailable');
+    const deletion = await this.deletionFor(view, row);
+    if (!deletion || deletion.revision !== revision) throw new Error('skill-delete-changed');
+    const key = keyOf(view.scope, view.projectRoot, name);
+    await deleteOwnedSkill(this.deletionBase(view), this.importTarget(view), name, row.path, revision, () => this.active(), async () => {
+      let removed: NativeSkillRecord | undefined;
+      if (!this.preferences().has(key)) return;
+      await this.ctx.configEditor.edit(this.owner.fiber.entry, raw => {
+        this.active();
+        if (Object.hasOwn(raw, 'disabledSkills') && !Array.isArray(raw.disabledSkills)) throw new Error('skill-delete-unavailable');
+        const next = records(raw.disabledSkills ?? this.config.disabledSkills.get());
+        if (next.get(key)?.path === row.path) { removed = next.get(key); next.delete(key); }
+        return { ...raw, disabledSkills: [...next.values()] };
+      });
+      return async () => {
+        if (!removed || this.closed) return;
+        await this.ctx.configEditor.edit(this.owner.fiber.entry, raw => {
+          this.active();
+          const next = records(raw.disabledSkills ?? this.config.disabledSkills.get());
+          if (!next.has(key)) next.set(key, removed!);
+          return { ...raw, disabledSkills: [...next.values()] };
+        });
+      };
+    });
+    this.active();
+    this.invalidate();
+    const after = await this.readView(view);
+    if (!after.complete || after.skills.some(skill => skill.name === name && skill.path === row.path)) throw new Error('skill-delete-readback-failed');
+    return after;
   }
 
   async setEnabled(cwd: string, scope: string, name: string, enabled: boolean) {
@@ -351,6 +402,143 @@ export class SkillPolicy {
     const after = await this.list(before.cwd, before.scope);
     if (after.skills.find(item => item.name === name)?.enabled !== enabled) throw new Error('DSH did not accept the requested skill state. Refresh the list to inspect its actual state.');
     return after;
+  }
+
+
+  /** Target directory for imported skills in the current scope. */
+  importTarget(view: SkillView): string {
+    if (view.scope === 'user') return join(this.owner.profileContext.home, 'skills');
+    if (!view.projectRoot) throw new Error('The selected workspace has no project root.');
+    return join(view.projectRoot, '.dsh', 'skills');
+  }
+
+  externalRoots(view: SkillView) {
+    return resolveSkillRoots(homedir(), view.scope === 'project' ? view.projectRoot : '').filter(root => root.scope === view.scope);
+  }
+
+  async discoverExternalSkills(cwd: string, scope: string): Promise<ExternalSkillCatalog> {
+    const view = await this.context(cwd, scope);
+    const catalog = await this.readView(view);
+    const target = this.importTarget(view);
+    const roots = this.externalRoots(view);
+    const inherited = view.scope === 'project'
+      ? (await this.registry.snapshot({ scope: view.scopeKey })).skills.filter(skill => !isProject(skill.source)).map(skill => skill.name) : [];
+    const entries = await discoverExternal(roots, target, new Set(catalog.skills.map(skill => skill.name)),
+      new Map(catalog.skills.map(skill => [skill.name, skill.path])), new Set(inherited));
+    this.active();
+    return { complete: catalog.complete, entries };
+  }
+
+  /**
+   * Read one discovered skill's body without importing it.
+   *
+   * The dialog shows what the copy would hold, so the source file is read
+   * in place and nothing is written.
+   * @param cwd - project directory for the project scope; ignored for user scope.
+   * @param scope - `user` or `project`.
+   * @param id - stable id the discovery list gave the skill.
+   * @returns the skill with its Markdown body, or null when it is gone.
+   */
+  async readExternal(cwd: string, scope: string, id: string): Promise<ExternalSkillDetail | null> {
+    if (typeof id !== 'string' || id === '') throw new TypeError('Invalid skill operation.');
+    const view = await this.context(cwd, scope);
+    const roots = this.externalRoots(view);
+    let [skill] = await resolveSelection(roots, [id]);
+    if (!skill) {
+      const entry = (await this.discoverExternalSkills(cwd, scope)).entries.find(item => item.id === id);
+      if (entry?.comparison === 'same' && entry.variants?.[0]) [skill] = await resolveSelection(roots, [entry.variants[0].id]);
+    }
+    this.active();
+    if (skill === undefined) return null;
+    const labels = new Map(SKILL_SOURCES.map(spec => [spec.id, spec.label]));
+    try {
+      const detail = await readDiscoveredSkill(skill);
+      return { ...detail, source: labels.get(skill.source) ?? skill.source };
+    } catch (error) {
+      this.active();
+      throw new Error('The skill body could not be read.');
+    }
+  }
+
+  async importExternalSkills(cwd: string, scope: string, ids: string[]): Promise<SkillImportResult> {
+    if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100 || ids.some(id => typeof id !== 'string' || id === '')) {
+      throw new TypeError('Invalid skill import request.');
+    }
+    const imported: string[] = [];
+    const skipped: { name: string; reason: string }[] = [];
+    for (const id of ids) {
+      const catalog = await this.discoverExternalSkills(cwd, scope);
+      const entry = catalog.entries.find(item => item.id === id || item.variants?.some(variant => variant.id === id));
+      const variant = entry?.variants?.find(item => item.id === id) ?? (entry?.comparison === 'same' ? entry.variants?.[0] : undefined);
+      if (!entry || !variant) { skipped.push({ name: entry?.name ?? '', reason: 'skill-source-selection-required' }); continue; }
+      try {
+        await this.addSkill(cwd, scope, variant.id, 'copy', variant.revision);
+        imported.push(entry.name);
+      } catch (error) {
+        skipped.push({ name: entry.name, reason: error instanceof Error ? error.message : 'skill-copy-failed' });
+      }
+    }
+    this.active();
+    this.invalidate();
+    return { imported, skipped };
+  }
+
+  async addSkill(cwd: string, scope: string, id: string, mode: string, revision: string): Promise<SkillImportResult> {
+    const source = await this.context(cwd, scope);
+    return this.addSkillTo(source.cwd, source.scope, id, mode, revision, source.scope === 'project' ? source.cwd : '');
+  }
+
+  async readSkillImportDestination(cwd: string, scope: string, name: string, flat: boolean): Promise<import('./rpc.ts').SkillImportDestination> {
+    if (typeof name !== 'string' || !NAME.test(name) || typeof flat !== 'boolean') throw new TypeError('Invalid skill import destination.');
+    const view = await this.context(cwd, scope);
+    const catalog = await this.readView(view);
+    const root = this.importTarget(view);
+    const available = catalog.skills.some(skill => skill.name === name)
+      || await pathExists(join(root, name)) || await pathExists(join(root, `${name}.md`));
+    const inherited = view.scope === 'project'
+      && (await this.registry.snapshot({ scope: view.scopeKey })).skills.some(skill => skill.name === name && !isProject(skill.source));
+    this.active();
+    return { path: join(root, flat ? `${name}.md` : name), complete: catalog.complete, available, inherited };
+  }
+
+  async importSkillTo(cwd: string, scope: string, id: string, revision: string, targetCwd: string): Promise<SkillImportResult> {
+    if (typeof targetCwd !== 'string') throw new TypeError('Invalid skill import destination.');
+    return this.addSkillTo(cwd, scope, id, 'copy', revision, targetCwd);
+  }
+
+  async addSkillTo(cwd: string, scope: string, id: string, mode: string, revision: string, targetCwd: string): Promise<SkillImportResult> {
+    if (typeof id !== 'string' || typeof revision !== 'string' || (mode !== 'copy' && mode !== 'link')) throw new Error('skill-operation-invalid');
+    const source = await this.context(cwd, scope);
+    const view = await this.context(targetCwd, targetCwd ? 'project' : 'user');
+    const catalog = await this.readView(view);
+    if (!catalog.complete) throw new Error('skill-catalog-incomplete');
+    const discovered = await this.discoverExternalSkills(cwd, scope);
+    if (!discovered.complete) throw new Error('skill-catalog-incomplete');
+    const entry = discovered.entries.find(item => item.variants?.some(variant => variant.id === id));
+    const variant = entry?.variants?.find(item => item.id === id);
+    if (!entry || !variant || !revision || revision !== variant.revision) throw new Error('skill-source-changed');
+    if (catalog.skills.some(skill => skill.name === entry.name)) throw new Error('skill-name-conflict');
+    const roots = this.externalRoots(source);
+    const [skill] = await resolveSelection(roots, [id]);
+    if (!skill) throw new Error('skill-source-changed');
+    this.active();
+    await addDiscoveredSkill(this.importTarget(view), skill, mode, revision, () => this.active());
+    this.invalidate();
+    await this.verifyImportedSkill(view, skill.name, variant.flat, revision);
+    return { imported: [skill.name], skipped: [] };
+  }
+
+  async verifyImportedSkill(view: SkillView, name: string, flat: boolean, revision: string) {
+    const after = await this.readView(view);
+    const accepted = after.skills.find(item => item.name === name);
+    let verified = false;
+    try {
+      const location = accepted?.path ? (await packageLocation(accepted.path)).path : '';
+      const target = join(this.importTarget(view), flat ? `${name}.md` : name);
+      verified = Boolean(location) && await realpath(location) === await realpath(target) && await skillRevision(location, flat) === revision;
+    } catch {}
+    this.active();
+    if (!after.complete || !verified) throw new Error('skill-readback-failed');
   }
 
   async close() {

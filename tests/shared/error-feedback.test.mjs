@@ -6,7 +6,7 @@ import { locales } from '../../src/shared/client/locales.ts';
 
 function descendants(node) {
   if (!node || typeof node !== 'object') return [];
-  return [node, ...(node.props.children || []).flat(Infinity).flatMap(descendants)];
+  return [node, ...(node.props.children || []).flat(Infinity).flatMap(descendants), ...descendants(node.props.footer)];
 }
 
 function fixture(language = 'en') {
@@ -28,7 +28,7 @@ function fixture(language = 'en') {
       if (!(index in states)) { states[index] = true; effects.push({ callback, cleanup: callback() }); }
     },
   };
-  const feedback = createErrorFeedback(React, 'button');
+  const feedback = createErrorFeedback(React, 'button', 'native-modal');
   const props = { t: key => locales[language][key] || key, message: 'Could not read the directory.', code: 'PD-SKILLS-LOAD', operation: 'listSkills' };
   const outer = feedback(props);
   let detailsNode = descendants(outer).find(node => typeof node.type === 'function');
@@ -67,6 +67,7 @@ async function withBrowser(t, clipboard, run) {
 const copyButton = view => descendants(view).find(node => node.props.className === 'power-dsh-error-copy');
 const disclosure = view => descendants(view).find(node => node.props.className === 'power-dsh-error-disclosure');
 const status = view => descendants(view).find(node => node.props.role === 'status');
+const dialog = view => descendants(view).find(node => node.type === 'native-modal');
 
 test('diagnostic text is bounded and excludes credentials, URLs and Windows/POSIX paths', () => {
   const source = [
@@ -138,6 +139,18 @@ test('shared errors expose one alert, associated id, authored code and optional 
   assert.ok(!descendants(app.outer).some(node => node.type === 'button'));
 });
 
+test('modal placement groups the summary and recovery actions into one banner', () => {
+  const app = fixture();
+  let retries = 0;
+  const view = app.feedback({ ...app.props, placement: 'modal', retry: () => { retries++; } });
+  assert.equal(view.props.role, 'alert');
+  assert.equal(view.props['data-placement'], 'modal');
+  const actions = descendants(view).find(node => node.props.className === 'power-dsh-error-actions');
+  assert.ok(actions, 'The modal banner must group the disclosure and retry actions.');
+  assert.ok(descendants(actions).some(node => node.type === 'button'));
+  assert.ok(app.outer.props.children.includes(app.props.message));
+});
+
 test('error information stays selectable and bilingual; copying writes only the displayed diagnostic', async t => {
   const copies = [];
   await withBrowser(t, { writeText: async text => { copies.push(text); } }, async () => {
@@ -145,29 +158,29 @@ test('error information stays selectable and bilingual; copying writes only the 
       const app = fixture(language);
       let view = app.render();
       const toggle = disclosure(view);
-      assert.ok(toggle.props.children.includes(locales[language].errorDetails));
+      assert.ok(toggle.props.children.includes(locales[language].errorDetailsAction));
       assert.equal(toggle.props['aria-expanded'], false);
-      const panel = descendants(view).find(node => node.props.id === toggle.props['aria-controls']);
-      assert.equal(panel.props.hidden, true);
+      assert.equal(toggle.props['aria-haspopup'], 'dialog');
+      assert.equal(dialog(view).props.open, false);
       toggle.props.onClick();
       view = app.render();
       assert.equal(disclosure(view).props['aria-expanded'], true);
-      assert.equal(disclosure(view).props['aria-controls'], panel.props.id);
-      assert.equal(descendants(view).find(node => node.props.id === panel.props.id).props.hidden, false);
+      assert.equal(dialog(view).props.open, true);
+      assert.equal(dialog(view).props.title, locales[language].errorDetails);
       assert.equal(disclosure(view).props.variant, 'ghost');
       assert.equal(disclosure(view).props.size, 'sm');
       assert.equal(copyButton(view).props.variant, 'outline');
-      assert.equal(copyButton(view).props.size, 'sm');
+      assert.equal(copyButton(view).props['data-modal-autofocus'], true);
       const report = descendants(view).find(node => node.type === 'pre');
       assert.equal(report.props.tabIndex, 0);
       await copyButton(view).props.onClick();
       assert.equal(copies.at(-1), report.props.children[0]);
       assert.ok(copies.at(-1).includes('DSH: 0.2.2-rc.1'));
       assert.ok(status(app.render()).props.children.includes(locales[language].errorInfoCopied));
-      disclosure(app.render()).props.onClick();
+      dialog(app.render()).props.onClose();
       view = app.render();
       assert.equal(disclosure(view).props['aria-expanded'], false);
-      assert.equal(descendants(view).find(node => node.props.id === panel.props.id).props.hidden, true);
+      assert.equal(dialog(view).props.open, false);
       disclosure(view).props.onClick();
       assert.equal(descendants(app.render()).find(node => node.type === 'pre').props.children[0], report.props.children[0]);
       app.dispose();

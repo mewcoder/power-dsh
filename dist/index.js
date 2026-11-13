@@ -1,12 +1,13 @@
 import { TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import z from "@deepseek-ai/schemastery";
-import { spawn } from "node:child_process";
-import { access, lstat, mkdir, readFile, readdir, realpath, rename, unlink, writeFile } from "node:fs/promises";
-import { basename, dirname, isAbsolute, join, normalize, posix, resolve, win32 } from "node:path";
-import { Buffer as Buffer$1 } from "node:buffer";
+import { execFile, spawn } from "node:child_process";
+import { access, copyFile, lstat, mkdir, mkdtemp, open, readFile, readdir, readlink, realpath, rename, rm, rmdir, stat, symlink, unlink, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
+import path, { basename, dirname, isAbsolute, join, normalize, posix, relative, resolve, sep, win32 } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
+import { Buffer as Buffer$1 } from "node:buffer";
+import { constants, linkSync, lstatSync, mkdtempSync, readdirSync, renameSync, rmdirSync, unlinkSync } from "node:fs";
 import { AsyncLocalStorage } from "node:async_hooks";
-import { linkSync, lstatSync, mkdtempSync, readdirSync, renameSync, rmdirSync, unlinkSync } from "node:fs";
 import { defineTool } from "@deepseek-ai/dsh-tools";
 
 // \0rolldown/runtime.js
@@ -64,13 +65,13 @@ const definition$21 = Object.freeze({
 	id: "plugin-updates",
 	category: "other",
 	order: 100,
-	keys: Object.freeze(["pluginUpdatesEnabled"]),
+	keys: Object.freeze([]),
 	spec: "src/features/plugin-updates/spec.md"
 });
 
 // src/features/plugin-updates/config.ts
 var config_exports$21 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$21 });
-const configFields$21 = { pluginUpdatesEnabled: z.boolean().default(true).volatile() };
+const configFields$21 = {};
 
 // src/features/plugin-updates/versions.ts
 function versionParts(value) {
@@ -79,8 +80,120 @@ function versionParts(value) {
 	return parts.every(Number.isSafeInteger) ? parts : null;
 }
 
+// src/features/plugin-updates/diagnostics.ts
+const stages = [
+	"release.rpc",
+	"git.resolve",
+	"git.tags",
+	"release.latest",
+	"release.asset",
+	"market.capabilities",
+	"market.updates",
+	"market.submit",
+	"market.operation",
+	"update.validation",
+	"update.resume"
+];
+const reasons = [
+	"unavailable",
+	"not-found",
+	"process-exit",
+	"incomplete-output",
+	"http",
+	"invalid-response",
+	"tag-mismatch",
+	"timeout",
+	"cancelled",
+	"network",
+	"rate-limited",
+	"identity-changed",
+	"unknown-result",
+	"dns",
+	"proxy",
+	"certificate",
+	"authentication",
+	"connection"
+];
+const systemCodes = [
+	"ENOTFOUND",
+	"EAI_AGAIN",
+	"ECONNREFUSED",
+	"ECONNRESET",
+	"ETIMEDOUT",
+	"ENETUNREACH",
+	"EHOSTUNREACH",
+	"CERT_HAS_EXPIRED",
+	"DEPTH_ZERO_SELF_SIGNED_CERT",
+	"UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+	"SELF_SIGNED_CERT_IN_CHAIN",
+	"ERR_TLS_CERT_ALTNAME_INVALID",
+	"UND_ERR_CONNECT_TIMEOUT",
+	"UND_ERR_SOCKET"
+];
+function networkCode(error) {
+	if (typeof error !== "object" || error === null) return;
+	const value = error;
+	const code = value.cause?.code ?? value.code;
+	return systemCodes.find((known) => known === code);
+}
+function parseUpdateDiagnostic(value) {
+	if (value === void 0) return;
+	if (typeof value !== "object" || value === null) throw new TypeError("Invalid update diagnostic");
+	const data = value;
+	const stage = stages.find((item) => item === data.stage);
+	const reason = reasons.find((item) => item === data.reason);
+	if (!stage || !reason || typeof data.observedAt !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(data.observedAt) || !Number.isFinite(Date.parse(data.observedAt))) throw new TypeError("Invalid update diagnostic");
+	const result = {
+		stage,
+		reason,
+		observedAt: data.observedAt
+	};
+	for (const [key, minimum, maximum] of [
+		[
+			"httpStatus",
+			100,
+			599
+		],
+		[
+			"exitCode",
+			-2147483648,
+			2147483647
+		],
+		[
+			"elapsedMs",
+			0,
+			864e5
+		]
+	]) {
+		if (data[key] === void 0) continue;
+		if (!Number.isSafeInteger(data[key]) || Number(data[key]) < minimum || Number(data[key]) > maximum) throw new TypeError("Invalid update diagnostic");
+		result[key] = Number(data[key]);
+	}
+	if (data.systemCode !== void 0) {
+		const code = systemCodes.find((item) => item === data.systemCode);
+		if (!code) throw new TypeError("Invalid update diagnostic");
+		result.systemCode = code;
+	}
+	return result;
+}
+var UpdateFailure = class extends Error {
+	diagnostic;
+	constructor(key, diagnostic) {
+		super(key);
+		this.diagnostic = diagnostic;
+	}
+};
+
 // src/features/plugin-updates/releases.ts
 const REPOSITORY = "https://github.com/mewcoder/power-dsh";
+function gitFailureReason(text) {
+	if (/could not resolve proxy|proxy authentication|CONNECT tunnel failed/i.test(text)) return "proxy";
+	if (/could not resolve host|name or service not known|temporary failure in name resolution/i.test(text)) return "dns";
+	if (/SSL certificate problem|server certificate verification failed|certificate verify failed/i.test(text)) return "certificate";
+	if (/authentication failed|could not read Username|terminal prompts disabled/i.test(text)) return "authentication";
+	if (/failed to connect|connection refused|connection reset|connection timed out/i.test(text)) return "connection";
+	return "process-exit";
+}
 function releaseCommits(text) {
 	const tags = /* @__PURE__ */ new Map();
 	for (const line of text.split(/\r?\n/)) {
@@ -95,15 +208,13 @@ function releaseCommits(text) {
 }
 var PluginReleases = class {
 	ctx;
-	config;
 	fetch;
 	controller = null;
 	handle = null;
 	retryAt = 0;
 	closed = false;
-	constructor(ctx, config, request = fetch) {
+	constructor(ctx, request = fetch) {
 		this.ctx = ctx;
-		this.config = config;
 		this.fetch = request;
 		ctx.effect(() => () => this.close());
 	}
@@ -119,20 +230,45 @@ var PluginReleases = class {
 			const retry = response.headers.get("retry-after") || "";
 			const deadline = /^\d+$/.test(retry) ? now + Number(retry) * 1e3 : Date.parse(retry);
 			this.retryAt = Math.min(now + 864e5, Math.max(now + 6e4, Number.isFinite(deadline) ? deadline : 0));
-			throw new Error("rate-limited");
+			throw new UpdateFailure("rate-limited", {
+				stage: url.endsWith("/latest") ? "release.latest" : "release.asset",
+				reason: "rate-limited",
+				observedAt: (/* @__PURE__ */ new Date()).toISOString(),
+				httpStatus: response.status
+			});
 		}
 		return response;
 	}
 	async read() {
-		if (this.closed || this.config.pluginUpdatesEnabled.get() !== true) return { status: "unavailable" };
+		if (this.closed) return { status: "unavailable" };
 		if (this.retryAt > Date.now()) return {
 			status: "rate-limited",
 			retryAt: this.retryAt
 		};
 		const subprocess = this.ctx.get("subprocess");
-		if (!subprocess) return { status: "git-unavailable" };
+		if (!subprocess) return {
+			status: "git-unavailable",
+			diagnostic: {
+				stage: "git.resolve",
+				reason: "unavailable",
+				observedAt: (/* @__PURE__ */ new Date()).toISOString()
+			}
+		};
+		const started = Date.now();
+		let stage = "git.resolve";
+		let timedOut = false;
+		const failure = (reason, details = {}) => new UpdateFailure("unavailable", {
+			stage,
+			reason,
+			observedAt: (/* @__PURE__ */ new Date()).toISOString(),
+			elapsedMs: Date.now() - started,
+			...details
+		});
 		const controller = this.controller = new AbortController();
-		const timer = setTimeout(() => controller.abort(), 2e4);
+		const timer = setTimeout(() => {
+			timedOut = true;
+			controller.abort();
+		}, 2e4);
 		const stopped = new Promise((_resolve, reject) => {
 			controller.signal.addEventListener("abort", () => reject(/* @__PURE__ */ new Error("unavailable")), { once: true });
 		});
@@ -141,9 +277,13 @@ var PluginReleases = class {
 			try {
 				executable = await Promise.race([subprocess.resolveExecutable("git", void 0, controller.signal), stopped]);
 			} catch (_error) {
-				return { status: controller.signal.aborted ? "unavailable" : "git-unavailable" };
+				return {
+					status: controller.signal.aborted ? "unavailable" : "git-unavailable",
+					diagnostic: failure(controller.signal.aborted ? timedOut ? "timeout" : "cancelled" : "not-found").diagnostic
+				};
 			}
-			if (this.closed || this.config.pluginUpdatesEnabled.get() !== true) return { status: "unavailable" };
+			if (this.closed) return { status: "unavailable" };
+			stage = "git.tags";
 			const handle = this.handle = subprocess.spawn({
 				argv: [
 					executable,
@@ -172,33 +312,46 @@ var PluginReleases = class {
 				}
 			});
 			const outcome = await Promise.race([handle.done, stopped]);
-			if (!await Promise.race([handle.waitForExit(controller.signal), stopped]) || outcome.exitCode !== 0 || outcome.signal !== null) throw new Error("unavailable");
+			if (!await Promise.race([handle.waitForExit(controller.signal), stopped]) || outcome.exitCode !== 0 || outcome.signal !== null) throw failure(gitFailureReason(handle.collected?.stderr?.readFrom(0)?.text || ""), typeof outcome.exitCode === "number" ? { exitCode: outcome.exitCode } : {});
 			const output = handle.collected?.stdout?.readFrom(0);
-			if (!output || output.lossy || output.text.length > 65536) throw new Error("unavailable");
+			if (!output || output.lossy || output.text.length > 65536) throw failure("incomplete-output");
 			const tags = releaseCommits(output.text);
 			controller.signal.throwIfAborted();
-			if (this.config.pluginUpdatesEnabled.get() !== true) return { status: "unavailable" };
+			stage = "release.latest";
 			const latest = await this.head(`${REPOSITORY}/releases/latest`, controller.signal);
 			controller.signal.throwIfAborted();
 			const location = latest.headers.get("location") || "";
 			const version = location.startsWith(`${REPOSITORY}/releases/tag/v`) ? location.slice(`${REPOSITORY}/releases/tag/v`.length) : "";
-			if (latest.status !== 302 || !versionParts(version) || !tags.has(version)) throw new Error("unavailable");
-			if (this.config.pluginUpdatesEnabled.get() !== true) return { status: "unavailable" };
+			if (latest.status !== 302) throw failure("http", { httpStatus: latest.status });
+			if (!versionParts(version)) throw failure("invalid-response", { httpStatus: latest.status });
+			if (!tags.has(version)) throw failure("tag-mismatch", { httpStatus: latest.status });
+			stage = "release.asset";
 			const asset = await this.head(`${REPOSITORY}/releases/download/v${version}/power-dsh.tgz`, controller.signal);
-			const assetUrl = new URL(asset.headers.get("location") || "");
-			if (asset.status !== 302 || assetUrl.protocol !== "https:" || assetUrl.hostname !== "release-assets.githubusercontent.com" || assetUrl.username || assetUrl.password) throw new Error("unavailable");
+			if (asset.status !== 302) throw failure("http", { httpStatus: asset.status });
+			let assetUrl;
+			try {
+				assetUrl = new URL(asset.headers.get("location") || "");
+			} catch {
+				throw failure("invalid-response", { httpStatus: asset.status });
+			}
+			if (assetUrl.protocol !== "https:" || assetUrl.hostname !== "release-assets.githubusercontent.com" || assetUrl.username || assetUrl.password) throw failure("invalid-response", { httpStatus: asset.status });
 			controller.signal.throwIfAborted();
-			if (this.closed || this.config.pluginUpdatesEnabled.get() !== true) return { status: "unavailable" };
+			if (this.closed) return { status: "unavailable" };
 			return {
 				status: "ready",
 				version,
 				commit: tags.get(version)
 			};
 		} catch (error) {
+			const diagnostic = error instanceof UpdateFailure ? error.diagnostic : failure(controller.signal.aborted ? timedOut ? "timeout" : "cancelled" : stage.startsWith("release.") ? "network" : "unavailable", { systemCode: networkCode(error) }).diagnostic;
 			return error instanceof Error && error.message === "rate-limited" ? {
 				status: "rate-limited",
-				retryAt: this.retryAt
-			} : { status: "unavailable" };
+				retryAt: this.retryAt,
+				diagnostic
+			} : {
+				status: "unavailable",
+				diagnostic
+			};
 		} finally {
 			clearTimeout(timer);
 			controller.abort();
@@ -219,8 +372,8 @@ var host_exports$15 = /* @__PURE__ */ __exportAll({
 	createHost: () => createHost$15,
 	methods: () => methods$15
 });
-function createHost$15(ctx, config) {
-	return { pluginReleases: new PluginReleases(ctx, config) };
+function createHost$15(ctx) {
+	return { pluginReleases: new PluginReleases(ctx) };
 }
 const methods$15 = { readPluginRelease() {
 	return this.run(() => this.pluginReleases.read());
@@ -265,10 +418,14 @@ const READ_PLUGIN_RELEASE_RPC = {
 				version: value.version,
 				commit: value.commit
 			};
-			if (isOneOf(value.status, ["unavailable", "git-unavailable"])) return { status: value.status };
+			if (isOneOf(value.status, ["unavailable", "git-unavailable"])) return {
+				status: value.status,
+				...value.diagnostic === void 0 ? {} : { diagnostic: parseUpdateDiagnostic(value.diagnostic) }
+			};
 			if (value.status === "rate-limited" && Number.isSafeInteger(value.retryAt) && Number(value.retryAt) > 0) return {
 				status: value.status,
-				retryAt: Number(value.retryAt)
+				retryAt: Number(value.retryAt),
+				...value.diagnostic === void 0 ? {} : { diagnostic: parseUpdateDiagnostic(value.diagnostic) }
 			};
 			throw new TypeError("Invalid plugin release");
 		} })
@@ -431,6 +588,322 @@ const settingsTool$7 = {
 	}]
 };
 
+// src/features/restart-button/windows-restart.ts
+const WINDOWS_RESTART_IDENTITY = String.raw`
+function Read-Process([int]$processId) {
+  return Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $processId) -ErrorAction Stop
+}
+function Start-Stamp($process) {
+  return ([datetime]$process.CreationDate).ToUniversalTime().Ticks.ToString()
+}
+function Matches-Process($process, [string]$executable, [string]$stamp) {
+  return $null -ne $process -and [string]$process.ExecutablePath -ieq $executable -and (Start-Stamp $process) -eq $stamp
+}
+function Read-Product([string]$executable) {
+  return [Diagnostics.FileVersionInfo]::GetVersionInfo($executable).ProductName
+}
+function Resolve-Target([string]$executable, [int]$hostPid) {
+  if ([IO.Path]::GetFileName($executable) -ine 'DeepSeek Harness.exe') { throw 'identity' }
+  if ((Read-Product $executable) -ne 'DeepSeek Harness') { throw 'identity' }
+  $hostProcess = Read-Process $hostPid
+  if ($null -eq $hostProcess -or [string]$hostProcess.ExecutablePath -ine $executable) { throw 'identity' }
+  $main = $hostProcess
+  $seen = @{}
+  for ($step = 0; $step -lt 32; $step++) {
+    if ($seen.ContainsKey([int]$main.ProcessId)) { throw 'identity' }
+    $seen[[int]$main.ProcessId] = $true
+    $parent = Read-Process ([int]$main.ParentProcessId)
+    if ($null -eq $parent -or [string]$parent.ExecutablePath -ine $executable) { break }
+    if ([datetime]$parent.CreationDate -gt [datetime]$main.CreationDate) { throw 'identity' }
+    $main = $parent
+  }
+  if ($step -ge 32 -or $main.ProcessId -eq $hostPid -or [string]::IsNullOrWhiteSpace([string]$main.CommandLine) -or
+    [string]$main.CommandLine -match '(?i)(?:^|\s)--(?:type|utility-sub-type|run-as-node)(?:[=\s]|$)') { throw 'identity' }
+  return @{ executable = $executable; mainPid = [int]$main.ProcessId; mainStart = (Start-Stamp $main)
+    hostPid = $hostPid; hostStart = (Start-Stamp $hostProcess) }
+}`;
+const WINDOWS_RESTART_HELPER = String.raw`param([Parameter(Mandatory = $true)][string]$Directory)
+$ErrorActionPreference = 'Stop'
+${WINDOWS_RESTART_IDENTITY}
+$env:ELECTRON_RUN_AS_NODE = $null
+$env:NODE_OPTIONS = $null
+$env:NODE_PATH = $null
+$request = $null
+function Publish-State([string]$phase) {
+  $text = @{ nonce = [string]$request.nonce; phase = $phase } | ConvertTo-Json -Compress
+  $temporary = [IO.Path]::Combine($Directory, 'state.next')
+  [IO.File]::WriteAllText($temporary, $text, (New-Object Text.UTF8Encoding($false)))
+  Move-Item -LiteralPath $temporary -Destination ([IO.Path]::Combine($Directory, 'state.json')) -Force
+}
+function Require-Time {
+  if ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -ge [long]$request.expiresAt) { throw 'timeout' }
+}
+try {
+  $request = Get-Content -LiteralPath ([IO.Path]::Combine($Directory, 'request.json')) -Raw -Encoding UTF8 | ConvertFrom-Json
+  $target = $request.target
+  $helper = Read-Process $PID
+  $ancestor = $helper
+  for ($step = 0; $step -lt 64; $step++) {
+    if ($null -eq $ancestor) { break }
+    if ([int]$ancestor.ProcessId -eq [int]$target.mainPid -or [int]$ancestor.ProcessId -eq [int]$target.hostPid) { throw 'handoff' }
+    $parent = Read-Process ([int]$ancestor.ParentProcessId)
+    if ($null -eq $parent -or [datetime]$parent.CreationDate -gt [datetime]$ancestor.CreationDate) { break }
+    $ancestor = $parent
+  }
+  if ($step -ge 64) { throw 'handoff' }
+  Publish-State 'ready'
+  $deadline = [DateTime]::UtcNow.AddSeconds(12)
+  $approved = $false
+  while ([DateTime]::UtcNow -lt $deadline) {
+    $approval = [IO.Path]::Combine($Directory, 'commit')
+    if (Test-Path -LiteralPath $approval) {
+      $approved = [IO.File]::ReadAllText($approval) -ceq [string]$request.nonce
+      break
+    }
+    Start-Sleep -Milliseconds 100
+  }
+  if (-not $approved) { throw 'handoff' }
+  Require-Time
+  $resolved = Resolve-Target ([string]$target.executable) ([int]$target.hostPid)
+  if ($resolved.mainPid -ne $target.mainPid -or $resolved.mainStart -cne $target.mainStart -or
+    $resolved.hostStart -cne $target.hostStart) { throw 'identity' }
+  $oldMain = [Diagnostics.Process]::GetProcessById([int]$target.mainPid)
+  $null = $oldMain.Handle
+  if ([Math]::Abs([decimal]$oldMain.StartTime.ToUniversalTime().Ticks - [decimal]$target.mainStart) -gt 10) { throw 'identity' }
+  $tree = @{}
+  $queue = New-Object 'Collections.Generic.Queue[int]'
+  $queue.Enqueue([int]$target.mainPid)
+  while ($queue.Count -gt 0) {
+    if ($tree.Count -ge 512) { throw 'identity' }
+    $parentId = $queue.Dequeue()
+    if ($tree.ContainsKey($parentId)) { throw 'identity' }
+    $process = Read-Process $parentId
+    if ($null -eq $process) { continue }
+    $tree[$parentId] = Start-Stamp $process
+    foreach ($child in @(Get-CimInstance Win32_Process -Filter ('ParentProcessId = ' + $parentId))) {
+      if ([datetime]$child.CreationDate -ge [datetime]$process.CreationDate) { $queue.Enqueue([int]$child.ProcessId) }
+    }
+  }
+  if (-not (Matches-Process (Read-Process ([int]$target.mainPid)) ([string]$target.executable) ([string]$target.mainStart))) { throw 'identity' }
+  Require-Time
+  Publish-State 'stopping'
+  & ([IO.Path]::Combine($env:SystemRoot, 'System32', 'taskkill.exe')) /PID ([string]$target.mainPid) /T /F 2>$null | Out-Null
+  if (-not $oldMain.WaitForExit(20000)) { throw 'timeout' }
+  $deadline = [DateTime]::UtcNow.AddSeconds(10)
+  do {
+    $alive = $false
+    foreach ($processId in @($tree.Keys)) {
+      $process = Read-Process $processId
+      if ($null -ne $process -and (Start-Stamp $process) -ceq $tree[$processId]) { $alive = $true; break }
+    }
+    if (-not $alive) { break }
+    Start-Sleep -Milliseconds 100
+  } while ([DateTime]::UtcNow -lt $deadline)
+  if ($alive) { throw 'timeout' }
+  Publish-State 'opening'
+  Require-Time
+  Start-Process -FilePath ([string]$target.executable) -WorkingDirectory ([IO.Path]::GetDirectoryName([string]$target.executable))
+  $deadline = [DateTime]::UtcNow.AddSeconds(25)
+  while ([DateTime]::UtcNow -lt $deadline) {
+    $processes = @(Get-CimInstance Win32_Process -Filter "Name = 'DeepSeek Harness.exe'")
+    foreach ($candidate in $processes) {
+      if ([string]$candidate.ExecutablePath -ieq [string]$target.executable -and
+        [bigint](Start-Stamp $candidate) -gt [bigint]$target.mainStart -and
+        [string]$candidate.CommandLine -notmatch '(?i)(?:^|\s)--type(?:[=\s]|$)') {
+        Publish-State 'opened'
+        return
+      }
+    }
+    Start-Sleep -Milliseconds 250
+  }
+  throw 'opening'
+} catch {
+  if ($null -ne $request) { try { Publish-State 'failed' } catch {} }
+} finally {
+  Remove-Item -LiteralPath $Directory -Recurse -Force -ErrorAction SilentlyContinue
+}
+`;
+function payloadScript(value) {
+	return `$data = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${Buffer.from(JSON.stringify(value)).toString("base64")}')) | ConvertFrom-Json\n`;
+}
+function windowsTargetScript(executable, hostPid) {
+	return `$ErrorActionPreference = 'Stop'\n[Console]::OutputEncoding = New-Object Text.UTF8Encoding($false)\n${WINDOWS_RESTART_IDENTITY}\n${payloadScript({
+		executable,
+		hostPid
+	})}
+Resolve-Target ([string]$data.executable) ([int]$data.hostPid) | ConvertTo-Json -Compress`;
+}
+function windowsDispatchScript(directory, powershell) {
+	return `$ErrorActionPreference = 'Stop'\n${payloadScript({
+		directory,
+		powershell
+	})}
+$shell = New-Object -ComObject WScript.Shell
+$shortcutPath = [IO.Path]::Combine([string]$data.directory, 'helper.lnk')
+$shortcut = $shell.CreateShortcut($shortcutPath)
+$shortcut.TargetPath = [string]$data.powershell
+$scriptPath = [IO.Path]::Combine([string]$data.directory, 'helper.ps1')
+$shortcut.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $scriptPath + '" -Directory "' + [string]$data.directory + '"'
+$shortcut.WorkingDirectory = $env:SystemRoot
+$shortcut.WindowStyle = 7
+$shortcut.Save()
+Start-Process -FilePath ([IO.Path]::Combine($env:SystemRoot, 'explorer.exe')) -ArgumentList ('"' + $shortcutPath + '"')`;
+}
+var WindowsRestart = class {
+	config;
+	options;
+	controller = new AbortController();
+	current = null;
+	pending = false;
+	error = "";
+	closed = false;
+	availability = {
+		supported: false,
+		expiresAt: 0
+	};
+	constructor(config, options) {
+		this.config = config;
+		this.options = options;
+	}
+	powershell() {
+		const root = this.options.env.SystemRoot;
+		if (!root || !path.win32.isAbsolute(root) || /[\u0000-\u001f"]/.test(root)) throw new Error("restartUnavailable");
+		return path.win32.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+	}
+	async run(script) {
+		this.controller.signal.throwIfAborted();
+		if (this.options.run) return this.options.run(script, this.controller.signal);
+		const env = { ...this.options.env };
+		for (const key of Object.keys(env)) if ([
+			"ELECTRON_RUN_AS_NODE",
+			"NODE_OPTIONS",
+			"NODE_PATH"
+		].includes(key.toUpperCase())) delete env[key];
+		return new Promise((resolve, reject) => {
+			execFile(this.powershell(), [
+				"-NoProfile",
+				"-NonInteractive",
+				"-EncodedCommand",
+				Buffer.from(script, "utf16le").toString("base64")
+			], {
+				windowsHide: true,
+				timeout: 1e4,
+				maxBuffer: 8192,
+				encoding: "utf8",
+				env,
+				signal: this.controller.signal
+			}, (error, stdout) => error ? reject(/* @__PURE__ */ new Error("restartUnavailable")) : resolve(stdout.replace(/^\uFEFF/, "").trim()));
+		});
+	}
+	async target() {
+		if (this.closed || !this.options.env.DSH_CLIENT_VERSION || !path.win32.isAbsolute(this.options.executable) || path.win32.basename(this.options.executable).toLowerCase() !== "deepseek harness.exe") return null;
+		try {
+			this.powershell();
+			const value = JSON.parse(await this.run(windowsTargetScript(this.options.executable, this.options.hostPid ?? process.pid)));
+			if (!value || typeof value !== "object") return null;
+			const target = value;
+			if (target.executable?.toLowerCase() !== this.options.executable.toLowerCase() || !Number.isSafeInteger(target.mainPid) || target.mainPid <= 0 || target.mainPid === target.hostPid || target.hostPid !== (this.options.hostPid ?? process.pid) || !/^\d{15,20}$/.test(target.mainStart ?? "") || !/^\d{15,20}$/.test(target.hostStart ?? "")) return null;
+			return target;
+		} catch {
+			return null;
+		}
+	}
+	async state(operation) {
+		try {
+			const value = JSON.parse(await readFile(path.join(operation.directory, "state.json"), "utf8"));
+			if (value && typeof value === "object" && "nonce" in value && value.nonce === operation.nonce && "phase" in value && typeof value.phase === "string") return value.phase;
+		} catch {}
+		return "";
+	}
+	async status() {
+		if (this.closed) throw new Error("restartUnavailable");
+		const operation = this.current;
+		if (operation?.committed) {
+			const phase = await this.state(operation);
+			let removed = false;
+			if (phase === "") try {
+				await access(operation.directory);
+			} catch (error) {
+				removed = !!error && typeof error === "object" && "code" in error && error.code === "ENOENT";
+			}
+			if (this.current === operation && (phase === "failed" || phase === "opened" || removed || Date.now() >= operation.expiresAt)) {
+				this.error = "restartFailed";
+				this.current = null;
+				await rm(operation.directory, {
+					recursive: true,
+					force: true
+				}).catch(() => {});
+			}
+		}
+		if (Date.now() >= this.availability.expiresAt) this.availability = {
+			supported: Boolean(await this.target()),
+			expiresAt: Date.now() + 3e4
+		};
+		if (this.closed) throw new Error("restartUnavailable");
+		return {
+			supported: this.availability.supported,
+			running: this.pending || this.current !== null,
+			error: this.error
+		};
+	}
+	async restart() {
+		if (this.closed || !this.config.showRestartButton.get()) throw new Error("restartUnavailable");
+		if (this.pending || this.current) throw new Error("restartBusy");
+		this.pending = true;
+		this.error = "";
+		let operation;
+		try {
+			const target = await this.target();
+			if (!target || this.closed || !this.config.showRestartButton.get()) throw new Error("restartUnavailable");
+			operation = {
+				directory: await mkdtemp(path.join(tmpdir(), "power-dsh-restart-")),
+				nonce: randomUUID(),
+				committed: false,
+				expiresAt: Date.now() + 9e4
+			};
+			this.current = operation;
+			await writeFile(path.join(operation.directory, "request.json"), JSON.stringify({
+				target,
+				nonce: operation.nonce,
+				expiresAt: operation.expiresAt
+			}), { mode: 384 });
+			await writeFile(path.join(operation.directory, "helper.ps1"), WINDOWS_RESTART_HELPER, { mode: 384 });
+			if (this.closed || !this.config.showRestartButton.get()) throw new Error("restartUnavailable");
+			await this.run(windowsDispatchScript(operation.directory, this.powershell()));
+			const deadline = Date.now() + (this.options.handoffMs ?? 8e3);
+			while (Date.now() < deadline) {
+				if (this.closed || !this.config.showRestartButton.get()) throw new Error("restartUnavailable");
+				const phase = await this.state(operation);
+				if (phase === "failed") throw new Error("restartFailed");
+				if (phase === "ready") {
+					await writeFile(path.join(operation.directory, "commit.next"), operation.nonce, { mode: 384 });
+					if (this.closed || !this.config.showRestartButton.get()) throw new Error("restartUnavailable");
+					await rename(path.join(operation.directory, "commit.next"), path.join(operation.directory, "commit"));
+					operation.committed = true;
+					return { accepted: true };
+				}
+				await new Promise((resolve) => setTimeout(resolve, 100));
+			}
+			throw new Error("restartFailed");
+		} catch (error) {
+			if (operation && !operation.committed) await rm(operation.directory, {
+				recursive: true,
+				force: true
+			}).catch(() => {});
+			this.current = null;
+			const unavailable = error instanceof Error && error.message === "restartUnavailable";
+			if (!unavailable) this.error = "restartFailed";
+			throw new Error(unavailable ? "restartUnavailable" : "restartFailed");
+		} finally {
+			this.pending = false;
+		}
+	}
+	close() {
+		this.closed = true;
+		this.controller.abort();
+	}
+};
+
 // src/features/restart-button/restart.ts
 const MAC_RESTART_SCRIPT = `on run argv
   set appPath to item 1 of argv
@@ -447,7 +920,7 @@ const MAC_RESTART_SCRIPT = `on run argv
   end repeat
   error "Application did not exit" number 1001
 end run`;
-/** Only the packaged macOS desktop Host can hand off a graceful application restart. */
+/** Verified packaged desktop Hosts can hand off one application restart. */
 var DesktopRestart = class {
 	config;
 	platform;
@@ -459,6 +932,7 @@ var DesktopRestart = class {
 	closed;
 	current;
 	error;
+	windows;
 	constructor(ctx, config, options = {}) {
 		this.config = config;
 		this.platform = options.platform ?? process.platform;
@@ -470,6 +944,11 @@ var DesktopRestart = class {
 		this.closed = false;
 		this.current = null;
 		this.error = "";
+		this.windows = this.platform === "win32" ? new WindowsRestart(config, {
+			executable: this.executable,
+			env: this.env,
+			...options.windows
+		}) : null;
 		ctx.effect(() => () => this.close());
 	}
 	async target() {
@@ -487,6 +966,7 @@ var DesktopRestart = class {
 		}
 	}
 	async status() {
+		if (this.windows) return this.windows.status();
 		if (this.closed) throw new Error("restartUnavailable");
 		const supported = Boolean(await this.target());
 		if (this.closed) throw new Error("restartUnavailable");
@@ -497,6 +977,7 @@ var DesktopRestart = class {
 		};
 	}
 	async restart() {
+		if (this.windows) return this.windows.restart();
 		if (this.closed || this.config.showRestartButton.get() !== true) throw new Error("restartUnavailable");
 		if (this.current) throw new Error("restartBusy");
 		const operation = {
@@ -552,6 +1033,7 @@ var DesktopRestart = class {
 	}
 	close() {
 		this.closed = true;
+		this.windows?.close();
 		if (this.current && !this.current.handedOff) this.current.handle?.kill();
 	}
 };
@@ -1229,7 +1711,7 @@ var WindowsToasts = class {
 };
 
 // package.json
-var version = "0.0.7";
+var version = "0.0.8";
 
 // src/features/notifications/host.ts
 var host_exports$13 = /* @__PURE__ */ __exportAll({
@@ -1480,6 +1962,720 @@ async function skillOrigin(skill, { readPackage = readFile } = {}) {
 		if (owner) return owner;
 	}
 	return "";
+}
+
+// src/features/skills/skill-content.ts
+function skillIdentity(...values) {
+	return createHash("sha256").update(JSON.stringify(values)).digest("hex");
+}
+function pathInside(root, candidate) {
+	const suffix = relative(resolve(root), resolve(candidate));
+	return suffix === "" || !isAbsolute(suffix) && suffix !== ".." && !suffix.startsWith(`..${sep}`);
+}
+async function pathIdentity(path) {
+	const value = await lstat(path);
+	return `${value.dev}:${value.ino}`;
+}
+async function pathExists(path) {
+	try {
+		await lstat(path);
+		return true;
+	} catch (error) {
+		if (error.code === "ENOENT") return false;
+		throw new Error("skill-target-unavailable");
+	}
+}
+async function boundedRead(path, size) {
+	const handle = await open(path, "r");
+	try {
+		const data = Buffer.alloc(size + 1);
+		let length = 0;
+		while (length < data.length) {
+			const result = await handle.read(data, length, data.length - length, length);
+			if (!result.bytesRead) break;
+			length += result.bytesRead;
+		}
+		if (length !== size) throw new Error("skill-source-changed");
+		return data.subarray(0, length);
+	} finally {
+		await handle.close();
+	}
+}
+async function readSkillPackage(path, flat, budget = {
+	files: 0,
+	bytes: 0
+}) {
+	const root = await realpath(path);
+	const files = [];
+	let bytes = 0;
+	const collect = async (current, name) => {
+		budget.files++;
+		if (budget.files > 4096 || files.length >= 512) throw new Error("skill-content-limit");
+		const info = await lstat(current);
+		if (info.isSymbolicLink()) {
+			const target = await realpath(current);
+			if (!pathInside(root, target)) throw new Error("skill-external-resource-link");
+			const normalized = relative(dirname(current), target).split(sep).join("/") || ".";
+			files.push({
+				path: name,
+				kind: "link",
+				data: Buffer.from(normalized),
+				mode: info.mode,
+				linkDirectory: (await stat(target)).isDirectory()
+			});
+		} else if (info.isDirectory()) {
+			if (name) files.push({
+				path: name,
+				kind: "directory",
+				data: Buffer.alloc(0),
+				mode: info.mode
+			});
+			const entries = (await readdir(current)).sort();
+			for (const entry of entries) {
+				if (entry === ".git" || entry === ".DS_Store") continue;
+				await collect(join(current, entry), name ? `${name}/${entry}` : entry);
+			}
+		} else if (info.isFile()) {
+			bytes += info.size;
+			budget.bytes += info.size;
+			if (bytes > 52428800 || budget.bytes > 268435456 || budget.files > 4096 || files.length >= 512) throw new Error("skill-content-limit");
+			const data = await boundedRead(current, info.size);
+			const after = await lstat(current);
+			if (data.length !== info.size || after.ino !== info.ino || after.mtimeMs !== info.mtimeMs || after.size !== info.size) throw new Error("skill-source-changed");
+			files.push({
+				path: name,
+				kind: "file",
+				data,
+				mode: info.mode
+			});
+		} else throw new Error("skill-resource-unsupported");
+		if (files.length > 512) throw new Error("skill-content-limit");
+	};
+	await collect(root, flat ? "SKILL.md" : "");
+	if (!files.some((file) => file.path === "SKILL.md" && file.kind !== "directory")) throw new Error("skill-definition-missing");
+	const hash = createHash("sha256");
+	for (const file of files.slice().sort((first, second) => first.path < second.path ? -1 : first.path > second.path ? 1 : 0)) {
+		hash.update(JSON.stringify([
+			file.path,
+			file.kind,
+			file.data.length
+		]));
+		hash.update(file.data);
+	}
+	return {
+		flat,
+		revision: hash.digest("hex"),
+		files
+	};
+}
+async function skillRevision(path, flat) {
+	return (await readSkillPackage(path, flat)).revision;
+}
+async function writePackage(snapshot, target, active, reservedIdentity = "") {
+	if (snapshot.flat) {
+		active();
+		const definition = snapshot.files.find((file) => file.path === "SKILL.md");
+		await writeFile(target, definition.data, {
+			flag: "wx",
+			mode: definition.mode & 511
+		});
+		return;
+	}
+	if (!reservedIdentity) await mkdir(target);
+	const created = [];
+	const ordered = snapshot.files.slice().sort((first, second) => first.path === "SKILL.md" ? 1 : second.path === "SKILL.md" ? -1 : first.path.split("/").length - second.path.split("/").length);
+	try {
+		for (const file of ordered) {
+			active();
+			if (reservedIdentity && await pathIdentity(target) !== reservedIdentity) throw new Error("skill-target-changed");
+			const destination = join(target, file.path);
+			if (file.kind === "directory") await mkdir(destination, { mode: file.mode & 511 });
+			else if (file.kind === "link") {
+				const link = file.data.toString().split("/").join(sep);
+				await symlink(link, destination, file.linkDirectory ? "dir" : "file");
+			} else await writeFile(destination, file.data, {
+				flag: "wx",
+				mode: file.mode & 511
+			});
+			created.push({
+				file,
+				identity: await pathIdentity(destination)
+			});
+		}
+	} catch (error) {
+		if (reservedIdentity && await pathIdentity(target).catch(() => "") === reservedIdentity) for (const { file, identity } of created.reverse()) {
+			const destination = join(target, file.path);
+			try {
+				if (await pathIdentity(destination) !== identity) continue;
+				if (file.kind === "directory") await rmdir(destination);
+				else if (file.kind === "link" || (await boundedRead(destination, file.data.length)).equals(file.data)) await rm(destination);
+			} catch {}
+		}
+		throw error;
+	}
+}
+async function prepareSkillPackage(snapshot, targetRoot, active) {
+	active();
+	await mkdir(targetRoot, { recursive: true });
+	const temporary = await mkdtemp(join(targetRoot, ".power-dsh-"));
+	const path = join(temporary, snapshot.flat ? "skill.md" : "skill");
+	try {
+		await writePackage(snapshot, path, active);
+		active();
+		if (await skillRevision(path, snapshot.flat) !== snapshot.revision) throw new Error("skill-copy-verification-failed");
+		return {
+			path,
+			close: () => rm(temporary, {
+				recursive: true,
+				force: true
+			})
+		};
+	} catch (error) {
+		await rm(temporary, {
+			recursive: true,
+			force: true
+		});
+		throw error;
+	}
+}
+async function installPreparedSkill(staged, target, flat, active) {
+	active();
+	if (flat) {
+		await copyFile(staged, target, constants.COPYFILE_EXCL);
+		return;
+	}
+	const snapshot = await readSkillPackage(staged, false);
+	active();
+	await mkdir(target);
+	const identity = await pathIdentity(target);
+	try {
+		active();
+		if (await pathIdentity(target) !== identity || (await readdir(target)).length !== 0) throw new Error("skill-target-changed");
+		await writePackage(snapshot, target, active, identity);
+	} catch (error) {
+		if (await pathIdentity(target).catch(() => "") === identity) await rmdir(target).catch(() => {});
+		throw error;
+	}
+}
+async function installSkillLink(source, target, flat, active) {
+	active();
+	await mkdir(dirname(target), { recursive: true });
+	if (pathInside(source, target)) throw new Error("skill-circular-link");
+	try {
+		await symlink(source, target, process.platform === "win32" ? flat ? "file" : "junction" : flat ? "file" : "dir");
+	} catch (error) {
+		if (error.code === "EEXIST") throw new Error("skill-name-conflict");
+		throw new Error("skill-link-failed");
+	}
+}
+
+// src/features/skills/skill-import.ts
+const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** Cap on one scan, so a runaway home directory cannot stall the settings page. */
+const MAX_SCAN_ENTRIES = 400;
+/**
+* Known agent skill directories.
+*
+* Each tool keeps Agent Skills bundles (`<name>/SKILL.md`) under a
+* tool-specific home directory; a few also keep a project-scope directory.
+* Only the entries listed here are read, and a missing directory is treated as
+* empty rather than as a failure.
+*/
+const SKILL_SOURCES = [
+	{
+		id: "claude-code",
+		label: "Claude Code",
+		user: [".claude", "skills"],
+		env: "CLAUDE_CONFIG_DIR",
+		project: [".claude", "skills"]
+	},
+	{
+		id: "codex",
+		label: "Codex",
+		user: [".codex", "skills"],
+		env: "CODEX_HOME",
+		project: [".codex", "skills"]
+	},
+	{
+		id: "cursor",
+		label: "Cursor",
+		user: [".cursor", "skills"],
+		project: [".cursor", "skills"]
+	},
+	{
+		id: "gemini",
+		label: "Gemini",
+		user: [
+			".gemini",
+			"antigravity",
+			"skills"
+		],
+		project: [".gemini", "skills"]
+	},
+	{
+		id: "gemini-cli",
+		label: "Gemini CLI",
+		user: [".gemini", "skills"]
+	},
+	{
+		id: "opencode",
+		label: "OpenCode",
+		user: [
+			".config",
+			"opencode",
+			"skills"
+		],
+		project: [".opencode", "skills"]
+	},
+	{
+		id: "copilot",
+		label: "Copilot",
+		user: [".copilot", "skills"],
+		project: [".github", "skills"]
+	},
+	{
+		id: "windsurf",
+		label: "Windsurf",
+		user: [
+			".codeium",
+			"windsurf",
+			"skills"
+		],
+		project: [".windsurf", "skills"]
+	},
+	{
+		id: "windsurf-legacy",
+		label: "Windsurf (legacy)",
+		user: [".windsurf", "skills"]
+	},
+	{
+		id: "trae",
+		label: "Trae",
+		user: [".trae", "skills"],
+		project: [".trae", "skills"]
+	},
+	{
+		id: "trae-cn",
+		label: "Trae CN",
+		user: [".trae-cn", "skills"],
+		project: [".trae-cn", "skills"]
+	},
+	{
+		id: "roo",
+		label: "Roo Code",
+		user: [".roo", "skills"],
+		project: [".roo", "skills"]
+	},
+	{
+		id: "codebuddy",
+		label: "CodeBuddy",
+		user: [".codebuddy", "skills"],
+		project: [".codebuddy", "skills"]
+	},
+	{
+		id: "workbuddy",
+		label: "WorkBuddy",
+		user: [".workbuddy", "skills"],
+		project: [".workbuddy", "skills"]
+	},
+	{
+		id: "qoder",
+		label: "Qoder",
+		user: [".qoder", "skills"],
+		project: [".qoder", "skills"]
+	},
+	{
+		id: "qoder-cn",
+		label: "Qoder CN",
+		user: [".qoder-cn", "skills"]
+	},
+	{
+		id: "lingma",
+		label: "Lingma",
+		user: [".lingma", "skills"]
+	},
+	{
+		id: "openclaw",
+		label: "OpenClaw",
+		user: [".openclaw", "skills"]
+	},
+	{
+		id: "clawdbot",
+		label: "Clawdbot",
+		user: [".clawdbot", "skills"]
+	},
+	{
+		id: "cc-switch",
+		label: "CC Switch",
+		user: [".cc-switch", "skills"]
+	},
+	{
+		id: "agents",
+		label: "Shared directory",
+		user: [".agents", "skills"],
+		env: "DSH_AGENTS_HOME",
+		project: [".agents", "skills"]
+	}
+];
+/** Read the environment without depending on a Node global type in the browser build. */
+function environment() {
+	return typeof process === "undefined" ? {} : process.env;
+}
+/**
+* Resolve every configured root against the current home and project.
+*
+* `home` is the operating-system user home (`~`), never the DSH data home:
+* another tool's skills live in `~/.claude/skills`, not `$DSH_HOME/.claude`.
+*/
+function resolveSkillRoots(home = homedir(), projectRoot = "", env = environment()) {
+	const roots = [];
+	for (const spec of SKILL_SOURCES) {
+		if (spec.user) {
+			const override = spec.env ? env[spec.env]?.trim() : "";
+			const segments = override ? spec.user.slice(1) : spec.user;
+			const base = override || home;
+			roots.push({
+				source: spec.id,
+				label: spec.label,
+				scope: "user",
+				path: join(base, ...segments)
+			});
+		}
+		if (spec.project && projectRoot) roots.push({
+			source: spec.id,
+			label: spec.label,
+			scope: "project",
+			path: join(projectRoot, ...spec.project)
+		});
+	}
+	return roots;
+}
+function unquote(value) {
+	const trimmed = value.trim();
+	if (trimmed.length >= 2 && (trimmed.startsWith("\"") && trimmed.endsWith("\"") || trimmed.startsWith("'") && trimmed.endsWith("'"))) return trimmed.slice(1, -1);
+	return trimmed;
+}
+/** Read the small frontmatter subset needed to list a skill. */
+function parseSkillFrontmatter(text) {
+	if (!text.startsWith("---")) return null;
+	const end = text.indexOf("\n---", 3);
+	if (end < 0) return null;
+	const lines = text.slice(3, end).replaceAll("\r\n", "\n").split("\n");
+	const values = /* @__PURE__ */ new Map();
+	let key = "";
+	let block = null;
+	const flush = () => {
+		if (key && block) values.set(key, block.join(" ").trim());
+		key = "";
+		block = null;
+	};
+	for (const line of lines) {
+		const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line);
+		if (match) {
+			flush();
+			const [, name, raw] = match;
+			if (raw === ">" || raw === "|") {
+				key = name;
+				block = [];
+			} else values.set(name, raw.trim());
+			continue;
+		}
+		if (key && /^\s+/.test(line)) block?.push(line.trim());
+	}
+	flush();
+	const name = unquote(values.get("name") ?? "");
+	const description = unquote(values.get("description") ?? "");
+	if (!SKILL_NAME.test(name) || !description) return null;
+	return {
+		name,
+		description
+	};
+}
+async function readSkill(file) {
+	try {
+		if ((await stat(file)).size > 1048576) return null;
+		return parseSkillFrontmatter(await readFile(file, "utf8"));
+	} catch {
+		return null;
+	}
+}
+async function realPathOf(path) {
+	try {
+		return await realpath(path);
+	} catch {
+		return path;
+	}
+}
+/**
+* Resolve one root entry through any link it may be.
+*
+* Another tool may serve a skill through a link (that is how most Codex skills
+* are stored); the entry is still one skill, so the scan follows it and records
+* the real path, which is also the identity used to collapse duplicates.
+*/
+async function entryKind(path) {
+	try {
+		const info = await stat(path);
+		if (info.isDirectory()) return "directory";
+		if (info.isFile()) return "file";
+		return;
+	} catch {
+		return;
+	}
+}
+async function discoverSkillRoot(root) {
+	let entries;
+	try {
+		entries = await readdir(root.path, { withFileTypes: true });
+	} catch (error) {
+		if (error.code === "ENOENT") return [];
+		throw new Error("skill-scan-failed");
+	}
+	if (entries.length > 4096) throw new Error("skill-scan-limit");
+	const result = [];
+	for (const entry of entries) {
+		if (entry.name.startsWith(".")) continue;
+		const path = join(root.path, entry.name);
+		const kind = await entryKind(path);
+		if (kind === "directory") {
+			const parsed = await readSkill(join(path, "SKILL.md"));
+			if (!parsed) continue;
+			const realPath = await realPathOf(path);
+			result.push({
+				id: skillIdentity("candidate", realPath),
+				...parsed,
+				source: root.source,
+				path,
+				flat: false,
+				realPath
+			});
+		} else if (kind === "file" && entry.name.endsWith(".md") && entry.name.toLowerCase() !== "skill.md") {
+			const parsed = await readSkill(path);
+			if (!parsed || parsed.name !== entry.name.slice(0, -3)) continue;
+			const realPath = await realPathOf(path);
+			result.push({
+				id: skillIdentity("candidate", realPath),
+				...parsed,
+				source: root.source,
+				path,
+				flat: true,
+				realPath
+			});
+		}
+	}
+	return result;
+}
+async function discoverExternal(roots, targetRoot, existingNames, existingPaths = /* @__PURE__ */ new Map(), inheritedNames = /* @__PURE__ */ new Set()) {
+	const found = [];
+	for (const root of roots) found.push(...await discoverSkillRoot(root));
+	if (found.length > MAX_SCAN_ENTRIES) throw new Error("skill-scan-limit");
+	const labels = new Map(SKILL_SOURCES.map((spec) => [spec.id, spec.label]));
+	const candidates = /* @__PURE__ */ new Map();
+	for (const skill of found) {
+		const occurrence = {
+			agent: labels.get(skill.source) ?? roots.find((root) => root.source === skill.source)?.label ?? skill.source,
+			path: skill.path,
+			realPath: skill.realPath,
+			linked: resolve(skill.path) !== resolve(skill.realPath)
+		};
+		const previous = candidates.get(skill.realPath);
+		if (previous) {
+			if (!previous.sources.some((source) => source.agent === occurrence.agent && source.path === occurrence.path)) previous.sources.push(occurrence);
+		} else candidates.set(skill.realPath, {
+			skill,
+			sources: [occurrence]
+		});
+	}
+	const groups = /* @__PURE__ */ new Map();
+	const budget = {
+		files: 0,
+		bytes: 0
+	};
+	for (const { skill, sources } of candidates.values()) {
+		let revision = "";
+		try {
+			revision = (await readSkillPackage(skill.realPath, skill.flat, budget)).revision;
+		} catch {}
+		const variants = groups.get(skill.name) ?? [];
+		variants.push({
+			id: skill.id,
+			description: skill.description,
+			path: skill.path,
+			flat: skill.flat,
+			revision,
+			sources
+		});
+		groups.set(skill.name, variants);
+	}
+	const result = [];
+	for (const [name, variants] of groups) {
+		const first = variants[0];
+		const occupied = await pathExists(join(targetRoot, name)) || await pathExists(join(targetRoot, `${name}.md`));
+		const available = existingNames.has(name);
+		let conflict = available || occupied;
+		if (available) {
+			const installedPath = existingPaths.get(name);
+			if (installedPath) try {
+				const installed = await packageLocation(installedPath);
+				const revision = (await readSkillPackage(installed.path, installed.flat, budget)).revision;
+				if (variants.every((variant) => variant.revision === revision)) conflict = false;
+			} catch {}
+		}
+		const comparison = !variants.every((variant) => variant.revision !== "") ? "unknown" : new Set(variants.map((variant) => variant.revision)).size > 1 ? "different" : "same";
+		result.push({
+			id: skillIdentity("group", name),
+			name,
+			description: first.description,
+			source: first.sources[0].agent,
+			path: first.path,
+			flat: first.flat,
+			variants,
+			sources: variants.flatMap((variant) => variant.sources),
+			comparison,
+			available,
+			conflict,
+			inherited: inheritedNames.has(name)
+		});
+	}
+	return result.sort((first, second) => first.name.localeCompare(second.name));
+}
+async function packageLocation(path) {
+	const location = basename(path).toLowerCase() === "skill.md" ? dirname(path) : path;
+	return {
+		path: location,
+		flat: (await stat(location)).isFile()
+	};
+}
+/** Read one discovered skill's frontmatter and Markdown body for the detail dialog. */
+async function readDiscoveredSkill(skill) {
+	const file = skill.flat ? skill.path : join(skill.path, "SKILL.md");
+	if ((await stat(file)).size > 1048576) throw new Error("skill-content-limit");
+	const text = await readFile(file, "utf8");
+	const parsed = parseSkillFrontmatter(text);
+	if (!parsed) throw new Error("This skill has no readable frontmatter.");
+	return {
+		name: parsed.name,
+		description: parsed.description,
+		content: skillBody(text),
+		path: skill.path
+	};
+}
+/** Strip the frontmatter block, leaving the instruction body a reader expects. */
+function skillBody(text) {
+	if (!text.startsWith("---")) return text.trim();
+	const end = text.indexOf("\n---", 3);
+	if (end < 0) return text.trim();
+	const after = text.indexOf("\n", end + 1);
+	return (after < 0 ? "" : text.slice(after + 1)).trim();
+}
+/** Find a discovered skill by the id a client selected. */
+async function resolveSelection(roots, ids) {
+	const wanted = new Set(ids);
+	const found = /* @__PURE__ */ new Map();
+	for (const root of roots) for (const skill of await discoverSkillRoot(root)) if (wanted.has(skill.id) || wanted.has(`${skill.source}:${skill.name}:${skill.flat ? "file" : "dir"}`)) found.set(skill.realPath, skill);
+	return [...found.values()];
+}
+
+// src/features/skills/skill-install.ts
+async function addDiscoveredSkill(targetRoot, skill, mode, revision, active) {
+	active();
+	if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(skill.name) || mode !== "copy" && mode !== "link") throw new Error("skill-operation-invalid");
+	if (await pathExists(join(targetRoot, skill.name)) || await pathExists(join(targetRoot, `${skill.name}.md`))) throw new Error("skill-name-conflict");
+	if (await realpath(skill.path) !== skill.realPath) throw new Error("skill-source-changed");
+	const snapshot = await readSkillPackage(skill.realPath, skill.flat);
+	if (!revision || snapshot.revision !== revision) throw new Error("skill-source-changed");
+	const target = join(targetRoot, skill.flat ? `${skill.name}.md` : skill.name);
+	const staged = mode === "copy" ? await prepareSkillPackage(snapshot, targetRoot, active) : null;
+	let identity = "";
+	try {
+		active();
+		if (await skillRevision(skill.realPath, skill.flat) !== revision || await realpath(skill.path) !== skill.realPath) throw new Error("skill-source-changed");
+		if (mode === "copy") await installPreparedSkill(staged.path, target, skill.flat, active);
+		else await installSkillLink(skill.realPath, target, skill.flat, active);
+		identity = await pathIdentity(target);
+		active();
+		if (await skillRevision(target, skill.flat) !== snapshot.revision) throw new Error("skill-copy-verification-failed");
+		active();
+	} catch (error) {
+		if (identity && await pathIdentity(target).catch(() => "") === identity && await skillRevision(target, skill.flat).catch(() => "") === snapshot.revision) await rm(target, {
+			recursive: true,
+			force: true
+		});
+		throw error;
+	} finally {
+		await staged?.close();
+	}
+}
+
+// src/features/skills/skill-delete.ts
+async function fingerprint(path) {
+	const entries = [];
+	const visit = async (current, name) => {
+		if (entries.length >= 4096) throw new Error("skill-delete-unavailable");
+		const info = await lstat(current);
+		if (!info.isDirectory() && !info.isFile() && !info.isSymbolicLink()) throw new Error("skill-delete-unavailable");
+		entries.push([
+			name,
+			info.dev,
+			info.ino,
+			info.mode,
+			info.size,
+			info.mtimeMs,
+			name ? info.ctimeMs : 0,
+			info.isSymbolicLink() ? await readlink(current) : ""
+		]);
+		if (info.isDirectory()) for (const entry of (await readdir(current)).sort()) await visit(join(current, entry), name ? `${name}/${entry}` : entry);
+	};
+	await visit(path, "");
+	return skillIdentity(JSON.stringify(entries));
+}
+async function skillDeletion(base, root, name, sourcePath) {
+	if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) return null;
+	const bundle = join(root, name);
+	const flat = join(root, `${name}.md`);
+	const source = resolve(sourcePath);
+	const path = source === bundle || source === join(bundle, "SKILL.md") ? bundle : source === flat ? flat : "";
+	if (!path) return null;
+	if (await realpath(root) !== resolve(await realpath(base), relative(base, root))) return null;
+	const info = await lstat(path);
+	const linked = info.isSymbolicLink();
+	if (!linked && (path === flat ? !info.isFile() : !info.isDirectory())) return null;
+	return {
+		path,
+		linked,
+		revision: skillIdentity(path, await fingerprint(path))
+	};
+}
+async function deleteOwnedSkill(base, root, name, sourcePath, revision, active, prepare) {
+	const before = await skillDeletion(base, root, name, sourcePath);
+	if (!before || !revision || revision !== before.revision) throw new Error("skill-delete-changed");
+	active();
+	const expected = await fingerprint(before.path);
+	if (skillIdentity(before.path, expected) !== revision) throw new Error("skill-delete-changed");
+	const temporary = await mkdtemp(join(root, ".power-dsh-delete-"));
+	const staged = join(temporary, "skill");
+	let moved = false;
+	let rollback;
+	try {
+		active();
+		if ((await skillDeletion(base, root, name, sourcePath))?.revision !== revision) throw new Error("skill-delete-changed");
+		active();
+		await rename(before.path, staged);
+		moved = true;
+		if (await fingerprint(staged) !== expected) throw new Error("skill-delete-changed");
+		active();
+		rollback = await prepare?.();
+		active();
+		if (before.linked) await unlink(staged);
+		else await rm(staged, { recursive: true });
+		moved = false;
+	} catch (error) {
+		if (moved && !await pathExists(before.path)) await rename(staged, before.path).catch(() => {});
+		await rollback?.();
+		throw error;
+	} finally {
+		await rmdir(temporary).catch(() => {});
+	}
 }
 
 // src/features/skills/skill-policy.ts
@@ -1856,7 +3052,8 @@ var SkillPolicy = class {
 	async read(cwd, scope, name) {
 		if (typeof name !== "string" || !NAME.test(name)) throw new TypeError("Invalid skill operation.");
 		const view = await this.context(cwd, scope);
-		const row = (await this.readView(view)).skills.find((skill) => skill.name === name);
+		const before = await this.readView(view);
+		const row = before.skills.find((skill) => skill.name === name);
 		if (!row) return null;
 		let content = "";
 		try {
@@ -1870,6 +3067,8 @@ var SkillPolicy = class {
 			throw new Error("The skill body could not be read.");
 		}
 		this.active();
+		const deletion = before.complete ? await this.deletionFor(view, row).catch(() => null) : null;
+		this.active();
 		return {
 			name: row.name,
 			description: row.description,
@@ -1879,8 +3078,60 @@ var SkillPolicy = class {
 			origin: row.origin,
 			enabled: row.enabled,
 			modelInvocable: row.modelInvocable,
-			userInvocable: row.userInvocable
+			userInvocable: row.userInvocable,
+			...deletion ? { deletion } : {}
 		};
+	}
+	deletionBase(view) {
+		return view.scope === "user" ? this.owner.profileContext.home : view.projectRoot;
+	}
+	deletionFor(view, row) {
+		if (row.source !== (view.scope === "user" ? "user-dsh" : "project-dsh") || !row.path) return Promise.resolve(null);
+		return skillDeletion(this.deletionBase(view), this.importTarget(view), row.name, row.path);
+	}
+	async deleteSkill(cwd, scope, name, revision) {
+		if (typeof name !== "string" || !NAME.test(name) || typeof revision !== "string" || !/^[a-f0-9]{64}$/.test(revision)) throw new Error("skill-delete-unavailable");
+		const view = await this.context(cwd, scope);
+		const before = await this.readView(view);
+		const row = before.skills.find((skill) => skill.name === name);
+		if (!before.complete || !row) throw new Error("skill-delete-unavailable");
+		const deletion = await this.deletionFor(view, row);
+		if (!deletion || deletion.revision !== revision) throw new Error("skill-delete-changed");
+		const key = keyOf(view.scope, view.projectRoot, name);
+		await deleteOwnedSkill(this.deletionBase(view), this.importTarget(view), name, row.path, revision, () => this.active(), async () => {
+			let removed;
+			if (!this.preferences().has(key)) return;
+			await this.ctx.configEditor.edit(this.owner.fiber.entry, (raw) => {
+				this.active();
+				if (Object.hasOwn(raw, "disabledSkills") && !Array.isArray(raw.disabledSkills)) throw new Error("skill-delete-unavailable");
+				const next = records(raw.disabledSkills ?? this.config.disabledSkills.get());
+				if (next.get(key)?.path === row.path) {
+					removed = next.get(key);
+					next.delete(key);
+				}
+				return {
+					...raw,
+					disabledSkills: [...next.values()]
+				};
+			});
+			return async () => {
+				if (!removed || this.closed) return;
+				await this.ctx.configEditor.edit(this.owner.fiber.entry, (raw) => {
+					this.active();
+					const next = records(raw.disabledSkills ?? this.config.disabledSkills.get());
+					if (!next.has(key)) next.set(key, removed);
+					return {
+						...raw,
+						disabledSkills: [...next.values()]
+					};
+				});
+			};
+		});
+		this.active();
+		this.invalidate();
+		const after = await this.readView(view);
+		if (!after.complete || after.skills.some((skill) => skill.name === name && skill.path === row.path)) throw new Error("skill-delete-readback-failed");
+		return after;
 	}
 	async setEnabled(cwd, scope, name, enabled) {
 		if (typeof name !== "string" || !NAME.test(name) || typeof enabled !== "boolean") throw new TypeError("Invalid skill operation.");
@@ -1918,6 +3169,150 @@ var SkillPolicy = class {
 		const after = await this.list(before.cwd, before.scope);
 		if (after.skills.find((item) => item.name === name)?.enabled !== enabled) throw new Error("DSH did not accept the requested skill state. Refresh the list to inspect its actual state.");
 		return after;
+	}
+	/** Target directory for imported skills in the current scope. */
+	importTarget(view) {
+		if (view.scope === "user") return join(this.owner.profileContext.home, "skills");
+		if (!view.projectRoot) throw new Error("The selected workspace has no project root.");
+		return join(view.projectRoot, ".dsh", "skills");
+	}
+	externalRoots(view) {
+		return resolveSkillRoots(homedir(), view.scope === "project" ? view.projectRoot : "").filter((root) => root.scope === view.scope);
+	}
+	async discoverExternalSkills(cwd, scope) {
+		const view = await this.context(cwd, scope);
+		const catalog = await this.readView(view);
+		const target = this.importTarget(view);
+		const roots = this.externalRoots(view);
+		const inherited = view.scope === "project" ? (await this.registry.snapshot({ scope: view.scopeKey })).skills.filter((skill) => !isProject(skill.source)).map((skill) => skill.name) : [];
+		const entries = await discoverExternal(roots, target, new Set(catalog.skills.map((skill) => skill.name)), new Map(catalog.skills.map((skill) => [skill.name, skill.path])), new Set(inherited));
+		this.active();
+		return {
+			complete: catalog.complete,
+			entries
+		};
+	}
+	/**
+	* Read one discovered skill's body without importing it.
+	*
+	* The dialog shows what the copy would hold, so the source file is read
+	* in place and nothing is written.
+	* @param cwd - project directory for the project scope; ignored for user scope.
+	* @param scope - `user` or `project`.
+	* @param id - stable id the discovery list gave the skill.
+	* @returns the skill with its Markdown body, or null when it is gone.
+	*/
+	async readExternal(cwd, scope, id) {
+		if (typeof id !== "string" || id === "") throw new TypeError("Invalid skill operation.");
+		const view = await this.context(cwd, scope);
+		const roots = this.externalRoots(view);
+		let [skill] = await resolveSelection(roots, [id]);
+		if (!skill) {
+			const entry = (await this.discoverExternalSkills(cwd, scope)).entries.find((item) => item.id === id);
+			if (entry?.comparison === "same" && entry.variants?.[0]) [skill] = await resolveSelection(roots, [entry.variants[0].id]);
+		}
+		this.active();
+		if (skill === void 0) return null;
+		const labels = new Map(SKILL_SOURCES.map((spec) => [spec.id, spec.label]));
+		try {
+			return {
+				...await readDiscoveredSkill(skill),
+				source: labels.get(skill.source) ?? skill.source
+			};
+		} catch (error) {
+			this.active();
+			throw new Error("The skill body could not be read.");
+		}
+	}
+	async importExternalSkills(cwd, scope, ids) {
+		if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100 || ids.some((id) => typeof id !== "string" || id === "")) throw new TypeError("Invalid skill import request.");
+		const imported = [];
+		const skipped = [];
+		for (const id of ids) {
+			const entry = (await this.discoverExternalSkills(cwd, scope)).entries.find((item) => item.id === id || item.variants?.some((variant) => variant.id === id));
+			const variant = entry?.variants?.find((item) => item.id === id) ?? (entry?.comparison === "same" ? entry.variants?.[0] : void 0);
+			if (!entry || !variant) {
+				skipped.push({
+					name: entry?.name ?? "",
+					reason: "skill-source-selection-required"
+				});
+				continue;
+			}
+			try {
+				await this.addSkill(cwd, scope, variant.id, "copy", variant.revision);
+				imported.push(entry.name);
+			} catch (error) {
+				skipped.push({
+					name: entry.name,
+					reason: error instanceof Error ? error.message : "skill-copy-failed"
+				});
+			}
+		}
+		this.active();
+		this.invalidate();
+		return {
+			imported,
+			skipped
+		};
+	}
+	async addSkill(cwd, scope, id, mode, revision) {
+		const source = await this.context(cwd, scope);
+		return this.addSkillTo(source.cwd, source.scope, id, mode, revision, source.scope === "project" ? source.cwd : "");
+	}
+	async readSkillImportDestination(cwd, scope, name, flat) {
+		if (typeof name !== "string" || !NAME.test(name) || typeof flat !== "boolean") throw new TypeError("Invalid skill import destination.");
+		const view = await this.context(cwd, scope);
+		const catalog = await this.readView(view);
+		const root = this.importTarget(view);
+		const available = catalog.skills.some((skill) => skill.name === name) || await pathExists(join(root, name)) || await pathExists(join(root, `${name}.md`));
+		const inherited = view.scope === "project" && (await this.registry.snapshot({ scope: view.scopeKey })).skills.some((skill) => skill.name === name && !isProject(skill.source));
+		this.active();
+		return {
+			path: join(root, flat ? `${name}.md` : name),
+			complete: catalog.complete,
+			available,
+			inherited
+		};
+	}
+	async importSkillTo(cwd, scope, id, revision, targetCwd) {
+		if (typeof targetCwd !== "string") throw new TypeError("Invalid skill import destination.");
+		return this.addSkillTo(cwd, scope, id, "copy", revision, targetCwd);
+	}
+	async addSkillTo(cwd, scope, id, mode, revision, targetCwd) {
+		if (typeof id !== "string" || typeof revision !== "string" || mode !== "copy" && mode !== "link") throw new Error("skill-operation-invalid");
+		const source = await this.context(cwd, scope);
+		const view = await this.context(targetCwd, targetCwd ? "project" : "user");
+		const catalog = await this.readView(view);
+		if (!catalog.complete) throw new Error("skill-catalog-incomplete");
+		const discovered = await this.discoverExternalSkills(cwd, scope);
+		if (!discovered.complete) throw new Error("skill-catalog-incomplete");
+		const entry = discovered.entries.find((item) => item.variants?.some((variant) => variant.id === id));
+		const variant = entry?.variants?.find((item) => item.id === id);
+		if (!entry || !variant || !revision || revision !== variant.revision) throw new Error("skill-source-changed");
+		if (catalog.skills.some((skill) => skill.name === entry.name)) throw new Error("skill-name-conflict");
+		const roots = this.externalRoots(source);
+		const [skill] = await resolveSelection(roots, [id]);
+		if (!skill) throw new Error("skill-source-changed");
+		this.active();
+		await addDiscoveredSkill(this.importTarget(view), skill, mode, revision, () => this.active());
+		this.invalidate();
+		await this.verifyImportedSkill(view, skill.name, variant.flat, revision);
+		return {
+			imported: [skill.name],
+			skipped: []
+		};
+	}
+	async verifyImportedSkill(view, name, flat, revision) {
+		const after = await this.readView(view);
+		const accepted = after.skills.find((item) => item.name === name);
+		let verified = false;
+		try {
+			const location = accepted?.path ? (await packageLocation(accepted.path)).path : "";
+			const target = join(this.importTarget(view), flat ? `${name}.md` : name);
+			verified = Boolean(location) && await realpath(location) === await realpath(target) && await skillRevision(location, flat) === revision;
+		} catch {}
+		this.active();
+		if (!after.complete || !verified) throw new Error("skill-readback-failed");
 	}
 	async close() {
 		if (this.closed) return;
@@ -1984,10 +3379,99 @@ const methods$11 = {
 			if (!this.skills.current) throw new Error("DSH skill management is unavailable.");
 			return this.skills.current.setEnabled(cwd, scope, name, enabled);
 		});
+	},
+	discoverExternalSkills(cwd, scope) {
+		return this.run(() => {
+			if (!this.skills.current) throw new Error("DSH skill management is unavailable.");
+			return this.skills.current.discoverExternalSkills(cwd, scope);
+		});
+	},
+	readExternalSkill(cwd, scope, id) {
+		return this.run(() => {
+			if (!this.skills.current) throw new Error("DSH skill management is unavailable.");
+			return this.skills.current.readExternal(cwd, scope, id);
+		});
+	},
+	importExternalSkills(cwd, scope, ids) {
+		return this.run(() => {
+			if (!this.skills.current) throw new Error("DSH skill management is unavailable.");
+			return this.skills.current.importExternalSkills(cwd, scope, ids);
+		});
+	},
+	addSkill(cwd, scope, id, mode, revision) {
+		return this.run(() => {
+			if (!this.skills.current) throw new Error("DSH skill management is unavailable.");
+			return this.skills.current.addSkill(cwd, scope, id, mode, revision);
+		});
+	},
+	readSkillImportDestination(cwd, scope, name, flat) {
+		return this.run(() => {
+			if (!this.skills.current) throw new Error("DSH skill management is unavailable.");
+			return this.skills.current.readSkillImportDestination(cwd, scope, name, flat);
+		});
+	},
+	importSkillTo(cwd, scope, id, revision, targetCwd) {
+		return this.run(() => {
+			if (!this.skills.current) throw new Error("DSH skill management is unavailable.");
+			return this.skills.current.importSkillTo(cwd, scope, id, revision, targetCwd);
+		});
+	},
+	deleteSkill(cwd, scope, name, revision) {
+		return this.run(() => {
+			if (!this.skills.current) throw new Error("DSH skill management is unavailable.");
+			return this.skills.current.deleteSkill(cwd, scope, name, revision).catch((error) => {
+				const message = error instanceof Error ? error.message : "";
+				throw new Error([
+					"skill-delete-changed",
+					"skill-delete-readback-failed",
+					"skill-delete-unavailable"
+				].includes(message) ? message : "skill-delete-failed");
+			});
+		});
 	}
 };
 
 // src/features/skills/rpc.ts
+function parseSources(value) {
+	if (!isArray(value) || value.length > 400) throw new TypeError("Invalid skill sources");
+	return value.map((source) => {
+		if (!isRecord$1(source) || !hasStrings(source, [
+			"agent",
+			"path",
+			"realPath"
+		]) || typeof source.linked !== "boolean") throw new TypeError("Invalid skill source");
+		return {
+			agent: source.agent,
+			path: source.path,
+			realPath: source.realPath,
+			linked: source.linked
+		};
+	});
+}
+function parseVariant(value) {
+	if (!isRecord$1(value) || !hasStrings(value, [
+		"id",
+		"description",
+		"path",
+		"revision"
+	]) || typeof value.flat !== "boolean") throw new TypeError("Invalid skill variant");
+	return {
+		id: value.id,
+		description: value.description,
+		path: value.path,
+		revision: value.revision,
+		flat: value.flat,
+		sources: parseSources(value.sources)
+	};
+}
+function parseDeletion(value) {
+	if (!isRecord$1(value) || !hasStrings(value, ["path", "revision"]) || typeof value.linked !== "boolean" || !value.path || !/^[a-f0-9]{64}$/.test(value.revision)) throw new TypeError("Invalid skill deletion");
+	return {
+		path: value.path,
+		revision: value.revision,
+		linked: value.linked
+	};
+}
 const skillCatalogCodec = {
 	mode: "strict",
 	typeSymbol: "power-dsh#SkillCatalog",
@@ -2058,7 +3542,8 @@ const skillDetailCodec = {
 			origin: value.origin,
 			enabled: value.enabled,
 			modelInvocable: value.modelInvocable,
-			userInvocable: value.userInvocable
+			userInvocable: value.userInvocable,
+			...value.deletion === void 0 ? {} : { deletion: parseDeletion(value.deletion) }
 		};
 	} })
 };
@@ -2073,7 +3558,7 @@ function skillRpc(method, fields, result = skillCatalogCodec) {
 			name,
 			wire: name,
 			source: "json",
-			codec: name === "enabled" ? booleanCodec : stringCodec
+			codec: name === "enabled" || name === "flat" ? booleanCodec : stringCodec
 		})),
 		result
 	};
@@ -2090,10 +3575,229 @@ const SET_SKILL_ENABLED_RPC = skillRpc("setSkillEnabled", [
 	"name",
 	"enabled"
 ]);
+const externalSkillCatalogCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#ExternalSkillCatalog",
+	create: () => ({ parse(value) {
+		if (!isRecord$1(value) || typeof value.complete !== "boolean" || !isArray(value.entries)) throw new TypeError("Invalid external skill catalog");
+		const entries = value.entries.map((row) => {
+			if (!isRecord$1(row) || !hasStrings(row, [
+				"id",
+				"name",
+				"description",
+				"source",
+				"path"
+			]) || typeof row.flat !== "boolean") throw new TypeError("Invalid external skill entry");
+			if (row.variants !== void 0 && (!isArray(row.variants) || row.variants.length > 400)) throw new TypeError("Invalid skill variants");
+			if (row.comparison !== void 0 && !isOneOf(row.comparison, [
+				"same",
+				"different",
+				"unknown"
+			])) throw new TypeError("Invalid skill comparison");
+			if (row.conflict !== void 0 && typeof row.conflict !== "boolean") throw new TypeError("Invalid skill conflict");
+			if (row.available !== void 0 && typeof row.available !== "boolean") throw new TypeError("Invalid skill availability");
+			if (row.inherited !== void 0 && typeof row.inherited !== "boolean") throw new TypeError("Invalid skill inheritance");
+			return {
+				id: row.id,
+				name: row.name,
+				description: row.description,
+				source: row.source,
+				path: row.path,
+				flat: row.flat,
+				...isArray(row.variants) ? { variants: row.variants.map(parseVariant) } : {},
+				...row.sources === void 0 ? {} : { sources: parseSources(row.sources) },
+				...isOneOf(row.comparison, [
+					"same",
+					"different",
+					"unknown"
+				]) ? { comparison: row.comparison } : {},
+				...typeof row.conflict === "boolean" ? { conflict: row.conflict } : {},
+				...typeof row.available === "boolean" ? { available: row.available } : {},
+				...typeof row.inherited === "boolean" ? { inherited: row.inherited } : {}
+			};
+		});
+		return {
+			complete: value.complete,
+			entries
+		};
+	} })
+};
+const skillImportResultCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#SkillImportResult",
+	create: () => ({ parse(value) {
+		if (!isRecord$1(value) || !isArray(value.imported) || !value.imported.every((item) => typeof item === "string") || !isArray(value.skipped)) throw new TypeError("Invalid skill import result");
+		const skipped = value.skipped.map((item) => {
+			if (!isRecord$1(item) || !hasStrings(item, ["name", "reason"])) throw new TypeError("Invalid skill import skipped row");
+			return {
+				name: item.name,
+				reason: item.reason
+			};
+		});
+		return {
+			imported: value.imported,
+			skipped
+		};
+	} })
+};
+const stringArrayCodec = {
+	mode: "strict",
+	typeSymbol: "string[]",
+	create: () => ({ parse(value) {
+		if (!isArray(value) || !value.every((item) => typeof item === "string")) throw new TypeError("Expected a string array");
+		return value;
+	} })
+};
+const externalSkillDetailCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#ExternalSkillDetail",
+	create: () => ({ parse(value) {
+		if (value === null) return null;
+		if (!isRecord$1(value) || !hasStrings(value, [
+			"name",
+			"description",
+			"content",
+			"source",
+			"path"
+		])) throw new TypeError("Invalid external skill detail");
+		return {
+			name: value.name,
+			description: value.description,
+			content: value.content,
+			source: value.source,
+			path: value.path
+		};
+	} })
+};
+const READ_EXTERNAL_SKILL_RPC = {
+	id: "power-dsh#powerDsh/readExternalSkill",
+	service: "powerDsh",
+	namespace: "powerDsh",
+	method: "readExternalSkill",
+	invocation: { kind: "direct" },
+	parameters: [
+		{
+			name: "cwd",
+			wire: "cwd",
+			source: "json",
+			codec: stringCodec
+		},
+		{
+			name: "scope",
+			wire: "scope",
+			source: "json",
+			codec: stringCodec
+		},
+		{
+			name: "id",
+			wire: "id",
+			source: "json",
+			codec: stringCodec
+		}
+	],
+	result: externalSkillDetailCodec
+};
+const DISCOVER_EXTERNAL_SKILLS_RPC = {
+	id: "power-dsh#powerDsh/discoverExternalSkills",
+	service: "powerDsh",
+	namespace: "powerDsh",
+	method: "discoverExternalSkills",
+	invocation: { kind: "direct" },
+	parameters: [{
+		name: "cwd",
+		wire: "cwd",
+		source: "json",
+		codec: stringCodec
+	}, {
+		name: "scope",
+		wire: "scope",
+		source: "json",
+		codec: stringCodec
+	}],
+	result: externalSkillCatalogCodec
+};
+const IMPORT_EXTERNAL_SKILLS_RPC = {
+	id: "power-dsh#powerDsh/importExternalSkills",
+	service: "powerDsh",
+	namespace: "powerDsh",
+	method: "importExternalSkills",
+	invocation: { kind: "direct" },
+	parameters: [
+		{
+			name: "cwd",
+			wire: "cwd",
+			source: "json",
+			codec: stringCodec
+		},
+		{
+			name: "scope",
+			wire: "scope",
+			source: "json",
+			codec: stringCodec
+		},
+		{
+			name: "ids",
+			wire: "ids",
+			source: "json",
+			codec: stringArrayCodec
+		}
+	],
+	result: skillImportResultCodec
+};
+const ADD_SKILL_RPC = skillRpc("addSkill", [
+	"cwd",
+	"scope",
+	"id",
+	"mode",
+	"revision"
+], skillImportResultCodec);
+const skillImportDestinationCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#SkillImportDestination",
+	create: () => ({ parse(value) {
+		if (!isRecord$1(value) || !hasStrings(value, ["path"]) || !hasBooleans(value, [
+			"complete",
+			"available",
+			"inherited"
+		])) throw new TypeError("Invalid skill import destination");
+		return {
+			path: value.path,
+			complete: value.complete,
+			available: value.available,
+			inherited: value.inherited
+		};
+	} })
+};
+const READ_SKILL_IMPORT_DESTINATION_RPC = skillRpc("readSkillImportDestination", [
+	"cwd",
+	"scope",
+	"name",
+	"flat"
+], skillImportDestinationCodec);
+const IMPORT_SKILL_TO_RPC = skillRpc("importSkillTo", [
+	"cwd",
+	"scope",
+	"id",
+	"revision",
+	"targetCwd"
+], skillImportResultCodec);
+const DELETE_SKILL_RPC = skillRpc("deleteSkill", [
+	"cwd",
+	"scope",
+	"name",
+	"revision"
+]);
 const rpc$11 = [
 	LIST_SKILLS_RPC,
 	READ_SKILL_RPC,
-	SET_SKILL_ENABLED_RPC
+	SET_SKILL_ENABLED_RPC,
+	DISCOVER_EXTERNAL_SKILLS_RPC,
+	READ_EXTERNAL_SKILL_RPC,
+	IMPORT_EXTERNAL_SKILLS_RPC,
+	ADD_SKILL_RPC,
+	READ_SKILL_IMPORT_DESTINATION_RPC,
+	IMPORT_SKILL_TO_RPC,
+	DELETE_SKILL_RPC
 ];
 
 // src/features/mcp/definition.ts
@@ -5900,6 +7604,13 @@ const MOD_RPC = composeRpc([
 	LIST_SKILLS_RPC,
 	READ_SKILL_RPC,
 	SET_SKILL_ENABLED_RPC,
+	DISCOVER_EXTERNAL_SKILLS_RPC,
+	READ_EXTERNAL_SKILL_RPC,
+	IMPORT_EXTERNAL_SKILLS_RPC,
+	ADD_SKILL_RPC,
+	READ_SKILL_IMPORT_DESTINATION_RPC,
+	IMPORT_SKILL_TO_RPC,
+	DELETE_SKILL_RPC,
 	LIST_MCP_SERVERS_RPC,
 	READ_MCP_SERVER_RPC,
 	SET_MCP_SERVER_ENABLED_RPC,

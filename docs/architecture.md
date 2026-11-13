@@ -49,9 +49,13 @@ DSH `0.2.2-rc.1` 的原生 logger 提供内存缓冲与 exporter；插件安装�
 
 本机通知通过 `notificationTransport` 取得 Host 平台、原生服务能力和包版本，版本与 Client 构建版本一致后才发送。本机 Windows 不依赖 DOM 或 Electron bridge 标记做路由，失败不回退 renderer；具体握手、策略、测试通知和诊断字段见主 Spec。插件运行版本通过构建时常量内联至 Client，不把包清单或 Host 模块导入浏览器模块图。
 
-插件更新通过设置页的 feature-owned footer 贡献显示独立入口；市场公开 API v1 持有安装和进度。owner-only Host 查询通过托管 Git 读取固定远端标签，并匿名 HEAD 核对正式 Release 与固定附件，不调用 GitHub REST API、不新增 Host 写入接口。设置外壳只渲染 footer 贡献，版本校验、确认、进度和生命周期均归 `plugin-updates` 模块。
+插件更新通过设置页的 feature-owned 尾部贡献显示在通用分类的最后一行，复用标准设置行；外壳传递当前分类，并将贡献放在 tabpanel 内。市场公开 API v1 持有安装和进度。owner-only Host 查询通过托管 Git 读取固定远端标签，并匿名 HEAD 核对正式 Release 与固定附件，不调用 GitHub REST API、不新增 Host 写入接口。分类显隐、版本校验、确认、进度和生命周期均归 `plugin-updates` 模块。
 
 [通知模块](../src/features/notifications/)拥有结束摘要投影、通知订阅和系统声音。Host 注册最小投影，Client 订阅原生列表与交互状态；本机 Windows 桌面端经 owner-only RPC 和宿主 subprocess 托管 PowerShell / WinRT Toast，其余环境调用浏览器通知。原生 Toast 独立串行发送与定向清理，避免阻塞设置策略队列；声音保留原有并发控制与托管进程。触发、权限、去重、声音及生命周期边界由[任务通知 Spec](../src/features/notifications/spec.md)维护。
+
+## 技能发现与导入
+
+[技能管理](../src/features/skills/spec.md)的来源扫描、包指纹和导入归 `skills` 模块。发现结果投影本次原生目录中的已存在状态，保留卡片并在名称右侧标注「已存在」，禁止重复导入，不维护独立导入历史或受管更新基线。目标确认通过 owner-only RPC 返回实际路径、完整性和已有状态；来源范围与目标范围独立校验，目标仅允许全局或已登记工作区。导入共用已有 Host 队列，接收候选和版本指纹；写前重查，写后使原生目录失效并核对注册路径与内容，不能以磁盘存在冒充注册成功。包在目标文件系统暂存，独占创建目标、最后写入定义；失败只清理仍属于本次操作且未被外部修改的内容。删除仅接受 Host 推导的 DSH 自有目录及确认指纹，链接仅移除链接；外部共享来源不提供删除。旧历史文件不读写，也不自动删除；原生技能与源文件保持由各自所有者管理。
 
 ## MCP 详情
 
@@ -95,7 +99,7 @@ Host 保持一个[操作队列](../src/shared/host/operation-queue.ts)，核对�
 
 [重启模块](../src/features/restart-button/)拥有公共确认弹窗、状态轮询和 Host 助手；共享菜单只承载动作。配置保存与执行分开，owner-only RPC 重新校验平台和应用身份。
 
-已确认交接的 detached 助手可在 Host 正常退出后完成单次同路径重开，随后结束；取消、超时和失败不强杀或延迟补开。该跨退出生命周期例外、平台范围和实际验收限制见[重启 Spec](../src/features/restart-button/spec.md)。
+已确认交接的助手可跨 Host 退出完成单次同路径重开，随后结束。macOS 使用 detached AppleScript 正常退出；Windows 通过 Explorer 交接 PowerShell 助手，确认后仅结束已绑定身份的当前进程树，确认旧树退出后重开。取消、交接失败或身份失效不结束进程，过期不补执行。该跨退出生命周期例外、平台范围和实际验收限制见[重启 Spec](../src/features/restart-button/spec.md)。
 
 ## 生命周期与扩展
 

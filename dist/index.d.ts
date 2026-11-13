@@ -16,7 +16,6 @@ interface Preferences {
   showRestartButton: boolean;
   notificationsEnabled: boolean;
   notificationMode: string;
-  pluginUpdatesEnabled: boolean;
   notificationSoundEnabled: boolean;
   notificationSound: string;
   personalizationEnabled: boolean;
@@ -76,6 +75,20 @@ interface FeatureDefinition {
   readonly spec: string;
 }
 type SkillScope = 'user' | 'project';
+interface SkillOccurrence {
+  agent: string;
+  path: string;
+  realPath: string;
+  linked: boolean;
+}
+interface SkillVariant {
+  id: string;
+  description: string;
+  path: string;
+  flat: boolean;
+  revision: string;
+  sources: SkillOccurrence[];
+}
 interface SkillWorkspace {
   path: string;
   title: string;
@@ -99,6 +112,45 @@ interface SkillCatalog {
   complete: boolean;
   skills: SkillRow[];
 }
+interface ExternalSkillEntry {
+  id: string;
+  name: string;
+  description: string;
+  source: string;
+  path: string;
+  flat: boolean;
+  variants?: SkillVariant[];
+  sources?: SkillOccurrence[];
+  comparison?: 'same' | 'different' | 'unknown';
+  available?: boolean;
+  conflict?: boolean;
+  inherited?: boolean;
+}
+interface ExternalSkillDetail {
+  name: string;
+  description: string;
+  /** Markdown body from the skill's `SKILL.md`, read on demand. */
+  content: string;
+  source: string;
+  path: string;
+}
+interface ExternalSkillCatalog {
+  complete: boolean;
+  entries: ExternalSkillEntry[];
+}
+interface SkillImportResult {
+  imported: string[];
+  skipped: {
+    name: string;
+    reason: string;
+  }[];
+}
+interface SkillImportDestination {
+  path: string;
+  complete: boolean;
+  available: boolean;
+  inherited: boolean;
+}
 interface SkillDetail {
   name: string;
   description: string;
@@ -111,6 +163,12 @@ interface SkillDetail {
   enabled: boolean;
   modelInvocable: boolean;
   userInvocable: boolean;
+  deletion?: SkillDeletion;
+}
+interface SkillDeletion {
+  path: string;
+  linked: boolean;
+  revision: string;
 }
 type McpRuntimeState = 'pending' | 'loading' | 'active' | 'failed' | 'unloading' | 'inactive' | 'disabled' | 'unknown';
 type McpTransport = 'stdio' | 'streamable-http' | 'unknown';
@@ -209,15 +267,26 @@ interface NotificationTransport {
   nativeAvailable: boolean;
   version: string;
 }
+interface PluginUpdateDiagnostic {
+  stage: 'release.rpc' | 'git.resolve' | 'git.tags' | 'release.latest' | 'release.asset' | 'market.capabilities' | 'market.updates' | 'market.submit' | 'market.operation' | 'update.validation' | 'update.resume';
+  reason: 'unavailable' | 'not-found' | 'process-exit' | 'incomplete-output' | 'http' | 'invalid-response' | 'tag-mismatch' | 'timeout' | 'cancelled' | 'network' | 'rate-limited' | 'identity-changed' | 'unknown-result' | 'dns' | 'proxy' | 'certificate' | 'authentication' | 'connection';
+  observedAt: string;
+  httpStatus?: number;
+  exitCode?: number;
+  systemCode?: string;
+  elapsedMs?: number;
+}
 type PluginRelease = {
   status: 'ready';
   version: string;
   commit: string;
 } | {
   status: 'unavailable' | 'git-unavailable';
+  diagnostic?: PluginUpdateDiagnostic;
 } | {
   status: 'rate-limited';
   retryAt: number;
+  diagnostic?: PluginUpdateDiagnostic;
 };
 interface RestartStatus {
   supported: boolean;
@@ -349,6 +418,13 @@ interface PowerDshMethods {
   listSkills(cwd: string, scope: string): Promise<SkillCatalog>;
   readSkill(cwd: string, scope: string, name: string): Promise<SkillDetail | null>;
   setSkillEnabled(cwd: string, scope: string, name: string, enabled: boolean): Promise<SkillCatalog>;
+  discoverExternalSkills(cwd: string, scope: string): Promise<ExternalSkillCatalog>;
+  readExternalSkill(cwd: string, scope: string, id: string): Promise<ExternalSkillDetail | null>;
+  importExternalSkills(cwd: string, scope: string, ids: string[]): Promise<SkillImportResult>;
+  addSkill(cwd: string, scope: string, id: string, mode: string, revision: string): Promise<SkillImportResult>;
+  readSkillImportDestination(cwd: string, scope: string, name: string, flat: boolean): Promise<SkillImportDestination>;
+  importSkillTo(cwd: string, scope: string, id: string, revision: string, targetCwd: string): Promise<SkillImportResult>;
+  deleteSkill(cwd: string, scope: string, name: string, revision: string): Promise<SkillCatalog>;
   listMcpServers(): Promise<McpCatalog>;
   readMcpServer(id: string): Promise<McpServerDetail | null>;
   setMcpServerEnabled(id: string, enabled: boolean): Promise<McpCatalog>;
@@ -638,6 +714,12 @@ interface NativeSettings {
 interface NativeSubprocessHandle {
   collected?: {
     stdout?: {
+      readFrom(offset: number): {
+        text: string;
+        lossy: boolean;
+      };
+    };
+    stderr?: {
       readFrom(offset: number): {
         text: string;
         lossy: boolean;

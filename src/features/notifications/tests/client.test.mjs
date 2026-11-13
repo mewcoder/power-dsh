@@ -138,7 +138,7 @@ test('Windows Host delivery cannot fall back to renderer when desktop bridge and
   await testButton.props.onClick();
   assert.equal(app.nativeNotifications.length, 2);
   assert.equal(app.notifications.length, 0);
-  assert.equal(descendants(app.renderSettings()).find(node => node.props['aria-label'] === 'notificationTest').props.title, 'notificationTestSent');
+  assert.equal(descendants(app.renderSettings()).find(node => node.props['aria-label'] === 'notificationTest').props.title, 'notificationTest');
   app.set({ notificationMode: 'never' });
   await testButton.props.onClick();
   assert.equal(app.nativeNotifications.length, 2, 'A stale test button cannot bypass the current policy.');
@@ -170,14 +170,22 @@ test('the test icon sits immediately before the policy menu and waits for delive
   assert.equal(controls.props.children.length, 2);
   assert.equal(controls.props.children[0].props['aria-label'], 'notificationTest');
   assert.equal(controls.props.children[1].props.anchor.props['aria-label'], 'notificationsEnabled');
+  const anchor = () => notificationMenu(app).props.anchor;
+  assert.equal(descendants(anchor()).find(node => node.type === 'use').props.href, '#dsw-icon-chevron-down-outline-regular');
+  anchor().props.onClick();
+  assert.equal(notificationMenu(app).props.open, true);
+  anchor().props.onClick();
+  assert.equal(notificationMenu(app).props.open, false);
   assert.equal(descendants(icon()).filter(node => node.type === 'svg').length, 1);
+  const bellPath = descendants(icon()).find(node => node.type === 'path').props.d;
   assert.equal(icon().props.children.some(child => typeof child === 'string'), false);
   assert.equal(descendants(app.renderSettings()).some(node => node.props.role === 'switch' && node.props.id?.endsWith('-notificationsEnabled')), false);
   const sending = icon().props.onClick();
   assert.equal(icon().props['aria-busy'], true);
   await sending;
-  assert.equal(icon().props.title, 'notificationTestSent');
-  assert.equal(app.settingsProps().transportSource.getSnapshot().tested, true);
+  assert.equal(icon().props.title, 'notificationTest');
+  assert.equal(descendants(icon()).find(node => node.type === 'path').props.d, bellPath);
+  assert.equal(icon().props['aria-busy'], false);
   assert.equal(app.timers.size, 0);
   app.unmount();
 });
@@ -486,7 +494,7 @@ test('local sound catalog loads without waiting for notification session service
   await loadedSoundSettings(app);
   assert.equal(app.soundLists(), 1);
   assert.equal(soundControl(app, 'select').props.disabled, false);
-  assert.ok(soundControl(app, 'select').props.children.includes('Ping'));
+  assert.ok(descendants(soundControl(app, 'select')).some(node => node.props.children.includes('Ping')));
   assert.equal(app.settingsProps().soundsSource.getSnapshot().error, '');
   app.unmount();
 });
@@ -499,7 +507,7 @@ test('remote connections keep native browser notification sound and never play s
   assert.equal(soundControl(app, 'select').props.disabled, true);
   assert.equal(descendants(app.renderSettings()).some(node => node.props.role === 'alert'), false);
   assert.equal(descendants(app.renderSettings()).some(node => node.props.className === 'power-dsh-prompt-action'), false);
-  assert.ok(soundControl(app, 'select').props.children.includes('notificationSoundDefault'));
+  assert.ok(descendants(soundControl(app, 'select')).some(node => node.props.children.includes('notificationSoundDefault')));
   app.setSessions([notificationSession()]);
   app.setSessions([notificationSession({ seq: 10, reason: 'error', running: false })]);
   assert.equal(app.notifications.length, 1);
@@ -541,7 +549,7 @@ test('missing sounds, catalog errors and read-only preferences cannot play or wr
     if (options.soundListError) {
       assert.ok(descendants(app.renderSettings()).some(node => node.props.role === 'alert' && node.props.children.includes('notificationSoundUnavailable')));
     } else {
-      assert.ok(soundControl(app, 'select').props.children.includes('notificationSoundMissing'));
+      assert.ok(descendants(soundControl(app, 'select')).some(node => node.props.children.includes('notificationSoundMissing')));
     }
     app.unmount();
   }
@@ -597,7 +605,7 @@ test('sound settings appear only while notifications are on and preserve choices
   await notificationMenu(app).props.onSelect('background');
   assert.equal(rows().length, 3);
   assert.equal(notificationSoundSwitch(app).props['aria-checked'], true);
-  assert.ok(soundControl(app, 'select').props.children.includes('Ping'));
+  assert.ok(descendants(soundControl(app, 'select')).some(node => node.props.children.includes('Ping')));
   soundControl(app, 'select').props.onClick();
   const staleMenu = descendants(app.renderSettings()).find(node => node.type === 'native-menu-fixture' && node.props.items.some(item => item.id === 'default'));
   const staleSoundToggle = notificationSoundSwitch(app).props.onClick;
@@ -618,7 +626,7 @@ test('sound settings appear only while notifications are on and preserve choices
 
   await notificationMenu(app).props.onSelect('background');
   assert.equal(notificationSoundSwitch(app).props['aria-checked'], true);
-  assert.ok(soundControl(app, 'select').props.children.includes('Ping'));
+  assert.ok(descendants(soundControl(app, 'select')).some(node => node.props.children.includes('Ping')));
   assert.equal(descendants(app.renderSettings()).find(node => node.type === 'native-menu-fixture').props.open, false);
   await notificationSoundSwitch(app).props.onClick();
   await notificationMenu(app).props.onSelect('never');

@@ -2,20 +2,33 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { descendants, mount } from '../../../../tests/helpers/client-fixture.mjs';
 
-test('plugin update footer shows its own running version, stays manual and can be independently hidden', async () => {
+test('plugin version is the last General setting row, always shown in General and stays manual', async () => {
   const app = await mount();
   const { version } = JSON.parse(await (await import('node:fs/promises')).readFile(new URL('../../../../package.json', import.meta.url), 'utf8'));
-  const footer = () => descendants(app.renderSettings()).find(node => node.type === 'footer');
-  assert.ok(descendants(footer()).some(node => node.props.children.includes(`PowerDSH ${version}`)));
-  assert.ok(descendants(footer()).some(node => node.props.children.includes('pluginUpdateCheck')));
+  const row = () => descendants(app.renderSettings()).find(node => node.props.role === 'group' && node.props['aria-label'] === 'pluginUpdateVersion');
+  assert.ok(row().props.className.includes('power-dsh-setting-row'));
+  assert.ok(descendants(row()).some(node => node.type === 'span' && node.props.children.includes(version)));
+  assert.equal(descendants(row()).some(node => node.props.children.includes(`PowerDSH ${version}`)), false);
+  assert.ok(descendants(row()).some(node => node.props.children.includes('pluginUpdateCheck')));
+  const panel = descendants(app.renderSettings()).find(node => node.props.role === 'tabpanel');
+  assert.equal(panel.props.children.at(-1).props['aria-label'], 'pluginUpdateVersion');
+  const staleCheck = descendants(row()).find(node => node.type === 'button' && node.props.children.includes('pluginUpdateCheck')).props.onClick;
   for (const tab of ['interface', 'enhancements', 'simplify', 'other']) {
     app.selectSettingsTab(tab);
-    assert.equal(descendants(app.renderSettings()).filter(node => node.type === 'footer').length, 1);
+    assert.equal(row(), undefined);
+    assert.equal(descendants(app.renderSettings()).filter(node => node.type === 'footer').length, 0);
   }
-  app.set({ pluginUpdatesEnabled: false });
-  assert.equal(footer(), undefined);
-  app.set({ pluginUpdatesEnabled: true });
-  assert.ok(footer());
+  await staleCheck();
+  assert.equal(app.settingsProps().pluginUpdates.state.phase, 'idle');
+  app.selectSettingsTab('general');
+  assert.ok(row());
+  app.settingsProps().pluginUpdates.publish({ phase: 'current', error: '', target: null });
+  const versionLine = descendants(row()).find(node => node.props.className === 'power-dsh-description power-dsh-plugin-version');
+  assert.ok(versionLine.props.children[0].props.children.includes(version));
+  assert.equal(versionLine.props.children[1].props.role, 'status');
+  assert.ok(versionLine.props.children[1].props.children.includes('pluginUpdateCurrent'));
+  const check = descendants(row()).find(node => node.type === 'button' && node.props.children.includes('pluginUpdateCheck'));
+  assert.equal(check.props.disabled, false);
   app.unmount();
 });
 
@@ -31,6 +44,19 @@ test('read-only settings cannot initiate update reads and unavailable API errors
   await descendants(allowed.renderSettings()).find(node => node.type === 'button' && node.props.children.includes('pluginUpdateCheck')).props.onClick();
   assert.ok(descendants(allowed.renderSettings()).some(node => node.props.role === 'alert' && node.props.children.includes('pluginUpdateApiUnavailable')));
   allowed.unmount();
+});
+
+test('update check errors pass specific evidence to shared details without a duplicate retry', async () => {
+  const app = await mount({ updateFetch: async () => new Response('', { status: 502 }) });
+  const view = () => descendants(app.renderSettings());
+  await view().find(node => node.type === 'button' && node.props.children.includes('pluginUpdateCheck')).props.onClick();
+  assert.equal(view().some(node => node.props.className === 'power-dsh-error-retry'), false);
+  assert.equal(view().some(node => node.type === 'native-modal-fixture'), false);
+  const details = view().find(node => typeof node.type === 'function' && node.props.code === 'PD-PLUGIN-UPDATE');
+  assert.ok(details.props.context.stage.includes('market.capabilities'));
+  assert.ok(details.props.context.actual.includes('HTTP 502'));
+  assert.ok(details.props.observedAt);
+  app.unmount();
 });
 
 test('rate-limit feedback offers the releases page and opening settings never performs update checks', async () => {
@@ -71,6 +97,15 @@ test('checking and opening the confirmation never installs; only the current con
   dialog.props.onClose();
   await staleConfirm();
   assert.equal(posts, 0);
+  open().props.onClick();
+  const hiddenConfirm = descendants(view().find(node => node.type === 'native-modal-fixture'))
+    .find(node => node.type === 'button' && node.props.children.includes('pluginUpdateAction')).props.onClick;
+  app.selectSettingsTab('interface');
+  assert.equal(view().find(node => node.type === 'native-modal-fixture'), undefined);
+  await hiddenConfirm();
+  assert.equal(posts, 0);
+  app.selectSettingsTab('general');
+  await view().find(node => node.type === 'button' && node.props.children.includes('pluginUpdateCheck')).props.onClick();
   open().props.onClick();
   dialog = view().find(node => node.type === 'native-modal-fixture');
   descendants(dialog).find(node => node.type === 'button' && node.props.children.includes('pluginUpdateAction')).props.onClick();

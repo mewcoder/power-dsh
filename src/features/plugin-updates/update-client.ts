@@ -1,8 +1,9 @@
 export const SCHEMA = 'dsh-market/update-api/v1';
 const API = 'dsh-market/api/v1/';
 const RELEASES = 'https://github.com/mewcoder/power-dsh/releases';
-import type { PluginRelease } from '../../shared/types/wire.ts';
+import type { PluginRelease, PluginUpdateDiagnostic } from '../../shared/types/wire.ts';
 import { compareVersions, versionParts } from './versions.ts';
+import { networkCode, UpdateFailure } from './diagnostics.ts';
 export { compareVersions } from './versions.ts';
 
 interface Capabilities { bootId: string; update: boolean }
@@ -14,6 +15,7 @@ export interface UpdateState {
   phase: 'idle' | 'checking' | 'available' | 'current' | 'unconfirmed' | 'updating' | 'done' | 'error';
   target: UpdateTarget | null; error: string; notice: string;
   restartRequired: boolean; refreshRequired: boolean; pending: PendingUpdate | null;
+  diagnostic: PluginUpdateDiagnostic | null;
 }
 interface UpdateOptions {
   baseURI: string; version: string; canUse(): boolean; notify(): void;
@@ -36,7 +38,7 @@ function validTarget(value: unknown): value is UpdateTarget {
 
 export class PluginUpdateClient {
   options: UpdateOptions;
-  state: UpdateState = { phase: 'idle', target: null, error: '', notice: '', restartRequired: false, refreshRequired: false, pending: null };
+  state: UpdateState = { phase: 'idle', target: null, error: '', notice: '', restartRequired: false, refreshRequired: false, pending: null, diagnostic: null };
   controller: AbortController | null = null;
   timer: number | null = null;
   busy = false;
@@ -51,7 +53,7 @@ export class PluginUpdateClient {
   }
   publish(patch: Partial<UpdateState>) {
     if (this.closed) return;
-    this.state = { ...this.state, ...patch };
+    this.state = { ...this.state, ...(patch.error !== undefined ? { diagnostic: null } : {}), ...patch };
     this.options.notify();
   }
   path(endpoint: string) {
@@ -64,7 +66,17 @@ export class PluginUpdateClient {
     } catch (_error) {}
     return this.githubRetryAt > (this.options.now?.() ?? Date.now());
   }
+  failure(stage: PluginUpdateDiagnostic['stage'], reason: PluginUpdateDiagnostic['reason'], key = 'pluginUpdateCheckFailed',
+    details: Partial<Pick<PluginUpdateDiagnostic, 'httpStatus' | 'elapsedMs' | 'systemCode'>> = {}) {
+    return new UpdateFailure(key, { stage, reason, observedAt: new Date().toISOString(), ...details });
+  }
+  diagnostic(error: unknown, stage: PluginUpdateDiagnostic['stage'] = 'update.validation') {
+    return error instanceof UpdateFailure ? error.diagnostic : this.failure(stage, 'unavailable').diagnostic;
+  }
   async request(url: string, signal: AbortSignal, body?: object) {
+    const stage = body ? 'market.submit' : url.includes('/capabilities') ? 'market.capabilities'
+      : url.includes('/operations?') ? 'market.operation' : 'market.updates';
+    const started = Date.now();
     const timeout = new AbortController();
     const timer = this.options.schedule(() => timeout.abort(), 15_000);
     try {
@@ -75,17 +87,23 @@ export class PluginUpdateClient {
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
       const text = await response.text();
-      if (text.length > 131_072) problem('pluginUpdateCheckFailed');
+      if (text.length > 131_072) throw this.failure(stage, 'invalid-response', 'pluginUpdateCheckFailed', { httpStatus: response.status });
       if (!response.ok) {
         if (response.status === 429) {
-          problem('pluginUpdateRateLimited');
+          throw this.failure(stage, 'rate-limited', 'pluginUpdateRateLimited', { httpStatus: response.status });
         }
-        problem(response.status === 404 || response.status === 405 ? 'pluginUpdateApiUnavailable'
-          : response.status === 401 || response.status === 403 ? 'pluginUpdateDenied' : 'pluginUpdateCheckFailed');
+        throw this.failure(stage, 'http', response.status === 404 || response.status === 405 ? 'pluginUpdateApiUnavailable'
+          : response.status === 401 || response.status === 403 ? 'pluginUpdateDenied' : 'pluginUpdateCheckFailed', { httpStatus: response.status });
       }
-      const data: unknown = JSON.parse(text);
-      if (!record(data) || data.schema !== SCHEMA) problem('pluginUpdateApiUnavailable');
+      let data: unknown;
+      try { data = JSON.parse(text); }
+      catch { throw this.failure(stage, 'invalid-response', 'pluginUpdateApiUnavailable', { httpStatus: response.status }); }
+      if (!record(data) || data.schema !== SCHEMA) throw this.failure(stage, 'invalid-response', 'pluginUpdateApiUnavailable', { httpStatus: response.status });
       return data;
+    } catch (error) {
+      if (error instanceof UpdateFailure) throw error;
+      throw this.failure(stage, timeout.signal.aborted ? 'timeout' : signal.aborted ? 'cancelled' : 'network',
+        'pluginUpdateCheckFailed', { elapsedMs: Date.now() - started, systemCode: networkCode(error) });
     } finally { this.options.cancel(timer); }
   }
   async discover(signal: AbortSignal): Promise<Capabilities> {
@@ -93,29 +111,32 @@ export class PluginUpdateClient {
     if (data.apiVersion !== 1 || !['beta', 'stable'].includes(String(data.stability)) || !record(data.features)
       || !record(data.endpoints) || data.features.check !== true || data.features.progress !== true
       || data.endpoints.updates !== '/dsh-market/api/v1/updates' || data.endpoints.operations !== '/dsh-market/api/v1/operations'
-      || typeof data.bootId !== 'string' || !data.bootId || data.bootId.length > 128) problem('pluginUpdateApiUnavailable');
+      || typeof data.bootId !== 'string' || !data.bootId || data.bootId.length > 128) throw this.failure('market.capabilities', 'invalid-response', 'pluginUpdateApiUnavailable');
     return { bootId: data.bootId, update: data.features.update === true };
   }
   async inspect(signal: AbortSignal): Promise<{ target: UpdateTarget | null; phase: 'available' | 'current' | 'unconfirmed' }> {
-    if (this.githubCooldown()) problem('pluginUpdateRateLimited');
-    const release = await this.options.release(signal);
+    if (this.githubCooldown()) throw this.failure('release.rpc', 'rate-limited', 'pluginUpdateRateLimited');
+    let release: PluginRelease;
+    try { release = await this.options.release(signal); }
+    catch (error) { throw error instanceof UpdateFailure ? error : this.failure('release.rpc', 'unavailable'); }
     signal.throwIfAborted();
     if (release.status === 'rate-limited') {
       const now = this.options.now?.() ?? Date.now();
       this.githubRetryAt = Math.min(now + 86_400_000, Math.max(now + 60_000, release.retryAt));
       try { this.options.storage?.setItem('power-dsh:update:github-retry-at', String(this.githubRetryAt)); } catch (_error) {}
-      problem('pluginUpdateRateLimited');
+      throw new UpdateFailure('pluginUpdateRateLimited', release.diagnostic ?? this.failure('release.rpc', 'rate-limited').diagnostic);
     }
-    if (release.status !== 'ready') problem(release.status === 'git-unavailable' ? 'pluginUpdateGitUnavailable' : 'pluginUpdateCheckFailed');
+    if (release.status !== 'ready') throw new UpdateFailure(release.status === 'git-unavailable' ? 'pluginUpdateGitUnavailable' : 'pluginUpdateCheckFailed',
+      release.diagnostic ?? this.failure('release.rpc', 'unavailable').diagnostic);
     const version = release.version;
-    if (!versionParts(version) || !/^[a-f0-9]{40}$/.test(release.commit)) problem('pluginUpdateCheckFailed');
+    if (!versionParts(version) || !/^[a-f0-9]{40}$/.test(release.commit)) throw this.failure('release.rpc', 'invalid-response');
     const comparison = compareVersions(version, this.options.version);
     if (comparison === null) problem('pluginUpdateSource');
     if (comparison <= 0) return { target: null, phase: 'current' };
     const capabilities = await this.discover(signal);
     const data = await this.request(`${this.path('updates')}?name=power-dsh&force=1`, signal);
     const item = data.package;
-    if (!record(item) || item.name !== 'power-dsh' || typeof item.updateAvailable !== 'boolean') problem('pluginUpdateCheckFailed');
+    if (!record(item) || item.name !== 'power-dsh' || typeof item.updateAvailable !== 'boolean') throw this.failure('market.updates', 'invalid-response');
     if (item.source !== 'github' && item.source !== 'npm') problem('pluginUpdateSource');
     if (!capabilities.update || !item.updateAvailable || typeof item.installedVersion !== 'string' || !item.installedVersion
       || item.installedVersion.length > 128 || typeof item.latestVersion !== 'string' || item.latestVersion.length > 128) {
@@ -131,6 +152,14 @@ export class PluginUpdateClient {
   }
   errorKey(error: unknown) {
     const key = error instanceof Error ? error.message : '';
+    if (key === 'pluginUpdateCheckFailed' && error instanceof UpdateFailure) {
+      const { stage, reason } = error.diagnostic;
+      if (reason === 'timeout') return 'pluginUpdateTimeout';
+      if (stage === 'git.tags') return 'pluginUpdateGitFailed';
+      if (stage === 'release.latest') return 'pluginUpdateReleaseFailed';
+      if (stage === 'release.asset') return 'pluginUpdateAssetFailed';
+      if (reason === 'network') return 'pluginUpdateNetworkFailed';
+    }
     return ['pluginUpdateApiUnavailable', 'pluginUpdateDenied', 'pluginUpdateGitUnavailable', 'pluginUpdateRateLimited',
       'pluginUpdateSource', 'pluginUpdateChanged'].includes(key)
       ? key : 'pluginUpdateCheckFailed';
@@ -145,7 +174,7 @@ export class PluginUpdateClient {
       const result = await this.inspect(controller.signal);
       if (sequence === this.sequence && this.options.canUse()) this.publish({ ...result, error: '' });
     } catch (error) {
-      if (sequence === this.sequence) this.publish({ phase: 'error', error: this.errorKey(error) });
+      if (sequence === this.sequence) this.publish({ phase: 'error', error: this.errorKey(error), diagnostic: this.diagnostic(error) });
     } finally { if (sequence === this.sequence) { this.busy = false; this.controller = null; } }
   }
   savePending(pending: PendingUpdate | null) {
@@ -182,7 +211,7 @@ export class PluginUpdateClient {
       this.observe(operation);
     } catch (error) {
       if (sequence === this.sequence) this.publish({ phase: 'error', target: null,
-        error: submitted ? 'pluginUpdateUnknown' : this.errorKey(error) });
+        error: submitted ? 'pluginUpdateUnknown' : this.errorKey(error), diagnostic: this.diagnostic(error, submitted ? 'market.submit' : 'update.validation') });
     } finally { if (sequence === this.sequence) { this.busy = false; this.controller = null; } }
   }
   observe(value: unknown) {
@@ -217,8 +246,8 @@ export class PluginUpdateClient {
     try {
       const reply = await this.request(`${this.path('operations')}?operationId=${encodeURIComponent(pending.operationId)}`, controller.signal);
       if (sequence === this.sequence && this.options.canUse()) this.observe(reply.operation);
-    } catch (_error) {
-      if (sequence === this.sequence) this.publish({ phase: 'error', error: 'pluginUpdateUnknown' });
+    } catch (error) {
+      if (sequence === this.sequence) this.publish({ phase: 'error', error: 'pluginUpdateUnknown', diagnostic: this.diagnostic(error, 'market.operation') });
     } finally { if (sequence === this.sequence) { this.busy = false; this.controller = null; } }
   }
   async resume() {
@@ -243,11 +272,12 @@ export class PluginUpdateClient {
       if (sequence !== this.sequence) return;
       if (capabilities.bootId !== restored.target.bootId) {
         this.savePending(null);
-        this.publish({ phase: 'error', pending: null, target: null, error: 'pluginUpdateUnknown' });
+        this.publish({ phase: 'error', pending: null, target: null, error: 'pluginUpdateUnknown',
+          diagnostic: this.failure('update.resume', 'identity-changed').diagnostic });
         return;
       }
-    } catch (_error) {
-      if (sequence === this.sequence) this.publish({ phase: 'error', error: 'pluginUpdateUnknown' });
+    } catch (error) {
+      if (sequence === this.sequence) this.publish({ phase: 'error', error: 'pluginUpdateUnknown', diagnostic: this.diagnostic(error, 'update.resume') });
       return;
     } finally { if (sequence === this.sequence) { this.busy = false; this.controller = null; } }
     if (sequence === this.sequence && this.options.canUse()) { this.polls = 0; await this.poll(); }

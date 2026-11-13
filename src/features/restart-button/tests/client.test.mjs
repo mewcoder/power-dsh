@@ -76,8 +76,8 @@ test('hidden or disabled restart controls dismiss confirmation and reject captur
   }
 });
 
-test('Web and Windows hide the restart setting while preserving its preference and the refresh action', async () => {
-  for (const options of [{ desktop: false }, { desktop: true, windows: true }]) {
+test('Web and unrecognized desktop platforms hide restart while preserving its preference and refresh', async () => {
+  for (const options of [{ desktop: false }, { desktop: true, platformMarker: false }]) {
     const app = await mount(options);
     try {
       app.set({ showRestartButton: true, showRefreshButton: true });
@@ -91,6 +91,41 @@ test('Web and Windows hide the restart setting while preserving its preference a
       assert.deepEqual(app.intervals(), [], 'Unsupported platforms must not poll restart status.');
     } finally { app.unmount(); }
   }
+});
+
+test('Windows offers the restart setting and force-close confirmation only for a supported local desktop', async () => {
+  const app = await mount({ desktop: true, windows: true });
+  const toggle = descendants(app.selectSettingsTab('other')).find(node => node.props.id === 'settings-test-showRestartButton');
+  assert.ok(toggle);
+  await toggle.props.onClick();
+  await enableRestart(app);
+  restartControl(app).props.onClick();
+  assert.equal(restartDialog(app).props.description, 'restartWindowsConfirm');
+  restartDialog(app).props.onClose();
+  assert.equal(app.restartCalls.length, 0);
+  restartControl(app).props.onClick();
+  restartConfirmButton(app).props.onClick();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.restartCalls.length, 1);
+  app.unmount();
+  const remote = await mount({ desktop: true, windows: true, localConnection: false });
+  await enableRestart(remote);
+  assert.equal(restartControl(remote), undefined);
+  assert.equal(remote.restartCalls.length, 0);
+  assert.deepEqual(remote.intervals(), []);
+  remote.unmount();
+});
+
+test('a desktop disconnection dismisses restart confirmation and rejects its captured callback', async () => {
+  const app = await mount({ desktop: true, windows: true });
+  await enableRestart(app);
+  restartControl(app).props.onClick();
+  const confirm = restartConfirmButton(app).props.onClick;
+  app.setConnectionGeneration(undefined);
+  confirm();
+  assert.equal(restartDialog(app), undefined);
+  assert.equal(app.restartCalls.length, 0);
+  app.unmount();
 });
 
 test('Web and unsupported Hosts show neither restart button nor confirmation', async () => {

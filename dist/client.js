@@ -29,30 +29,25 @@
 
 // src/shared/client/error-feedback.ts
 	const styles$15 = `
-.power-dsh-feedback { min-width:0; color:var(--dsw-alias-state-error-primary); font:inherit; font-size:12px; line-height:18px; overflow-wrap:anywhere; }
-.power-dsh-feedback[data-placement="page"] { margin:12px 0 0; padding:12px 14px; border:.5px solid var(--dsw-alias-settings-card-stroke); border-radius:var(--dsw-radius-lg); background:var(--dsw-alias-settings-card-fill); font-size:13px; line-height:20px; }
+.power-dsh-feedback { display:flex; align-items:center; flex-wrap:wrap; gap:2px 8px; min-width:0; color:var(--dsw-alias-state-error-primary); font:inherit; font-size:12px; line-height:18px; overflow-wrap:anywhere; }
+.power-dsh-feedback[data-placement="page"] { margin:12px 0 0; font-size:13px; line-height:20px; }
 .power-dsh-feedback[data-placement="inline"] { margin:4px 0 0; }
 .power-dsh-feedback[data-placement="compact"] { box-sizing:border-box; max-width:min(280px,calc(100vw - 16px)); max-height:calc(100vh - 72px); overflow:auto; padding:10px 12px; border:.5px solid var(--dsw-alias-border-l2); border-radius:var(--dsw-radius-md); background:var(--dsw-alias-bg-layer-1); pointer-events:auto; -webkit-app-region:no-drag; }
-.power-dsh-error-actions { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; gap:0 8px; margin-top:8px; color:var(--dsw-alias-label-secondary); }
-.power-dsh-error-details { grid-area:1 / 1 / 2 / 3; min-width:0; }
-.power-dsh-error-disclosure { max-width:100%; }
-.power-dsh-error-actions[data-has-retry="true"] .power-dsh-error-disclosure { max-width:calc(100% - 80px); }
-.power-dsh-error-chevron { flex:none; transition:transform 120ms ease; }
-.power-dsh-error-disclosure[aria-expanded="true"] .power-dsh-error-chevron { transform:rotate(180deg); }
-.power-dsh-error-retry { grid-area:1 / 2; position:relative; }
-.power-dsh-error-panel { margin-top:10px; padding:10px 12px; border-radius:var(--dsw-radius-md); background:var(--dsw-alias-bg-module-platform); color:var(--dsw-alias-label-secondary); }
-.power-dsh-error-report { box-sizing:border-box; max-width:100%; max-height:200px; overflow:auto; margin:0; color:inherit; font-family:var(--ds-font-family-code,monospace); font-size:12px; line-height:18px; white-space:pre-wrap; overflow-wrap:anywhere; user-select:text; }
-.power-dsh-error-panel-footer { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:4px 8px; margin-top:8px; padding-top:8px; border-top:.5px solid var(--dsw-alias-border-l2); }
+.power-dsh-error-details { display:contents; }
+.power-dsh-error-actions { display:contents; }
+.power-dsh-feedback[data-placement="modal"] { flex-wrap:nowrap; justify-content:space-between; gap:8px; padding:10px 12px; border-radius:var(--dsw-radius-md); background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 8%,transparent); }
+.power-dsh-feedback[data-placement="modal"] .power-dsh-error-actions { display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:8px; flex:none; }
+.power-dsh-feedback[data-placement="modal"] .power-dsh-error-retry { order:-1; }
+.power-dsh-error-dialog { width:min(520px,100%); }
+.power-dsh-error-report { box-sizing:border-box; max-width:100%; max-height:min(45vh,320px); overflow:auto; margin:0; color:var(--dsw-alias-label-secondary); font-family:var(--ds-font-family-code,monospace); font-size:12px; line-height:18px; white-space:pre-wrap; overflow-wrap:anywhere; user-select:text; }
 .power-dsh-error-disclosure:focus-visible,.power-dsh-error-retry:focus-visible,.power-dsh-error-copy:focus-visible,.power-dsh-error-report:focus-visible { outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary)); outline-offset:2px; }
 .power-dsh-copy-status { flex:1 1 120px; color:var(--dsw-alias-label-secondary); font-size:12px; line-height:18px; }
-@media (prefers-reduced-motion:reduce) { .power-dsh-error-chevron { transition:none; } }
 `;
 	/** One visual treatment for product errors, with optional recovery and copyable details. */
-	function createErrorFeedback(React, Button) {
+	function createErrorFeedback(React, Button, Modal) {
 		const h = React.createElement;
 		function ErrorDetails({ t, message, code, operation, context, observedAt: suppliedObservedAt }) {
 			const [expanded, setExpanded] = React.useState(false);
-			const panelId = React.useId();
 			const [copyState, setCopyState] = React.useState("idle");
 			const [mountedAt] = React.useState(() => (/* @__PURE__ */ new Date()).toISOString());
 			const observedAt = suppliedObservedAt ?? mountedAt;
@@ -99,34 +94,30 @@
 				variant: "ghost",
 				size: "sm",
 				className: "power-dsh-error-disclosure",
+				"aria-haspopup": "dialog",
 				"aria-expanded": expanded,
-				"aria-controls": panelId,
-				onClick: () => setExpanded(!expanded)
-			}, t("errorDetails"), h("svg", {
-				className: "power-dsh-error-chevron",
-				width: 14,
-				height: 14,
-				viewBox: "0 0 16 16",
-				"aria-hidden": true,
-				focusable: false
-			}, h("use", { href: "#dsw-icon-chevron-down-outline-regular" }))), h("div", {
-				id: panelId,
-				className: "power-dsh-error-panel",
-				hidden: !expanded
+				onClick: () => setExpanded(true)
+			}, t("errorDetailsAction")), h(Modal, {
+				open: expanded,
+				onClose: () => setExpanded(false),
+				title: t("errorDetails"),
+				closeLabel: t("close"),
+				className: "power-dsh-error-dialog",
+				footer: h(React.Fragment, null, (copyState === "copied" || copyState === "failed") && h("span", {
+					className: "power-dsh-copy-status",
+					role: "status"
+				}, t(copyState === "copied" ? "errorInfoCopied" : "errorInfoCopyFailed")), h(Button, {
+					variant: "outline",
+					className: "power-dsh-error-copy",
+					onClick: copy,
+					"data-modal-autofocus": true,
+					disabled: copyState === "pending",
+					"aria-busy": copyState === "pending"
+				}, t("copyErrorInfo")))
 			}, h("pre", {
 				className: "power-dsh-error-report",
 				tabIndex: 0
-			}, report), h("div", { className: "power-dsh-error-panel-footer" }, (copyState === "copied" || copyState === "failed") && h("span", {
-				className: "power-dsh-copy-status",
-				role: "status"
-			}, t(copyState === "copied" ? "errorInfoCopied" : "errorInfoCopyFailed")), h(Button, {
-				variant: "outline",
-				size: "sm",
-				className: "power-dsh-error-copy",
-				onClick: copy,
-				disabled: copyState === "pending",
-				"aria-busy": copyState === "pending"
-			}, t("copyErrorInfo")))));
+			}, report)));
 		}
 		return function errorFeedback(props) {
 			const { t, code, operation, id, placement = "inline", className = "", style, retry, disabled } = props;
@@ -154,10 +145,7 @@
 				"data-placement": placement,
 				"data-tone": "error",
 				style
-			}, message, h("style", null, styles$15), h("div", {
-				className: "power-dsh-error-actions",
-				"data-has-retry": Boolean(retry)
-			}, h(ErrorDetails, {
+			}, message, h("style", null, styles$15), h("div", { className: "power-dsh-error-actions" }, h(ErrorDetails, {
 				key: diagnosticKey,
 				t,
 				message,
@@ -166,7 +154,7 @@
 				context,
 				observedAt
 			}), retry && h(Button, {
-				variant: "outline",
+				variant: "ghost",
 				size: "sm",
 				className: "power-dsh-error-retry",
 				disabled,
@@ -230,7 +218,7 @@
 			useMounted,
 			NativeIcon,
 			loadingFeedback,
-			errorFeedback: createErrorFeedback(React, primitives.Button)
+			errorFeedback: createErrorFeedback(React, primitives.Button, primitives.Modal)
 		};
 	}
 	function errorMessage(error) {
@@ -385,6 +373,7 @@
 			}
 			const viewContext = {
 				snapshot,
+				activeTab,
 				disabled,
 				saving,
 				error,
@@ -479,7 +468,7 @@
 				className: "power-dsh-fields",
 				role: "tabpanel",
 				"aria-labelledby": `${id}-tab-${activeTab}`
-			}, ...fields.filter((field) => field.category === activeTab).map(row)), ...footers);
+			}, ...fields.filter((field) => field.category === activeTab).map(row), ...footers));
 		}
 		return SettingsPage;
 	}
@@ -695,6 +684,131 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		return 0;
 	}
 
+// src/features/plugin-updates/diagnostics.ts
+	const stages = [
+		"release.rpc",
+		"git.resolve",
+		"git.tags",
+		"release.latest",
+		"release.asset",
+		"market.capabilities",
+		"market.updates",
+		"market.submit",
+		"market.operation",
+		"update.validation",
+		"update.resume"
+	];
+	const reasons = [
+		"unavailable",
+		"not-found",
+		"process-exit",
+		"incomplete-output",
+		"http",
+		"invalid-response",
+		"tag-mismatch",
+		"timeout",
+		"cancelled",
+		"network",
+		"rate-limited",
+		"identity-changed",
+		"unknown-result",
+		"dns",
+		"proxy",
+		"certificate",
+		"authentication",
+		"connection"
+	];
+	const systemCodes = [
+		"ENOTFOUND",
+		"EAI_AGAIN",
+		"ECONNREFUSED",
+		"ECONNRESET",
+		"ETIMEDOUT",
+		"ENETUNREACH",
+		"EHOSTUNREACH",
+		"CERT_HAS_EXPIRED",
+		"DEPTH_ZERO_SELF_SIGNED_CERT",
+		"UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+		"SELF_SIGNED_CERT_IN_CHAIN",
+		"ERR_TLS_CERT_ALTNAME_INVALID",
+		"UND_ERR_CONNECT_TIMEOUT",
+		"UND_ERR_SOCKET"
+	];
+	function networkCode(error) {
+		if (typeof error !== "object" || error === null) return;
+		const value = error;
+		const code = value.cause?.code ?? value.code;
+		return systemCodes.find((known) => known === code);
+	}
+	function parseUpdateDiagnostic(value) {
+		if (value === void 0) return;
+		if (typeof value !== "object" || value === null) throw new TypeError("Invalid update diagnostic");
+		const data = value;
+		const stage = stages.find((item) => item === data.stage);
+		const reason = reasons.find((item) => item === data.reason);
+		if (!stage || !reason || typeof data.observedAt !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(data.observedAt) || !Number.isFinite(Date.parse(data.observedAt))) throw new TypeError("Invalid update diagnostic");
+		const result = {
+			stage,
+			reason,
+			observedAt: data.observedAt
+		};
+		for (const [key, minimum, maximum] of [
+			[
+				"httpStatus",
+				100,
+				599
+			],
+			[
+				"exitCode",
+				-2147483648,
+				2147483647
+			],
+			[
+				"elapsedMs",
+				0,
+				864e5
+			]
+		]) {
+			if (data[key] === void 0) continue;
+			if (!Number.isSafeInteger(data[key]) || Number(data[key]) < minimum || Number(data[key]) > maximum) throw new TypeError("Invalid update diagnostic");
+			result[key] = Number(data[key]);
+		}
+		if (data.systemCode !== void 0) {
+			const code = systemCodes.find((item) => item === data.systemCode);
+			if (!code) throw new TypeError("Invalid update diagnostic");
+			result.systemCode = code;
+		}
+		return result;
+	}
+	var UpdateFailure = class extends Error {
+		diagnostic;
+		constructor(key, diagnostic) {
+			super(key);
+			this.diagnostic = diagnostic;
+		}
+	};
+	function updateDiagnosticContext(diagnostic, version, phase, t) {
+		if (!diagnostic) return {
+			stage: "release.rpc",
+			result: t("pluginUpdateDiagnosticUnavailable"),
+			state: `PowerDSH ${version}; ${phase}`
+		};
+		return {
+			stage: `${diagnostic.stage} (${t(`pluginUpdateStage_${diagnostic.stage}`)})`,
+			check: diagnostic.stage === "git.tags" ? "git.ls-remote --tags" : diagnostic.stage.startsWith("release.") && diagnostic.stage !== "release.rpc" ? "github.HEAD" : diagnostic.stage.startsWith("market.") ? "dsh-market.update-api.v1" : void 0,
+			result: `${diagnostic.reason} (${t(`pluginUpdateReason_${diagnostic.reason}`)})`,
+			expected: diagnostic.stage === "git.tags" ? "exit 0; complete tag output" : diagnostic.stage === "release.latest" ? "HTTP 302; stable tag present in Git" : diagnostic.stage === "release.asset" ? "HTTP 302; official HTTPS asset redirect" : diagnostic.stage.startsWith("market.") ? "HTTP 2xx; dsh-market/update-api/v1" : void 0,
+			actual: [
+				diagnostic.httpStatus !== void 0 ? `HTTP ${diagnostic.httpStatus}` : "",
+				diagnostic.exitCode !== void 0 ? `exit ${diagnostic.exitCode}` : "",
+				diagnostic.systemCode,
+				diagnostic.elapsedMs !== void 0 ? `${diagnostic.elapsedMs} ms` : ""
+			].filter(Boolean).join("; ") || void 0,
+			state: `PowerDSH ${version}; ${phase}`,
+			recovery: t(diagnostic.reason === "not-found" ? "pluginUpdateRecoveryGit" : diagnostic.stage.startsWith("market.") ? "pluginUpdateRecoveryMarket" : diagnostic.reason === "tag-mismatch" || diagnostic.reason === "invalid-response" ? "pluginUpdateRecoveryRelease" : "pluginUpdateRecoveryNetwork")
+		};
+	}
+
 // src/features/plugin-updates/update-client.ts
 	const SCHEMA = "dsh-market/update-api/v1";
 	const API = "dsh-market/api/v1/";
@@ -717,7 +831,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			notice: "",
 			restartRequired: false,
 			refreshRequired: false,
-			pending: null
+			pending: null,
+			diagnostic: null
 		};
 		controller = null;
 		timer = null;
@@ -735,6 +850,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			if (this.closed) return;
 			this.state = {
 				...this.state,
+				...patch.error !== void 0 ? { diagnostic: null } : {},
 				...patch
 			};
 			this.options.notify();
@@ -749,7 +865,20 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			} catch (_error) {}
 			return this.githubRetryAt > (this.options.now?.() ?? Date.now());
 		}
+		failure(stage, reason, key = "pluginUpdateCheckFailed", details = {}) {
+			return new UpdateFailure(key, {
+				stage,
+				reason,
+				observedAt: (/* @__PURE__ */ new Date()).toISOString(),
+				...details
+			});
+		}
+		diagnostic(error, stage = "update.validation") {
+			return error instanceof UpdateFailure ? error.diagnostic : this.failure(stage, "unavailable").diagnostic;
+		}
 		async request(url, signal, body) {
+			const stage = body ? "market.submit" : url.includes("/capabilities") ? "market.capabilities" : url.includes("/operations?") ? "market.operation" : "market.updates";
+			const started = Date.now();
 			const timeout = new AbortController();
 			const timer = this.options.schedule(() => timeout.abort(), 15e3);
 			try {
@@ -763,29 +892,45 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					...body ? { body: JSON.stringify(body) } : {}
 				});
 				const text = await response.text();
-				if (text.length > 131072) problem("pluginUpdateCheckFailed");
+				if (text.length > 131072) throw this.failure(stage, "invalid-response", "pluginUpdateCheckFailed", { httpStatus: response.status });
 				if (!response.ok) {
-					if (response.status === 429) problem("pluginUpdateRateLimited");
-					problem(response.status === 404 || response.status === 405 ? "pluginUpdateApiUnavailable" : response.status === 401 || response.status === 403 ? "pluginUpdateDenied" : "pluginUpdateCheckFailed");
+					if (response.status === 429) throw this.failure(stage, "rate-limited", "pluginUpdateRateLimited", { httpStatus: response.status });
+					throw this.failure(stage, "http", response.status === 404 || response.status === 405 ? "pluginUpdateApiUnavailable" : response.status === 401 || response.status === 403 ? "pluginUpdateDenied" : "pluginUpdateCheckFailed", { httpStatus: response.status });
 				}
-				const data = JSON.parse(text);
-				if (!record(data) || data.schema !== "dsh-market/update-api/v1") problem("pluginUpdateApiUnavailable");
+				let data;
+				try {
+					data = JSON.parse(text);
+				} catch {
+					throw this.failure(stage, "invalid-response", "pluginUpdateApiUnavailable", { httpStatus: response.status });
+				}
+				if (!record(data) || data.schema !== "dsh-market/update-api/v1") throw this.failure(stage, "invalid-response", "pluginUpdateApiUnavailable", { httpStatus: response.status });
 				return data;
+			} catch (error) {
+				if (error instanceof UpdateFailure) throw error;
+				throw this.failure(stage, timeout.signal.aborted ? "timeout" : signal.aborted ? "cancelled" : "network", "pluginUpdateCheckFailed", {
+					elapsedMs: Date.now() - started,
+					systemCode: networkCode(error)
+				});
 			} finally {
 				this.options.cancel(timer);
 			}
 		}
 		async discover(signal) {
 			const data = await this.request(this.path("capabilities"), signal);
-			if (data.apiVersion !== 1 || !["beta", "stable"].includes(String(data.stability)) || !record(data.features) || !record(data.endpoints) || data.features.check !== true || data.features.progress !== true || data.endpoints.updates !== "/dsh-market/api/v1/updates" || data.endpoints.operations !== "/dsh-market/api/v1/operations" || typeof data.bootId !== "string" || !data.bootId || data.bootId.length > 128) problem("pluginUpdateApiUnavailable");
+			if (data.apiVersion !== 1 || !["beta", "stable"].includes(String(data.stability)) || !record(data.features) || !record(data.endpoints) || data.features.check !== true || data.features.progress !== true || data.endpoints.updates !== "/dsh-market/api/v1/updates" || data.endpoints.operations !== "/dsh-market/api/v1/operations" || typeof data.bootId !== "string" || !data.bootId || data.bootId.length > 128) throw this.failure("market.capabilities", "invalid-response", "pluginUpdateApiUnavailable");
 			return {
 				bootId: data.bootId,
 				update: data.features.update === true
 			};
 		}
 		async inspect(signal) {
-			if (this.githubCooldown()) problem("pluginUpdateRateLimited");
-			const release = await this.options.release(signal);
+			if (this.githubCooldown()) throw this.failure("release.rpc", "rate-limited", "pluginUpdateRateLimited");
+			let release;
+			try {
+				release = await this.options.release(signal);
+			} catch (error) {
+				throw error instanceof UpdateFailure ? error : this.failure("release.rpc", "unavailable");
+			}
 			signal.throwIfAborted();
 			if (release.status === "rate-limited") {
 				const now = this.options.now?.() ?? Date.now();
@@ -793,11 +938,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				try {
 					this.options.storage?.setItem("power-dsh:update:github-retry-at", String(this.githubRetryAt));
 				} catch (_error) {}
-				problem("pluginUpdateRateLimited");
+				throw new UpdateFailure("pluginUpdateRateLimited", release.diagnostic ?? this.failure("release.rpc", "rate-limited").diagnostic);
 			}
-			if (release.status !== "ready") problem(release.status === "git-unavailable" ? "pluginUpdateGitUnavailable" : "pluginUpdateCheckFailed");
+			if (release.status !== "ready") throw new UpdateFailure(release.status === "git-unavailable" ? "pluginUpdateGitUnavailable" : "pluginUpdateCheckFailed", release.diagnostic ?? this.failure("release.rpc", "unavailable").diagnostic);
 			const version = release.version;
-			if (!versionParts(version) || !/^[a-f0-9]{40}$/.test(release.commit)) problem("pluginUpdateCheckFailed");
+			if (!versionParts(version) || !/^[a-f0-9]{40}$/.test(release.commit)) throw this.failure("release.rpc", "invalid-response");
 			const comparison = compareVersions(version, this.options.version);
 			if (comparison === null) problem("pluginUpdateSource");
 			if (comparison <= 0) return {
@@ -806,7 +951,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			};
 			const capabilities = await this.discover(signal);
 			const item = (await this.request(`${this.path("updates")}?name=power-dsh&force=1`, signal)).package;
-			if (!record(item) || item.name !== "power-dsh" || typeof item.updateAvailable !== "boolean") problem("pluginUpdateCheckFailed");
+			if (!record(item) || item.name !== "power-dsh" || typeof item.updateAvailable !== "boolean") throw this.failure("market.updates", "invalid-response");
 			if (item.source !== "github" && item.source !== "npm") problem("pluginUpdateSource");
 			if (!capabilities.update || !item.updateAvailable || typeof item.installedVersion !== "string" || !item.installedVersion || item.installedVersion.length > 128 || typeof item.latestVersion !== "string" || item.latestVersion.length > 128) return {
 				target: null,
@@ -835,6 +980,14 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		}
 		errorKey(error) {
 			const key = error instanceof Error ? error.message : "";
+			if (key === "pluginUpdateCheckFailed" && error instanceof UpdateFailure) {
+				const { stage, reason } = error.diagnostic;
+				if (reason === "timeout") return "pluginUpdateTimeout";
+				if (stage === "git.tags") return "pluginUpdateGitFailed";
+				if (stage === "release.latest") return "pluginUpdateReleaseFailed";
+				if (stage === "release.asset") return "pluginUpdateAssetFailed";
+				if (reason === "network") return "pluginUpdateNetworkFailed";
+			}
 			return [
 				"pluginUpdateApiUnavailable",
 				"pluginUpdateDenied",
@@ -864,7 +1017,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			} catch (error) {
 				if (sequence === this.sequence) this.publish({
 					phase: "error",
-					error: this.errorKey(error)
+					error: this.errorKey(error),
+					diagnostic: this.diagnostic(error)
 				});
 			} finally {
 				if (sequence === this.sequence) {
@@ -924,7 +1078,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				if (sequence === this.sequence) this.publish({
 					phase: "error",
 					target: null,
-					error: submitted ? "pluginUpdateUnknown" : this.errorKey(error)
+					error: submitted ? "pluginUpdateUnknown" : this.errorKey(error),
+					diagnostic: this.diagnostic(error, submitted ? "market.submit" : "update.validation")
 				});
 			} finally {
 				if (sequence === this.sequence) {
@@ -984,10 +1139,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			try {
 				const reply = await this.request(`${this.path("operations")}?operationId=${encodeURIComponent(pending.operationId)}`, controller.signal);
 				if (sequence === this.sequence && this.options.canUse()) this.observe(reply.operation);
-			} catch (_error) {
+			} catch (error) {
 				if (sequence === this.sequence) this.publish({
 					phase: "error",
-					error: "pluginUpdateUnknown"
+					error: "pluginUpdateUnknown",
+					diagnostic: this.diagnostic(error, "market.operation")
 				});
 			} finally {
 				if (sequence === this.sequence) {
@@ -1034,14 +1190,16 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 						phase: "error",
 						pending: null,
 						target: null,
-						error: "pluginUpdateUnknown"
+						error: "pluginUpdateUnknown",
+						diagnostic: this.failure("update.resume", "identity-changed").diagnostic
 					});
 					return;
 				}
-			} catch (_error) {
+			} catch (error) {
 				if (sequence === this.sequence) this.publish({
 					phase: "error",
-					error: "pluginUpdateUnknown"
+					error: "pluginUpdateUnknown",
+					diagnostic: this.diagnostic(error, "update.resume")
 				});
 				return;
 			} finally {
@@ -1078,9 +1236,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	function createClientFeature$21(runtime, env) {
 		const { React, h, Button, Modal, observable, useSnapshot, errorFeedback } = runtime;
 		const { ctx, source, t, pluginVersion } = env;
+		let settingsVisible = false;
 		const canUse = () => {
 			const snapshot = source.getSnapshot();
-			return snapshot.status === "ready" && snapshot.writable && snapshot.value?.pluginUpdatesEnabled === true;
+			return settingsVisible && snapshot.status === "ready" && snapshot.writable;
 		};
 		let storage;
 		try {
@@ -1104,11 +1263,12 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		});
 		const updateSource = observable(() => updates.state);
 		ctx.effect(() => () => updates.close());
-		function useSettingsFooter({ snapshot, id }) {
+		function useSettingsFooter({ snapshot, activeTab, id }) {
 			const state = useSnapshot(updateSource);
 			const [confirming, setConfirming] = React.useState(null);
 			const confirmation = React.useRef(null);
-			const visible = snapshot.status === "ready" && snapshot.value?.pluginUpdatesEnabled === true;
+			const visible = activeTab === "general" && snapshot.status === "ready";
+			settingsVisible = visible;
 			const writable = visible && snapshot.writable;
 			const close = () => {
 				confirmation.current = null;
@@ -1133,27 +1293,15 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				close();
 				updates.update(expected);
 			};
-			return h("footer", {
-				className: "power-dsh-plugin-update",
+			return h("div", {
+				className: "power-dsh-setting-row power-dsh-plugin-update",
 				key: "plugin-updates",
-				"aria-label": t("pluginUpdateConfirm")
-			}, h("div", { className: "power-dsh-plugin-update-row" }, h("span", null, `PowerDSH ${pluginVersion}`), h("div", { className: "power-dsh-plugin-update-actions" }, h(Button, {
-				size: "sm",
-				variant: "outline",
-				disabled: !writable || busy || Boolean(state.pending) || state.error === "pluginUpdateUnknown",
-				"aria-busy": state.phase === "checking",
-				onClick: () => updates.check()
-			}, t(state.phase === "checking" ? "pluginUpdateChecking" : "pluginUpdateCheck")), state.phase === "available" && state.target && h(Button, {
-				size: "sm",
-				variant: "primary",
-				disabled: !writable || busy,
-				onClick: () => {
-					if (canUse() && updates.state.target) {
-						confirmation.current = { target: updates.state.target };
-						setConfirming(updates.state.target);
-					}
-				}
-			}, `${t("pluginUpdateAction")} ${state.target.version}`))), state.target && h("a", {
+				role: "group",
+				"aria-label": t("pluginUpdateVersion")
+			}, h("div", { className: "power-dsh-setting-copy" }, h("div", { className: "power-dsh-setting-label" }, t("pluginUpdateVersion")), h("div", { className: "power-dsh-description power-dsh-plugin-version" }, h("span", null, pluginVersion), state.phase === "current" && h("span", {
+				className: "power-dsh-plugin-status",
+				role: "status"
+			}, t("pluginUpdateCurrent"))), state.target && h("a", {
 				href: state.target.url,
 				target: "_blank",
 				rel: "noopener noreferrer"
@@ -1162,14 +1310,13 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				target: "_blank",
 				rel: "noopener noreferrer"
 			}, t("pluginUpdateReleaseNotes")), [
-				"current",
 				"unconfirmed",
 				"updating",
 				"done"
 			].includes(state.phase) && h("p", {
 				className: "power-dsh-description",
 				role: "status"
-			}, state.phase === "done" ? `${t("pluginUpdateDone")} ${state.target?.version || ""}` : t(state.phase === "current" ? "pluginUpdateCurrent" : state.phase === "unconfirmed" ? "pluginUpdateUnconfirmed" : "pluginUpdateRunning")), state.notice && h("p", { className: "power-dsh-description" }, t(state.notice)), state.phase === "done" && state.restartRequired && h("p", { className: "power-dsh-description" }, t("pluginUpdateRestart")), state.phase === "done" && state.refreshRequired && h(Button, {
+			}, state.phase === "done" ? `${t("pluginUpdateDone")} ${state.target?.version || ""}` : t(state.phase === "unconfirmed" ? "pluginUpdateUnconfirmed" : "pluginUpdateRunning")), state.notice && h("p", { className: "power-dsh-description" }, t(state.notice)), state.phase === "done" && state.restartRequired && h("p", { className: "power-dsh-description" }, t("pluginUpdateRestart")), state.phase === "done" && state.refreshRequired && h(Button, {
 				size: "sm",
 				variant: "outline",
 				onClick: () => window.location.reload()
@@ -1179,8 +1326,26 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				message: t(state.error),
 				code: "PD-PLUGIN-UPDATE",
 				operation: state.pending ? "pluginUpdate.observe" : "pluginUpdate.check",
-				retry: state.pending ? () => updates.resume() : state.error === "pluginUpdateUnknown" ? void 0 : () => updates.check()
-			}), h(Modal, {
+				observedAt: state.diagnostic?.observedAt,
+				context: updateDiagnosticContext(state.diagnostic, pluginVersion, state.phase, t),
+				retry: state.pending ? () => updates.resume() : void 0
+			})), h("div", { className: "power-dsh-plugin-update-actions" }, h(Button, {
+				size: "md",
+				variant: "outline",
+				disabled: !writable || busy || Boolean(state.pending) || state.error === "pluginUpdateUnknown",
+				"aria-busy": state.phase === "checking",
+				onClick: () => updates.check()
+			}, t(state.phase === "checking" ? "pluginUpdateChecking" : "pluginUpdateCheck")), state.phase === "available" && state.target && h(Button, {
+				size: "md",
+				variant: "primary",
+				disabled: !writable || busy,
+				onClick: () => {
+					if (canUse() && updates.state.target) {
+						confirmation.current = { target: updates.state.target };
+						setConfirming(updates.state.target);
+					}
+				}
+			}, `${t("pluginUpdateAction")} ${state.target.version}`)), h(Modal, {
 				open: Boolean(confirming) && writable && state.target === confirming,
 				onClose: close,
 				title: t("pluginUpdateConfirm"),
@@ -1198,14 +1363,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			}, h("p", null, `${pluginVersion} → ${confirming?.version || ""}`)));
 		}
 		return {
-			settings: [{
-				field: "pluginUpdatesEnabled",
-				description: "pluginUpdatesDescription"
-			}],
+			settings: [],
 			useSettingsFooter,
-			styles: `.power-dsh-plugin-update { margin-top:24px; padding-top:16px; border-top:.5px solid var(--dsw-alias-border-l2); font-size:13px; color:var(--dsw-alias-label-secondary); }
-.power-dsh-plugin-update-row,.power-dsh-plugin-update-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
-.power-dsh-plugin-update-row { justify-content:space-between; }
+			styles: `.power-dsh-plugin-update-actions { display:flex; align-items:center; align-self:flex-start; margin-top:3px; justify-content:flex-end; flex-wrap:wrap; flex:none; max-width:50%; gap:8px; }
+.power-dsh-plugin-version { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 8px; }
+.power-dsh-plugin-status { color:#4ade80; background:rgba(74,222,128,.14); border-radius:999px; padding:1px 8px; font-weight:600; }
 .power-dsh-plugin-update a { display:inline-block; margin-top:8px; color:var(--dsw-alias-state-business-primary); }`,
 			api: {
 				pluginUpdateSource: updateSource,
@@ -1219,22 +1381,21 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		id: "plugin-updates",
 		category: "other",
 		order: 100,
-		keys: Object.freeze(["pluginUpdatesEnabled"]),
+		keys: Object.freeze([]),
 		spec: "src/features/plugin-updates/spec.md"
 	});
 
 // src/features/plugin-updates/locales.ts
 	const locales$22 = {
 		zh: {
-			pluginUpdatesEnabled: "显示插件更新入口",
-			pluginUpdatesDescription: "在设置页底部手动检查 PowerDSH 更新",
+			pluginUpdateVersion: "插件版本",
 			pluginUpdateCheck: "检查更新",
 			pluginUpdateChecking: "正在检查…",
 			pluginUpdateAction: "更新",
 			pluginUpdateConfirm: "更新 PowerDSH",
 			pluginUpdateConfirmDescription: "由插件市场完成安装，过程中插件可能重新加载。完成后可能需要刷新界面或重启 DSH。",
 			pluginUpdateReleaseNotes: "更新日志",
-			pluginUpdateCurrent: "当前版本无需更新",
+			pluginUpdateCurrent: "无需更新",
 			pluginUpdateUnconfirmed: "未确认可用更新，请到插件市场核对当前安装来源。",
 			pluginUpdateRunning: "插件市场正在处理更新…",
 			pluginUpdateDone: "已安装",
@@ -1246,7 +1407,46 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			pluginUpdateGitUnavailable: "当前 DSH 无法使用 Git 检查版本，请安装 Git 后重启 DSH，或直接查看 GitHub 发布页。",
 			pluginUpdateSource: "当前安装来源或版本无法安全更新，请在插件市场处理。",
 			pluginUpdateChanged: "更新目标或安装状态已变化，请重新检查并确认。",
-			pluginUpdateCheckFailed: "检查更新失败，请检查网络后重试。",
+			pluginUpdateCheckFailed: "检查更新失败，请查看详情",
+			pluginUpdateGitFailed: "无法读取远端版本标签，请查看详情后重试",
+			pluginUpdateReleaseFailed: "正式发布版本核验失败，请查看详情",
+			pluginUpdateAssetFailed: "安装包核验失败，请查看详情",
+			pluginUpdateNetworkFailed: "更新服务连接失败，请查看详情后重试",
+			pluginUpdateTimeout: "检查更新超时，请稍后重试",
+			pluginUpdateDiagnosticUnavailable: "宿主未返回具体失败原因，请确认已加载新版插件",
+			"pluginUpdateStage_release.rpc": "读取宿主版本查询结果",
+			"pluginUpdateStage_git.resolve": "查找 Git",
+			"pluginUpdateStage_git.tags": "读取远端 Git 标签",
+			"pluginUpdateStage_release.latest": "核验 GitHub 正式 Release",
+			"pluginUpdateStage_release.asset": "核验正式安装包",
+			"pluginUpdateStage_market.capabilities": "发现市场更新接口",
+			"pluginUpdateStage_market.updates": "读取市场更新目标",
+			"pluginUpdateStage_market.submit": "提交市场更新任务",
+			"pluginUpdateStage_market.operation": "读取市场任务进度",
+			"pluginUpdateStage_update.validation": "核验更新状态",
+			"pluginUpdateStage_update.resume": "恢复更新进度",
+			"pluginUpdateReason_unavailable": "所需服务不可用或未返回具体原因",
+			"pluginUpdateReason_not-found": "未找到 Git 可执行文件",
+			"pluginUpdateReason_process-exit": "Git 未正常完成",
+			"pluginUpdateReason_incomplete-output": "Git 输出缺失或被截断",
+			"pluginUpdateReason_http": "HTTP 状态不符合预期",
+			"pluginUpdateReason_invalid-response": "返回内容或跳转不符合预期",
+			"pluginUpdateReason_tag-mismatch": "正式 Release 与远端标签不一致",
+			"pluginUpdateReason_timeout": "操作超过等待期限",
+			"pluginUpdateReason_cancelled": "操作已取消",
+			"pluginUpdateReason_network": "网络或传输请求失败",
+			"pluginUpdateReason_dns": "Git 无法解析远端主机名",
+			"pluginUpdateReason_proxy": "Git 代理连接或认证失败",
+			"pluginUpdateReason_certificate": "Git 证书核验失败",
+			"pluginUpdateReason_authentication": "Git 要求认证，匿名版本查询未完成",
+			"pluginUpdateReason_connection": "Git 连接被拒绝、重置或超时",
+			"pluginUpdateReason_rate-limited": "服务限流，当前请求已暂停",
+			"pluginUpdateReason_identity-changed": "市场实例已变化",
+			"pluginUpdateReason_unknown-result": "无法确认任务结果",
+			pluginUpdateRecoveryGit: "安装 Git 后重启 DSH，再手动检查",
+			pluginUpdateRecoveryMarket: "核对市场是否启用、支持公开更新接口及当前管理权限；已提交的任务请先在市场确认结果",
+			pluginUpdateRecoveryRelease: "到 GitHub 发布页核对正式版本及 power-dsh.tgz 附件，稍后重新检查",
+			pluginUpdateRecoveryNetwork: "检查 DSH 进程访问 GitHub 的网络、代理与证书配置，再手动重试",
 			pluginUpdateUnknown: "无法确认更新结果，请到插件市场查看，避免重复安装。",
 			pluginUpdateStorage: "进度无法在刷新后保留，请在插件市场查看更新结果。",
 			pluginUpdateFailed: "更新未成功，请到插件市场查看原因和恢复操作。",
@@ -1255,15 +1455,14 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			pluginUpdateResume: "重新查询进度"
 		},
 		en: {
-			pluginUpdatesEnabled: "Show plugin update controls",
-			pluginUpdatesDescription: "Manually check PowerDSH updates at the bottom of settings",
+			pluginUpdateVersion: "Plugin version",
 			pluginUpdateCheck: "Check for updates",
 			pluginUpdateChecking: "Checking…",
 			pluginUpdateAction: "Update",
 			pluginUpdateConfirm: "Update PowerDSH",
 			pluginUpdateConfirmDescription: "The plugin market handles installation. The plugin may reload during the update, and DSH may need a refresh or restart afterward.",
 			pluginUpdateReleaseNotes: "Release notes",
-			pluginUpdateCurrent: "No update needed for this version",
+			pluginUpdateCurrent: "No update needed",
 			pluginUpdateUnconfirmed: "No update target confirmed. Check the installation source in the plugin market.",
 			pluginUpdateRunning: "The plugin market is processing the update…",
 			pluginUpdateDone: "Installed",
@@ -1275,7 +1474,46 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			pluginUpdateGitUnavailable: "Git is unavailable to DSH. Install Git and restart DSH, or check the GitHub releases page.",
 			pluginUpdateSource: "This installation source or version cannot be updated safely here. Use the plugin market.",
 			pluginUpdateChanged: "The update target or installation changed. Check again and confirm the new target.",
-			pluginUpdateCheckFailed: "Could not check for updates. Check your connection and retry.",
+			pluginUpdateCheckFailed: "Could not check for updates. See details",
+			pluginUpdateGitFailed: "Could not read remote version tags. See details and retry",
+			pluginUpdateReleaseFailed: "Could not verify the official release. See details",
+			pluginUpdateAssetFailed: "Could not verify the release asset. See details",
+			pluginUpdateNetworkFailed: "Could not connect to the update service. See details and retry",
+			pluginUpdateTimeout: "The update check timed out. Try again later",
+			pluginUpdateDiagnosticUnavailable: "The Host returned no specific cause. Confirm it has loaded the latest plugin",
+			"pluginUpdateStage_release.rpc": "Read the Host release lookup result",
+			"pluginUpdateStage_git.resolve": "Find Git",
+			"pluginUpdateStage_git.tags": "Read remote Git tags",
+			"pluginUpdateStage_release.latest": "Verify the official GitHub release",
+			"pluginUpdateStage_release.asset": "Verify the release asset",
+			"pluginUpdateStage_market.capabilities": "Discover the market update API",
+			"pluginUpdateStage_market.updates": "Read the market update target",
+			"pluginUpdateStage_market.submit": "Submit the market update",
+			"pluginUpdateStage_market.operation": "Read market operation progress",
+			"pluginUpdateStage_update.validation": "Validate update state",
+			"pluginUpdateStage_update.resume": "Resume update progress",
+			"pluginUpdateReason_unavailable": "Required service unavailable or no specific cause returned",
+			"pluginUpdateReason_not-found": "Git executable not found",
+			"pluginUpdateReason_process-exit": "Git did not exit successfully",
+			"pluginUpdateReason_incomplete-output": "Git output missing or truncated",
+			"pluginUpdateReason_http": "Unexpected HTTP status",
+			"pluginUpdateReason_invalid-response": "Unexpected response or redirect",
+			"pluginUpdateReason_tag-mismatch": "Official release does not match remote tags",
+			"pluginUpdateReason_timeout": "Operation exceeded its deadline",
+			"pluginUpdateReason_cancelled": "Operation cancelled",
+			"pluginUpdateReason_network": "Network or transport request failed",
+			"pluginUpdateReason_dns": "Git could not resolve the remote host",
+			"pluginUpdateReason_proxy": "Git proxy connection or authentication failed",
+			"pluginUpdateReason_certificate": "Git certificate verification failed",
+			"pluginUpdateReason_authentication": "Git requested authentication; anonymous version lookup did not complete",
+			"pluginUpdateReason_connection": "Git connection refused, reset or timed out",
+			"pluginUpdateReason_rate-limited": "Service rate limit; request paused",
+			"pluginUpdateReason_identity-changed": "Market instance changed",
+			"pluginUpdateReason_unknown-result": "Operation result could not be confirmed",
+			pluginUpdateRecoveryGit: "Install Git, restart DSH, then check manually",
+			pluginUpdateRecoveryMarket: "Check market availability, public update API support and management permissions; confirm submitted tasks in the market first",
+			pluginUpdateRecoveryRelease: "Verify the official release and power-dsh.tgz asset on GitHub, then check again later",
+			pluginUpdateRecoveryNetwork: "Check network, proxy and certificate settings used by the DSH process to access GitHub, then retry manually",
 			pluginUpdateUnknown: "The update result is unknown. Check the plugin market before installing again.",
 			pluginUpdateStorage: "Progress cannot survive a refresh. Check the update result in the plugin market.",
 			pluginUpdateFailed: "The update did not succeed. Check the plugin market for details and recovery.",
@@ -1324,10 +1562,14 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					version: value.version,
 					commit: value.commit
 				};
-				if (isOneOf(value.status, ["unavailable", "git-unavailable"])) return { status: value.status };
+				if (isOneOf(value.status, ["unavailable", "git-unavailable"])) return {
+					status: value.status,
+					...value.diagnostic === void 0 ? {} : { diagnostic: parseUpdateDiagnostic(value.diagnostic) }
+				};
 				if (value.status === "rate-limited" && Number.isSafeInteger(value.retryAt) && Number(value.retryAt) > 0) return {
 					status: value.status,
-					retryAt: Number(value.retryAt)
+					retryAt: Number(value.retryAt),
+					...value.diagnostic === void 0 ? {} : { diagnostic: parseUpdateDiagnostic(value.diagnostic) }
 				};
 				throw new TypeError("Invalid plugin release");
 			} })
@@ -2293,6 +2535,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					t,
 					message: current.error,
 					code: "PD-MCP-DETAIL",
+					placement: "modal",
 					operation: "readMcpServer",
 					retry: () => {
 						if (server) openDetail(server, detailTrigger.current);
@@ -2672,17 +2915,17 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 .power-dsh-notification-test:focus-visible { outline:2px solid var(--dsw-alias-state-business-primary); outline-offset:2px; }
 .power-dsh-notification-test:disabled { opacity:.45; cursor:default; }
 .power-dsh-page .power-dsh-sound-controls { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; flex:none; max-width:50%; }
-.power-dsh-page .power-dsh-mode-select { box-sizing:border-box; display:inline-flex; align-items:center; min-height:36px; padding:0 14px; border:0; border-radius:var(--dsw-radius-md); background:var(--dsw-alias-bg-module-platform); color:var(--dsw-alias-label-primary); font:inherit; font-size:14px; cursor:pointer; }
-.power-dsh-page .power-dsh-mode-select:disabled { opacity:.5; cursor:default; }
-.power-dsh-page .power-dsh-mode-select:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
-.power-dsh-page .power-dsh-sound-select { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; gap:12px; min-height:36px; max-width:100%; padding:0 14px; border:0; border-radius:var(--dsw-radius-md); background:var(--dsw-alias-bg-module-platform); color:var(--dsw-alias-label-primary); font:inherit; font-size:14px; line-height:22px; cursor:pointer; }
+.power-dsh-page .power-dsh-mode-select, .power-dsh-page .power-dsh-sound-select { box-sizing:border-box; display:inline-flex; align-items:center; gap:12px; height:36px; max-width:100%; padding:0 14px; border:0; border-radius:var(--dsw-radius-md); background:var(--dsw-alias-bg-module-platform); color:var(--dsw-alias-label-primary); font:inherit; font-size:14px; line-height:22px; cursor:pointer; }
+.power-dsh-page .power-dsh-notification-select-label { min-width:0; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.power-dsh-page .power-dsh-notification-select-icon { flex:none; }
+.power-dsh-page .power-dsh-mode-select:disabled, .power-dsh-page .power-dsh-sound-select:disabled { opacity:.5; cursor:default; }
+.power-dsh-page .power-dsh-mode-select:focus-visible, .power-dsh-page .power-dsh-sound-select:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
+.power-dsh-page .power-dsh-mode-select:active:not(:disabled), .power-dsh-page .power-dsh-sound-select:active:not(:disabled) { background:var(--dsw-alias-interactive-bg-active); }
+@media (hover:hover) { .power-dsh-page .power-dsh-mode-select:hover:not(:disabled), .power-dsh-page .power-dsh-sound-select:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover); } }
 .power-dsh-page .power-dsh-sound-preview { display:inline-flex; align-items:center; justify-content:center; flex:none; width:36px; height:36px; padding:0; border:0; border-radius:var(--dsw-radius-md); background:transparent; color:var(--dsw-alias-label-secondary); cursor:pointer; }
 .power-dsh-page .power-dsh-sound-preview:disabled { opacity:.5; cursor:default; }
 .power-dsh-page .power-dsh-sound-preview:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
 @media (hover:hover) { .power-dsh-page .power-dsh-sound-preview:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover); } }
-.power-dsh-page .power-dsh-sound-select:disabled { opacity:.5; cursor:default; }
-.power-dsh-page .power-dsh-sound-select:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
-@media (hover:hover) { .power-dsh-page .power-dsh-sound-select:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover); } }
 `;
 
 // src/features/notifications/client.ts
@@ -2697,8 +2940,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			status: "loading",
 			value: null,
 			local: false,
-			testing: false,
-			tested: false
+			testing: false
 		};
 		let transportGeneration = 0;
 		const transportSource = observable(() => transport);
@@ -2801,7 +3043,6 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 								return;
 							}
 							if (reply.value.shown) reportError("");
-							if (manual && reply.value.shown) publishTransport({ tested: true });
 							if (reply.value.shown && localTone) try {
 								await playSound(sound, false);
 							} catch (_error) {
@@ -2846,10 +3087,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 							resolve();
 						});
 						notification.onshow = () => {
-							if (active) {
-								reportError("");
-								publishTransport({ tested: true });
-							}
+							if (active) reportError("");
 							pendingTests.get(notification)?.();
 						};
 					});
@@ -3230,6 +3468,14 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				if (snapshot.value?.notificationsEnabled !== true || snapshot.value.notificationMode === "never") setSoundMenuOpen(false);
 			}, [snapshot.value?.notificationsEnabled, snapshot.value?.notificationMode]);
 			const soundName = (sound) => sound.id === "default" ? t("notificationSoundDefault") : sound.id.startsWith("win:") ? t(`sound${sound.id.slice(4)}`) : sound.name;
+			const selectorChevron = () => h("svg", {
+				width: 16,
+				height: 16,
+				className: "power-dsh-notification-select-icon",
+				"data-icon": "dsw-icon-chevron-down-outline-regular",
+				"aria-hidden": true,
+				focusable: false
+			}, h("use", { href: "#dsw-icon-chevron-down-outline-regular" }));
 			const mode = snapshot.value?.notificationsEnabled === true ? snapshot.value.notificationMode || "background" : "never";
 			function modeRow() {
 				const busy = saving?.field === "notificationMode";
@@ -3265,7 +3511,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					type: "button",
 					className: "power-dsh-notification-test",
 					disabled: disabled || busy || !notificationReady || !transportReady() || channel.testing || mode === "never",
-					title: t(channel.tested ? "notificationTestSent" : "notificationTest"),
+					title: t("notificationTest"),
 					"aria-label": t("notificationTest"),
 					"aria-busy": channel.testing,
 					onClick: testNotification
@@ -3280,7 +3526,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					strokeLinejoin: "round",
 					"aria-hidden": true,
 					focusable: false
-				}, channel.tested ? h("path", { d: "m5 12 4 4L19 6" }) : h(React.Fragment, null, h("path", { d: "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" })))), h(Menu, {
+				}, h("path", { d: "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" }))), h(Menu, {
 					open: modeMenuOpen && !disabled && !busy,
 					onClose: () => setModeMenuOpen(false),
 					selectedId: mode,
@@ -3311,18 +3557,15 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 						"aria-invalid": Boolean(failed || notifications.error),
 						"aria-busy": busy,
 						onClick: () => {
-							if (!disabled && !busy) setModeMenuOpen(true);
+							if (!disabled && !busy) setModeMenuOpen((value) => !value);
 						}
-					}, modeLabel(mode))
+					}, h("span", { className: "power-dsh-notification-select-label" }, modeLabel(mode)), selectorChevron())
 				})));
 			}
 			const testNotification = async () => {
 				const current = source.getSnapshot();
 				if (!active || current.status !== "ready" || !current.writable || current.value?.notificationsEnabled !== true || current.value.notificationMode === "never" || !transportReady() || transport.testing || !testSender) return;
-				publishTransport({
-					testing: true,
-					tested: false
-				});
+				publishTransport({ testing: true });
 				try {
 					await testSender();
 				} finally {
@@ -3415,18 +3658,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 						onClick: () => {
 							if (!soundDisabled) setSoundMenuOpen((value) => !value);
 						}
-					}, sounds.status === "remote" ? t("notificationSoundDefault") : current ? soundName(current) : t(sounds.status === "ready" ? "notificationSoundMissing" : "notificationSoundDefault"), h("svg", {
-						width: 16,
-						height: 16,
-						viewBox: "0 0 16 16",
-						fill: "none",
-						stroke: "currentColor",
-						strokeWidth: 1.4,
-						strokeLinecap: "round",
-						strokeLinejoin: "round",
-						"aria-hidden": true,
-						focusable: false
-					}, h("path", { d: "m4 6 4 4 4-4" })))
+					}, h("span", { className: "power-dsh-notification-select-label" }, sounds.status === "remote" ? t("notificationSoundDefault") : current ? soundName(current) : t(sounds.status === "ready" ? "notificationSoundMissing" : "notificationSoundDefault")), selectorChevron())
 				}), h("button", {
 					type: "button",
 					className: "power-dsh-sound-preview",
@@ -3513,7 +3745,6 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"notificationBackground": "When not focused",
 			"notificationAlways": "Always",
 			"notificationTest": "Send test notification",
-			"notificationTestSent": "Submitted to the system",
 			"notificationTestUnconfirmed": "Notification delivery has not been confirmed. Check Notification Center, Focus, and notifications during screen sharing.",
 			"notificationTestBody": "PowerDSH notification delivery test",
 			"notificationNative": "Windows native notifications",
@@ -3558,7 +3789,6 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"notificationBackground": "仅在未聚焦时提醒",
 			"notificationAlways": "始终提醒",
 			"notificationTest": "发送测试通知",
-			"notificationTestSent": "已交给系统",
 			"notificationTestUnconfirmed": "尚未确认通知投递，请检查通知中心、专注模式和共享屏幕时的通知设置。",
 			"notificationTestBody": "PowerDSH 通知发送测试",
 			"notificationNative": "Windows 原生通知",
@@ -4098,9 +4328,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	function createClientFeature$13(runtime, env) {
 		const { React, h, Modal, Button, observable, useSnapshot } = runtime;
 		const { ctx, form, source, t } = env;
-		function isMacDesktop() {
-			return window.dshDesktop?.protocolVersion === 1 && window.location.protocol === "dsh-app:" && document.documentElement.getAttribute("data-platform") === "darwin";
+		function isDesktop() {
+			return window.dshDesktop?.protocolVersion === 1 && window.location.protocol === "dsh-app:" && ["darwin", "win32"].includes(document.documentElement.getAttribute("data-platform") || "");
 		}
+		let connection = null;
+		const isLocalDesktop = () => isDesktop() && connection?.isLoopback === true && connection.generation.getSnapshot() !== void 0;
 		let active = true;
 		ctx.effect(() => () => {
 			active = false;
@@ -4123,7 +4355,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			restartSource.notify();
 		};
 		const loadRestartStatus = async () => {
-			if (!active || !isMacDesktop() || restartReadPending || restartWritePending) return;
+			if (!active || !isLocalDesktop() || restartReadPending || restartWritePending) return;
 			restartReadPending = true;
 			const generation = restartGeneration;
 			try {
@@ -4138,7 +4370,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			}
 		};
 		const restartApp = async () => {
-			if (!active || !isMacDesktop() || restartWritePending || restartState.running || !restartState.supported || form.getSnapshot().value?.showRestartButton !== true) return;
+			if (!active || !isLocalDesktop() || restartWritePending || restartState.running || !restartState.supported || form.getSnapshot().value?.showRestartButton !== true) return;
 			restartWritePending = true;
 			restartGeneration++;
 			publishRestart({
@@ -4159,17 +4391,36 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				if (active && restartState.running) loadRestartStatus();
 			}
 		};
+		ctx.inject(["connection"], (child) => {
+			child.effect(() => {
+				connection = child.connection;
+				publishRestart({ supported: false });
+				return () => {
+					connection = null;
+					restartGeneration++;
+					publishRestart({ supported: false });
+				};
+			});
+		});
 		function useHeaderAction({ wide, latestWide, mounted }) {
 			const config = useSnapshot(source);
 			const status = useSnapshot(restartSource);
-			const requested = wide && config.status === "ready" && config.value?.showRestartButton === true && isMacDesktop();
-			const visible = requested && status.supported;
+			const requested = wide && config.status === "ready" && config.value?.showRestartButton === true && isDesktop() && connection?.isLoopback === true;
+			const visible = requested && isLocalDesktop() && status.supported;
 			React.useEffect(() => {
 				if (!requested) return;
 				loadRestartStatus();
 				const timer = window.setInterval(loadRestartStatus, 2e3);
-				return () => window.clearInterval(timer);
-			}, [requested]);
+				const dispose = connection?.generation.subscribe(() => {
+					restartGeneration++;
+					publishRestart({ supported: false });
+					if (isLocalDesktop()) loadRestartStatus();
+				});
+				return () => {
+					window.clearInterval(timer);
+					dispose?.();
+				};
+			}, [requested, connection]);
 			const [confirming, setConfirming] = React.useState(false);
 			const confirmation = React.useRef(false);
 			const closeConfirmation = () => {
@@ -4182,7 +4433,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			const canUse = () => {
 				const current = source.getSnapshot();
 				const status = restartSource.getSnapshot();
-				return mounted.current && latestWide.current && current.status === "ready" && current.value?.showRestartButton === true && isMacDesktop() && status.supported && !status.running;
+				return mounted.current && latestWide.current && current.status === "ready" && current.value?.showRestartButton === true && isLocalDesktop() && status.supported && !status.running;
 			};
 			const request = confirmation.current;
 			const confirmRestart = () => {
@@ -4209,7 +4460,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					onClose: closeConfirmation,
 					title: t("restart"),
 					closeLabel: t("close"),
-					description: t("restartConfirm"),
+					description: t(document.documentElement.getAttribute("data-platform") === "win32" ? "restartWindowsConfirm" : "restartConfirm"),
 					footer: h(React.Fragment, null, h(Button, {
 						variant: "outline",
 						"data-modal-autofocus": true,
@@ -4226,7 +4477,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			settings: [{
 				field: "showRestartButton",
 				description: "restartDescription",
-				hidden: !isMacDesktop()
+				hidden: !isDesktop()
 			}],
 			headerAction: useHeaderAction,
 			api: {
@@ -4253,8 +4504,9 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"restartDescription": "Restart the application",
 			"restart": "Restart application",
 			"restartConfirm": "Running tasks will stop and unsaved content may be lost.",
+			"restartWindowsConfirm": "This will force-close the current DSH instance and its child processes, then reopen it. Running tasks will stop and unsaved content may be lost.",
 			"restartAction": "Restart application",
-			"restartFailed": "Could not restart DSH. Check whether quitting was cancelled, then try again.",
+			"restartFailed": "Could not restart DSH. Check whether the application is still running, then try again or reopen it manually.",
 			"restartUnavailable": "Restart is unavailable. Re-enable PowerDSH and try again.",
 			"restartBusy": "DSH is already preparing to restart."
 		},
@@ -4263,8 +4515,9 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"restartDescription": "重新启动应用",
 			"restart": "重启应用",
 			"restartConfirm": "运行中的任务会停止，未保存的内容可能丢失。",
+			"restartWindowsConfirm": "将强制关闭当前 DSH 及其子进程后重新打开，运行中的任务会停止，未保存的内容可能丢失。",
 			"restartAction": "重启应用",
-			"restartFailed": "未能重启 DSH。请检查是否取消了退出，然后重试。",
+			"restartFailed": "未能重启 DSH。请检查应用是否仍在运行，再重试或手动打开。",
 			"restartUnavailable": "重启暂不可用，请重新启用 PowerDSH 后重试。",
 			"restartBusy": "DSH 正在准备重启。"
 		}
@@ -4359,17 +4612,21 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 .power-dsh-skills-page .power-dsh-tab:focus-visible { color:var(--dsw-alias-label-primary); }
 .power-dsh-skills-page .power-dsh-tab:focus-visible::after { position:absolute; right:0; bottom:-1px; left:0; height:2px; border-radius:2px 2px 0 0; background:var(--dsw-alias-label-primary); content:""; }
 @media (hover:hover) { .power-dsh-skills-page .power-dsh-tab:hover:not(:disabled) { color:var(--dsw-alias-label-primary); } }
-.power-dsh-skills-page .power-dsh-project-trigger { box-sizing:border-box; display:inline-flex; flex:none; align-items:center; gap:12px; width:200px; min-width:0; height:36px; max-width:100%; white-space:nowrap; border:0; border-radius:var(--dsw-radius-md); padding:0 14px; background:var(--dsw-alias-bg-module-platform); color:var(--dsw-alias-label-primary); font:inherit; font-size:14px; line-height:22px; cursor:pointer; }
-.power-dsh-skills-page .power-dsh-project-search-row { display:flex; align-items:center; flex-wrap:wrap; gap:12px; min-width:0; }
-.power-dsh-skills-page .power-dsh-project-search-row > .power-dsh-skill-search-field { flex:1 1 180px; min-width:0; width:auto; }
-.power-dsh-skills-page .power-dsh-project-menu { min-width:0; max-width:100%; }
-.power-dsh-skills-page .power-dsh-project-trigger-label { flex:1; min-width:0; overflow:hidden; text-align:left; text-overflow:ellipsis; }
-.power-dsh-skills-page .power-dsh-project-trigger > svg { flex:none; color:var(--dsw-alias-label-tertiary); }
-.power-dsh-skills-page .power-dsh-project-trigger:active:not(:disabled) { background:var(--dsw-alias-interactive-bg-active); }
-@media (hover:hover) { .power-dsh-skills-page .power-dsh-project-trigger:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover); } }
-.power-dsh-skills-page .power-dsh-project-trigger:focus-visible { outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
-.power-dsh-skills-page .power-dsh-project-trigger:disabled { opacity:.5; cursor:default; }
 .power-dsh-skills-page .power-dsh-skill-card-meta { justify-content:flex-end; }
+.power-dsh-skills-page .power-dsh-skill-group-toggle { flex:1; min-width:0; }
+.power-dsh-skills-page .power-dsh-skill-group-title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.power-dsh-skills-page .power-dsh-skill-group-count { flex:none; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; font-variant-numeric:tabular-nums; }
+.power-dsh-skills-page .power-dsh-skill-card-origin { flex:1 1 auto; min-width:0; overflow:hidden; color:var(--dsw-alias-label-tertiary); font-family:var(--ds-font-family-code); font-size:11px; line-height:17px; text-overflow:ellipsis; white-space:nowrap; }
+.power-dsh-skills-page .power-dsh-skill-card-detail:disabled { opacity:.5; cursor:default; }
+.power-dsh-skills-page .power-dsh-skill-card-detail:disabled:hover { background:transparent; }
+.power-dsh-skill-existing { flex:none; align-self:center; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
+.power-dsh-skill-detail .power-dsh-skill-delete { color:var(--dsw-alias-state-error-primary); }
+@media (hover:hover) { .power-dsh-skill-delete:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover-danger); } }
+.power-dsh-skills-page .power-dsh-skill-path-stack { position:relative; isolation:isolate; display:inline-block; max-width:calc(100% - 8px); padding:0 8px 8px 0; vertical-align:middle; }
+.power-dsh-skills-page .power-dsh-skill-path-stack::before,.power-dsh-skills-page .power-dsh-skill-path-stack::after { position:absolute; z-index:-1; border:.5px solid var(--dsw-alias-border-l3); border-radius:var(--dsw-radius-xs); content:""; pointer-events:none; }
+.power-dsh-skills-page .power-dsh-skill-path-stack::before { inset:4px; }
+.power-dsh-skills-page .power-dsh-skill-path-stack::after { inset:8px 0 0 8px; opacity:.6; }
+.power-dsh-skills-page .power-dsh-skill-path-label { display:block; overflow:hidden; border:.5px solid var(--dsw-alias-border-l3); border-radius:var(--dsw-radius-xs); background:var(--dsw-alias-settings-card-fill); padding:0 4px; text-overflow:ellipsis; }
 .power-dsh-skills-page .power-dsh-skill-card-detail { box-sizing:border-box; display:inline-flex; flex:none; align-items:center; justify-content:center; height:28px; padding:0 10px; border:.5px solid var(--dsw-alias-border-l3); border-radius:var(--dsw-radius-sm); background:transparent; color:var(--dsw-alias-label-primary); font:inherit; font-size:12px; line-height:18px; cursor:pointer; }
 .power-dsh-skills-page .power-dsh-skill-card-detail:active { background:var(--dsw-alias-interactive-bg-hover-solid); }
 @media (hover:hover) { .power-dsh-skills-page .power-dsh-skill-card-detail:hover { background:var(--dsw-alias-interactive-bg-hover-solid); } }
@@ -4377,6 +4634,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 /* One scrollable reading area keeps the full description and rendered body together. */
 .power-dsh-skill-detail { width:min(560px,100%); }
 .power-dsh-skill-detail .power-dsh-skill-detail-body { display:flex; flex-direction:column; gap:16px; min-width:0; max-height:min(60vh,560px); overflow:auto; padding-right:4px; }
+.power-dsh-skill-detail .power-dsh-skill-detail-body > * { flex-shrink:0; }
 .power-dsh-skill-detail .power-dsh-skill-detail-description { margin:0; font-size:13px; line-height:20px; white-space:pre-wrap; overflow-wrap:anywhere; }
 .power-dsh-skill-detail .power-dsh-skill-detail-list { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:baseline; gap:6px 16px; margin:0; }
 .power-dsh-skill-detail .power-dsh-skill-detail-row { display:contents; }
@@ -4387,6 +4645,18 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 .power-dsh-skill-detail .power-dsh-skill-detail-body:focus-visible { outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:-2px; }
 .power-dsh-skill-detail .power-dsh-skill-detail-empty { margin:0; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
 .power-dsh-skill-detail .power-dsh-notice { margin:0; color:var(--dsw-alias-label-tertiary); font-size:13px; line-height:20px; }
+.power-dsh-skills-page .power-dsh-skill-import-button { flex:none; }
+.power-dsh-skill-import-empty-title { margin:0; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }
+.power-dsh-skill-import-notice { display:flex; flex-wrap:wrap; align-items:center; gap:8px; color:var(--dsw-alias-label-secondary); font-size:12px; }
+.power-dsh-skill-detail .power-dsh-skill-path-select { display:flex; align-items:baseline; justify-content:space-between; gap:8px; width:100%; min-width:0; border:0; border-radius:var(--dsw-radius-xs); padding:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.power-dsh-skill-detail .power-dsh-skill-path-select > code { min-width:0; }
+.power-dsh-skill-detail .power-dsh-skill-path-select > svg { flex:none; }
+.power-dsh-skill-detail .power-dsh-skill-path-select:focus-visible { outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:3px; }
+.power-dsh-skill-detail .power-dsh-skill-path-select:disabled { cursor:default; opacity:.5; }
+.power-dsh-skill-import-confirmation { width:min(440px,100%); }
+.power-dsh-skill-detail .power-dsh-skill-target-select { display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; min-width:0; padding:6px 10px; border:.5px solid var(--dsw-alias-border-l3); border-radius:var(--dsw-radius-sm); background:transparent; color:var(--dsw-alias-label-primary); font:inherit; text-align:left; cursor:pointer; }
+.power-dsh-skill-detail .power-dsh-skill-target-select:focus-visible { outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); }
+.power-dsh-skill-detail .power-dsh-skill-target-select:disabled { opacity:.5; cursor:default; }
 `;
 
 // src/features/skills/client.ts
@@ -4421,32 +4691,66 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			if (source === "bundled" || source.startsWith("bundled-")) return "skillBundledSource";
 			return source;
 		}
-		function SkillsPage({ t, source, skillsSource, loadSkills, setSkillEnabled, readSkill }) {
+		function SkillsPage({ t, source, skillsSource, loadSkills, setSkillEnabled, readSkill, deleteSkill, listWorkspaceSkills, discoverSkills, readExternalSkill, readImportDestination, importSkills }) {
 			const config = useSnapshot(source);
 			const snapshot = useSnapshot(skillsSource);
 			const catalog = snapshot.value;
 			const scope = snapshot.scope || "user";
 			const scopeTabs = React.useRef({});
-			const [projectMenuOpen, setProjectMenuOpen] = React.useState(false);
+			const activeTab = React.useRef("user");
+			const [projectView, setProjectView] = React.useState(false);
 			const [query, setQuery] = React.useState("");
 			const [error, setError] = React.useState(null);
 			const [groupsOpen, setGroupsOpen] = React.useState({});
 			const [detail, setDetail] = React.useState(null);
+			const [deleteConfirm, setDeleteConfirm] = React.useState(false);
+			const deleteConfirmationRef = React.useRef(null);
+			const [deleteError, setDeleteError] = React.useState("");
+			const [deleting, setDeleting] = React.useState(false);
+			const [importView, setImportView] = React.useState(false);
+			const [importing, setImporting] = React.useState("");
+			const [importNotice, setImportNotice] = React.useState("");
+			const [importState, setImportState] = React.useState({ groups: {} });
+			const [importGroupsOpen, setImportGroupsOpen] = React.useState({});
+			const [externalDetail, setExternalDetail] = React.useState(null);
+			const [pathMenuOpen, setPathMenuOpen] = React.useState(false);
+			const [confirmation, setConfirmation] = React.useState(null);
+			const confirmationRef = React.useRef(null);
+			const [targetMenuOpen, setTargetMenuOpen] = React.useState(false);
+			const [workspaceState, setWorkspaceState] = React.useState({});
+			const [workspaceOpen, setWorkspaceOpen] = React.useState({});
+			const [workspaceSaving, setWorkspaceSaving] = React.useState(null);
+			const workspaceGeneration = React.useRef({});
+			const workspaceOpenRef = React.useRef({});
+			const importGeneration = React.useRef({});
 			const mounted = useMounted();
 			const pending = React.useRef(false);
 			const detailGeneration = React.useRef(0);
 			const detailTrigger = React.useRef(null);
 			const id = React.useId();
-			const busy = snapshot.status === "loading" || Boolean(snapshot.saving);
-			React.useEffect(() => {
-				setProjectMenuOpen(false);
-			}, [scope, busy]);
+			const busy = snapshot.status === "loading" || Boolean(snapshot.saving) || Boolean(workspaceSaving) || importing !== "" || deleting;
+			const tab = importView ? "sources" : projectView ? "project" : "user";
 			const writable = config.status === "ready" && config.writable && config.value?.skillManagerEnabled === true;
 			const disabled = busy || !writable || snapshot.status !== "ready" || !catalog?.complete;
+			const workspaces = snapshot.workspaces ?? [];
+			React.useEffect(() => {
+				if (!importNotice) return;
+				const timer = window.setTimeout(() => setImportNotice(""), 3e3);
+				return () => window.clearTimeout(timer);
+			}, [importNotice]);
+			React.useEffect(() => {
+				workspaceOpenRef.current = Object.fromEntries(workspaces.map((workspace) => [workspace.path, workspaceOpen[workspace.path] ?? true]));
+			}, [workspaces, workspaceOpen]);
+			React.useEffect(() => {
+				if (projectView) queueWorkspaceLoads();
+			}, [projectView, workspaces]);
 			React.useEffect(() => {
 				loadSkills();
 				const refresh = () => {
 					loadSkills();
+					if (!pending.current) {
+						for (const [path, open] of Object.entries(workspaceOpenRef.current)) if (open && workspaceGeneration.current[path]) loadWorkspace(path);
+					}
 				};
 				window.addEventListener("focus", refresh);
 				return () => window.removeEventListener("focus", refresh);
@@ -4466,12 +4770,23 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			const hasPersonalSkills = (catalog?.skills ?? []).some((skill) => displaySource(skill) !== "skillBundledSource");
 			const needle = query.trim().toLocaleLowerCase();
 			const rows = (catalog?.skills ?? []).filter((skill) => `${skill.name} ${skill.description} ${skill.origin} ${sourceLabel(displaySource(skill))}`.toLocaleLowerCase().includes(needle));
-			function changeScope(next) {
-				if (busy || pending.current || scope === next) return;
+			const TABS = [
+				"user",
+				"project",
+				"sources"
+			];
+			function selectTab(next) {
+				if (busy || pending.current || tab === next) return;
 				setError(null);
-				return loadSkills("", next);
+				closeConfirmation();
+				closeExternalDetail();
+				activeTab.current = next;
+				setImportNotice("");
+				setImportView(next === "sources");
+				setProjectView(next === "project");
+				if (next === "sources") loadImport();
 			}
-			function scopeTab(value, label) {
+			function tabButton(value, label) {
 				return h("button", {
 					id: `${id}-scope-${value}`,
 					type: "button",
@@ -4480,83 +4795,31 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					ref: (element) => {
 						scopeTabs.current[value] = element;
 					},
-					"aria-selected": scope === value,
+					"aria-selected": tab === value,
 					"aria-controls": `${id}-skill-panel`,
-					tabIndex: scope === value ? 0 : -1,
+					tabIndex: tab === value ? 0 : -1,
 					disabled: busy,
-					onClick: () => changeScope(value),
+					onClick: () => selectTab(value),
 					onKeyDown: (event) => {
-						const next = event.key === "Home" ? "user" : event.key === "End" ? "project" : event.key === "ArrowLeft" || event.key === "ArrowRight" ? value === "user" ? "project" : "user" : null;
+						const index = TABS.indexOf(value);
+						const next = event.key === "Home" ? TABS[0] : event.key === "End" ? TABS[TABS.length - 1] : event.key === "ArrowLeft" ? TABS[(index + TABS.length - 1) % TABS.length] : event.key === "ArrowRight" ? TABS[(index + 1) % TABS.length] : null;
 						if (!next || busy || pending.current) return;
 						event.preventDefault();
-						changeScope(next);
+						selectTab(next);
 						scopeTabs.current[next]?.focus();
 					}
 				}, t(label));
 			}
-			const projectWorkspaces = catalog?.workspaces ?? snapshot.workspaces;
-			const projectContext = () => {
-				if (scope !== "project") return null;
-				const cwd = catalog?.cwd || snapshot.cwd;
-				const values = projectWorkspaces ?? [];
-				const selected = values.some((project) => project.path === cwd) ? cwd : "";
-				const current = values.find((project) => project.path === selected);
-				return h(Menu, {
-					open: projectMenuOpen && !busy && values.length > 0,
-					align: "end",
-					portal: true,
-					autoFocus: true,
-					minWidthFromAnchor: true,
-					className: "power-dsh-project-menu",
-					selectedId: selected || void 0,
-					items: values.map((project) => ({
-						id: project.path,
-						label: h("span", { title: project.path }, values.some((other) => other.path !== project.path && other.title === project.title) ? `${project.title} (${project.path})` : project.title)
-					})),
-					onClose: () => setProjectMenuOpen(false),
-					onSelect: (path) => {
-						setProjectMenuOpen(false);
-						const latest = skillsSource.getSnapshot();
-						const projects = latest.value?.workspaces ?? latest.workspaces ?? [];
-						if (latest.scope !== "project" || latest.status === "loading" || latest.saving || pending.current || !projects.some((project) => project.path === path) || path === latest.cwd) return;
-						setError(null);
-						return loadSkills(path, "project");
-					},
-					anchor: h("button", {
-						type: "button",
-						className: "power-dsh-project-trigger",
-						disabled: busy || values.length === 0,
-						title: current?.path,
-						"aria-label": t("skillWorkspace"),
-						"aria-haspopup": "menu",
-						"aria-expanded": projectMenuOpen && !busy && values.length > 0,
-						onClick: () => {
-							const latest = skillsSource.getSnapshot();
-							if (latest.scope !== "project" || latest.status === "loading" || latest.saving || pending.current || !(latest.value?.workspaces ?? latest.workspaces ?? []).length) return;
-							setProjectMenuOpen((open) => !open);
-						}
-					}, h("span", { className: "power-dsh-project-trigger-label" }, current?.title || t(values.length ? "skillWorkspace" : "skillNoProjects")), h("svg", {
-						width: 16,
-						height: 16,
-						viewBox: "0 0 16 16",
-						fill: "none",
-						stroke: "currentColor",
-						strokeWidth: 1.4,
-						strokeLinecap: "round",
-						strokeLinejoin: "round",
-						"aria-hidden": true
-					}, h("path", { d: "m4 6 4 4 4-4" })))
-				});
-			};
 			async function toggle(skill) {
 				const latest = skillsSource.getSnapshot();
-				if (disabled || pending.current || !skill.canToggle || skill.reason || latest.scope !== scope || latest.cwd !== catalog?.cwd) return;
+				if (activeTab.current !== "user" || disabled || pending.current || !skill.canToggle || skill.reason || latest.scope !== scope || latest.cwd !== catalog?.cwd) return;
 				pending.current = true;
 				setError(null);
 				try {
-					await setSkillEnabled(skill.name, !skill.enabled);
+					await setSkillEnabled("", skill.name, !skill.enabled);
 				} catch (failure) {
 					if (mounted.current) setError({
+						cwd: "",
 						name: skill.name,
 						message: errorMessage(failure) || t("skillSaveFailed")
 					});
@@ -4564,21 +4827,56 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					pending.current = false;
 				}
 			}
-			const renderCard = (skill) => {
-				const index = catalog.skills.indexOf(skill);
-				const control = `${id}-skill-${index}`;
-				const identity = JSON.stringify([
-					scope,
-					catalog.cwd,
-					skill.name
-				]);
+			async function toggleWorkspace(cwd, skill) {
+				const state = workspaceState[cwd];
+				if (activeTab.current !== "project" || busy || !writable || pending.current || snapshot.status !== "ready" || !skill.canToggle || skill.reason || state?.status !== "ready" || !state.catalog?.complete) return;
+				pending.current = true;
+				setError(null);
+				setWorkspaceSaving({
+					cwd,
+					name: skill.name
+				});
+				try {
+					const catalog = await setSkillEnabled(cwd, skill.name, !skill.enabled);
+					if (mounted.current && catalog) setWorkspaceState((current) => ({
+						...current,
+						[cwd]: {
+							status: "ready",
+							catalog,
+							error: ""
+						}
+					}));
+				} catch (failure) {
+					if (mounted.current) {
+						setError({
+							cwd,
+							name: skill.name,
+							message: errorMessage(failure) || t("skillSaveFailed")
+						});
+						loadWorkspace(cwd);
+					}
+				} finally {
+					pending.current = false;
+					if (mounted.current) setWorkspaceSaving(null);
+				}
+			}
+			const renderCard = (skill, cwd = "", rows = catalog?.skills ?? []) => {
+				const group = cwd ? workspaceState[cwd] : null;
+				const groupReady = cwd ? group?.status === "ready" && Boolean(group.catalog?.complete) : Boolean(catalog?.complete);
+				const index = rows.indexOf(skill);
+				const workspaceIndex = cwd ? Math.max(workspaces.findIndex((row) => row.path === cwd), 0) : -1;
+				const control = `${id}-skill-${cwd ? `w${workspaceIndex}-${index}` : index}`;
+				const identity = JSON.stringify([cwd, skill.name]);
 				const reasonKey = {
 					"source-disabled": "skillSourceDisabled",
 					incomplete: "skillIncomplete",
 					unsupported: "skillUnsupported",
-					"legacy-scope": "skillLegacyScope"
+					"legacy-scope": "skillLegacyScope",
+					"link-broken": "skillLinkBroken",
+					"managed-unavailable": "skillManagedUnavailable"
 				}[skill.reason];
 				const reason = reasonKey ? t(reasonKey) : skill.reason || !skill.canToggle ? t("skillUnavailable") : "";
+				const rowError = error?.cwd === cwd && error?.name === skill.name ? error : null;
 				return h("li", {
 					key: identity,
 					className: "power-dsh-skill-card",
@@ -4597,11 +4895,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					"aria-describedby": [
 						skill.description && `${control}-description`,
 						reason && `${control}-reason`,
-						error?.name === skill.name && `${control}-error`
+						rowError && `${control}-error`
 					].filter(Boolean).join(" ") || void 0,
-					"aria-busy": snapshot.saving?.name === skill.name,
-					disabled: Boolean(disabled || !skill.canToggle || skill.reason),
-					onClick: () => toggle(skill)
+					"aria-busy": cwd ? workspaceSaving?.cwd === cwd && workspaceSaving.name === skill.name : snapshot.saving?.name === skill.name,
+					disabled: Boolean(busy || !writable || snapshot.status !== "ready" || !groupReady || !skill.canToggle || skill.reason),
+					onClick: () => cwd ? toggleWorkspace(cwd, skill) : toggle(skill)
 				}, h("span", {
 					className: "power-dsh-switch-thumb",
 					"aria-hidden": true
@@ -4618,13 +4916,13 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				}, skill.description)), reason && h("p", {
 					id: `${control}-reason`,
 					className: "power-dsh-skill-reason"
-				}, reason), error?.name === skill.name && errorFeedback({
+				}, reason), rowError && errorFeedback({
 					t,
 					id: `${control}-error`,
-					message: error.message,
+					message: rowError.message,
 					code: "PD-SKILLS-CHANGE",
 					operation: "setSkillEnabled"
-				}), h("div", { className: "power-dsh-skill-card-meta" }, h("button", {
+				}), h("div", { className: "power-dsh-skill-card-meta" }, renderOrigin([skill.path], skill.origin), h("button", {
 					type: "button",
 					className: "power-dsh-skill-card-detail",
 					"data-detail": skill.name,
@@ -4633,24 +4931,29 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					"aria-describedby": reason ? `${control}-reason` : void 0,
 					onClick: (event) => {
 						detailTrigger.current = event.currentTarget;
-						if (mounted.current) openDetail(skill);
+						if (mounted.current) openDetail(skill, cwd);
 					}
 				}, t("skillDetail")))));
 			};
-			async function openDetail(skill) {
-				if (!mounted.current) return;
+			async function openDetail(skill, cwd = "") {
+				if (!mounted.current || pending.current) return;
 				detailGeneration.current++;
 				const generation = detailGeneration.current;
+				deleteConfirmationRef.current = null;
+				setDeleteConfirm(false);
+				setDeleteError("");
 				setDetail({
+					cwd,
 					name: skill.name,
 					status: "loading",
 					value: null,
 					error: ""
 				});
 				try {
-					const value = await readSkill(skill.name);
+					const value = await readSkill(cwd, skill.name);
 					if (!mounted.current || generation !== detailGeneration.current) return;
 					setDetail({
+						cwd,
 						name: skill.name,
 						status: "ready",
 						value,
@@ -4659,26 +4962,735 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				} catch (failure) {
 					if (!mounted.current || generation !== detailGeneration.current) return;
 					setDetail({
+						cwd,
 						name: skill.name,
 						status: "error",
 						value: null,
-						error: errorMessage(failure) || t("skillDetailFailed")
+						error: t("skillDetailFailed")
 					});
 				}
 			}
-			function closeDetail() {
-				if (!mounted.current) return;
+			function variantsOf(entry) {
+				return entry.variants?.length ? entry.variants : [{
+					id: entry.id,
+					description: entry.description,
+					path: entry.path,
+					flat: entry.flat,
+					revision: "",
+					sources: [{
+						agent: entry.source,
+						path: entry.path,
+						realPath: entry.path,
+						linked: false
+					}]
+				}];
+			}
+			function pathsOf(entry) {
+				const sources = entry.sources?.length ? entry.sources : variantsOf(entry).flatMap((variant) => variant.sources);
+				const paths = [...new Set(sources.map((source) => source.path).filter(Boolean))];
+				return paths.length ? paths : entry.path ? [entry.path] : [];
+			}
+			function directoryLabel(path) {
+				const parts = path.replaceAll("\\", "/").split("/").filter(Boolean);
+				const index = parts.lastIndexOf("skills");
+				return parts[index > 0 ? index - 1 : parts.length - 2] ?? parts[0] ?? "";
+			}
+			function renderOrigin(paths, origin = "") {
+				const locations = [...new Set(paths.filter(Boolean))];
+				const label = origin || directoryLabel(locations[0] ?? "");
+				if (!label) return h("span", {
+					className: "power-dsh-skill-card-origin",
+					"aria-hidden": true
+				});
+				const stacked = locations.length > 1;
+				return h(Tooltip, {
+					label: locations.join("\n") || label,
+					side: "top",
+					portal: true,
+					delayMs: 0,
+					maxWidth: 400
+				}, h("span", {
+					className: "power-dsh-skill-card-origin",
+					tabIndex: 0,
+					"data-source-count": locations.length,
+					"aria-label": stacked ? locations.join("\n") : void 0
+				}, stacked ? h("span", { className: "power-dsh-skill-path-stack" }, h("span", { className: "power-dsh-skill-path-label" }, label)) : label));
+			}
+			async function openExternalDetail(entry, cwd, selectedId = "") {
+				if (!mounted.current || pending.current) return;
+				closeConfirmation();
+				const variants = variantsOf(entry);
+				const choose = entry.comparison === "different" && variants.length > 1;
+				const selected = selectedId || (choose ? "" : variants[0].id);
+				const generation = ++detailGeneration.current;
+				setPathMenuOpen(false);
+				setExternalDetail({
+					id: selected,
+					entry,
+					cwd,
+					status: selected ? "loading" : "ready",
+					value: null,
+					error: ""
+				});
+				try {
+					const value = selected ? await readExternalSkill(cwd, selected) : null;
+					if (!mounted.current || generation !== detailGeneration.current) return;
+					setExternalDetail({
+						id: selected,
+						entry,
+						cwd,
+						status: "ready",
+						value,
+						error: ""
+					});
+				} catch (failure) {
+					if (!mounted.current || generation !== detailGeneration.current) return;
+					setExternalDetail({
+						id: selected,
+						entry,
+						cwd,
+						status: "error",
+						value: null,
+						error: t("skillDetailFailed")
+					});
+				}
+			}
+			function closeExternalDetail(force = false) {
+				if (!mounted.current || pending.current && !force) return;
 				detailGeneration.current++;
+				setPathMenuOpen(false);
+				setExternalDetail(null);
+			}
+			function closeDetail() {
+				if (!mounted.current || pending.current) return;
+				detailGeneration.current++;
+				deleteConfirmationRef.current = null;
 				setDetail(null);
 				detailTrigger.current?.focus?.();
 			}
+			async function confirmDelete(current) {
+				const deletion = current.value?.deletion;
+				if (!mounted.current || pending.current || !writable || busy || !deleteConfirm || !deletion || deleteConfirmationRef.current !== current) return;
+				pending.current = true;
+				setDeleting(true);
+				setDeleteError("");
+				try {
+					const result = await deleteSkill(current.cwd, current.name, deletion.revision);
+					if (!mounted.current) return;
+					detailGeneration.current++;
+					deleteConfirmationRef.current = null;
+					setDetail(null);
+					setDeleteConfirm(false);
+					if (current.cwd) setWorkspaceState((state) => ({
+						...state,
+						[current.cwd]: {
+							status: "ready",
+							catalog: result,
+							error: ""
+						}
+					}));
+					await loadSkills();
+					await Promise.all(Object.keys(importState.groups).map((path) => loadImportGroup(path, true)));
+				} catch (failure) {
+					if (!mounted.current) return;
+					const message = errorMessage(failure) || "";
+					deleteConfirmationRef.current = null;
+					setDeleteError(t(message.includes("skill-delete-changed") ? "skillDeleteChanged" : message.includes("skill-delete-readback-failed") || message.includes("skill-delete-preferences-failed") ? "skillDeleteReadbackFailed" : "skillDeleteFailed"));
+					if (current.cwd) loadWorkspace(current.cwd);
+					else loadSkills();
+				} finally {
+					pending.current = false;
+					if (mounted.current) setDeleting(false);
+				}
+			}
+			function importFailure(value) {
+				const message = typeof value === "string" ? value : errorMessage(value);
+				if (message?.includes("skill-source-changed")) return t("skillStaleSource");
+				if (message?.includes("skill-name-conflict")) return t("skillNameConflict");
+				if (message?.includes("skill-readback-failed")) return t("skillReadbackFailed");
+				return t("skillImportFailed");
+			}
+			async function loadImportGroup(cwd, afterWrite = false) {
+				if (!writable || pending.current && !afterWrite) return;
+				const generation = (importGeneration.current[cwd] ?? 0) + 1;
+				importGeneration.current[cwd] = generation;
+				setImportState((current) => ({
+					...current,
+					groups: {
+						...current.groups,
+						[cwd]: {
+							status: "loading",
+							catalog: current.groups[cwd]?.catalog ?? null,
+							error: ""
+						}
+					}
+				}));
+				try {
+					const catalog = await discoverSkills(cwd, cwd ? "project" : "user");
+					if (!mounted.current || importGeneration.current[cwd] !== generation) return;
+					setImportState((current) => Object.hasOwn(current.groups, cwd) ? {
+						...current,
+						groups: {
+							...current.groups,
+							[cwd]: {
+								status: "ready",
+								catalog,
+								error: ""
+							}
+						}
+					} : current);
+				} catch (failure) {
+					if (!mounted.current || importGeneration.current[cwd] !== generation) return;
+					setImportState((current) => Object.hasOwn(current.groups, cwd) ? {
+						...current,
+						groups: {
+							...current.groups,
+							[cwd]: {
+								status: "error",
+								catalog: current.groups[cwd]?.catalog ?? null,
+								error: errorMessage(failure) || t("skillImportFailed")
+							}
+						}
+					} : current);
+				}
+			}
+			async function loadImport() {
+				if (!writable || pending.current) return;
+				const paths = ["", ...skillsSource.getSnapshot().workspaces.map((workspace) => workspace.path)];
+				setImportState((current) => ({ groups: Object.fromEntries(paths.map((path) => [path, current.groups[path] ?? {
+					status: "idle",
+					catalog: null,
+					error: ""
+				}])) }));
+				await Promise.all(paths.map((path) => loadImportGroup(path)));
+			}
+			function updateConfirmation(value) {
+				confirmationRef.current = value;
+				setConfirmation(value);
+			}
+			function closeConfirmation() {
+				if (pending.current) return;
+				updateConfirmation(null);
+				setTargetMenuOpen(false);
+			}
+			async function loadDestination(selection, error = "") {
+				const request = {
+					...selection,
+					status: "loading",
+					destination: null,
+					error
+				};
+				updateConfirmation(request);
+				try {
+					const destination = await readImportDestination(request.targetCwd, request.entry.name, request.variant.flat);
+					if (!mounted.current || confirmationRef.current !== request) return;
+					updateConfirmation({
+						...request,
+						status: "ready",
+						destination
+					});
+				} catch {
+					if (!mounted.current || confirmationRef.current !== request) return;
+					updateConfirmation({
+						...request,
+						status: "error",
+						error: error || t("skillImportTargetFailed")
+					});
+				}
+			}
+			function importOne(entry, cwd, selectedId = "") {
+				const group = importState.groups[cwd];
+				if (!mounted.current || activeTab.current !== "sources" || !writable || pending.current || group?.status !== "ready" || !group.catalog?.complete) return;
+				if (entry.available) return;
+				if (entry.conflict || entry.comparison === "unknown") {
+					openExternalDetail(entry, cwd);
+					return;
+				}
+				const variant = selectedId ? variantsOf(entry).find((item) => item.id === selectedId) : variantsOf(entry)[0];
+				if (!variant) return;
+				if (!selectedId && entry.comparison === "different") {
+					openExternalDetail(entry, cwd);
+					return;
+				}
+				closeExternalDetail();
+				setTargetMenuOpen(false);
+				loadDestination({
+					entry,
+					variant,
+					cwd,
+					targetCwd: cwd,
+					status: "loading",
+					destination: null,
+					error: ""
+				});
+			}
+			async function confirmImport(current) {
+				if (!mounted.current || confirmationRef.current !== current || pending.current || !writable || activeTab.current !== "sources" || current.status !== "ready" || !current.destination?.complete || current.destination.available || current.targetCwd && !skillsSource.getSnapshot().workspaces.some((workspace) => workspace.path === current.targetCwd)) return;
+				const { entry, variant, cwd, targetCwd } = current;
+				const latest = skillsSource.getSnapshot();
+				pending.current = true;
+				for (const path of Object.keys(importGeneration.current)) importGeneration.current[path] = (importGeneration.current[path] ?? 0) + 1;
+				setImporting(JSON.stringify([cwd, entry.id]));
+				setImportNotice("");
+				updateConfirmation({
+					...current,
+					error: ""
+				});
+				try {
+					const result = await importSkills(cwd, [variant.id], "copy", variant.revision, targetCwd);
+					if (!mounted.current) return;
+					const imported = result.imported.length > 0;
+					const reason = result.skipped[0]?.reason;
+					if (!imported) throw new Error(reason || "skill-copy-failed");
+					updateConfirmation(null);
+					setImportNotice(t("skillImportDone"));
+					setImportState((current) => {
+						const group = current.groups[targetCwd];
+						if (!group?.catalog) return current;
+						return {
+							...current,
+							groups: {
+								...current.groups,
+								[targetCwd]: {
+									...group,
+									catalog: {
+										...group.catalog,
+										entries: group.catalog.entries.map((item) => item.name === entry.name ? {
+											...item,
+											available: true
+										} : item)
+									}
+								}
+							}
+						};
+					});
+					await Promise.all(Object.keys(importState.groups).map((path) => loadImportGroup(path, true)));
+					if (targetCwd && workspaceGeneration.current[targetCwd]) await loadWorkspace(targetCwd);
+					await loadSkills(latest.cwd, latest.scope);
+				} catch (failure) {
+					if (mounted.current) await loadDestination(current, importFailure(failure));
+				} finally {
+					pending.current = false;
+					if (mounted.current) setImporting("");
+				}
+			}
+			async function loadWorkspace(path) {
+				const generation = (workspaceGeneration.current[path] ?? 0) + 1;
+				workspaceGeneration.current[path] = generation;
+				setWorkspaceState((current) => ({
+					...current,
+					[path]: {
+						status: "loading",
+						catalog: current[path]?.catalog ?? null,
+						error: ""
+					}
+				}));
+				try {
+					const catalog = await listWorkspaceSkills(path);
+					if (!mounted.current || workspaceGeneration.current[path] !== generation) return;
+					setWorkspaceState((current) => ({
+						...current,
+						[path]: {
+							status: "ready",
+							catalog,
+							error: ""
+						}
+					}));
+				} catch (failure) {
+					if (!mounted.current || workspaceGeneration.current[path] !== generation) return;
+					setWorkspaceState((current) => ({
+						...current,
+						[path]: {
+							status: "error",
+							catalog: current[path]?.catalog ?? null,
+							error: errorMessage(failure) || t("skillLoadFailed")
+						}
+					}));
+				}
+			}
+			function queueWorkspaceLoads() {
+				for (const workspace of workspaces) if (!workspaceGeneration.current[workspace.path]) loadWorkspace(workspace.path);
+			}
+			const renderImport = () => {
+				const current = importState;
+				const entryCard = (entry, cwd) => {
+					const busyRow = importing === JSON.stringify([cwd, entry.id]);
+					const reason = entry.conflict ? t("skillNameConflict") : entry.available ? t("skillAlreadyExistsHint") : entry.comparison === "unknown" ? t("skillComparisonUnknown") : "";
+					return h("li", {
+						key: entry.id,
+						className: "power-dsh-skill-card",
+						"data-import": entry.name,
+						"data-existing": Boolean(entry.available)
+					}, h("div", { className: "power-dsh-skill-card-content" }, h("div", { className: "power-dsh-skill-card-main" }, h("span", {
+						className: "power-dsh-skill-card-title",
+						title: entry.path
+					}, entry.name), entry.available && h("span", {
+						className: "power-dsh-skill-existing",
+						title: reason
+					}, t("skillAlreadyExists"))), entry.description && h(Tooltip, {
+						label: entry.description,
+						side: "top",
+						portal: true,
+						delayMs: 0,
+						maxWidth: 400
+					}, h("span", {
+						className: "power-dsh-skill-card-description",
+						tabIndex: 0
+					}, entry.description)), h("div", { className: "power-dsh-skill-card-meta" }, renderOrigin(pathsOf(entry)), h("button", {
+						type: "button",
+						className: "power-dsh-skill-card-detail",
+						"data-import-detail": entry.name,
+						"aria-haspopup": "dialog",
+						"aria-label": `${t("skillDetail")}: ${entry.name}`,
+						onClick: () => {
+							openExternalDetail(entry, cwd);
+						}
+					}, t("skillDetail")), !entry.available && h("button", {
+						type: "button",
+						className: "power-dsh-skill-card-detail",
+						"data-import-action": entry.name,
+						title: reason || (cwd ? t("skillImportProjectTarget").replace("{path}", cwd) : t("skillImportUserTarget")),
+						disabled: importing !== "" || !writable || Boolean(reason) || current.groups[cwd]?.status !== "ready" || !current.groups[cwd]?.catalog?.complete,
+						onClick: () => {
+							importOne(entry, cwd);
+						}
+					}, t(busyRow ? "skillImporting" : "skillImportOne")))));
+				};
+				const group = (cwd, title, index) => {
+					const state = current.groups[cwd] ?? {
+						status: "idle",
+						catalog: null,
+						error: ""
+					};
+					const entries = (state.catalog?.entries ?? []).filter((entry) => [
+						entry.name,
+						entry.description,
+						entry.source,
+						...pathsOf(entry),
+						...variantsOf(entry).map((variant) => variant.description)
+					].join(" ").toLocaleLowerCase().includes(needle));
+					if (state.status === "ready" && state.catalog?.complete && entries.length === 0 && !state.error) return null;
+					const titleId = `${id}-import-group-${index}`;
+					const open = Boolean(needle) || (importGroupsOpen[cwd] ?? true);
+					const toggle = () => {
+						if (!needle) setImportGroupsOpen((value) => ({
+							...value,
+							[cwd]: !(value[cwd] ?? true)
+						}));
+					};
+					return h("section", {
+						key: cwd,
+						className: "power-dsh-skill-group",
+						"aria-labelledby": titleId,
+						"data-import-group": cwd ? "project" : "user",
+						"data-import-cwd": cwd
+					}, h("div", { className: "power-dsh-skill-group-header" }, h("button", {
+						id: titleId,
+						type: "button",
+						className: "power-dsh-skill-group-toggle",
+						"aria-expanded": open,
+						"aria-controls": `${titleId}-body`,
+						onClick: toggle
+					}, h(SkillChevron), h("span", {
+						className: "power-dsh-skill-group-title",
+						title: cwd || void 0
+					}, title), state.catalog?.complete && h("span", { className: "power-dsh-skill-group-count" }, entries.length))), open && h("div", {
+						id: `${titleId}-body`,
+						className: "power-dsh-skill-group-body"
+					}, state.status === "loading" && loadingFeedback({
+						label: t("loading"),
+						compact: true
+					}), state.status === "error" && errorFeedback({
+						t,
+						message: state.error,
+						code: "PD-SKILLS-IMPORT",
+						operation: "discoverExternalSkills",
+						disabled: pending.current,
+						retry: () => {
+							loadImportGroup(cwd);
+						}
+					}), state.catalog && !state.catalog.complete && h("p", { className: "power-dsh-skill-import-empty-title" }, t("skillIncomplete")), entries.length > 0 && h("ul", { className: "power-dsh-skill-cards" }, entries.map((entry) => entryCard(entry, cwd))), state.status !== "error" && state.error && errorFeedback({
+						t,
+						message: state.error,
+						code: "PD-SKILLS-IMPORT",
+						operation: "importExternalSkills"
+					})));
+				};
+				const groups = [group("", t("skillImportUserScope"), 0), ...workspaces.map((workspace, index) => group(workspace.path, workspace.title, index + 1))].filter(Boolean);
+				return h(React.Fragment, null, groups.length ? groups : h("p", { className: "power-dsh-skill-empty" }, t(needle ? "skillNoMatches" : "skillImportEmptyGroup")));
+			};
+			const renderWorkspaceGroup = (workspace, index) => {
+				const state = workspaceState[workspace.path] ?? {
+					status: "idle",
+					catalog: null,
+					error: ""
+				};
+				const titleId = `${id}-workspace-${index}`;
+				const open = Boolean(needle) || (workspaceOpen[workspace.path] ?? true);
+				const hasFeedback = state.status === "loading" || state.status === "error" || Boolean(state.catalog && !state.catalog.complete);
+				const groupRows = (state.catalog?.skills ?? []).filter((skill) => `${skill.name} ${skill.description} ${skill.origin} ${sourceLabel(skillSource(skill.source))}`.toLocaleLowerCase().includes(needle));
+				if (state.status === "ready" && state.catalog?.complete && groupRows.length === 0) return null;
+				return h("section", {
+					key: workspace.path,
+					className: "power-dsh-skill-group",
+					"aria-labelledby": titleId,
+					"data-workspace": workspace.path
+				}, h("div", { className: "power-dsh-skill-group-header" }, h("button", {
+					id: titleId,
+					type: "button",
+					className: "power-dsh-skill-group-toggle",
+					"aria-expanded": open,
+					"aria-controls": `${titleId}-body`,
+					onClick: () => {
+						if (needle) return;
+						const next = !(workspaceOpen[workspace.path] ?? true);
+						setWorkspaceOpen((current) => ({
+							...current,
+							[workspace.path]: next
+						}));
+						if (next && (workspaceState[workspace.path]?.status ?? "idle") === "idle") loadWorkspace(workspace.path);
+					}
+				}, h(SkillChevron), h("span", {
+					className: "power-dsh-skill-group-title",
+					title: workspace.path
+				}, workspace.title), state.catalog?.complete && h("span", { className: "power-dsh-skill-group-count" }, groupRows.length))), (open || hasFeedback) && h("div", {
+					id: `${titleId}-body`,
+					className: "power-dsh-skill-group-body"
+				}, state.status === "loading" && loadingFeedback({
+					label: t("loading"),
+					...state.catalog ? { compact: true } : {}
+				}), state.status === "error" && errorFeedback({
+					t,
+					message: state.error,
+					code: "PD-SKILLS-LOAD",
+					operation: "listSkills",
+					retry: () => {
+						loadWorkspace(workspace.path);
+					}
+				}), state.catalog && !state.catalog.complete && h("p", { className: "power-dsh-skill-import-empty-title" }, t("skillIncomplete")), open && state.catalog && groupRows.length > 0 && h("ul", { className: "power-dsh-skill-cards" }, groupRows.map((skill) => renderCard(skill, workspace.path, state.catalog.skills)))));
+			};
+			const renderWorkspaces = () => {
+				if (workspaces.length === 0) return h("p", { className: "power-dsh-skill-empty" }, t("skillNoProjects"));
+				const groups = workspaces.map(renderWorkspaceGroup).filter(Boolean);
+				return groups.length ? groups : h("p", { className: "power-dsh-skill-empty" }, t(needle ? "skillNoMatches" : "skillEmpty"));
+			};
+			const detailField = (key, value) => h("div", {
+				key,
+				className: "power-dsh-skill-detail-row"
+			}, h("dt", { className: "power-dsh-skill-detail-label" }, t(key)), h("dd", { className: "power-dsh-skill-detail-value" }, value));
+			const renderMetadata = (description, path) => description || path ? h("dl", { className: "power-dsh-skill-detail-list" }, path && detailField("skillDetailPath", path), description && detailField("skillDetailDescription", h("p", { className: "power-dsh-skill-detail-description" }, description))) : null;
+			const renderMarkdown = (content) => content ? h("div", { className: "power-dsh-skill-detail-markdown" }, h(MarkdownText, {
+				text: content,
+				variant: "compact",
+				omitHtml: true,
+				labels: {
+					code: {
+						copyLabel: t("skillCopyCode"),
+						copiedLabel: t("skillCopiedCode")
+					},
+					footnotes: t("skillFootnotes")
+				}
+			})) : h("p", { className: "power-dsh-skill-detail-empty" }, t("skillDetailNoContent"));
+			const renderConfirmation = () => {
+				const current = confirmation;
+				const targets = [{
+					path: "",
+					title: t("skillUserScope")
+				}, ...workspaces];
+				const target = targets.find((target) => target.path === current.targetCwd);
+				const canImport = current.status === "ready" && Boolean(current.destination?.complete) && !current.destination?.available && Boolean(target) && !busy && writable;
+				return h(Modal, {
+					open: true,
+					onClose: closeConfirmation,
+					title: t("skillImportTitle"),
+					closeLabel: t("cancel"),
+					className: "power-dsh-skill-detail power-dsh-skill-import-confirmation",
+					description: current.entry.name,
+					footer: h(React.Fragment, null, h(Button, {
+						variant: "outline",
+						"data-modal-autofocus": true,
+						disabled: importing !== "",
+						onClick: closeConfirmation
+					}, t("cancel")), !current.destination?.available && h(Button, {
+						variant: "outline",
+						className: "power-dsh-confirm-import",
+						disabled: !canImport,
+						onClick: () => {
+							if (canImport) confirmImport(current);
+						}
+					}, t(importing ? "skillImporting" : "skillImportOne")))
+				}, h("div", { className: "power-dsh-skill-detail-body" }, h("dl", { className: "power-dsh-skill-detail-list" }, detailField("skillImportTo", h(Menu, {
+					open: targetMenuOpen,
+					align: "end",
+					portal: true,
+					autoFocus: true,
+					minWidthFromAnchor: true,
+					items: targets.map((target) => ({
+						id: target.path || "user",
+						label: target.title + (targets.filter((other) => other.title === target.title).length > 1 ? ` · ${target.path || t("skillUserScope")}` : "")
+					})),
+					selectedId: current.targetCwd || "user",
+					onClose: () => setTargetMenuOpen(false),
+					onSelect: (id) => {
+						if (pending.current || confirmationRef.current !== current) return;
+						const targetCwd = id === "user" ? "" : id;
+						if (!targets.some((target) => target.path === targetCwd)) return;
+						setTargetMenuOpen(false);
+						if (targetCwd !== current.targetCwd) loadDestination({
+							...current,
+							targetCwd
+						});
+					},
+					anchor: h("button", {
+						type: "button",
+						className: "power-dsh-skill-target-select",
+						disabled: importing !== "",
+						"aria-haspopup": "menu",
+						"aria-expanded": targetMenuOpen,
+						"aria-label": t("skillImportTo"),
+						onClick: () => {
+							if (!pending.current) setTargetMenuOpen((open) => !open);
+						}
+					}, target?.title ?? t("skillNoProjects"), h(SkillChevron))
+				}))), current.destination && h("code", {
+					className: "power-dsh-skill-detail-code",
+					"data-import-destination": true
+				}, current.destination.path), current.status === "loading" && loadingFeedback({ label: t("loading") }), current.error && errorFeedback({
+					t,
+					message: current.error,
+					code: "PD-SKILLS-IMPORT",
+					placement: "modal",
+					operation: current.status === "error" ? "readSkillImportDestination" : "importSkillTo",
+					disabled: pending.current,
+					retry: current.status === "error" ? () => {
+						loadDestination(current);
+					} : void 0
+				}), current.destination && !current.destination.complete && h("p", { className: "power-dsh-notice" }, t("skillIncomplete")), current.destination?.available && h("p", { className: "power-dsh-notice" }, t("skillChooseOtherTarget")), current.destination?.inherited && !current.destination.available && h("p", { className: "power-dsh-notice" }, t("skillInheritedHint"))));
+			};
+			const renderExternalDetail = () => {
+				const current = externalDetail;
+				const skill = current.value;
+				const variants = variantsOf(current.entry);
+				const selected = variants.find((variant) => variant.id === current.id);
+				const choose = current.entry.comparison === "different" && variants.length > 1;
+				const canAdd = !current.entry.available && !current.entry.conflict && current.entry.comparison !== "unknown" && current.status === "ready" && Boolean(skill) && (current.entry.variants === void 0 || Boolean(selected?.revision)) && !busy && writable;
+				const path = choose ? h(Menu, {
+					open: pathMenuOpen,
+					align: "end",
+					portal: true,
+					autoFocus: true,
+					minWidthFromAnchor: true,
+					items: variants.map((variant) => ({
+						id: variant.id,
+						label: variant.path
+					})),
+					selectedId: current.id,
+					onClose: () => setPathMenuOpen(false),
+					onSelect: (pathId) => {
+						setPathMenuOpen(false);
+						if (!pending.current && pathId !== current.id && variants.some((variant) => variant.id === pathId)) openExternalDetail(current.entry, current.cwd, pathId);
+					},
+					anchor: h("button", {
+						type: "button",
+						className: "power-dsh-skill-path-select",
+						disabled: importing !== "",
+						"aria-haspopup": "menu",
+						"aria-expanded": pathMenuOpen,
+						"aria-label": t("skillChoosePath"),
+						onClick: () => {
+							if (!pending.current) setPathMenuOpen((open) => !open);
+						}
+					}, h("code", { className: "power-dsh-skill-detail-code" }, selected?.path ?? t("skillChoosePath")), h(SkillChevron))
+				}) : h("code", { className: "power-dsh-skill-detail-code" }, pathsOf(current.entry).join("\n"));
+				return h(Modal, {
+					open: true,
+					onClose: () => closeExternalDetail(),
+					title: t("skillDetailTitle"),
+					closeLabel: t("close"),
+					className: "power-dsh-skill-detail",
+					description: current.entry.name,
+					footer: h(React.Fragment, null, h(Button, {
+						variant: "outline",
+						"data-modal-autofocus": true,
+						disabled: importing !== "",
+						onClick: () => closeExternalDetail()
+					}, t("close")), !current.entry.available && h(Button, {
+						variant: "outline",
+						disabled: !canAdd,
+						onClick: () => {
+							if (canAdd) importOne(current.entry, current.cwd, current.id);
+						}
+					}, t(importing ? "skillImporting" : "skillImportOne")))
+				}, h("div", {
+					className: "power-dsh-skill-detail-body",
+					tabIndex: 0
+				}, importState.groups[current.cwd]?.error && errorFeedback({
+					t,
+					message: importState.groups[current.cwd].error,
+					code: "PD-SKILLS-IMPORT",
+					placement: "modal",
+					operation: "addSkill"
+				}), current.entry.conflict && h("p", { className: "power-dsh-notice" }, t("skillNameConflict")), current.entry.comparison === "unknown" && h("p", { className: "power-dsh-notice" }, t("skillComparisonUnknown")), current.entry.inherited && h("p", { className: "power-dsh-notice" }, t("skillInheritedHint")), renderMetadata(skill?.description ?? (choose ? "" : current.entry.description), path), current.status === "loading" && loadingFeedback({ label: t("skillDetailLoading") }), current.status === "error" && errorFeedback({
+					t,
+					message: current.error,
+					code: "PD-SKILLS-DETAIL",
+					placement: "modal",
+					operation: "readExternalSkill",
+					retry: () => {
+						openExternalDetail(current.entry, current.cwd, current.id);
+					}
+				}), current.status === "ready" && current.id && skill === null && h("p", {
+					className: "power-dsh-notice",
+					role: "status"
+				}, t("skillDetailMissing")), current.status === "ready" && skill && renderMarkdown(skill.content)));
+			};
 			const renderDetail = () => {
 				const current = detail;
 				const skill = current.value;
-				const label = (key, value) => h("div", {
-					key,
-					className: "power-dsh-skill-detail-row"
-				}, h("dt", { className: "power-dsh-skill-detail-label" }, t(key)), h("dd", { className: "power-dsh-skill-detail-value" }, value));
+				const deletion = skill?.deletion;
+				const canDelete = Boolean(deletion) && current.status === "ready" && writable && !busy;
+				const deleteLabel = t(deletion?.linked ? "skillRemoveLink" : "skillDelete");
+				if (deleteConfirm && deletion) return h(Modal, {
+					open: true,
+					onClose: () => {
+						if (!pending.current) {
+							deleteConfirmationRef.current = null;
+							setDeleteConfirm(false);
+						}
+					},
+					title: deleteLabel,
+					closeLabel: t("cancel"),
+					className: "power-dsh-skill-detail",
+					description: current.name,
+					footer: h(React.Fragment, null, h(Button, {
+						variant: "outline",
+						"data-modal-autofocus": true,
+						disabled: deleting,
+						onClick: () => {
+							if (!pending.current) {
+								deleteConfirmationRef.current = null;
+								setDeleteConfirm(false);
+							}
+						}
+					}, t("cancel")), h(Button, {
+						variant: "outline",
+						className: "power-dsh-skill-delete",
+						disabled: !canDelete || Boolean(deleteError),
+						onClick: () => {
+							if (canDelete) confirmDelete(current);
+						}
+					}, t(deleting ? "skillDeleting" : deletion.linked ? "skillRemoveLink" : "skillDelete")))
+				}, h("div", { className: "power-dsh-skill-detail-body" }, h("p", { className: "power-dsh-notice" }, t(deletion.linked ? "skillRemoveLinkHint" : "skillDeleteHint")), h("code", { className: "power-dsh-skill-detail-code" }, deletion.path), deleteError && errorFeedback({
+					t,
+					message: deleteError,
+					code: "PD-SKILLS-DELETE",
+					placement: "modal",
+					operation: "deleteSkill",
+					disabled: deleting,
+					retry: () => {
+						openDetail({ name: current.name }, current.cwd);
+					}
+				})));
 				return h(Modal, {
 					open: true,
 					onClose: closeDetail,
@@ -4686,19 +5698,31 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					closeLabel: t("close"),
 					className: "power-dsh-skill-detail",
 					description: skill?.name ?? current.name,
-					footer: h(Button, {
+					footer: h(React.Fragment, null, deletion && h(Button, {
+						variant: "outline",
+						className: "power-dsh-skill-delete",
+						disabled: !canDelete,
+						onClick: () => {
+							if (canDelete && !pending.current) {
+								deleteConfirmationRef.current = current;
+								setDeleteError("");
+								setDeleteConfirm(true);
+							}
+						}
+					}, deleteLabel), h(Button, {
 						variant: "outline",
 						"data-modal-autofocus": true,
 						onClick: closeDetail
-					}, t("close"))
+					}, t("close")))
 				}, current.status === "loading" && loadingFeedback({ label: t("skillDetailLoading") }), current.status === "error" && errorFeedback({
 					t,
 					message: current.error,
 					code: "PD-SKILLS-DETAIL",
+					placement: "modal",
 					operation: "readSkill",
 					retry: () => {
-						const row = (catalog?.skills ?? []).find((candidate) => candidate.name === current.name);
-						if (row) openDetail(row);
+						const row = (current.cwd ? workspaceState[current.cwd]?.catalog?.skills : catalog?.skills)?.find((candidate) => candidate.name === current.name);
+						if (row) openDetail(row, current.cwd);
 					}
 				}), current.status === "ready" && skill === null && h("p", {
 					className: "power-dsh-notice",
@@ -4706,18 +5730,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				}, t("skillDetailMissing")), current.status === "ready" && skill && h("div", {
 					className: "power-dsh-skill-detail-body",
 					tabIndex: 0
-				}, (skill.description || skill.path) && h("dl", { className: "power-dsh-skill-detail-list" }, skill.path && label("skillDetailPath", h("code", { className: "power-dsh-skill-detail-code" }, skill.path)), skill.description && label("skillDetailDescription", h("p", { className: "power-dsh-skill-detail-description" }, skill.description))), skill.content ? h("div", { className: "power-dsh-skill-detail-markdown" }, h(MarkdownText, {
-					text: skill.content,
-					variant: "compact",
-					omitHtml: true,
-					labels: {
-						code: {
-							copyLabel: t("skillCopyCode"),
-							copiedLabel: t("skillCopiedCode")
-						},
-						footnotes: t("skillFootnotes")
-					}
-				})) : h("p", { className: "power-dsh-skill-detail-empty" }, t("skillDetailNoContent"))));
+				}, renderMetadata(skill.description, skill.path ? h("code", { className: "power-dsh-skill-detail-code" }, skill.path) : null), renderMarkdown(skill.content)));
 			};
 			const renderGroup = (group, label, selectedRows) => {
 				if (selectedRows.length === 0) return null;
@@ -4740,15 +5753,15 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 							[group]: !(current[group] ?? defaultOpen)
 						}));
 					}
-				}, h(SkillChevron), h("span", { className: "power-dsh-skill-group-title" }, t(label)))), h("p", { className: "power-dsh-skill-group-description" }, t(group === "preinstalled" ? "skillPreinstalledDescription" : "skillPersonalDescription")), open && h("div", {
+				}, h(SkillChevron), h("span", { className: "power-dsh-skill-group-title" }, t(label)), catalog?.complete && h("span", { className: "power-dsh-skill-group-count" }, selectedRows.length))), open && h("div", {
 					id: `${titleId}-body`,
 					className: "power-dsh-skill-group-body"
-				}, h("ul", { className: "power-dsh-skill-cards" }, selectedRows.map(renderCard))));
+				}, h("ul", { className: "power-dsh-skill-cards" }, selectedRows.map((skill) => renderCard(skill)))));
 			};
 			return h("section", {
 				className: "power-dsh-page power-dsh-skills-page",
 				"aria-label": t("skillsTab")
-			}, h("style", null, styles), h("header", null, h("h2", { className: "power-dsh-title" }, t("skillsTab")), h("p", { className: "power-dsh-description" }, t("skillsDescription"))), snapshot.status === "loading" && loadingFeedback({
+			}, h("style", null, styles), h("header", null, h("h2", { className: "power-dsh-title" }, t("skillsTab")), h("p", { className: "power-dsh-description" }, t(tab === "sources" ? "skillDiscoverDescription" : "skillsDescription"))), snapshot.status === "loading" && loadingFeedback({
 				label: t("loading"),
 				...catalog ? { compact: true } : {}
 			}), snapshot.error && errorFeedback({
@@ -4763,21 +5776,27 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				className: "power-dsh-tabs",
 				role: "tablist",
 				"aria-label": t("skillScope")
-			}, scopeTab("user", "skillUserScope"), scopeTab("project", "skillProjectScope"))), h("div", {
+			}, tabButton("user", "skillUserScope"), tabButton("project", "skillProjectScope"), tabButton("sources", "skillImport"))), h("div", {
 				id: `${id}-skill-panel`,
 				className: "power-dsh-skill-panel",
 				role: "tabpanel",
-				"aria-labelledby": `${id}-scope-${scope}`
-			}, h("div", { className: scope === "project" ? "power-dsh-project-search-row" : "power-dsh-global-search-row" }, scope === "project" && projectContext(), catalog && h("label", { className: "power-dsh-skill-search-field" }, h(SkillSearchIcon), h("input", {
+				"aria-labelledby": `${id}-scope-${tab}`
+			}, importNotice && h("div", {
+				className: "power-dsh-skill-import-notice",
+				role: "status"
+			}, importNotice), (tab === "sources" || (tab === "project" ? workspaces.length > 0 : Boolean(catalog))) && h("label", { className: "power-dsh-skill-search-field" }, h(SkillSearchIcon), h("input", {
 				type: "search",
 				value: query,
 				placeholder: t("skillSearch"),
 				"aria-label": t("skillSearch"),
-				onChange: (event) => setQuery(event.target.value)
-			}))), catalog && !catalog.complete && h("p", {
+				onChange: (event) => {
+					setQuery(event.target.value);
+					if (tab === "project" && event.target.value.trim()) queueWorkspaceLoads();
+				}
+			})), tab === "user" && catalog && !catalog.complete && h("p", {
 				className: "power-dsh-description power-dsh-skill-notice",
 				role: "status"
-			}, t("skillIncomplete")), config.status === "ready" && !config.writable && h("p", { className: "power-dsh-description power-dsh-skill-notice" }, t("readOnly")), catalog && (scope === "project" ? h("ul", { className: "power-dsh-skill-cards" }, rows.map(renderCard)) : [renderGroup("personal", "skillPersonalGroup", rows.filter((skill) => displaySource(skill) !== "skillBundledSource")), renderGroup("preinstalled", "skillPreinstalledGroup", rows.filter((skill) => displaySource(skill) === "skillBundledSource"))]), catalog && snapshot.status === "ready" && catalog.complete && rows.length === 0 && h("p", { className: "power-dsh-skill-empty" }, t(scope === "project" && projectWorkspaces?.length === 0 ? "skillNoProjects" : query ? "skillNoMatches" : "skillEmpty")), detail && renderDetail()));
+			}, t("skillIncomplete")), config.status === "ready" && !config.writable && h("p", { className: "power-dsh-description power-dsh-skill-notice" }, t("readOnly")), tab === "sources" ? renderImport() : tab === "project" ? renderWorkspaces() : catalog && [renderGroup("personal", "skillPersonalGroup", rows.filter((skill) => displaySource(skill) !== "skillBundledSource")), renderGroup("preinstalled", "skillPreinstalledGroup", rows.filter((skill) => displaySource(skill) === "skillBundledSource"))], tab === "user" && catalog && snapshot.status === "ready" && catalog.complete && rows.length === 0 && h("p", { className: "power-dsh-skill-empty" }, t(query ? "skillNoMatches" : "skillEmpty")), detail && renderDetail(), externalDetail && renderExternalDetail(), confirmation && renderConfirmation()));
 		}
 		let active = true;
 		ctx.effect(() => () => {
@@ -4839,19 +5858,79 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			}
 			skillsSource.notify();
 		};
-		const readSkill = async (name) => {
+		const readSkill = async (cwd, name) => {
 			if (!active || typeof name !== "string" || name === "") throw new Error(t("skillUnavailable"));
-			const result = await ctx.remote.powerDsh.readSkill(skillCatalog.scope === "project" ? skillCatalog.cwd : "", skillCatalog.scope, name);
+			const result = await ctx.remote.powerDsh.readSkill(cwd, cwd ? "project" : "user", name);
 			if (!result.ok) throw new Error(result.error.message);
 			return result.value;
 		};
-		const setSkillEnabled = async (name, enabled) => {
+		const deleteSkill = async (cwd, name, revision) => {
 			const config = form.getSnapshot();
-			if (!active || skillWritePending || skillCatalog.status !== "ready" || !skillCatalog.value?.complete || config.status !== "ready" || !config.writable || config.value?.skillManagerEnabled !== true) return;
+			if (!active || skillWritePending || config.status !== "ready" || !config.writable || config.value?.skillManagerEnabled !== true) throw new Error(t("skillUnavailable"));
+			skillWritePending = true;
+			try {
+				const result = await ctx.remote.powerDsh.deleteSkill(cwd, cwd ? "project" : "user", name, revision);
+				if (!result.ok) throw new Error(result.error.message);
+				return result.value;
+			} finally {
+				skillWritePending = false;
+			}
+		};
+		const listWorkspaceSkills = async (path) => {
+			if (!active || typeof path !== "string" || path === "") throw new Error(t("skillUnavailable"));
+			const result = await ctx.remote.powerDsh.listSkills(path, "project");
+			if (!result.ok) throw new Error(result.error.message);
+			return result.value;
+		};
+		const discoverSkills = async (cwd, scope) => {
+			if (!active || scope === "project" && typeof cwd !== "string") throw new Error(t("skillUnavailable"));
+			const result = await ctx.remote.powerDsh.discoverExternalSkills(scope === "project" ? cwd : "", scope);
+			if (!result.ok) throw new Error(result.error.message);
+			return result.value;
+		};
+		const readExternalSkill = async (cwd, id) => {
+			if (!active || typeof id !== "string" || id === "") throw new Error(t("skillUnavailable"));
+			const result = await ctx.remote.powerDsh.readExternalSkill(cwd, cwd ? "project" : "user", id);
+			if (!result.ok) throw new Error(result.error.message);
+			return result.value;
+		};
+		const readImportDestination = async (cwd, name, flat) => {
+			if (!active) throw new Error(t("skillUnavailable"));
+			const result = await ctx.remote.powerDsh.readSkillImportDestination(cwd, cwd ? "project" : "user", name, flat);
+			if (!result.ok) throw new Error(result.error.message);
+			return result.value;
+		};
+		const importSkills = async (cwd, ids, mode = "copy", revision = "", targetCwd) => {
+			const config = form.getSnapshot();
+			if (!active || skillWritePending || typeof cwd !== "string" || config.status !== "ready" || !config.writable || config.value?.skillManagerEnabled !== true) throw new Error(t("skillUnavailable"));
+			if (mode === "link" && !revision) throw new Error(t("skillLinkFailed"));
+			skillWritePending = true;
+			try {
+				const result = targetCwd !== void 0 ? await ctx.remote.powerDsh.importSkillTo(cwd, cwd ? "project" : "user", ids[0], revision, targetCwd) : revision ? await ctx.remote.powerDsh.addSkill(cwd, cwd ? "project" : "user", ids[0], mode, revision) : await ctx.remote.powerDsh.importExternalSkills(cwd, cwd ? "project" : "user", ids);
+				if (!result.ok) throw new Error(result.error.message);
+				return result.value;
+			} finally {
+				skillWritePending = false;
+			}
+		};
+		const setSkillEnabled = async (cwd, name, enabled) => {
+			const config = form.getSnapshot();
+			if (!active || skillWritePending || config.status !== "ready" || !config.writable || config.value?.skillManagerEnabled !== true) return null;
+			if (cwd) {
+				skillWritePending = true;
+				try {
+					const result = await ctx.remote.powerDsh.setSkillEnabled(cwd, "project", name, enabled);
+					if (!result.ok) throw new Error(result.error.message);
+					return result.value;
+				} finally {
+					skillWritePending = false;
+				}
+			}
+			if (skillCatalog.status !== "ready" || !skillCatalog.value?.complete) return null;
 			const skill = skillCatalog.value.skills.find((candidate) => candidate.name === name);
-			if (!skill?.canToggle || skill.reason) return;
+			if (!skill?.canToggle || skill.reason) return null;
 			const { scope } = skillCatalog;
-			const cwd = scope === "project" ? skillCatalog.cwd : "";
+			const context = scope === "project" ? skillCatalog.cwd : "";
 			const generation = ++skillGeneration;
 			skillWritePending = true;
 			skillCatalog = {
@@ -4861,9 +5940,9 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			};
 			skillsSource.notify();
 			try {
-				const result = await ctx.remote.powerDsh.setSkillEnabled(cwd, scope, name, enabled);
+				const result = await ctx.remote.powerDsh.setSkillEnabled(context, scope, name, enabled);
 				if (!result.ok) throw new Error(result.error.message);
-				if (!active || generation !== skillGeneration) return;
+				if (!active || generation !== skillGeneration) return null;
 				skillCatalog = {
 					status: "ready",
 					value: result.value,
@@ -4881,12 +5960,13 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 						...skillCatalog,
 						saving: null
 					};
-					await loadSkills(cwd, scope);
+					await loadSkills(context, scope);
 				}
 				throw failure;
 			} finally {
 				skillWritePending = false;
 			}
+			return null;
 		};
 		preferenceSlot("skillManagerEnabled", "settings.section", {
 			id: "power-dsh-skills",
@@ -4899,7 +5979,13 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			skillsSource,
 			loadSkills,
 			setSkillEnabled,
-			readSkill
+			readSkill,
+			deleteSkill,
+			listWorkspaceSkills,
+			discoverSkills,
+			readExternalSkill,
+			readImportDestination,
+			importSkills
 		}));
 		preferenceSlot("skillManagerEnabled", "settings.section.icon", { id: "power-dsh-skills" }, SkillsIcon);
 		return {
@@ -4912,7 +5998,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				skillsSource,
 				loadSkills,
 				setSkillEnabled,
-				readSkill
+				readSkill,
+				listWorkspaceSkills,
+				discoverSkills,
+				readExternalSkill,
+				importSkills
 			}
 		};
 	}
@@ -4932,11 +6022,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"skillManagerEnabled": "Skill management",
 			"skillManagerDescription": "Manage skills in settings",
 			"skillsTab": "Skills",
-			"skillsDescription": "Manage available skills",
+			"skillsDescription": "DSH reads skills from .dsh and .agents automatically",
+			"skillDiscoverDescription": "Import skills from other agents",
 			"skillSearch": "Search skills",
 			"skillSources": "Filter by source",
 			"skillAllSources": "All sources",
-			"skillWorkspace": "Workspace",
 			"skillNoProjects": "No imported workspaces",
 			"skillPreinstalledDescription": "Provided by plugins",
 			"skillPersonalDescription": "Loaded from local skill directories",
@@ -4966,19 +6056,94 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"skillDetailNoContent": "This skill has no instruction body.",
 			"skillDetailDescription": "Description",
 			"skillDetailPath": "Path",
+			"skillDetailSource": "Source",
 			"skillCopyCode": "Copy code",
 			"skillCopiedCode": "Copied",
-			"skillFootnotes": "Footnotes"
+			"skillFootnotes": "Footnotes",
+			"skillImport": "Discover",
+			"skillImportOne": "Import",
+			"skillImportTitle": "Import skill",
+			"skillImportTo": "Import to",
+			"skillImportTargetFailed": "Could not read the destination. Please try again.",
+			"skillChooseOtherTarget": "Choose another destination to import this skill.",
+			"skillAlreadyExists": "Already present",
+			"skillAlreadyExistsHint": "This skill is already in DSH",
+			"skillDelete": "Delete",
+			"skillRemoveLink": "Remove link",
+			"skillDeleting": "Deleting…",
+			"skillDeleteHint": "Delete this skill and its resources? This cannot be undone.",
+			"skillRemoveLinkHint": "Remove this link from DSH? The source files will be kept.",
+			"skillDeleteFailed": "Could not delete this skill. Refresh its details and try again.",
+			"skillDeleteChanged": "The skill changed. Refresh its details before deleting.",
+			"skillDeleteReadbackFailed": "The files were removed, but the catalog has not confirmed the change. Refresh before continuing.",
+			"skillImportDone": "Imported successfully",
+			"skillChoosePath": "Choose a path",
+			"skillLinkDone": "Linked {name} to DSH.",
+			"skillCopied": "Copied · independent files",
+			"skillLinked": "Linked to source",
+			"skillShared": "Shared directory · read directly by DSH",
+			"skillSharedDirectory": "Shared directory",
+			"skillUntracked": "Existing skill · source not recorded",
+			"skillSourceChanged": "Source has changed",
+			"skillLocalChanged": "DSH copy has local changes",
+			"skillBothChanged": "Both source and DSH copy have changed",
+			"skillSourceMissing": "Source directory is unavailable",
+			"skillLinkBroken": "Source link is unavailable",
+			"skillTargetChanged": "DSH skill was replaced or shadowed",
+			"skillStateUnknown": "Could not compare source and DSH files",
+			"skillManagedUnavailable": "DSH has not recognised this imported skill",
+			"skillSourceBadgeHint": "Found in {agent}; click to view locations",
+			"skillNameConflict": "DSH has a different skill with this name. Existing files are kept.",
+			"skillDifferentContents": "{count} different contents",
+			"skillSameCopies": "{count} independent copies with identical content",
+			"skillSharedFiles": "Shared files across agents",
+			"skillComparisonUnknown": "Could not read this skill completely. Import is unavailable.",
+			"skillViewConflict": "View conflict",
+			"skillChooseSource": "Choose source…",
+			"skillLinkAction": "Link to source…",
+			"skillLinkConfirm": "Link to source",
+			"skillMoreActions": "More ways to add {name}",
+			"skillCopyHint": "DSH keeps an independent copy. Later source changes or removal will not change this copy.",
+			"skillLinkHint": "DSH references the selected real source directory. Changes affect later reads; moving or deleting it may break the link.",
+			"skillSourcesHint": "Agent labels show discovery locations, not whether those agents have loaded the skill.",
+			"skillInheritedHint": "This project will use the imported skill instead of the global skill with the same name.",
+			"skillSourceLink": "Link",
+			"skillSourceDirectory": "Directory or independent copy",
+			"skillSelectBeforeAdd": "Choose a source to read its instructions and add it.",
+			"skillTarget": "Destination",
+			"skillRelationship": "File relationship",
+			"skillSourcePath": "Source location",
+			"skillRealPath": "Real source",
+			"skillViewCurrent": "View current skill",
+			"skillCurrentContent": "Current DSH content",
+			"skillSourceContent": "Current source content",
+			"skillUpdateHint": "Updating replaces this unchanged DSH copy with the source shown below. Review the contents before confirming.",
+			"skillNoOverwriteHint": "Local changes, conflicts and missing sources are kept. No files are overwritten automatically.",
+			"skillUpdateCopy": "Confirm copy update",
+			"skillUpdating": "Updating…",
+			"skillUpdateFailed": "Could not update this copy. Refresh and compare the files again.",
+			"skillStaleSource": "The source changed. Refresh and choose it again.",
+			"skillReadbackFailed": "Files were added, but DSH has not confirmed this skill. Check the management page before retrying.",
+			"skillLinkFailed": "Could not create the link. Check system permissions or choose Copy to DSH.",
+			"skillImportSkipped": "Skipped {name}: {reason}.",
+			"skillImportSkippedUnknown": "unavailable",
+			"skillImporting": "Importing…",
+			"skillImportFailed": "Could not import skills. Please try again.",
+			"skillImportUserScope": "Global",
+			"skillImportUserTarget": "Import to global skills",
+			"skillImportProjectTarget": "Import to this project: {path}",
+			"skillImportEmptyGroup": "No skills found",
+			"skillWorkspaceEmpty": "No skills in this workspace"
 		},
 		"zh": {
 			"skillManagerEnabled": "技能管理",
 			"skillManagerDescription": "在设置中管理技能",
 			"skillsTab": "技能",
-			"skillsDescription": "管理可用的技能",
+			"skillsDescription": "DSH 自动读取 .dsh 和 .agents 中的技能",
+			"skillDiscoverDescription": "从其他 Agent 导入技能",
 			"skillSearch": "搜索技能",
 			"skillSources": "按来源筛选",
 			"skillAllSources": "全部来源",
-			"skillWorkspace": "工作区",
 			"skillNoProjects": "暂无已导入工作区",
 			"skillPreinstalledDescription": "由插件提供",
 			"skillPersonalDescription": "从本机技能目录加载",
@@ -5008,13 +6173,128 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"skillDetailNoContent": "此技能没有正文内容。",
 			"skillDetailDescription": "描述",
 			"skillDetailPath": "路径",
+			"skillDetailSource": "来源",
 			"skillCopyCode": "复制代码",
 			"skillCopiedCode": "已复制",
-			"skillFootnotes": "脚注"
+			"skillFootnotes": "脚注",
+			"skillImport": "发现",
+			"skillImportOne": "导入",
+			"skillImportTitle": "导入技能",
+			"skillImportTo": "导入到",
+			"skillImportTargetFailed": "读取导入位置失败，请重试。",
+			"skillChooseOtherTarget": "请选择其他导入位置。",
+			"skillAlreadyExists": "已存在",
+			"skillAlreadyExistsHint": "DSH 已有此技能",
+			"skillDelete": "删除",
+			"skillRemoveLink": "移除链接",
+			"skillDeleting": "正在删除…",
+			"skillDeleteHint": "确定删除此技能及其资源文件？此操作不可撤销。",
+			"skillRemoveLinkHint": "确定从 DSH 移除此链接？源文件会保留。",
+			"skillDeleteFailed": "删除技能失败，请刷新详情后重试。",
+			"skillDeleteChanged": "技能已发生变化，请刷新详情后重新确认删除。",
+			"skillDeleteReadbackFailed": "文件已移除，但目录尚未确认变化，请刷新后核对。",
+			"skillImportDone": "导入成功",
+			"skillChoosePath": "选择路径",
+			"skillLinkDone": "已链接 {name} 到 DSH。",
+			"skillCopied": "已复制 · 独立副本",
+			"skillLinked": "已链接到源目录",
+			"skillShared": "共享目录 · DSH 直接读取",
+			"skillSharedDirectory": "共享目录",
+			"skillUntracked": "已有技能 · 来源未记录",
+			"skillSourceChanged": "来源有变化",
+			"skillLocalChanged": "DSH 副本有本地修改",
+			"skillBothChanged": "来源与 DSH 副本均有修改",
+			"skillSourceMissing": "源目录不可用",
+			"skillLinkBroken": "链接失效，源位置不可用",
+			"skillTargetChanged": "DSH 技能已被替换或遮蔽",
+			"skillStateUnknown": "暂时无法比较来源与 DSH 文件",
+			"skillManagedUnavailable": "DSH 尚未识别此添加的技能",
+			"skillSourceBadgeHint": "在 {agent} 目录中发现，点击查看位置",
+			"skillNameConflict": "DSH 已有同名但内容不同的技能，保留现有文件。",
+			"skillDifferentContents": "{count} 份内容不同",
+			"skillSameCopies": "{count} 份独立副本，内容相同",
+			"skillSharedFiles": "多个 Agent 共享同一份文件",
+			"skillComparisonUnknown": "无法完整读取此技能，暂不可导入。",
+			"skillViewConflict": "查看冲突",
+			"skillChooseSource": "选择来源…",
+			"skillLinkAction": "链接到源目录…",
+			"skillLinkConfirm": "链接到源目录",
+			"skillMoreActions": "{name} 的更多添加方式",
+			"skillCopyHint": "DSH 保存独立副本，来源后续修改或删除不会同步到此副本。",
+			"skillLinkHint": "DSH 引用所选来源的真实目录。来源修改会影响后续读取，移动或删除可能导致链接失效。",
+			"skillSourcesHint": "Agent 标志表示发现位置，不代表对应 Agent 已加载或启用此技能。",
+			"skillInheritedHint": "此项目将优先使用导入的技能，全局同名技能不受影响。",
+			"skillSourceLink": "链接",
+			"skillSourceDirectory": "实际目录或独立副本",
+			"skillSelectBeforeAdd": "请选择来源，查看对应内容后再添加。",
+			"skillTarget": "添加位置",
+			"skillRelationship": "文件关系",
+			"skillSourcePath": "来源位置",
+			"skillRealPath": "真实源位置",
+			"skillViewCurrent": "查看当前技能",
+			"skillCurrentContent": "DSH 当前内容",
+			"skillSourceContent": "来源当前内容",
+			"skillUpdateHint": "确认后用下方来源内容更新此未被本地修改的 DSH 副本，请先核对内容。",
+			"skillNoOverwriteHint": "保留本地修改、冲突与来源缺失状态，不自动覆盖任何文件。",
+			"skillUpdateCopy": "确认更新副本",
+			"skillUpdating": "正在更新…",
+			"skillUpdateFailed": "无法更新此副本，请刷新后重新比较文件。",
+			"skillStaleSource": "来源已变化，请刷新并重新选择。",
+			"skillReadbackFailed": "文件已添加，但 DSH 尚未确认识别，请先在管理页核对，勿重复添加。",
+			"skillLinkFailed": "无法创建链接，请检查系统权限，或选择复制到 DSH。",
+			"skillImportSkipped": "跳过 {name}：{reason}。",
+			"skillImportSkippedUnknown": "暂不可用",
+			"skillImporting": "正在导入…",
+			"skillImportFailed": "导入技能失败，请重试。",
+			"skillImportUserScope": "全局",
+			"skillImportUserTarget": "导入到全局技能",
+			"skillImportProjectTarget": "导入到此项目：{path}",
+			"skillImportEmptyGroup": "未发现技能",
+			"skillWorkspaceEmpty": "此工作区没有技能"
 		}
 	};
 
 // src/features/skills/rpc.ts
+	function parseSources(value) {
+		if (!isArray(value) || value.length > 400) throw new TypeError("Invalid skill sources");
+		return value.map((source) => {
+			if (!isRecord(source) || !hasStrings(source, [
+				"agent",
+				"path",
+				"realPath"
+			]) || typeof source.linked !== "boolean") throw new TypeError("Invalid skill source");
+			return {
+				agent: source.agent,
+				path: source.path,
+				realPath: source.realPath,
+				linked: source.linked
+			};
+		});
+	}
+	function parseVariant(value) {
+		if (!isRecord(value) || !hasStrings(value, [
+			"id",
+			"description",
+			"path",
+			"revision"
+		]) || typeof value.flat !== "boolean") throw new TypeError("Invalid skill variant");
+		return {
+			id: value.id,
+			description: value.description,
+			path: value.path,
+			revision: value.revision,
+			flat: value.flat,
+			sources: parseSources(value.sources)
+		};
+	}
+	function parseDeletion(value) {
+		if (!isRecord(value) || !hasStrings(value, ["path", "revision"]) || typeof value.linked !== "boolean" || !value.path || !/^[a-f0-9]{64}$/.test(value.revision)) throw new TypeError("Invalid skill deletion");
+		return {
+			path: value.path,
+			revision: value.revision,
+			linked: value.linked
+		};
+	}
 	const skillCatalogCodec = {
 		mode: "strict",
 		typeSymbol: "power-dsh#SkillCatalog",
@@ -5085,7 +6365,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				origin: value.origin,
 				enabled: value.enabled,
 				modelInvocable: value.modelInvocable,
-				userInvocable: value.userInvocable
+				userInvocable: value.userInvocable,
+				...value.deletion === void 0 ? {} : { deletion: parseDeletion(value.deletion) }
 			};
 		} })
 	};
@@ -5100,7 +6381,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				name,
 				wire: name,
 				source: "json",
-				codec: name === "enabled" ? booleanCodec : stringCodec
+				codec: name === "enabled" || name === "flat" ? booleanCodec : stringCodec
 			})),
 			result
 		};
@@ -5117,10 +6398,229 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		"name",
 		"enabled"
 	]);
+	const externalSkillCatalogCodec = {
+		mode: "strict",
+		typeSymbol: "power-dsh#ExternalSkillCatalog",
+		create: () => ({ parse(value) {
+			if (!isRecord(value) || typeof value.complete !== "boolean" || !isArray(value.entries)) throw new TypeError("Invalid external skill catalog");
+			const entries = value.entries.map((row) => {
+				if (!isRecord(row) || !hasStrings(row, [
+					"id",
+					"name",
+					"description",
+					"source",
+					"path"
+				]) || typeof row.flat !== "boolean") throw new TypeError("Invalid external skill entry");
+				if (row.variants !== void 0 && (!isArray(row.variants) || row.variants.length > 400)) throw new TypeError("Invalid skill variants");
+				if (row.comparison !== void 0 && !isOneOf(row.comparison, [
+					"same",
+					"different",
+					"unknown"
+				])) throw new TypeError("Invalid skill comparison");
+				if (row.conflict !== void 0 && typeof row.conflict !== "boolean") throw new TypeError("Invalid skill conflict");
+				if (row.available !== void 0 && typeof row.available !== "boolean") throw new TypeError("Invalid skill availability");
+				if (row.inherited !== void 0 && typeof row.inherited !== "boolean") throw new TypeError("Invalid skill inheritance");
+				return {
+					id: row.id,
+					name: row.name,
+					description: row.description,
+					source: row.source,
+					path: row.path,
+					flat: row.flat,
+					...isArray(row.variants) ? { variants: row.variants.map(parseVariant) } : {},
+					...row.sources === void 0 ? {} : { sources: parseSources(row.sources) },
+					...isOneOf(row.comparison, [
+						"same",
+						"different",
+						"unknown"
+					]) ? { comparison: row.comparison } : {},
+					...typeof row.conflict === "boolean" ? { conflict: row.conflict } : {},
+					...typeof row.available === "boolean" ? { available: row.available } : {},
+					...typeof row.inherited === "boolean" ? { inherited: row.inherited } : {}
+				};
+			});
+			return {
+				complete: value.complete,
+				entries
+			};
+		} })
+	};
+	const skillImportResultCodec = {
+		mode: "strict",
+		typeSymbol: "power-dsh#SkillImportResult",
+		create: () => ({ parse(value) {
+			if (!isRecord(value) || !isArray(value.imported) || !value.imported.every((item) => typeof item === "string") || !isArray(value.skipped)) throw new TypeError("Invalid skill import result");
+			const skipped = value.skipped.map((item) => {
+				if (!isRecord(item) || !hasStrings(item, ["name", "reason"])) throw new TypeError("Invalid skill import skipped row");
+				return {
+					name: item.name,
+					reason: item.reason
+				};
+			});
+			return {
+				imported: value.imported,
+				skipped
+			};
+		} })
+	};
+	const stringArrayCodec = {
+		mode: "strict",
+		typeSymbol: "string[]",
+		create: () => ({ parse(value) {
+			if (!isArray(value) || !value.every((item) => typeof item === "string")) throw new TypeError("Expected a string array");
+			return value;
+		} })
+	};
+	const externalSkillDetailCodec = {
+		mode: "strict",
+		typeSymbol: "power-dsh#ExternalSkillDetail",
+		create: () => ({ parse(value) {
+			if (value === null) return null;
+			if (!isRecord(value) || !hasStrings(value, [
+				"name",
+				"description",
+				"content",
+				"source",
+				"path"
+			])) throw new TypeError("Invalid external skill detail");
+			return {
+				name: value.name,
+				description: value.description,
+				content: value.content,
+				source: value.source,
+				path: value.path
+			};
+		} })
+	};
+	const READ_EXTERNAL_SKILL_RPC = {
+		id: "power-dsh#powerDsh/readExternalSkill",
+		service: "powerDsh",
+		namespace: "powerDsh",
+		method: "readExternalSkill",
+		invocation: { kind: "direct" },
+		parameters: [
+			{
+				name: "cwd",
+				wire: "cwd",
+				source: "json",
+				codec: stringCodec
+			},
+			{
+				name: "scope",
+				wire: "scope",
+				source: "json",
+				codec: stringCodec
+			},
+			{
+				name: "id",
+				wire: "id",
+				source: "json",
+				codec: stringCodec
+			}
+		],
+		result: externalSkillDetailCodec
+	};
+	const DISCOVER_EXTERNAL_SKILLS_RPC = {
+		id: "power-dsh#powerDsh/discoverExternalSkills",
+		service: "powerDsh",
+		namespace: "powerDsh",
+		method: "discoverExternalSkills",
+		invocation: { kind: "direct" },
+		parameters: [{
+			name: "cwd",
+			wire: "cwd",
+			source: "json",
+			codec: stringCodec
+		}, {
+			name: "scope",
+			wire: "scope",
+			source: "json",
+			codec: stringCodec
+		}],
+		result: externalSkillCatalogCodec
+	};
+	const IMPORT_EXTERNAL_SKILLS_RPC = {
+		id: "power-dsh#powerDsh/importExternalSkills",
+		service: "powerDsh",
+		namespace: "powerDsh",
+		method: "importExternalSkills",
+		invocation: { kind: "direct" },
+		parameters: [
+			{
+				name: "cwd",
+				wire: "cwd",
+				source: "json",
+				codec: stringCodec
+			},
+			{
+				name: "scope",
+				wire: "scope",
+				source: "json",
+				codec: stringCodec
+			},
+			{
+				name: "ids",
+				wire: "ids",
+				source: "json",
+				codec: stringArrayCodec
+			}
+		],
+		result: skillImportResultCodec
+	};
+	const ADD_SKILL_RPC = skillRpc("addSkill", [
+		"cwd",
+		"scope",
+		"id",
+		"mode",
+		"revision"
+	], skillImportResultCodec);
+	const skillImportDestinationCodec = {
+		mode: "strict",
+		typeSymbol: "power-dsh#SkillImportDestination",
+		create: () => ({ parse(value) {
+			if (!isRecord(value) || !hasStrings(value, ["path"]) || !hasBooleans(value, [
+				"complete",
+				"available",
+				"inherited"
+			])) throw new TypeError("Invalid skill import destination");
+			return {
+				path: value.path,
+				complete: value.complete,
+				available: value.available,
+				inherited: value.inherited
+			};
+		} })
+	};
+	const READ_SKILL_IMPORT_DESTINATION_RPC = skillRpc("readSkillImportDestination", [
+		"cwd",
+		"scope",
+		"name",
+		"flat"
+	], skillImportDestinationCodec);
+	const IMPORT_SKILL_TO_RPC = skillRpc("importSkillTo", [
+		"cwd",
+		"scope",
+		"id",
+		"revision",
+		"targetCwd"
+	], skillImportResultCodec);
+	const DELETE_SKILL_RPC = skillRpc("deleteSkill", [
+		"cwd",
+		"scope",
+		"name",
+		"revision"
+	]);
 	const rpc$8 = [
 		LIST_SKILLS_RPC,
 		READ_SKILL_RPC,
-		SET_SKILL_ENABLED_RPC
+		SET_SKILL_ENABLED_RPC,
+		DISCOVER_EXTERNAL_SKILLS_RPC,
+		READ_EXTERNAL_SKILL_RPC,
+		IMPORT_EXTERNAL_SKILLS_RPC,
+		ADD_SKILL_RPC,
+		READ_SKILL_IMPORT_DESTINATION_RPC,
+		IMPORT_SKILL_TO_RPC,
+		DELETE_SKILL_RPC
 	];
 
 // src/features/telemetry-blocking/client.ts
@@ -7861,8 +9361,12 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				const refresh = () => {
 					loadArchivedSessions();
 				};
+				const offConnection = ctx.connection.generation.subscribe(refresh);
 				window.addEventListener("focus", refresh);
-				return () => window.removeEventListener("focus", refresh);
+				return () => {
+					offConnection();
+					window.removeEventListener("focus", refresh);
+				};
 			}, []);
 			const groups = catalog ? groupArchivedSessions(catalog, query, t("archiveUngrouped"), {
 				sortBy,
@@ -10626,6 +12130,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			"skillPersonalGroup": "User",
 			"retry": "Retry",
 			"errorDetails": "Error information",
+			"errorDetailsAction": "Details",
 			"copyErrorInfo": "Copy error information",
 			"errorInfoCopied": "Error information copied.",
 			"errorInfoCopyFailed": "Could not copy. Select the text above and copy it manually.",
@@ -10653,6 +12158,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			"skillPersonalGroup": "用户",
 			"retry": "重试",
 			"errorDetails": "错误信息",
+			"errorDetailsAction": "详情",
 			"copyErrorInfo": "复制错误信息",
 			"errorInfoCopied": "已复制错误信息。",
 			"errorInfoCopyFailed": "复制失败，请选择上方文本手动复制。",
@@ -10723,6 +12229,13 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		LIST_SKILLS_RPC,
 		READ_SKILL_RPC,
 		SET_SKILL_ENABLED_RPC,
+		DISCOVER_EXTERNAL_SKILLS_RPC,
+		READ_EXTERNAL_SKILL_RPC,
+		IMPORT_EXTERNAL_SKILLS_RPC,
+		ADD_SKILL_RPC,
+		READ_SKILL_IMPORT_DESTINATION_RPC,
+		IMPORT_SKILL_TO_RPC,
+		DELETE_SKILL_RPC,
 		LIST_MCP_SERVERS_RPC,
 		READ_MCP_SERVER_RPC,
 		SET_MCP_SERVER_ENABLED_RPC,
@@ -10801,7 +12314,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 							t,
 							version,
 							namespace,
-							pluginVersion: "0.0.7",
+							pluginVersion: "0.0.8",
 							savePreference,
 							preferenceSlot: preferenceSlot$1,
 							get footerBusy() {

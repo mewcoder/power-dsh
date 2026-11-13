@@ -34,6 +34,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## 原生设置下拉触发按钮
+
+任务通知与提示音的下拉触发按钮对照桌面 `0.2.2-rc.2` 发行包 `@deepseek-ai/dsh-client-ui-settings-general` 中 `DesktopChannelRow.tsx`、`DesktopChannelRow.module.css`，以及官方提交 `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` 中对应设置选择器的尺寸与状态：36px 高、14px 水平内边距、12px 图文间距、14px／22px 字体及主题交互背景。采用本插件自有类名，并复用公共 `Menu` 和原生 regular 下箭头 sprite；不运行时导入内部设置组件、CSS 或改写宿主 DOM。官方源码使用 MIT 许可证，全文见本文第一节。
+
+- [原生通用设置下拉](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/client/ui-settings-general/src/client/DesktopChannelRow.tsx)
+- [原生下拉触发按钮样式](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/client/ui-settings-general/src/client/DesktopChannelRow.module.css)
+
 ## 原生工作区（Workspace）删除语义
 
 [工作区管理](../src/features/projects/spec.md)的移除操作只调用原生 `workspaceController.delete({ workspaceId })`，沿用 DSH `0.2.2-rc.1` 安装包 `@deepseek-ai/dsh-api-workspace-controller` 与官方提交 `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` 的 `packages/workspace/workspace`、`packages/client/ui-workspace` 已核对的语义：删除一条工作区登记，保留目录与全部会话日志，会话回到「未分组」。确认框文案对照原生「删除工作区」的保留说明改写为本功能措辞，行内与确认按钮沿用上文原生危险按钮规格；没有复制其页面结构、组件或代码。
@@ -88,6 +95,8 @@ SOFTWARE.
 ## 重启插件参考
 
 [hulibuld/dsh-refresh-restart](https://github.com/hulibuld/dsh-refresh-restart/tree/3228af3fc3bcc27eb5b290831e43e5734d85901d)，提交 `3228af3fc3bcc27eb5b290831e43e5734d85901d`，MIT。阅读 `lib/restart.js`、`lib/platform.js` 与 Client 交互，仅借鉴外部助手、正常退出后重开的思路，没有复制代码。其他同类实现、平台取舍与原生确认组件来源见[重启应用](../src/features/restart-button/spec.md#参考与验证)。
+
+Windows 后续实现补充只读参考同仓库提交 `3acfc36373cc33d0b368a0fcfc248ddb54c4587b` 的 `lib/win.js`、`lib/win-helper.ps1`（Explorer 交接外部助手），[CZY1326/dsh-restart-button](https://github.com/CZY1326/dsh-restart-button/tree/70cb30cf54c57bbce3126d3e8d0ff1ecfc73c672) 的 `lib/index.js`（确认退出后重开），以及 [SMPcosy/dsh-easy2restart](https://github.com/SMPcosy/dsh-easy2restart/tree/05da56a6c876b758ffdaaa1589ce65526c3f6ee5) 的 `restart/restart.ps1` 与 Host 调度（Windows 进程树生命周期）。三者均为 MIT，仅借鉴方案，没有复制代码、安装依赖或执行参考插件；不采用修改 ASAR、计划任务或按进程名全局强杀，自行实现当前实例路径／PID／创建时间核对、一次性授权与清理。
 
 ## 通知插件参考
 
@@ -200,3 +209,20 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 历史合并背景阶段的「透明度」「毛玻璃」两行设置交互参考同目录 wallpaper 插件与 homepage-glass：wallpaper 以 0–100 的整屏磨砂与表面透明度滑块、homepage-glass 以卡片 `backdrop-filter: blur(14px) saturate(1.5)` 与固定半透明底色呈现毛玻璃，并在系统「减少透明」时退回不透明。当时只借鉴其「磨砂 + 透明度」的思路，用自有图层 `opacity` 与 Canvas `filter: blur()` 实现，未复制其滑块组件、样式表或 DOM 接入代码；当前独立壁纸的可见度与媒体扩边遵循上文 Cindy 参考。
 
 「自定义壁纸」的存储与上传交互参考同目录 wallpaper 插件的本地文件导入思路（本地读取、不自动上传、校验类型与体积）。PowerDSH 未复制其渲染器、壁纸库或界面代码，只实现单个壁纸文件的本地上传、校验与读取；图片保存在用户自己的 DSH profile 内，不上传任何远端。
+
+## 技能导入的来源扫描研究
+
+[技能管理](../src/features/skills/spec.md)的「从其他 Agent 导入」在实现前检索 dsh-market 并阅读以下参考实现，仅用于确定扫描目录、条目格式与冲突语义，没有复制代码、图标或样式：
+
+| 参考仓库 | 提交 | 许可 | 参考内容 |
+| --- | --- | --- | --- |
+| [Free-LZJ/free-dsh-plugins](https://github.com/Free-LZJ/free-dsh-plugins/tree/a668e48)（`packages/agent-import`） | `a668e48` | MIT | 22 个 agent 的技能目录表、`CODEX_HOME`／`CLAUDE_CONFIG_DIR`／`DSH_AGENTS_HOME` 覆盖、按真实路径合并同一链接技能、项目根优先于用户根 |
+| [WilShi/dsh-skill-station](https://github.com/WilShi/dsh-skill-station/tree/b39b84a) | `b39b84a` | MIT | Claude/Codex/Cursor/Gemini 四源扫描、Gemini 的 `antigravity/skills` 变体、只读扫描与冲突检测 |
+| [6pofx/dsh-tool-explorer](https://github.com/6pofx/dsh-tool-explorer/tree/63ea4c8) | `63ea4c8` | MIT | 跨 agent 配置导入的整体思路（本项目只用于确认“扫描已知目录”而非读取任意配置） |
+| [mjylfz/dsh-skill-mover](https://github.com/mjylfz/dsh-skill-mover/tree/a193e69aecb8138ea541bb13a05c0dbf58be01b6) | `a193e69aecb8138ea541bb13a05c0dbf58be01b6` | MIT | `src/core.js` 的名称／路径聚合与来源记录、`src/client/index.js` 的固定复制交互 |
+| [farion1231/cc-switch](https://github.com/farion1231/cc-switch/tree/3c76d3bda670297dd8c27d7d9be9b18a4c9143f5) | `3c76d3bda670297dd8c27d7d9be9b18a4c9143f5` | MIT | `src-tauri/src/services/skill.rs` 与 `app_config.rs` 的多 Agent 状态、来源与更新哈希 |
+| [vercel-labs/skills](https://github.com/vercel-labs/skills/tree/e781cb4d07433dfe1d19e924ed45cc61738c55ec) | `e781cb4d07433dfe1d19e924ed45cc61738c55ec` | MIT | `src/installer.ts` 与 `src/skill-lock.ts` 的复制／链接模式及独立安装记录 |
+
+另核对 `6pofx/dsh-tool-explorer` 提交 `63ea4c8192f715c3157af69e71fef67915db8af1` 的内容哈希、安装记录与更新判断。本项目自行实现有界扫描、完整包指纹、路径选择与不覆盖导入；当前直接依据原生目录判断是否已存在，不采用独立导入记录或受管更新流程。上述源码只作设计对照，没有复制实现、样式、图标或依赖，也未安装、执行这些插件。不读取其他 Agent 的 MCP／规则配置、不写入其他 Agent 目录或锁文件，行为边界见主 Spec。
+
+删除交互另对照同一提交的 `src/skills-trash.ts`，只用于理解确认路径和共享目录的边界。本项目独立实现 DSH 自有目录删除、确认指纹及失败暂存恢复，不采用来源的共享目录删除、回收站、锁文件或删除历史，也没有复制源码。

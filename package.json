@@ -1,6 +1,6 @@
 {
   "name": "power-dsh",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "license": "MIT",
   "private": true,
   "packageManager": "pnpm@12.5.1",

@@ -7,10 +7,12 @@ interface RestartOptions {
   readFile?: (path: string, encoding: 'utf8') => Promise<string>;
   realpath?: (path: string) => Promise<string>;
   spawn?: (command: string, args: string[], options: SpawnOptions) => ChildProcess;
+  windows?: Partial<WindowsRestartOptions>;
 }
 interface RestartOperation { handle: ChildProcess | null; handedOff: boolean }
 import { spawn } from 'node:child_process';
 import { readFile, realpath } from 'node:fs/promises';
+import { WindowsRestart, type WindowsRestartOptions } from './windows-restart.ts';
 
 // The helper outlives the Host only after an explicit restart request.
 // A cancelled quit or a timeout exits without launching another copy.
@@ -30,7 +32,7 @@ export const MAC_RESTART_SCRIPT = `on run argv
   error "Application did not exit" number 1001
 end run`;
 
-/** Only the packaged macOS desktop Host can hand off a graceful application restart. */
+/** Verified packaged desktop Hosts can hand off one application restart. */
 export class DesktopRestart {
   config: LivePreferences;
   platform: string;
@@ -42,6 +44,7 @@ export class DesktopRestart {
   closed: boolean;
   current: RestartOperation | null;
   error: RestartStatus['error'];
+  windows: WindowsRestart | null;
   constructor(ctx: NativeContext, config: LivePreferences, options: RestartOptions = {}) {
     this.config = config;
     this.platform = options.platform ?? process.platform;
@@ -53,6 +56,9 @@ export class DesktopRestart {
     this.closed = false;
     this.current = null;
     this.error = '';
+    this.windows = this.platform === 'win32' ? new WindowsRestart(config, {
+      executable: this.executable, env: this.env, ...options.windows,
+    }) : null;
     ctx.effect(() => () => this.close());
   }
 
@@ -73,6 +79,7 @@ export class DesktopRestart {
   }
 
   async status(): Promise<RestartStatus> {
+    if (this.windows) return this.windows.status();
     if (this.closed) throw new Error('restartUnavailable');
     const supported = Boolean(await this.target());
     if (this.closed) throw new Error('restartUnavailable');
@@ -80,6 +87,7 @@ export class DesktopRestart {
   }
 
   async restart(): Promise<RestartAccepted> {
+    if (this.windows) return this.windows.restart();
     if (this.closed || this.config.showRestartButton.get() !== true) throw new Error('restartUnavailable');
     if (this.current) throw new Error('restartBusy');
     const operation: RestartOperation = { handle: null, handedOff: false };
@@ -119,6 +127,7 @@ export class DesktopRestart {
 
   close() {
     this.closed = true;
+    this.windows?.close();
     // An accepted handoff must survive the application's normal Host teardown.
     if (this.current && !this.current.handedOff) this.current.handle?.kill();
   }

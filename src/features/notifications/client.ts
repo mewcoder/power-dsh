@@ -13,8 +13,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   let active = true;
   let notificationSequence = 0;
   const newNativeGroup = () => `pd${Math.random().toString(36).slice(2, 14)}`;
-  let transport: { status: 'loading' | 'ready' | 'error'; value: NotificationTransport | null; local: boolean; testing: boolean; tested: boolean } = {
-    status: 'loading', value: null, local: false, testing: false, tested: false,
+  let transport: { status: 'loading' | 'ready' | 'error'; value: NotificationTransport | null; local: boolean; testing: boolean } = {
+    status: 'loading', value: null, local: false, testing: false,
   };
   let transportGeneration = 0;
   const transportSource = observable(() => transport);
@@ -96,7 +96,6 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
               return;
             }
             if (reply.value.shown) reportError('');
-            if (manual && reply.value.shown) publishTransport({ tested: true });
             if (reply.value.shown && localTone) {
               try { await playSound(sound, false); }
               catch (_error) { if (active) reportError('notificationSoundFailed'); }
@@ -129,7 +128,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
           }, 5000);
           pendingTests.set(notification, () => { window.clearTimeout(timer); pendingTests.delete(notification); resolve(); });
           notification.onshow = () => {
-            if (active) { reportError(''); publishTransport({ tested: true }); }
+            if (active) reportError('');
             pendingTests.get(notification)?.();
           };
         });
@@ -391,6 +390,9 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     }, [snapshot.value?.notificationsEnabled, snapshot.value?.notificationMode]);
     const soundName = (sound: SoundEntry) => sound.id === 'default' ? t('notificationSoundDefault')
       : sound.id.startsWith('win:') ? t(`sound${sound.id.slice(4)}`) : sound.name;
+    const selectorChevron = () => h('svg', { width: 16, height: 16, className: 'power-dsh-notification-select-icon',
+      'data-icon': 'dsw-icon-chevron-down-outline-regular', 'aria-hidden': true, focusable: false },
+      h('use', { href: '#dsw-icon-chevron-down-outline-regular' }));
     const mode = snapshot.value?.notificationsEnabled === true ? snapshot.value.notificationMode || 'background' : 'never';
     function modeRow() {
       const busy = saving?.field === 'notificationMode';
@@ -408,28 +410,27 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         h('div', { className: 'power-dsh-notification-controls' },
           h('button', { type: 'button', className: 'power-dsh-notification-test',
             disabled: disabled || busy || !notificationReady || !transportReady() || channel.testing || mode === 'never',
-            title: t(channel.tested ? 'notificationTestSent' : 'notificationTest'),
+            title: t('notificationTest'),
             'aria-label': t('notificationTest'), 'aria-busy': channel.testing, onClick: testNotification },
             h('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
               strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, focusable: false },
-              channel.tested ? h('path', { d: 'm5 12 4 4L19 6' }) : h(React.Fragment, null,
-                h('path', { d: 'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4' })))),
+              h('path', { d: 'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4' }))),
           h(Menu, { open: modeMenuOpen && !disabled && !busy, onClose: () => setModeMenuOpen(false), selectedId: mode,
-          portal: true, align: 'end', autoFocus: true, minWidthFromAnchor: true,
-          items: ['never', 'background', 'always'].map(value => ({ id: value, label: modeLabel(value) })),
-          onSelect: value => { setModeMenuOpen(false); return save('notificationMode', value); },
-          anchor: h('button', { type: 'button', className: 'power-dsh-mode-select', disabled: disabled || busy,
-            'aria-label': t('notificationsEnabled'), 'aria-haspopup': 'menu', 'aria-expanded': modeMenuOpen && !disabled && !busy,
-            'aria-describedby': `${id}-notificationMode-description${failed || notifications.error ? ` ${id}-notificationMode-error` : ''}`,
-            'aria-invalid': Boolean(failed || notifications.error),
-            'aria-busy': busy, onClick: () => { if (!disabled && !busy) setModeMenuOpen(true); },
-          }, modeLabel(mode)) })));
+            portal: true, align: 'end', autoFocus: true, minWidthFromAnchor: true,
+            items: ['never', 'background', 'always'].map(value => ({ id: value, label: modeLabel(value) })),
+            onSelect: value => { setModeMenuOpen(false); return save('notificationMode', value); },
+            anchor: h('button', { type: 'button', className: 'power-dsh-mode-select', disabled: disabled || busy,
+              'aria-label': t('notificationsEnabled'), 'aria-haspopup': 'menu', 'aria-expanded': modeMenuOpen && !disabled && !busy,
+              'aria-describedby': `${id}-notificationMode-description${failed || notifications.error ? ` ${id}-notificationMode-error` : ''}`,
+              'aria-invalid': Boolean(failed || notifications.error),
+              'aria-busy': busy, onClick: () => { if (!disabled && !busy) setModeMenuOpen(value => !value); },
+            }, h('span', { className: 'power-dsh-notification-select-label' }, modeLabel(mode)), selectorChevron()) })));
     }
     const testNotification = async () => {
       const current = source.getSnapshot();
       if (!active || current.status !== 'ready' || !current.writable || current.value?.notificationsEnabled !== true
         || current.value.notificationMode === 'never' || !transportReady() || transport.testing || !testSender) return;
-      publishTransport({ testing: true, tested: false });
+      publishTransport({ testing: true });
       try { await testSender(); }
       finally { if (active) publishTransport({ testing: false }); }
     };
@@ -480,10 +481,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
               'aria-haspopup': 'menu', 'aria-expanded': soundMenuOpen && !soundDisabled,
               'aria-busy': sounds.playing || saving?.field === 'notificationSound',
               onClick: () => { if (!soundDisabled) setSoundMenuOpen(value => !value); },
-            }, sounds.status === 'remote' ? t('notificationSoundDefault') : current ? soundName(current) : t(sounds.status === 'ready' ? 'notificationSoundMissing' : 'notificationSoundDefault'), h('svg', {
-              width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', strokeWidth: 1.4,
-              strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, focusable: false,
-            }, h('path', { d: 'm4 6 4 4 4-4' }))),
+            }, h('span', { className: 'power-dsh-notification-select-label' },
+              sounds.status === 'remote' ? t('notificationSoundDefault') : current ? soundName(current) : t(sounds.status === 'ready' ? 'notificationSoundMissing' : 'notificationSoundDefault')), selectorChevron()),
           }),
           h('button', {
             type: 'button', className: 'power-dsh-sound-preview', disabled: soundDisabled || !current,

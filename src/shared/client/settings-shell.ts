@@ -52,7 +52,7 @@ export function createSettingsPage(runtime: ClientRuntime) {
       event.preventDefault();
       selectTab(tabs[nextIndex].id, true);
     }
-    const viewContext = { snapshot, disabled, saving, error, save, id, leaveSettings: close };
+    const viewContext = { snapshot, activeTab, disabled, saving, error, save, id, leaveSettings: close };
     const fields = features.flatMap(feature => feature.useSettings ? feature.useSettings(viewContext) : feature.settings || []);
     const footers = features.map(feature => feature.useSettingsFooter?.(viewContext));
     const allSettings = features.flatMap(feature => feature.settings || []);
@@ -106,7 +106,7 @@ export function createSettingsPage(runtime: ClientRuntime) {
       h('div', {
         id: `${id}-panel-${activeTab}`, className: 'power-dsh-fields', role: 'tabpanel',
         'aria-labelledby': `${id}-tab-${activeTab}`,
-      }, ...fields.filter(field => field.category === activeTab).map(row)), ...footers);
+      }, ...fields.filter(field => field.category === activeTab).map(row), ...footers));
   }
   return SettingsPage;
 }

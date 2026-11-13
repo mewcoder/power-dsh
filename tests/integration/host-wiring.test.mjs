@@ -188,7 +188,7 @@ test('all feature configuration defaults and settings tool output requirements s
   const { tool } = await fixture(t);
   const expected = {
     showVersion: false, showThemeSwitcher: false, showRefreshButton: false, showRestartButton: false,
-    notificationsEnabled: false, notificationMode: 'background', notificationSoundEnabled: true, notificationSound: 'default', pluginUpdatesEnabled: true,
+    notificationsEnabled: false, notificationMode: 'background', notificationSoundEnabled: true, notificationSound: 'default',
     blockOfficialAccount: false, blockOfficialSearch: false, blockOfficialTelemetry: false,
     blockTodo: false, blockPlan: false, blockGoal: false, blockDoubleClickRename: false, personalizationEnabled: false,
     skillManagerEnabled: false, mcpManagerEnabled: false, disabledSkills: [],

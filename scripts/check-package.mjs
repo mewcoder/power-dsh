@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { listFiles } from './lib/files.mjs';
 import { buildArtifacts } from './build.mjs';
+import { runtimeImports } from './lib/runtime-imports.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 await buildArtifacts({ check: true });
@@ -66,7 +67,7 @@ try {
   }
   for (const name of actual.filter(name => name.startsWith('dist/') && name.endsWith('.js'))) {
     run(process.execPath, ['--check', path.join(packageRoot, name)]);
-    for (const [, specifier] of (await read(name)).matchAll(/(?:from\s*|import\s*)['"]([^'"]+)['"]/g)) {
+    for (const specifier of runtimeImports(await read(name), name)) {
       if (specifier.startsWith('.')) {
         const target = path.posix.normalize(path.posix.join(path.posix.dirname(name), specifier));
         assert.ok(files.has(target), `Runtime import is missing: ${name} → ${specifier}`);

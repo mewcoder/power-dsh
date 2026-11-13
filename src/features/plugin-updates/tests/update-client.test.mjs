@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { PluginUpdateClient, compareVersions } from '../update-client.ts';
+import { updateDiagnosticContext } from '../diagnostics.ts';
+import { locales } from '../locales.ts';
 
 const schema = 'dsh-market/update-api/v1';
 const commit = 'a'.repeat(40);
@@ -130,6 +132,57 @@ test('release cooldown survives a client reload, blocks repeated reads and expir
   await reloaded.client.check();
   assert.equal(reloaded.client.state.phase, 'available');
   assert.equal(reloaded.timers.size, 0);
+});
+
+test('failure diagnostics distinguish Host evidence, HTTP, invalid responses and network errors and clear on recovery', async () => {
+  const evidence = { stage: 'release.asset', reason: 'http', httpStatus: 404, observedAt: '2026-11-12T00:00:00.000Z', elapsedMs: 42 };
+  const host = fixture({ releaseResult: { status: 'unavailable', diagnostic: evidence } });
+  await host.client.check();
+  assert.equal(host.client.state.error, 'pluginUpdateAssetFailed');
+  assert.deepEqual(host.client.state.diagnostic, evidence);
+  for (const language of ['en', 'zh']) {
+    const context = updateDiagnosticContext(evidence, '0.0.7', 'error', key => locales[language][key] || key);
+    assert.ok(context.stage.includes('release.asset'));
+    assert.ok(context.actual.includes('HTTP 404'));
+    assert.ok(context.actual.includes('42 ms'));
+    assert.ok(context.state.includes('0.0.7'));
+    assert.ok(!JSON.stringify(context).includes('pluginUpdateStage_'));
+  }
+  for (const [handler, expected] of [
+    [() => new Response('', { status: 502 }), { reason: 'http', httpStatus: 502 }],
+    [() => new Response('private invalid body'), { reason: 'invalid-response', httpStatus: 200 }],
+    [() => { throw new Error('password=private', { cause: { code: 'ECONNRESET' } }); }, { reason: 'network', systemCode: 'ECONNRESET' }],
+  ]) {
+    let fail = true;
+    const f = fixture({ handler: () => fail ? handler() : null });
+    await f.client.check();
+    assert.equal(f.client.state.diagnostic.stage, 'market.capabilities');
+    for (const [key, value] of Object.entries(expected)) assert.equal(f.client.state.diagnostic[key], value);
+    assert.ok(!JSON.stringify(f.client.state).includes('private'));
+    const observed = f.client.state.diagnostic.observedAt;
+    await f.client.resume();
+    assert.equal(f.client.state.diagnostic.observedAt, observed);
+    fail = false;
+    await f.client.check();
+    assert.equal(f.client.state.phase, 'available');
+    assert.equal(f.client.state.diagnostic, null);
+  }
+});
+
+test('a request timeout retains its step and remains distinct from a network rejection', async () => {
+  const started = Promise.withResolvers();
+  const f = fixture({ handler: (_url, init) => new Promise((_resolve, reject) => {
+    init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true });
+    started.resolve();
+  }) });
+  const checking = f.client.check();
+  await started.promise;
+  [...f.timers.values()].find(timer => timer.milliseconds === 15000).callback();
+  await checking;
+  assert.equal(f.client.state.error, 'pluginUpdateTimeout');
+  assert.equal(f.client.state.diagnostic.stage, 'market.capabilities');
+  assert.equal(f.client.state.diagnostic.reason, 'timeout');
+  assert.equal(f.timers.size, 0);
 });
 
 test('release and package validation reject wrong assets, versions, identities, and apparent updates that are not safe targets', async () => {

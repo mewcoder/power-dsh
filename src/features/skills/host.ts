@@ -41,4 +41,50 @@ export const methods = {
       return this.skills.current.setEnabled(cwd, scope, name, enabled);
     });
   },
+  discoverExternalSkills(cwd: string, scope: string) {
+    return this.run(() => {
+      if (!this.skills.current) throw new Error('DSH skill management is unavailable.');
+      return this.skills.current.discoverExternalSkills(cwd, scope);
+    });
+  },
+  readExternalSkill(cwd: string, scope: string, id: string) {
+    return this.run(() => {
+      if (!this.skills.current) throw new Error('DSH skill management is unavailable.');
+      return this.skills.current.readExternal(cwd, scope, id);
+    });
+  },
+  importExternalSkills(cwd: string, scope: string, ids: string[]) {
+    return this.run(() => {
+      if (!this.skills.current) throw new Error('DSH skill management is unavailable.');
+      return this.skills.current.importExternalSkills(cwd, scope, ids);
+    });
+  },
+  addSkill(cwd: string, scope: string, id: string, mode: string, revision: string) {
+    return this.run(() => {
+      if (!this.skills.current) throw new Error('DSH skill management is unavailable.');
+      return this.skills.current.addSkill(cwd, scope, id, mode, revision);
+    });
+  },
+  readSkillImportDestination(cwd: string, scope: string, name: string, flat: boolean) {
+    return this.run(() => {
+      if (!this.skills.current) throw new Error('DSH skill management is unavailable.');
+      return this.skills.current.readSkillImportDestination(cwd, scope, name, flat);
+    });
+  },
+  importSkillTo(cwd: string, scope: string, id: string, revision: string, targetCwd: string) {
+    return this.run(() => {
+      if (!this.skills.current) throw new Error('DSH skill management is unavailable.');
+      return this.skills.current.importSkillTo(cwd, scope, id, revision, targetCwd);
+    });
+  },
+  deleteSkill(cwd: string, scope: string, name: string, revision: string) {
+    return this.run(() => {
+      if (!this.skills.current) throw new Error('DSH skill management is unavailable.');
+      return this.skills.current.deleteSkill(cwd, scope, name, revision).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : '';
+        throw new Error(['skill-delete-changed', 'skill-delete-readback-failed', 'skill-delete-unavailable'].includes(message)
+          ? message : 'skill-delete-failed');
+      });
+    });
+  },
 } satisfies ThisType<HostService & ReturnType<typeof createHost>>;

@@ -210,7 +210,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         footer: h(Button, { variant: 'outline', 'data-modal-autofocus': true, onClick: closeDetail }, t('close')),
       },
       current.status === 'loading' && loadingFeedback({ label: t('mcpDetailLoading') }),
-      current.status === 'error' && errorFeedback({ t, message: current.error, code: 'PD-MCP-DETAIL',
+      current.status === 'error' && errorFeedback({ t, message: current.error, code: 'PD-MCP-DETAIL', placement: 'modal',
         operation: 'readMcpServer', retry: () => { if (server) void openDetail(server, detailTrigger.current); } }),
       current.status === 'ready' && current.value === null
         && h('p', { className: 'power-dsh-notice', role: 'status' }, t('mcpDetailMissing')),

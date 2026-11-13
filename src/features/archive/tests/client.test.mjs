@@ -167,6 +167,23 @@ test('archive load and action failures stay recoverable and localized', async ()
   failing.unmount();
 });
 
+test('a Host reconnect refreshes the archive and clears the stale load error', async () => {
+  let fail = true;
+  const app = await mount({ archiveCatalog: catalog, archiveList: () => fail
+    ? { ok: false, error: { message: 'archiveUnavailable' } }
+    : { ok: true, value: { ...catalog, sessions: [...catalog.sessions], workspaces: [...catalog.workspaces] } } });
+  app.set({ archiveManagerEnabled: true });
+  app.renderArchive('zh');
+  await app.reloadArchive();
+  const render = () => descendants(app.renderArchive('zh'));
+  assert.ok(render().some(node => node.props.role === 'alert'));
+  fail = false;
+  app.setConnectionGeneration({ id: 2 });
+  await new Promise(setImmediate);
+  assert.ok(!render().some(node => node.props.role === 'alert'));
+  app.unmount();
+});
+
 test('the group path only surfaces on hover, not in the header layout', async () => {
   const app = await mount();
   app.set({ archiveManagerEnabled: true });
