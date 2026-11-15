@@ -4,7 +4,7 @@
 
 ## 标识、入口与范围
 
-在 **设置 → PowerDSH → 界面** 提供「快捷推理等级切换」，说明为「在模型选择旁显示推理等级切换按钮」。开启后在输入框工具行的 `conversation.input.right` 原生 slot 注册一枚紧凑按钮：注册位不变，但按钮以自身 `order:1` 在同一个 `standardControls` flex 容器内视觉排在官方模型座位**右侧**；按钮默认用仪表盘显示当前推理等级，也可选择信号格；点击一次切换到下一档，到顶回到序列开头循环。
+在 **设置 → power-dsh → 界面** 提供「快捷推理等级切换」，说明为「在模型选择旁显示推理等级切换按钮」。开启后在输入框工具行的 `conversation.input.right` 原生 slot 注册一枚紧凑按钮：注册位不变，但按钮以自身 `order:1` 在同一个 `standardControls` flex 容器内视觉排在官方模型座位**右侧**；按钮默认用仪表盘显示当前推理等级，也可选择信号格；点击一次切换到下一档，到顶回到序列开头循环。
 
 **位置稳定性**：宿主 `trailing` 组（`margin-left:auto`）靠右对齐，官方模型座位的文字宽度随模型名和档位名变化，会把同组最左侧的控件推着左右移动。`SlotOutlet` 的 anchor 使用 `display:contents`，slot 条目直接成为 `standardControls` 的 flex item，因此本按钮可以用只作用于自身的 `order` 排到模型座位之后，由右侧固定宽度的发送按钮锚定；模型座位变宽时改为向左扩展，按钮位置不再漂移。这不修改宿主 DOM 或 CSS、不替换任何座位、不跨出宿主分配的 slot 容器，是主 Spec 已记录的有限视觉例外；若宿主日后提供模型座位右侧的 list slot，应迁移到该注册位。
 
@@ -12,7 +12,7 @@
 
 ## 配置与行为
 
-`showThinkingEffortSwitcher` 是独立的 boolean 偏好，默认 `false`，通过宿主 `configForms` 在 `power-dsh` 命名空间持久化，仅由本开关读写；`power_dsh_settings` 不暴露该键。设置行的保存成功、保存中、失败回到已保存值的行为由共享设置外壳处理。
+`showThinkingEffortSwitcher` 是独立的 boolean 偏好，默认 `false`，通过宿主 `configForms` 在 `power-dsh` 命名空间持久化，仅由本开关读写。设置行的保存成功、保存中、失败回到已保存值的行为由共享设置外壳处理。
 
 `thinkingEffortGlyph` 是独立的字符串偏好，默认 `arc`，取值 `signal`（信号格）或 `arc`（仪表盘），非法值回退 `arc`，同样通过 `configForms` 持久化，仅由本功能读写。
 

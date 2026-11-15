@@ -2,7 +2,7 @@
 
 ## 模块状态与范围
 
-模块 id `flowing-background` 保留为无 UI 的旧配置兼容模块。它不提供独立功能开关、设置主行、主页调节面板、侧栏快捷按钮、slot 注册、配置监听、动画或其他副作用。官网流动图案已经统一为 [原生设置左侧「壁纸」专页](../wallpaper/spec.md) 中的 `flow` 预制选项，只由 `wallpaperEnabled` 与 `wallpaperSelection` 控制；主开关位于 PowerDSH 界面页第一行，开启后注册壁纸原生侧栏入口及图标，关闭移除入口和效果。
+模块 id `flowing-background` 保留为无 UI 的旧配置兼容模块。它不提供独立功能开关、设置主行、主页调节面板、侧栏快捷按钮、slot 注册、配置监听、动画或其他副作用。官网流动图案已经统一为 [原生设置左侧「壁纸」专页](../wallpaper/spec.md) 中的 `flow` 预制选项，只由 `wallpaperEnabled` 与 `wallpaperSelection` 控制；主开关位于 power-dsh 界面页第一行，开启后注册壁纸原生侧栏入口及图标，关闭移除入口和效果。
 
 模块继续拥有五个隐藏的旧键，保留原保存值，不因升级自动删除或覆盖：
 

@@ -2,7 +2,7 @@
 
 模块 id：`telemetry-blocking`；主开关 `blockOfficialTelemetry` 默认 `false`。模块的[定义](definition.ts)、[配置](config.ts)、[Client](client.ts)与[行为测试](tests/)在本目录维护。
 
-入口：**设置 → PowerDSH → 精简 → 停用官方反馈与遥测**，默认关闭。说明：「停用使用统计、环境信息采集、会话日志及插件清单上报」
+入口：**设置 → power-dsh → 精简 → 停用官方反馈与遥测**，默认关闭。说明：「停用使用统计、环境信息采集、会话日志及插件清单上报」
 
 ## 七个内置目标
 
@@ -28,7 +28,7 @@
 
 保存精简偏好时只更新 `blockOfficialTelemetry`，保留其他功能的当前配置，不删除通知、提示音或双击屏蔽偏好；只移除明确废止的恢复快照与全屏设置字段。行为测试见[遥测策略测试](tests/telemetry-plugins.test.mjs)。
 
-`power_dsh_settings` 调用时按需返回 `telemetry.protected` 和七个目标条目 `senders` 的 available、enabled、active 状态。实现见 [telemetry-policy.ts](telemetry-policy.ts)。
+开关仅从设置界面操作，不提供对话设置工具。策略内部保留对目标 available、enabled、active 状态的核对，实现见 [telemetry-policy.ts](telemetry-policy.ts)。
 
 关闭精简会启用上述匹配目标，包括开启精简前已停用的模块。共用流程见[原生精简操作](../../../docs/architecture.md#原生精简操作)。停用或卸载 Mod 不会自动启用目标，撤销精简的方法见[安装与使用](../../../docs/development.md#安装与使用)。
 

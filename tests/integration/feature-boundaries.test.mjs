@@ -64,19 +64,15 @@ test('a selected Host assembly excludes unrelated capabilities and preserves the
   selectedMod.inject = inject;
   const fiber = await root.plugin(selectedMod);
   const service = root.get('powerDsh');
-  const tool = root.get('tools').get('power_dsh_settings');
+  assert.equal(root.get('tools').get('power_dsh_settings'), undefined);
   assert.deepEqual(wire.invocations.map(rpc => rpc.method), ['setAccountBlocked']);
   assert.equal(service.restartApp, undefined);
   assert.equal(service.playSystemSound, undefined);
   assert.equal(service.skills, undefined);
-  assert.equal(tool.parameters.properties.showRestartButton, undefined);
-  assert.equal(tool.parameters.properties.blockTodo, undefined);
-  assert.equal(tool.parameters.properties.blockPlan, undefined);
   assert.equal(service.setPlanBlocked, undefined);
-  assert.equal(tool.parameters.properties.blockGoal, undefined);
   assert.equal(service.setGoalBlocked, undefined);
-  assert.deepEqual(Object.keys(tool.parameters.properties).sort(), ['blockOfficialAccount', 'showRefreshButton', 'showVersion']);
-  await tool.execute({ showVersion: true, blockOfficialAccount: true }, { signal: new AbortController().signal });
+  await root.get('settings').mutate('power-dsh', [{ op: 'set', path: ['showVersion'], value: true }]);
+  await service.setAccountBlocked(true);
   assert.deepEqual(values, { showVersion: true, showRefreshButton: false, blockOfficialAccount: true,
     notificationsEnabled: true, notificationSound: 'mac:Glass.aiff', blockDoubleClickRename: true });
   assert.equal(target.enabled, false);

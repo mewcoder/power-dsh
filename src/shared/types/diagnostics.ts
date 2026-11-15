@@ -34,7 +34,7 @@ export interface ErrorDiagnostic {
 /** Build copyable diagnostic text only from selected fields, never arbitrary error data. */
 export function diagnosticReport(info: ErrorDiagnostic): string {
   return [
-    'PowerDSH', `Code: ${sanitizeDiagnosticText(info.code)}`,
+    'power-dsh', `Code: ${sanitizeDiagnosticText(info.code)}`,
     `Operation: ${sanitizeDiagnosticText(info.operation)}`,
     `Message: ${sanitizeDiagnosticText(info.message)}`,
     `Observed: ${sanitizeDiagnosticText(info.observedAt)}`,

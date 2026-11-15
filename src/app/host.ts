@@ -1,9 +1,11 @@
 import type * as AccountFeature from '../features/account-blocking/host.ts';
+import type * as MemoryFeature from '../features/memory/host.ts';
 import type * as TelemetryFeature from '../features/telemetry-blocking/host.ts';
 import type * as TodoFeature from '../features/todo-blocking/host.ts';
 import type * as PlanFeature from '../features/plan-blocking/host.ts';
 import type * as GoalFeature from '../features/goal-blocking/host.ts';
 import type * as SearchFeature from '../features/search-blocking/host.ts';
+import type * as SearchPopupFeature from '../features/search-popup/host.ts';
 import type * as PersonalizationFeature from '../features/personalization/host.ts';
 import type * as SkillsFeature from '../features/skills/host.ts';
 import type * as McpFeature from '../features/mcp/host.ts';
@@ -19,18 +21,19 @@ import type { LivePreferences } from '../shared/types/preferences.ts';
 import { OperationQueue } from '../shared/host/operation-queue.ts';
 import { HOST_FEATURES } from './host-features.ts';
 import { MOD_RPC } from './rpc.ts';
-import { createSettingsTool } from './settings-tool.ts';
 export { Config } from './config.ts';
 
 export const inject = ['settings', 'tools', 'clientModules', 'pluginManager', 'typert', 'configEditor', 'profileContext'];
 
 type ComposedService =
   typeof AccountFeature.methods & ReturnType<typeof AccountFeature.createHost>
+  & typeof MemoryFeature.methods & ReturnType<typeof MemoryFeature.createHost>
   & typeof TelemetryFeature.methods & ReturnType<typeof TelemetryFeature.createHost>
   & typeof TodoFeature.methods & ReturnType<typeof TodoFeature.createHost>
   & typeof PlanFeature.methods & ReturnType<typeof PlanFeature.createHost>
   & typeof GoalFeature.methods & ReturnType<typeof GoalFeature.createHost>
   & typeof SearchFeature.methods & ReturnType<typeof SearchFeature.createHost>
+  & typeof SearchPopupFeature.methods & ReturnType<typeof SearchPopupFeature.createHost>
   & typeof PersonalizationFeature.methods & ReturnType<typeof PersonalizationFeature.createHost>
   & typeof SkillsFeature.methods & ReturnType<typeof SkillsFeature.createHost>
   & typeof McpFeature.methods & ReturnType<typeof McpFeature.createHost>
@@ -101,5 +104,4 @@ export function apply(ctx: NativeContext, config: LivePreferences, features: rea
     model: { services: [], events: [], objects: [] }, invocations: MOD_RPC.filter(rpc => selectedRpc.has(rpc.id)),
   }));
   ctx.effect(() => ctx.settings.configure({ auto: false }));
-  ctx.effect(() => ctx.tools.register(createSettingsTool(ctx, config, namespace, service, features)));
 }

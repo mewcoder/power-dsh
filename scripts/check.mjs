@@ -85,15 +85,15 @@ const english = JSON.parse(await read('assets/locale/en.json'));
 const chinese = JSON.parse(await read('assets/locale/zh.json'));
 assert.deepEqual(keys(english.meta), keys(chinese.meta));
 for (const dictionary of [english, chinese]) {
-  assert.equal(dictionary.meta.title, 'PowerDSH');
+  assert.equal(dictionary.meta.title, 'power-dsh');
   for (const field of ['title', 'description']) assert.ok(typeof dictionary.meta[field] === 'string' && dictionary.meta[field].trim());
 }
 assert.deepEqual(keys(dictionaries), ['en', 'zh']);
 assert.deepEqual(keys(dictionaries.en), keys(dictionaries.zh));
-assert.equal(dictionaries.en.description, 'A DSH enhancement plugin');
-assert.equal(dictionaries.zh.description, 'DSH 增强插件');
+assert.equal(dictionaries.en.description, 'A dsh enhancement plugin');
+assert.equal(dictionaries.zh.description, 'dsh 增强插件');
 for (const dictionary of Object.values(dictionaries)) {
-  assert.equal(dictionary.title, 'PowerDSH');
+  assert.equal(dictionary.title, 'power-dsh');
   assert.ok(Object.values(dictionary).every(value => typeof value === 'string' && value.trim()));
 }
 const icon = await read('assets/icon.svg');

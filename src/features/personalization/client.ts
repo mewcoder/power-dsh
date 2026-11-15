@@ -1,4 +1,5 @@
 import { errorMessage } from '../../shared/client/runtime.ts';
+import { standalonePageActive } from '../../shared/client/settings-form.ts';
 import { styles as shellStyles } from '../../shared/client/shell-styles.ts';
 import type { ClientEnvironment, ClientFeature, ClientRuntime, FeatureState, FormSnapshot, IconProps, PageSlotProps, SnapshotSource } from '../../shared/client/types.ts';
 import type { PersonalizationFile } from './rpc.ts';
@@ -129,10 +130,16 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     instructions = { status: 'ready', value: result.value, error: '' };
     instructionsSource.notify();
   };
+  const renderPage = (props: PageSlotProps) => h(PersonalizationPage, { ...props, source, instructionsSource, loadInstructions, saveInstructions });
   preferenceSlot('personalizationEnabled', 'settings.section', {
     id: 'power-dsh-personalization', order: 51, locale: namespace,
     label: () => t('personalizationTab'),
-  }, (props: PageSlotProps) => h(PersonalizationPage, { ...props, source, instructionsSource, loadInstructions, saveInstructions }));
-  preferenceSlot('personalizationEnabled', 'settings.section.icon', { id: 'power-dsh-personalization' }, PersonalizationIcon);
-  return { settings: [{ field: 'personalizationEnabled', description: 'personalizationDescription', save: next => savePreference('personalizationEnabled', next === true, 'settingsOutdated'), hideError: true }], api: { instructionsSource, loadInstructions, saveInstructions } } satisfies ClientFeature;
+  }, renderPage, () => !standalonePageActive(source));
+  preferenceSlot('personalizationEnabled', 'settings.section.icon', { id: 'power-dsh-personalization' }, PersonalizationIcon, () => !standalonePageActive(source));
+  return { settings: [{ field: 'personalizationEnabled', description: 'personalizationDescription', save: next => savePreference('personalizationEnabled', next === true, 'settingsOutdated'), hideError: true }],
+    pages: [{
+      id: 'personalization', label: 'personalizationTab', icon: PersonalizationIcon, order: 10,
+      available: snapshot => snapshot.status === 'ready' && snapshot.value?.personalizationEnabled === true,
+      render: renderPage,
+    }], api: { instructionsSource, loadInstructions, saveInstructions } } satisfies ClientFeature;
 }

@@ -1,4 +1,8 @@
 import type { HostFeature } from '../shared/host/feature.ts';
+import { definition as memoryDefinition } from '../features/memory/definition.ts';
+import * as memoryConfig from '../features/memory/config.ts';
+import * as memoryHost from '../features/memory/host.ts';
+import { rpc as memoryRpc } from '../features/memory/rpc.ts';
 import { definition as pluginUpdatesDefinition } from '../features/plugin-updates/definition.ts';
 import * as pluginUpdatesConfig from '../features/plugin-updates/config.ts';
 import * as pluginUpdatesHost from '../features/plugin-updates/host.ts';
@@ -64,6 +68,12 @@ import { definition as wallpaperDefinition } from '../features/wallpaper/definit
 import * as wallpaperConfig from '../features/wallpaper/config.ts';
 import * as wallpaperHost from '../features/wallpaper/host.ts';
 import { rpc as wallpaperRpc } from '../features/wallpaper/rpc.ts';
+import { definition as standalonePageDefinition } from '../features/standalone-page/definition.ts';
+import * as standalonePageConfig from '../features/standalone-page/config.ts';
+import { definition as searchPopupDefinition } from '../features/search-popup/definition.ts';
+import * as searchPopupConfig from '../features/search-popup/config.ts';
+import * as searchPopupHost from '../features/search-popup/host.ts';
+import { rpc as searchPopupRpc } from '../features/search-popup/rpc.ts';
 import { definition as archiveDefinition } from '../features/archive/definition.ts';
 import * as archiveConfig from '../features/archive/config.ts';
 import * as archiveHost from '../features/archive/host.ts';
@@ -78,6 +88,7 @@ import * as projectsHost from '../features/projects/host.ts';
 import { rpc as projectsRpc } from '../features/projects/rpc.ts';
 
 export const HOST_FEATURES = Object.freeze([
+  { definition: memoryDefinition, ...memoryConfig, ...memoryHost, rpc: memoryRpc },
   { definition: pluginUpdatesDefinition, ...pluginUpdatesConfig, ...pluginUpdatesHost, rpc: pluginUpdatesRpc },
   { definition: versionDefinition, ...versionConfig },
   { definition: appearanceDefinition, ...appearanceConfig },
@@ -97,9 +108,11 @@ export const HOST_FEATURES = Object.freeze([
   { definition: effortDefinition, ...effortConfig },
   { definition: backgroundDefinition, ...backgroundConfig },
   { definition: wallpaperDefinition, ...wallpaperConfig, ...wallpaperHost, rpc: wallpaperRpc },
+  { definition: standalonePageDefinition, ...standalonePageConfig },
   { definition: archiveDefinition, ...archiveConfig, ...archiveHost, rpc: archiveRpc },
   { definition: usageDefinition, ...usageConfig, ...usageHost, rpc: usageRpc },
   { definition: projectsDefinition, ...projectsConfig, ...projectsHost, rpc: projectsRpc },
+  { definition: searchPopupDefinition, ...searchPopupConfig, ...searchPopupHost, rpc: searchPopupRpc },
 ] satisfies HostFeature[]);
 
 export const hostFeatures = HOST_FEATURES;

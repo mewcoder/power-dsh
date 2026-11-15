@@ -51,6 +51,10 @@ try {
   for (const required of ['README.md', 'CHANGELOG.md', 'docs/third-party-notices.md', 'screenshots.json']) {
     assert.ok(files.has(required), `Required package resource is missing: ${required}`);
   }
+  const notices = await read('docs/third-party-notices.md');
+  for (const copyright of ['Copyright (c) 2026 DeepSeek', 'Copyright (c) 2026 Lucide Icons and Contributors']) {
+    assert.ok(notices.includes(copyright), `Required copyright notice is missing: ${copyright}`);
+  }
   const screenshots = JSON.parse(await read('screenshots.json'));
   for (const name of screenshots) assert.ok(files.has(name), `Screenshot is missing: ${name}`);
   for (const spec of (await listFiles(root, 'src/features')).filter(name => name.endsWith('/spec.md'))) {
@@ -89,7 +93,7 @@ try {
   assert.match(icon, /ISC License/);
   for (const language of ['en', 'zh']) {
     const target = manifest.exports['./locale/*.json'].replace('*', language);
-    assert.equal(JSON.parse(await read(target)).meta.title, 'PowerDSH');
+    assert.equal(JSON.parse(await read(target)).meta.title, 'power-dsh');
   }
   console.log(`Passed: actual tarball (${files.size} files, ${packed.size} bytes), exports, runtime imports and dependencies, Client registration, resources, and development-file exclusion.`);
   console.log('Not checked: dependency download, DSH installation, live factory activation, or rendered pages.');

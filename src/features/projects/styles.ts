@@ -31,8 +31,11 @@ export const styles = `
 .power-dsh-projects-confirm-remove:not(:disabled) { --dsh-button-outline-color:var(--dsw-alias-state-error-primary); color:var(--dsw-alias-state-error-primary); }
 @media (hover:hover) { .power-dsh-projects-confirm-remove:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover-danger); } }
 @container power-dsh-skills (max-width:520px) {
-  .power-dsh-projects-page .power-dsh-projects-head,
-  .power-dsh-projects-page .power-dsh-projects-row { grid-template-columns:minmax(0,1fr) 96px 76px; }
+  .power-dsh-projects-page .power-dsh-projects-head { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+  .power-dsh-projects-page .power-dsh-projects-row { grid-template-columns:minmax(0,1fr) auto; gap:4px 12px; }
+  .power-dsh-projects-page .power-dsh-projects-main { grid-column:1; grid-row:1; }
+  .power-dsh-projects-page .power-dsh-projects-activity { grid-column:1; grid-row:2; padding-left:26px; }
+  .power-dsh-projects-page .power-dsh-projects-actions { grid-column:2; grid-row:1 / span 2; }
   .power-dsh-projects-page .power-dsh-projects-sessions { display:none; }
 }
 `;

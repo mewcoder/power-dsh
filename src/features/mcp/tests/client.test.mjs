@@ -265,6 +265,7 @@ test('MCP global groups use explicit membership and restore manual choices after
   assert.deepEqual(page.render().filter(node => node.props.id?.includes('-mcp-group-') && node.type === 'button').map(node => node.props.children[1].props.children[0]), [
     'skillPersonalGroup', 'skillPreinstalledGroup',
   ]);
+  assert.ok(!page.render().some(node => node.props.className === 'power-dsh-skill-group-description'));
   assert.equal(page.group('user').props['aria-expanded'], true);
   assert.equal(page.group('builtin').props['aria-expanded'], false);
   assert.ok(page.row('browser'));
@@ -738,9 +739,8 @@ test('MCP detail reads one entry on demand, lists only declared fields and never
   assert.deepEqual(app.mcpDetailReads, [{ id: 'include:browser' }]);
   assert.deepEqual(app.mcpWrites, []);
   assert.equal(page.control('browser').props['aria-checked'], true);
-  // Closing is a view change only; the dialog unmounts and the row stays intact.
-  const close = descendants(dialog()).find(node => node.props['data-native-button']);
-  close.props.onClick();
+  // Closing is a view change only; the native header owns the close control.
+  dialog().props.onClose();
   assert.equal(page.dialog(), undefined);
   assert.ok(page.row('browser'));
   assert.deepEqual(app.mcpWrites, []);
@@ -825,7 +825,7 @@ test('MCP action row keeps the detail button flush right with or without a tool 
     .props.children.filter(Boolean).at(-1);
   const parts = name => actions(name).props.children.filter(Boolean)
     .map(node => node.props.className === 'power-dsh-mcp-tools-summary' ? 'count'
-      : node.props.className === 'power-dsh-mcp-card-probe' ? 'probe'
+      : descendants(node).some(child => child.props.className === 'power-dsh-mcp-card-probe') ? 'probe'
       : node.props['data-detail'] ? 'action' : 'other');
   // The detail button is always the last child of the row, so it stays flush right.
   assert.deepEqual(parts('with-tools'), ['count', 'probe', 'action']);
@@ -999,8 +999,7 @@ test('MCP detail ignores a late answer after closing and follows the latest requ
   assert.ok(descendants(loading).some(node => node.props.children.includes('mcpDetailLoading')));
   assert.ok(descendants(loading).some(node => node.type === 'native-state-dot-fixture' && node.props.state === 'ongoing'));
   // Closing before the answer arrives must discard that answer.
-  const buttons = descendants(close).filter(node => node.props['data-native-button']);
-  buttons.at(-1).props.onClick();
+  close.props.onClose();
   pending[0].resolve({ ok: true, value: { server: mcpFixture(), config: null } });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(page.dialog(), undefined);
@@ -1068,33 +1067,57 @@ test('MCP test connection reports the probe result and never changes the server'
   const page = await mcpPage(app);
   const probeButton = () => descendants(page.row('browser')).find(node => node.props.className === 'power-dsh-mcp-card-probe');
   assert.ok(probeButton(), 'Every card offers a connection test.');
+  assert.equal(probeButton().props['data-probe-state'], 'idle');
+  assert.deepEqual(textOf(probeButton()), [], 'The test button only displays an icon.');
+  const cardRows = page.row('browser').props.children[0].props.children.filter(Boolean).length;
   await probeButton().props.onClick();
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(app.mcpProbes, [{ id: 'include:browser' }]);
-  const result = descendants(page.row('browser')).find(node => node.props.className === 'power-dsh-mcp-probe-result');
-  assert.ok(result);
-  assert.equal(result.props['data-ok'], 'true');
-  assert.equal(result.props.role, 'status');
-  const text = textOf(result).join(' ');
+  assert.equal(probeButton().props['data-probe-state'], 'done');
+  assert.deepEqual(textOf(probeButton()), []);
+  assert.equal(page.row('browser').props.children[0].props.children.filter(Boolean).length, cardRows);
+  const result = descendants(page.row('browser')).find(node => node.type === 'native-tooltip-fixture'
+    && descendants(node).some(child => child.props['data-probe']));
+  const text = result.props.label;
   assert.ok(text.includes('mcpProbeSuccess'));
   assert.ok(text.includes('browser 1.2.0'));
+  assert.ok(probeButton().props['aria-label'].includes(text));
+  assert.ok(!descendants(page.row('browser')).some(node => node.props.className === 'power-dsh-mcp-probe-result'));
   assert.ok(!page.render().some(node => node.props['data-error-code'] === 'PD-MCP-PROBE'));
   assert.deepEqual(app.mcpWrites, [], 'Testing a connection never changes the server.');
   app.unmount();
 
   // A failure keeps a product summary and exposes the sanitized native text only in the copyable details.
+  let failedAttempt = 0;
   const failed = await mount({
     mcpCatalog: mcpCatalogFixture({ servers: [mcpFixture()] }),
-    mcpProbeReply: () => ({ ok: true, value: { ok: false, stage: 'connect', message: 'spawn failed at /Users/me/secret', durationMs: 8, cleanupFailed: false } }),
+    mcpProbeReply: () => ({ ok: true, value: ++failedAttempt === 1
+      ? { ok: false, stage: 'connect', message: 'spawn failed at /Users/me/secret', durationMs: 8, cleanupFailed: false }
+      : success }),
   });
   const failedPage = await mcpPage(failed);
   const failedButton = () => descendants(failedPage.row('browser')).find(node => node.props.className === 'power-dsh-mcp-card-probe');
   await failedButton().props.onClick();
   await new Promise(resolve => setImmediate(resolve));
-  const failure = descendants(failedPage.row('browser')).find(node => node.props['data-error-code'] === 'PD-MCP-PROBE');
+  assert.equal(failedButton().props['data-probe-state'], 'error');
+  assert.ok(failedButton().props['aria-label'].includes('mcpProbeConnectFailed'));
+  assert.ok(failedButton().props['aria-label'].includes('mcpProbeSeeDetails'));
+  assert.ok(!descendants(failedPage.row('browser')).some(node => node.props['data-error-code'] === 'PD-MCP-PROBE'));
+  assert.equal(failedPage.row('browser').props.children[0].props.children.filter(Boolean).length, cardRows);
+  failedPage.detail('browser').props.onClick();
+  await new Promise(resolve => setImmediate(resolve));
+  const dialog = () => failedPage.render().find(node => node.type === 'native-modal-fixture');
+  const failure = descendants(dialog()).find(node => node.props['data-error-code'] === 'PD-MCP-PROBE');
   assert.ok(failure);
+  assert.equal(failure.props['data-placement'], 'modal');
   assert.ok(failure.props.children.includes('mcpProbeConnectFailed'));
   assert.ok(!failedPage.render().some(node => node.props.children.some?.(child => typeof child === 'string' && child.includes('/Users/me/secret'))));
+  const retry = descendants(failure).find(node => node.props.className === 'power-dsh-error-retry');
+  retry.props.onClick();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(failed.mcpProbes, [{ id: 'include:browser' }, { id: 'include:browser' }]);
+  assert.equal(failedButton().props['data-probe-state'], 'done');
+  assert.ok(!descendants(dialog()).some(node => node.props['data-error-code'] === 'PD-MCP-PROBE'));
   assert.deepEqual(failed.mcpWrites, []);
   failed.unmount();
 
@@ -1107,6 +1130,9 @@ test('MCP test connection reports the probe result and never changes the server'
   const busy = descendants(slowPage.row('browser')).find(node => node.props.className === 'power-dsh-mcp-card-probe');
   assert.equal(busy.props['aria-busy'], true);
   assert.equal(busy.props.disabled, true);
+  assert.equal(busy.props['data-probe-state'], 'running');
+  assert.ok(descendants(busy).some(node => node.type === 'native-state-dot-fixture' && node.props.state === 'ongoing'));
+  assert.deepEqual(textOf(busy), []);
   await busy.props.onClick();
   assert.equal(slow.mcpProbes.length, 1, 'A running probe ignores duplicate clicks.');
   pending.resolve({ ok: true, value: success });
@@ -1122,12 +1148,41 @@ test('MCP probe warnings and cleanup results stay bounded without hiding success
   const button = () => descendants(page.row('browser')).find(node => node.props.className === 'power-dsh-mcp-card-probe');
   await button().props.onClick();
   await new Promise(resolve => setImmediate(resolve));
-  const result = descendants(page.row('browser')).find(node => node.props.className === 'power-dsh-mcp-probe-result');
-  assert.equal(result.props.children[0].props.state, 'warning');
-  const text = textOf(result).join(' ');
+  assert.equal(button().props['data-probe-state'], 'warning');
+  const result = descendants(page.row('browser')).find(node => node.type === 'native-tooltip-fixture'
+    && descendants(node).some(child => child.props['data-probe']));
+  const text = result.props.label;
+  assert.ok(text.includes('mcpProbeSuccess'));
   assert.ok(text.includes('mcpProbeTruncated'));
   assert.ok(text.includes('mcpProbeCleanup'));
+  assert.ok(!descendants(page.row('browser')).some(node => node.props.className === 'power-dsh-mcp-probe-result'));
   app.unmount();
+});
+
+test('MCP probe errors keep compact icons and stage-specific details when retesting', async () => {
+  for (const [reply, key] of [
+    [{ ok: true, value: { ok: false, stage: 'list', message: 'list failed', durationMs: 3, cleanupFailed: true } }, 'mcpProbeListFailed'],
+    [{ ok: false, error: { message: 'mcpProbeFailed' } }, 'mcpProbeFailed'],
+  ]) {
+    const app = await mount({ mcpCatalog: mcpCatalogFixture({ servers: [mcpFixture()] }), mcpProbeReply: () => reply });
+    const page = await mcpPage(app);
+    const probeButton = () => descendants(page.row('browser')).find(node => node.props['data-probe']);
+    probeButton().props.onClick();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(probeButton().props['data-probe-state'], 'error');
+    assert.ok(probeButton().props['aria-label'].includes(key));
+    assert.deepEqual(textOf(probeButton()), []);
+    assert.ok(!descendants(page.row('browser')).some(node => node.props['data-error-code'] === 'PD-MCP-PROBE'));
+    page.detail('browser').props.onClick();
+    await new Promise(resolve => setImmediate(resolve));
+    const dialog = page.render().find(node => node.type === 'native-modal-fixture');
+    assert.ok(descendants(dialog).some(node => node.props['data-error-code'] === 'PD-MCP-PROBE'
+      && node.props.children.includes(key)));
+    probeButton().props.onClick();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(app.mcpProbes.length, 2, 'The failed icon can directly test the same server again.');
+    app.unmount();
+  }
 });
 
 test('MCP wire codecs accept a live connection and validate probe results', async () => {

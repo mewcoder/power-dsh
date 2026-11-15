@@ -57,7 +57,7 @@ export function installAutoArchive(ctx: NativeContext, prefs: Preferences,
     const warn = (reason: string) => {
       if (lastWarning === reason) return;
       lastWarning = reason;
-      try { child.logger?.warn(`PowerDSH auto archive: ${reason}`); }
+      try { child.logger?.warn(`power-dsh auto archive: ${reason}`); }
       catch { /* Diagnostics must not prevent native recovery. */ }
     };
 

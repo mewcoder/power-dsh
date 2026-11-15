@@ -4,6 +4,8 @@
 
 ## 当前结论
 
+[记忆功能](../src/features/memory/spec.md)只使用最低基线已有的 section/context、工具注册与步骤事件。旧 context 的严格插值由注入前转义保护，不依赖较新的 `when` 或 `required`。使用关闭运行时上下文的模式时不承诺索引召回；服务缺席仅停用本功能。本轮已在 macOS / DSH `0.2.2-rc.3` 本地链接安装中完成真实会话保存、召回与手动整理验收；不据此推定 Windows、旧宿主或最终压缩包升级已验收，具体见[0.1.0 发版准备记录](compatibility-audit.md#010-发版准备回归2026-11-15)。
+
 **最低已测基线为 `0.2.0-rc.1`，首版安装范围为 `>=0.2.0-rc.1 <0.3.0-0`，面向 DSH 桌面版。** 这是目标 `0.2.0` / `0.2.1` 分支最早的实际发行版，无须证明所有更早版本均不可用。安装门槛不等于范围内每版、每平台与每个功能场景都已完成实机验收；具体证据分别记录。
 
 [2026-11-08 历史快照](compatibility-audit.md#sdk-验证方法与结果)覆盖两个分支的全部 12 个实际发行版；[2026-11-09 后续单版复测](compatibility-audit.md#后续单版复测)覆盖目录调整与清理修复时的 `0.2.0-rc.1`；[模块化后的回归](compatibility-audit.md#模块化与-npm-产物回归)分别验证 `0.2.0-rc.1` 和 `0.2.1-rc.5` 的隔离 SDK、生产 Host 装配及本地 npm 产物解析。[TS/tsdown 迁移后](compatibility-audit.md#typescript-与-tsdown-迁移)复验这两版 SDK，并验证独立 npm 消费者使用公开声明。测试对象、通过数量、方法和日志标识统一在调查中维护；单版结果不能扩展到其余版本，测试后的新增改动也不自动视为已测。
@@ -70,6 +72,16 @@ DSH `0.2.2-rc.1` 安装包已核对会话行事件标记，作为有限 DOM 例�
 
 [MCP 管理](../src/features/mcp/spec.md)新增的真实连接状态与「测试连接」依赖 `@deepseek-ai/dsh-mcp-client` 的公开导出 `connectionStatusOf(fiber)`（句柄 `current()` / `onChange()`）与 `probeServer(ctx, config, options)`。接口依据为本机 DSH `0.2.2-rc.1` 桌面安装包中该包的构建产物与导出列表；`probeServer` 独立超时、只读连接、读取服务器身份与工具名后关闭、不注册工具，且不依赖 `mcpManager`，因此对 profile／preset／manager／运行时实例均可探测。旧宿主缺少这两个导出时，连接态回退到装载生命周期，`probeServer` 缺席或探测无法开始统一报 `mcpProbeFailed`，不影响目录、启停与详情。它不继承历史矩阵结论；本轮只完成源码、构建与行为测试，实际远端连接、真实页面的连接态与探测结果仍待实机验收，且不会为测试擅自启停用户真实 MCP。
 
+## 侧边栏独立页面的新增范围与证据
+
+[侧边栏独立页面](../src/features/standalone-page/spec.md)依赖 root 作用域 `sidebar.panellist` list slot、同 id 的 `main` keyed slot 与 `ctx.layout.selectPanel()`。已核对 `@deepseek-ai/dsh-client-ui-sidebar@0.2.0-rc.1` 与 `@deepseek-ai/dsh-client-ui-layout@0.2.0-rc.1` 的公开类型和 README，两个 slot 与服务在最低基线即存在；目标 `0.2.2-rc.1` 的对应源码结构一致。两个 slot 任一缺失时功能静默不注册，不影响设置页与其他功能。该功能没有新增 Host 数据接口；实际主页面的视觉、响应式与 DSH 版本切换仍待实机验收。
+
+## 搜索弹窗与搜索增强的新增范围与证据
+
+[搜索弹窗](../src/features/search-popup/spec.md)接管原生搜索入口，依赖三处宿主契约：`ui-layout` 自 `0.2.0-rc.1` 起声明的 `shell.overlay` root 作用域 list slot；`sessions` face 的 `list` 快照、`search(query, signal)` 与 `searchResultLimit`；以及 `uiWorkspace.openSession()`、`workspaces.list` 快照。注入任一缺失时面板显示「当前宿主无法搜索会话」或降级为空列表，不阻断设置页与其他功能。按钮识别读取运行时的 workspace locale 与当前手势 `composedPath()`，快捷键识别只读 `document.documentElement` 的 `data-platform`；原生按钮结构或 locale 键改变时功能静默退回原生行为，不产生半工作状态。
+
+「搜索弹窗」唯一开关同时启停正文搜索，通过 ConfigEditor 改写 `session-query-sqlite` 条目（与[停用官方搜索](../src/features/search-blocking/spec.md)同机制），并在写后读回核验。默认条目 `path: ':memory:'`、`openAt: 'never'` 核对自 `dsh-base` bundle 层；`openAt` 语义与 `SESSION_QUERY_SEARCH_DISABLED` 错误代码核对自 `session-query-sqlite` 源码，首次启用全文引擎仍需重启。已在本机 `0.2.2-rc.3` 安装包中确认按钮 JSX、`shell.overlay` 声明、`sessions.search` 与 `searchResultLimit` 字段存在；`0.2.0-rc.1` 的存在性以参考源码标签核对，未在旧版实机验证。实际侧栏点击、正文命中与最近摘要已验证；Cmd+K、语言切换后的标记解析、主题明暗视觉、工作区筛选真实数据、打开会话跳转，以及开关写入后重启的完整流程仍待实机验收。
+
 ## 接口核对清单
 
 下表来自本项目实际调用点。接口最早出现在哪个版本仍需对照确切发行版确认；当前版本有同名方法不能证明旧版具有相同参数、返回字段、事件和清理行为。
@@ -90,6 +102,8 @@ DSH `0.2.2-rc.1` 安装包已核对会话行事件标记，作为有限 DOM 例�
 | 任务通知 | [通知投影](../src/features/notifications/notifications.ts)及 Host 注册、Client 的 `sessions.list` / `uiSession.sessionStatus` | 投影注册与释放、`turn/end` 原因、首次订阅基线、重连去重、提问与审批状态字段 |
 | 系统声音 | [SystemSounds](../src/features/notifications/system-sounds.ts)、`connection.isLoopback`、subprocess `resolveExecutable` / `spawn` 与托管句柄 | 本机识别、参数与取消语义、平台真实试听、远程界面不会在服务器播放 |
 | 全局指令 | `profileContext.home`、文件 RPC、宿主全局指令发现 | 正文落在同一个原生全局文件、冲突时不覆盖、禁用入口不改变正文及读取行为 |
+| 搜索弹窗 | [搜索弹窗 Client](../src/features/search-popup/client.ts)的 `shell.overlay` slot、`sessions.list` / `search()` / `searchResultLimit`、`uiWorkspace.openSession()`、`workspaces.list`、workspace locale 与 `data-platform` | slot 作用域与注册、搜索结果页形状、结果条数上限、打开会话语义、按钮与快捷键标记在语言/平台变化后仍匹配，服务缺席时降级 |
+| 搜索增强 | [EnhancePolicy](../src/features/search-popup/enhance-policy.ts)的 ConfigEditor `entries()` / `edit()`、`profileContext.home` 与自身条目写入 | `session-query-sqlite` 条目身份与可编辑性、`openAt` / `path` 读回、`SESSION_QUERY_SEARCH_DISABLED` 与 `did not stabilize` 降级、重启后生效 |
 | 版本、外观与刷新 | `clientModules.graph().release`、boot release、theme service、桌面 updates bridge、侧栏 slot 与标题栏 | 显示的是宿主版本；桥协议、主题事件、slot props、窗口缩放和系统标题栏偏移 |
 
 ## 升级指南核对结果

@@ -89,12 +89,22 @@ export interface SkillDetail {
   enabled: boolean;
   modelInvocable: boolean;
   userInvocable: boolean;
+  /** The currently opened copy, kept for older clients and single-path deletion. */
   deletion?: SkillDeletion;
+  /** Every deletable DSH copy of this skill across the current scope and workspaces. */
+  deletions?: SkillDeletionOption[];
 }
 export interface SkillDeletion {
   path: string;
   linked: boolean;
   revision: string;
+}
+export interface SkillDeletionOption extends SkillDeletion {
+  /** Empty for the global copy; workspace path for a project copy. */
+  cwd: string;
+  scope: SkillScope;
+  /** Saved workspace title; empty for the global copy. */
+  workspaceTitle: string;
 }
 
 export type McpRuntimeState = 'pending' | 'loading' | 'active' | 'failed' | 'unloading' | 'inactive' | 'disabled' | 'unknown';
@@ -284,6 +294,17 @@ export interface UsageModelRow {
   provider: string;
   totalTokens: number;
   requestCount: number;
+  /** Model settlements attempted, including failed attempts. */
+  attemptCount: number;
+  /** Attempts that settled without an assembled assistant message. */
+  failedAttemptCount: number;
+  /** Scheduled retry attempts attributed to this model. */
+  retryCount: number;
+  outputTokens: number;
+  ttftMs: number;
+  ttftSteps: number;
+  decodeMs: number;
+  decodeTokens: number;
 }
 /** One model's tokens on one day, for the per-model trend lines. */
 export interface UsageDailyModelRow {
@@ -293,6 +314,32 @@ export interface UsageDailyModelRow {
   totalTokens: number;
   /** Billed settlements attributed to this model on this day. */
   requestCount: number;
+  /** Model settlements attempted, including failed attempts. */
+  attemptCount: number;
+  /** Attempts that settled without an assembled assistant message. */
+  failedAttemptCount: number;
+  /** Scheduled retry attempts attributed to this model. */
+  retryCount: number;
+  outputTokens: number;
+  ttftMs: number;
+  ttftSteps: number;
+  decodeMs: number;
+  decodeTokens: number;
+}
+export interface UsageWorkspaceDayRow {
+  date: string;
+  totalTokens: number;
+  activeMs: number;
+}
+/** One workspace's usage in the selected range, derived from session cwd. */
+export interface UsageWorkspaceRow {
+  path: string;
+  totalTokens: number;
+  activeMs: number;
+  /** Activity dates per main-session family in this workspace, without identifiers. */
+  sessionDays: string[][];
+  /** Continuous daily series over the whole history, zero-filled for quiet days. */
+  days: UsageWorkspaceDayRow[];
 }
 export interface UsageSummary {
   totalTokens: number;
@@ -337,6 +384,8 @@ export interface UsageSnapshot {
   dailyModels: UsageDailyModelRow[];
   /** Models ordered by total tokens, largest first. */
   models: UsageModelRow[];
+  /** Workspaces ordered by total tokens in the selected range. */
+  workspaces: UsageWorkspaceRow[];
 }
 
 export interface ProjectRow {
@@ -353,4 +402,41 @@ export interface ProjectCatalog {
   complete: boolean;
   /** Native registry order, so manual sorting mirrors the sidebar. */
   projects: ProjectRow[];
+}
+export type MemoryType = 'user' | 'feedback' | 'project' | 'reference';
+export interface MemoryEntry {
+  id: string; name: string; description: string; type: MemoryType;
+  created: string; updated: string; originSessionId: string; revision: string; invalid: boolean;
+}
+export interface MemoryDetail extends MemoryEntry { content: string }
+export interface MemoryFileDetail extends MemoryDetail { path: string }
+export interface MemoryScope {
+  id: string; cwd: string; revision: string; complete: boolean; entries: MemoryEntry[];
+}
+export interface MemoryCatalog { path: string; available: boolean; error: string; scopes: MemoryScope[] }
+export interface MemoryWriteResult { indexUpdated: boolean }
+export interface MemoryModel { provider: string; model: string; reasoningEffort?: string }
+export interface MemoryModels { models: (MemoryModel & { label: string })[]; default: MemoryModel | null }
+export interface MemoryCleanupChange {
+  before: MemoryDetail; description: string; content: string; removed: MemoryDetail[]; reason: string;
+}
+export interface MemoryCleanupPreview {
+  token: string; scope: string; revision: string; changes: MemoryCleanupChange[];
+}
+export interface MemoryCleanupResult extends MemoryWriteResult { backup: string }
+
+/** One content-search hit: a session id plus a bounded snippet centered on the match. */
+export interface SearchContentHit {
+  sessionId: string;
+  snippet: string;
+}
+/** Result of one content search over the derived session index. */
+export interface SearchContentResult {
+  available: boolean;
+  items: SearchContentHit[];
+  /**
+   * Recent-message previews for sessions the caller named. A title match has no
+   * content hit, so the row would otherwise leave its snippet line blank.
+   */
+  previews: SearchContentHit[];
 }

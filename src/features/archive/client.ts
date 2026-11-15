@@ -2,6 +2,7 @@ import { styles as catalogStyles } from '../../shared/client/catalog-styles.ts';
 import { createCatalogUI } from '../../shared/client/catalog-ui.ts';
 import { errorMessage } from '../../shared/client/runtime.ts';
 import { styles as shellStyles } from '../../shared/client/shell-styles.ts';
+import { standalonePageActive } from '../../shared/client/settings-form.ts';
 import type { ClientEnvironment, ClientFeature, ClientRuntime, FeatureState, IconProps, PageSlotProps, SnapshotSource } from '../../shared/client/types.ts';
 import type { ArchiveCatalog, ArchiveSessionRow } from './rpc.ts';
 import { groupArchivedSessions, type ArchiveGroup, type ArchiveSort } from './archive-catalog.ts';
@@ -410,14 +411,20 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     }
     return failure;
   };
+  const renderPage = (props: PageSlotProps) => h(ArchivePage, { ...props, archiveSource, settingsSource: env.source, savePreference,
+    loadArchivedSessions, restoreArchivedSession, deleteArchivedSessions });
   preferenceSlot('archiveManagerEnabled', 'settings.section', {
     id: 'power-dsh-archive', order: 54.5, locale: namespace, label: () => t('archiveTab'),
-  }, (props: PageSlotProps) => h(ArchivePage, { ...props, archiveSource, settingsSource: env.source, savePreference,
-    loadArchivedSessions, restoreArchivedSession, deleteArchivedSessions }));
-  preferenceSlot('archiveManagerEnabled', 'settings.section.icon', { id: 'power-dsh-archive' }, ArchiveIcon);
+  }, renderPage, () => !standalonePageActive(env.source));
+  preferenceSlot('archiveManagerEnabled', 'settings.section.icon', { id: 'power-dsh-archive' }, ArchiveIcon, () => !standalonePageActive(env.source));
   return {
     settings: [{ field: 'archiveManagerEnabled', description: 'archiveManagerDescription',
       save: next => savePreference('archiveManagerEnabled', next === true, 'archiveOutdated'), hideError: true }],
+    pages: [{
+      id: 'archive', label: 'archiveTab', icon: ArchiveIcon, order: 60,
+      available: snapshot => snapshot.status === 'ready' && snapshot.value?.archiveManagerEnabled === true,
+      render: renderPage,
+    }],
     api: { archiveSource, loadArchivedSessions, restoreArchivedSession },
   } satisfies ClientFeature;
 }

@@ -1,6 +1,6 @@
 import { isRecord, isArray, hasStrings, type Codec, type RpcDescriptor } from '../../shared/types/protocol.ts';
 import type { UsageSnapshot } from '../../shared/types/wire.ts';
-export type { UsageCardSummary, UsageSnapshot, UsageSummary, UsageDayRow, UsageDailyModelRow, UsageModelRow } from '../../shared/types/wire.ts';
+export type { UsageCardSummary, UsageSnapshot, UsageSummary, UsageDayRow, UsageDailyModelRow, UsageModelRow, UsageWorkspaceRow } from '../../shared/types/wire.ts';
 import { stringCodec } from '../../shared/rpc/codecs.ts';
 
 const usageSnapshotCodec: Codec<UsageSnapshot> = {
@@ -47,27 +47,68 @@ const usageSnapshotCodec: Codec<UsageSnapshot> = {
         requestCount: counts.requestCount, activeMs: counts.activeMs,
       };
     });
+    const timingFields = ['totalTokens', 'requestCount', 'attemptCount', 'failedAttemptCount', 'retryCount',
+      'outputTokens', 'ttftMs', 'ttftSteps', 'decodeMs', 'decodeTokens'] as const;
     const dailyModels = value.dailyModels.map(row => {
-      if (!isRecord(row) || !hasStrings(row, ['date', 'modelId', 'provider'])
-        || typeof row.totalTokens !== 'number' || !Number.isFinite(row.totalTokens)
-        || typeof row.requestCount !== 'number' || !Number.isFinite(row.requestCount)) {
+      if (!isRecord(row) || !hasStrings(row, ['date', 'modelId', 'provider'])) {
         throw new TypeError('Invalid usage daily model');
       }
+      const counts: Record<string, number> = {};
+      for (const field of timingFields) {
+        const count = row[field];
+        if (typeof count !== 'number' || !Number.isFinite(count) || count < 0) throw new TypeError('Invalid usage daily model');
+        counts[field] = count;
+      }
       return { date: row.date, modelId: row.modelId, provider: row.provider,
-        totalTokens: row.totalTokens, requestCount: row.requestCount };
+        totalTokens: counts.totalTokens, requestCount: counts.requestCount,
+        attemptCount: counts.attemptCount, failedAttemptCount: counts.failedAttemptCount, retryCount: counts.retryCount,
+        outputTokens: counts.outputTokens, ttftMs: counts.ttftMs, ttftSteps: counts.ttftSteps,
+        decodeMs: counts.decodeMs, decodeTokens: counts.decodeTokens };
     });
     const models = value.models.map(row => {
-      if (!isRecord(row) || !hasStrings(row, ['modelId', 'provider'])
-        || typeof row.totalTokens !== 'number' || !Number.isFinite(row.totalTokens)
-        || typeof row.requestCount !== 'number' || !Number.isFinite(row.requestCount)) {
+      if (!isRecord(row) || !hasStrings(row, ['modelId', 'provider'])) {
         throw new TypeError('Invalid usage model');
       }
-      return { modelId: row.modelId, provider: row.provider, totalTokens: row.totalTokens, requestCount: row.requestCount };
+      const counts: Record<string, number> = {};
+      for (const field of timingFields) {
+        const count = row[field];
+        if (typeof count !== 'number' || !Number.isFinite(count) || count < 0) throw new TypeError('Invalid usage model');
+        counts[field] = count;
+      }
+      return { modelId: row.modelId, provider: row.provider, totalTokens: counts.totalTokens, requestCount: counts.requestCount,
+        attemptCount: counts.attemptCount, failedAttemptCount: counts.failedAttemptCount, retryCount: counts.retryCount,
+        outputTokens: counts.outputTokens, ttftMs: counts.ttftMs, ttftSteps: counts.ttftSteps,
+        decodeMs: counts.decodeMs, decodeTokens: counts.decodeTokens };
+    });
+    if (!isArray(value.workspaces)) throw new TypeError('Invalid usage workspaces');
+    const workspaces = value.workspaces.map(workspace => {
+      if (!isRecord(workspace) || typeof workspace.path !== 'string'
+        || typeof workspace.totalTokens !== 'number' || !Number.isFinite(workspace.totalTokens)
+        || typeof workspace.activeMs !== 'number' || !Number.isFinite(workspace.activeMs)
+        || !isArray(workspace.sessionDays) || !isArray(workspace.days)) {
+        throw new TypeError('Invalid usage workspace');
+      }
+      const sessionDates = workspace.sessionDays.map(dates => {
+        if (!isArray(dates) || !dates.every(date => typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date))) {
+          throw new TypeError('Invalid usage workspace sessions');
+        }
+        return dates as string[];
+      });
+      const days = workspace.days.map(day => {
+        if (!isRecord(day) || typeof day.date !== 'string'
+          || typeof day.totalTokens !== 'number' || !Number.isFinite(day.totalTokens)
+          || typeof day.activeMs !== 'number' || !Number.isFinite(day.activeMs)) {
+          throw new TypeError('Invalid usage workspace day');
+        }
+        return { date: day.date, totalTokens: day.totalTokens, activeMs: day.activeMs };
+      });
+      return { path: workspace.path, totalTokens: workspace.totalTokens, activeMs: workspace.activeMs,
+        sessionDays: sessionDates, days };
     });
     return {
       complete: value.complete, generatedAt: value.generatedAt, timeZone: value.timeZone,
       firstDate: value.firstDate, lastDate: value.lastDate, summary: counts as unknown as UsageSnapshot['summary'],
-      days, dailyModels, models, sessionDays,
+      days, dailyModels, models, sessionDays, workspaces,
     };
   } }),
 };

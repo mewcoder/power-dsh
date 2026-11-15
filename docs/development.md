@@ -61,7 +61,7 @@ npm run check
 
 修改源码或类型后执行 `npm run build`，更新 `dist/index.js`、`dist/index.d.ts` 与 `dist/client.js`；`build:client` 仅用于客户端开发。`check:types` 执行严格类型检查，`check:build` 在内存验证三个产物新鲜度；`check` 还核对完整源码是否纳入类型检查、特性登记、配置归属、Spec/测试、依赖边界、浏览器模块图、资源、文案与链接，再递归执行行为测试。检查不自动改写产物来掩盖遗漏。
 
-[实际包检查](../scripts/check-package.mjs)在系统临时目录生成并解包标准 npm tarball，核对编译 JS、公开声明、运行导入/依赖、Client factory、图标许可、locale、截图和十八份 Spec，排除 TS 编译输入、测试、构建配置/脚本及开发规范。文档另允许第三方声明、截图与 npm 自动收录的索引。
+[实际包检查](../scripts/check-package.mjs)在系统临时目录生成并解包标准 npm tarball，核对编译 JS、公开声明、运行导入/依赖、Client factory、图标许可、locale、截图和各项 Spec，排除 TS 编译输入、测试、构建配置/脚本及开发规范。文档另允许第三方声明、截图与 npm 自动收录的索引。
 
 `npm run check:install` 运行[独立安装检查](../scripts/check-install.mjs)：重新验证产物新鲜度，将实际 tarball 安装到仓库外的临时项目，只安装生产依赖、禁止安装脚本，验证所有公开导出、Host 配置、Client 登记和独立 TypeScript 消费者的 `Context.plugin` 接入，并确认没有安装编译器、打包工具或另一份 React。它需要访问公共 npm 注册表；成功或失败都会清理临时项目，不使用用户 DSH/profile。包内容检查本身不下载依赖，两项都不能替代实际宿主验收。
 
@@ -99,7 +99,7 @@ git clone --depth 1 --single-branch https://github.com/wlj521/dsh-ui-tweaks.git 
 git clone --depth 1 --single-branch https://github.com/deepseek-ai/deepseek-harness.git .references/deepseek-harness
 ```
 
-核对许可证、目标 DSH 版本和实现方式，在[第三方资源声明](third-party-notices.md)记录实际参考的仓库、提交和模块。复制或改编须遵循许可证；没有许可证不默认允许复制。参考源码无需安装依赖或执行脚本，仍须满足本项目接入约束。[忽略规则](../.gitignore)覆盖两个参考目录，不提交或打包。上游主分支可能领先目标发行版；接口依据应来自目标运行时 Inspect 或确切发行包，参考仓库用于理解与对照。
+核对许可证、目标 DSH 版本和实现方式，在[参考研究](reference-research.md)记录实际参考的仓库、提交和模块，仅供开发核对、不随安装包发布。[第三方许可](third-party-notices.md)只保留实际使用资源的版权和许可文本，不加入研究过程。复制或改编须遵循许可证；没有许可证不默认允许复制。参考源码无需安装依赖或执行脚本，仍须满足本项目接入约束。[忽略规则](../.gitignore)覆盖两个参考目录，不提交或打包。上游主分支可能领先目标发行版；接口依据应来自目标运行时 Inspect 或确切发行包，参考仓库用于理解与对照。
 
 在 Harness 内设计或修改插件时，加载适用技能，先 `cordis_inspect_list`，再用返回的方法定向查询：
 
@@ -132,7 +132,7 @@ dsh plugin --profile desktop add github:mewcoder/power-dsh
 dsh plugin --profile web add github:mewcoder/power-dsh
 ```
 
-自建的其他配置档把 `desktop`／`web` 换成对应名称。安装后按宿主提示刷新或重启，进入 **设置 → PowerDSH** 查看入口。
+自建的其他配置档把 `desktop`／`web` 换成对应名称。安装后按宿主提示刷新或重启，进入 **设置 → power-dsh** 查看入口。
 
 ### 从 GitHub 安装
 
@@ -160,7 +160,7 @@ npm run check
 
 ### 启用与功能行为
 
-启用后进入 **设置 → PowerDSH**，按需开启功能。入口、默认值和操作行为以[二十项主 Spec](README.md#功能规格spec)为准，分类与键盘交互见 [UI 规范](ui.md#分类-tab)。
+启用后进入 **设置 → power-dsh**，按需开启功能。入口、默认值和操作行为以[二十五项主 Spec](README.md#功能规格spec)为准，分类与键盘交互见 [UI 规范](ui.md#分类-tab)。
 
 安装和验收时注意：
 

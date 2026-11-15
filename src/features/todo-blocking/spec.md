@@ -4,7 +4,7 @@
 
 ## 入口与范围
 
-在 **设置 → PowerDSH → 精简** 提供独立「停用 Todo 工具」开关，说明为「新对话中不再生成待办列表」，默认关闭，使用宿主设置持久化为 `blockTodo`。UI 与 `power_dsh_settings` 工具共用 owner-only `setTodoBlocked` 操作，由现有 Host 队列串行执行。
+在 **设置 → power-dsh → 精简** 提供独立「停用 Todo 工具」开关，说明为「新对话中不再生成待办列表」，默认关闭，使用宿主设置持久化为 `blockTodo`。设置界面通过 owner-only `setTodoBlocked` 应用开关，由现有 Host 队列串行执行，不提供对话设置工具。
 
 只匹配 `@deepseek-ai/dsh-tool-todo`。全局条目通过原生 Plugin Manager 启停；可管理的 `@deepseek-ai/dsh-agent-preset` 声明通过原生 ConfigEditor 修改其中 Todo 条目的 `disabled`，包含 `group: true` 的嵌套条目。保留其他插件、模式元数据、配置与表达式，不手写 profile 文件。开启时禁用，关闭时启用，包括原本已停用的 Todo 条目，不保存之前的状态。
 

@@ -1,6 +1,6 @@
 import { errorCode, type NativeContext, type NativeAgent, type NativeSkill, type NativeSkillRecord, type NativeSkillControl, type NativeSkills, type NativeLease, type NativeScope, type CreateScope, type LifecycleOptions, type Release } from '../../shared/host/native.ts';
 import type { LivePreferences } from '../../shared/types/preferences.ts';
-import type { SkillCatalog, SkillDetail, SkillScope, SkillWorkspace, ExternalSkillCatalog, ExternalSkillDetail, SkillImportResult } from './rpc.ts';
+import type { SkillCatalog, SkillDetail, SkillScope, SkillWorkspace, ExternalSkillCatalog, ExternalSkillDetail, SkillImportResult, SkillDeletion, SkillDeletionOption } from './rpc.ts';
 import { isRecord, hasStrings, isOneOf } from '../../shared/types/protocol.ts';
 interface SkillView { cwd: string; scope: SkillScope; workspaces: SkillWorkspace[]; projectRoot: string; scopeKey: unknown }
 type SkillIdentity = Pick<NativeSkill, 'name' | 'description' | 'source' | 'provider' | 'path' | 'origin' | 'resourceBase'>;
@@ -9,7 +9,7 @@ import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { skillOrigin } from './skill-origin.ts';
 import { SKILL_SOURCES, discoverExternal, readDiscoveredSkill, resolveSelection, resolveSkillRoots, packageLocation } from './skill-import.ts';
 import { addDiscoveredSkill } from './skill-install.ts';
-import { pathExists, skillIdentity, skillRevision } from './skill-content.ts';
+import { pathExists, pathInside, skillIdentity, skillRevision } from './skill-content.ts';
 import { deleteOwnedSkill, skillDeletion } from './skill-delete.ts';
 import { homedir } from 'node:os';
 
@@ -323,6 +323,7 @@ export class SkillPolicy {
     }
     this.active();
     const deletion = before.complete ? await this.deletionFor(view, row).catch(() => null) : null;
+    const deletions = before.complete ? await this.deletionOptions(view, row, name, deletion).catch(() => []) : [];
     const actualPath = row.path && isAbsolute(row.path) ? await realpath(row.path).catch(() => '') : '';
     const samePath = (first: string, second: string) => process.platform === 'win32'
       ? resolve(first).toLowerCase() === resolve(second).toLowerCase() : resolve(first) === resolve(second);
@@ -330,23 +331,24 @@ export class SkillPolicy {
     return { name: row.name, description: row.description, content, source: row.source, path: row.path,
       origin: row.origin, enabled: row.enabled, modelInvocable: row.modelInvocable, userInvocable: row.userInvocable,
       ...(actualPath && !samePath(row.path, actualPath) ? { linkTarget: actualPath } : {}),
-      ...(deletion ? { deletion } : {}) };
+      ...(deletion ? { deletion } : {}),
+      ...(deletions.length > 0 ? { deletions } : {}) };
   }
 
   deletionLocation(view: SkillView, row: SkillCatalog['skills'][number]) {
     if (!row.path || !isAbsolute(row.path)) return null;
     if (view.scope === 'project') {
-      if (!['project-dsh', 'project-agents'].includes(row.source) || !view.projectRoot) return null;
-      return { base: view.projectRoot, root: join(view.projectRoot, row.source === 'project-dsh' ? '.dsh' : '.agents', 'skills') };
+      if (!isProject(row.source) || !view.projectRoot || !pathInside(view.projectRoot, row.path)) return null;
+      if (['project-dsh', 'project-agents'].includes(row.source)) {
+        return { base: view.projectRoot, root: join(view.projectRoot, row.source === 'project-dsh' ? '.dsh' : '.agents', 'skills') };
+      }
+    } else if (row.source !== 'custom' && row.source !== 'user' && !row.source.startsWith('user-')) {
+      return null;
     }
-    if (row.source === 'user-dsh') return { base: this.owner.profileContext.home, root: this.importTarget(view) };
-    if (!['user-agents', 'custom'].includes(row.source)) return null;
     const source = resolve(row.path);
-    const bundle = basename(source) === 'SKILL.md' ? dirname(source) : source;
-    const root = basename(bundle) === row.name || basename(source) === `${row.name}.md`
-      ? dirname(bundle) : '';
-    if (!root || root === dirname(root) || (row.source === 'user-agents' && basename(root) !== 'skills')) return null;
-    return { base: dirname(root), root };
+    const root = basename(source) === 'SKILL.md' ? dirname(dirname(source)) : dirname(source);
+    if (root === dirname(root) || (row.source !== 'custom' && basename(root) !== 'skills')) return null;
+    return { base: view.scope === 'project' ? view.projectRoot : dirname(root), root };
   }
 
   async deletionFor(view: SkillView, row: SkillCatalog['skills'][number]) {
@@ -354,6 +356,53 @@ export class SkillPolicy {
     if (!location) return null;
     const deletion = await skillDeletion(location.base, location.root, row.name, row.path);
     return deletion && { ...deletion, revision: skillIdentity(view.scope, view.projectRoot, row.source, row.path, deletion.revision) };
+  }
+
+  /**
+   * Collect every deletable DSH copy of a skill across the current scope and
+   * all imported workspaces. External providers and bundled skills never enter
+   * this list; each option is still revalidated by `deleteSkill` before a write.
+   */
+  async deletionOptions(view: SkillView, row: SkillCatalog['skills'][number], name: string, currentDeletion?: SkillDeletion | null): Promise<SkillDeletionOption[]> {
+    const options: SkillDeletionOption[] = [];
+    const seen = new Set<string>();
+    const add = async (candidateView: SkillView, candidateRow: SkillCatalog['skills'][number], known?: SkillDeletion | null) => {
+      const deletion = known === undefined ? await this.deletionFor(candidateView, candidateRow).catch(() => null) : known;
+      if (!deletion) return;
+      const cwd = candidateView.scope === 'project' ? candidateView.cwd : '';
+      const key = `${candidateView.scope}\0${cwd}\0${deletion.path}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      options.push({
+        ...deletion, cwd, scope: candidateView.scope,
+        workspaceTitle: candidateView.scope === 'project'
+          ? candidateView.workspaces.find(workspace => workspace.path === candidateView.cwd)?.title ?? candidateView.cwd : '',
+      });
+    };
+    await add(view, row, currentDeletion);
+    for (const workspace of view.workspaces) {
+      if (view.scope === 'project' && workspace.path === view.cwd) continue;
+      try {
+        const candidateView = await this.context(workspace.path, 'project');
+        const catalog = await this.readView(candidateView);
+        const candidateRow = catalog.skills.find(skill => skill.name === name);
+        if (candidateRow) await add(candidateView, candidateRow);
+      } catch { /* A removed or unreadable workspace cannot offer a deletion target. */ }
+    }
+    if (view.scope === 'project') {
+      try {
+        const globalView = await this.context('', 'user');
+        const catalog = await this.readView(globalView);
+        const globalRow = catalog.skills.find(skill => skill.name === name);
+        if (globalRow) await add(globalView, globalRow);
+      } catch { /* The global copy is optional. */ }
+    }
+    this.active();
+    return options.sort((first, second) => {
+      if (first.scope !== second.scope) return first.scope === 'user' ? -1 : 1;
+      return view.workspaces.findIndex(workspace => workspace.path === first.cwd)
+        - view.workspaces.findIndex(workspace => workspace.path === second.cwd);
+    });
   }
 
   async deleteSkill(cwd: string, scope: string, name: string, revision: string): Promise<SkillCatalog> {

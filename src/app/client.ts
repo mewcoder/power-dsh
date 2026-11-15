@@ -3,7 +3,8 @@ import { createPreferenceSaver, createSettingsForm, preferenceSlot as registerPr
 import { createSettingsPage } from '../shared/client/settings-shell.ts';
 import { createHeaderActions } from '../shared/client/sidebar-shell.ts';
 import { createFooterBusySource } from '../shared/client/footer-availability.ts';
-import type { ClientContext, ClientEnvironment, ClientFeatureSelection, IconProps, Listener, PageSlotProps, PreferenceKey, PublicPrimitives, ReactModule, SlotProps } from '../shared/client/types.ts';
+import { createStandalonePage, createStandalonePanelIcon, STANDALONE_PANEL_ID, STANDALONE_PANEL_ORDER } from '../features/standalone-page/client.ts';
+import type { ClientContext, ClientEnvironment, ClientFeatureSelection, Dispose, IconProps, LayoutService, Listener, PageSlotProps, PreferenceKey, PublicPrimitives, ReactModule, SlotProps } from '../shared/client/types.ts';
 import { clientFeatures } from './client-features.ts';
 import { featureDictionaries } from './locales.ts';
 import { MOD_RPC, composeRpc } from './rpc.ts';
@@ -44,7 +45,7 @@ export function createClient(React: ReactModule, primitives: PublicPrimitives, s
         const rawVersion = window.__DSH_BOOT__?.release?.version;
         const version = typeof rawVersion === 'string' && rawVersion.trim() ? rawVersion.trim() : null;
         const savePreference = createPreferenceSaver(ctx, form, t);
-        const preferenceSlot: ClientEnvironment['preferenceSlot'] = (field, name, options, component) => registerPreferenceSlot(ctx, form, field, name, options, component);
+        const preferenceSlot: ClientEnvironment['preferenceSlot'] = (field, name, options, component, available) => registerPreferenceSlot(ctx, form, field, name, options, component, available);
         let footerBusy: ClientEnvironment['footerBusy'] | undefined;
         const ids = new Set();
         const fields = new Set<PreferenceKey>();
@@ -63,10 +64,63 @@ export function createClient(React: ReactModule, primitives: PublicPrimitives, s
           return { ...feature, definition };
         });
         const api = features.reduce<Record<string, unknown>>((result, feature) => ({ ...result, ...feature.api }), {});
+        const pages = features.flatMap(feature => feature.pages ?? []).sort((left, right) => left.order - right.order);
+        const StandalonePage = createStandalonePage(runtime, {
+          source,
+          pages,
+        });
+        const StandalonePanelIcon = createStandalonePanelIcon(runtime);
         ctx.slots.inject('settings.section', () => ctx.slots.register({
           name: 'settings.section', id: namespace, order: 50, locale: namespace, label: () => t('title'),
         }, (props: PageSlotProps) => h(SettingsPage, { ...props, source, form, version, savePreference, features, ...api })));
         ctx.slots.inject('settings.section.icon', () => ctx.slots.register({ name: 'settings.section.icon', id: namespace }, Icon));
+        // The optional sidebar page is a root main panel plus its matching sidebar row.
+        // Both seats must exist before either is registered, or a row would point at nothing.
+        let mainSupported = false;
+        let rowSupported = false;
+        let releaseStandalonePanel: Dispose | null = null;
+        let releaseStandaloneRow: Dispose | null = null;
+        let layout: LayoutService | undefined;
+        const syncStandalonePage = () => {
+          const snapshot = source.getSnapshot();
+          const enabled = snapshot.status === 'ready' && snapshot.value?.standalonePageEnabled === true && mainSupported && rowSupported;
+          if (!enabled) {
+            if (releaseStandalonePanel || releaseStandaloneRow) {
+              if (layout?.panelInfo.getSnapshot().activePanelId === STANDALONE_PANEL_ID) layout.selectPanel(null);
+              releaseStandalonePanel?.();
+              releaseStandalonePanel = null;
+              releaseStandaloneRow?.();
+              releaseStandaloneRow = null;
+            }
+            return;
+          }
+          releaseStandalonePanel ??= ctx.slots.register({
+            name: 'main', key: STANDALONE_PANEL_ID, locale: namespace,
+          }, (props: PageSlotProps) => h(StandalonePage, props));
+          releaseStandaloneRow ??= ctx.slots.register({
+            name: 'sidebar.panellist', id: STANDALONE_PANEL_ID, order: STANDALONE_PANEL_ORDER,
+            locale: namespace, label: () => t('title'),
+          }, StandalonePanelIcon);
+        };
+        ctx.slots.inject('main', () => {
+          mainSupported = true;
+          syncStandalonePage();
+          return () => { mainSupported = false; syncStandalonePage(); };
+        });
+        ctx.slots.inject('sidebar.panellist', () => {
+          rowSupported = true;
+          syncStandalonePage();
+          return () => { rowSupported = false; syncStandalonePage(); };
+        });
+        ctx.inject(['layout'], scoped => {
+          layout = scoped.layout ?? ctx.layout;
+          syncStandalonePage();
+        });
+        ctx.effect(() => {
+          const unsubscribe = source.subscribe(syncStandalonePage);
+          syncStandalonePage();
+          return unsubscribe;
+        });
         const sidebar = features.filter(feature => feature.sidebar);
         const actions = features.flatMap(feature => feature.headerAction ? [feature.headerAction] : []);
         ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({

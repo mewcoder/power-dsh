@@ -25,7 +25,12 @@ export interface ModalProps {
   footer?: ReactTypes.ReactNode; children?: ReactTypes.ReactNode; className?: string;
 }
 export type StateDotState = 'ongoing' | 'done' | 'error' | 'idle' | 'warning';
+export interface SegmentedTabItem { value: string; label: ReactTypes.ReactNode; id: string; panelId: string; }
 export interface PublicPrimitives {
+  SegmentedTabs?: ReactTypes.ComponentType<{
+    items: readonly [SegmentedTabItem, ...SegmentedTabItem[]]; value: string;
+    onChange(value: string): void; label: string; className?: string; size?: 'sm' | 'md';
+  }>;
   MarkdownText: ReactTypes.ComponentType<{
     text: string; variant?: 'body' | 'compact'; omitHtml?: boolean;
     labels: { code: { copyLabel: string; copiedLabel: string }; footnotes: string };
@@ -60,7 +65,11 @@ export interface SlotProps extends PageSlotProps { wide: boolean; }
 export interface ComposerSlotProps extends PageSlotProps { sessionId?: string }
 export type SlotComponent = ReactTypes.ComponentType<PageSlotProps> | ReactTypes.ComponentType<SlotProps>
   | ReactTypes.ComponentType<IconProps> | ReactTypes.ComponentType<ComposerSlotProps>;
-export interface SlotOptions { name?: string; id: string; order?: number; locale?: string; label?: () => string; }
+export interface SlotOptions { name?: string; id?: string; key?: string; order?: number; locale?: string; label?: () => string; }
+export interface LayoutService {
+  panelInfo: SnapshotSource<{ activePanelId?: string | null }>;
+  selectPanel(panelId: string | null): void;
+}
 export interface ConfigForms { get(id: string): SettingsForm; describe(): { load(): Promise<unknown> }; }
 export type RpcReply<T> = { ok: true; value: T } | { ok: false; error: { message: string } };
 export type PowerDshRemote = {
@@ -69,7 +78,7 @@ export type PowerDshRemote = {
 // Generation snapshots are opaque object identities; no Host fields are read by this client.
 export interface Connection { isLoopback: boolean; generation: SnapshotSource<object | undefined>; state: SnapshotSource<string | undefined>; }
 export interface NotificationOutcome { seq: number; reason: string; }
-export interface SessionRow { origin?: string; displayTitle?: string; title?: string; running: boolean; projectionValues?: { powerDshNotifications?: NotificationOutcome }; retainedBy?: { mainView?: number }; }
+export interface SessionRow { origin?: string; displayTitle?: string; title?: string; cwd?: string; running: boolean; projectionValues?: { powerDshNotifications?: NotificationOutcome }; retainedBy?: { mainView?: number }; }
 export interface PendingInteraction { key: string; kind: string; review?: unknown; answerable?: boolean; }
 export interface SessionStatus { running?: boolean; pendingInteraction?: PendingInteraction; }
 export interface ThemeService { getTheme(): { preference: string }; setTheme(id: string): void; }
@@ -81,6 +90,7 @@ export interface ClientContext {
   remote: { $mount(options: { package: string; descriptors: readonly RpcDescriptor[] }): Promise<void>; powerDsh: PowerDshRemote };
   slots: { inject(name: string, callback: () => void | Dispose): void; register(options: (SlotOptions & { name: string }) | { name: 'sidebar.brand.mark'; priority: number }, component: SlotComponent): Dispose };
   locale: { register(namespace: string, language: string, dictionary: Record<string, string>): Dispose; bind(namespace: string): Translate };
+  layout?: LayoutService;
   configForms: ConfigForms; connection: Connection; theme: ThemeService;
   sessions: { list: SnapshotSource<{ phase: string; ids: string[]; byId: Record<string, SessionRow> }> };
   uiSession: { sessionStatus: SnapshotSource<ReadonlyMap<string, SessionStatus>> };
@@ -91,7 +101,7 @@ export interface ClientEnvironment {
   pluginVersion: string;
   savePreference: SavePreference;
   footerBusy: SnapshotSource<boolean>;
-  preferenceSlot(field: PreferenceKey, name: string, options: SlotOptions, component: SlotComponent): void;
+  preferenceSlot(field: PreferenceKey, name: string, options: SlotOptions, component: SlotComponent, available?: () => boolean): void;
 }
 export interface SavingSetting { field: PreferenceKey; value: PreferenceValue; }
 export interface SettingError { field: PreferenceKey; message: string; }
@@ -109,10 +119,19 @@ export interface SettingContribution {
 }
 export interface HeaderActionContext { wide: boolean; latestWide: ReactTypes.MutableRefObject<boolean>; mounted: ReactTypes.MutableRefObject<boolean>; source: SnapshotSource<FormSnapshot>; t: Translate; }
 export interface HeaderAction { id: string; label: string; visible: boolean; disabled?: boolean; error?: string; canUse(): boolean; select(): void; isConfirming?(): boolean; dialog?: ReactTypes.ReactNode; }
+export interface ClientPageContribution {
+  id: string;
+  label: string;
+  icon: ReactTypes.ComponentType<IconProps>;
+  order: number;
+  available(snapshot: FormSnapshot): boolean;
+  render(props: PageSlotProps): ReactTypes.ReactNode;
+}
 export interface ClientFeature {
   settings?: SettingContribution[]; styles?: string; api?: Record<string, unknown>;
   useSettings?(context: SettingsViewContext): SettingContribution[];
   useSettingsFooter?(context: SettingsViewContext): ReactTypes.ReactNode;
+  pages?: ClientPageContribution[];
   sidebar?(props: SlotProps): ReactTypes.ReactNode;
   headerAction?(context: HeaderActionContext): HeaderAction;
 }

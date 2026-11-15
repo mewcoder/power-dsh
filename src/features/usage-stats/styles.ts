@@ -1,7 +1,8 @@
 export const styles = `
 /* Usage page mirrors the native settings density: quiet cards, no nested chrome. */
-.power-dsh-usage-page .power-dsh-usage-body { display:flex; flex-direction:column; gap:24px; margin-top:10px; }
-.power-dsh-usage-page .power-dsh-usage-group { display:flex; flex-direction:column; gap:10px; }
+.power-dsh-usage-page { container:power-dsh-usage / inline-size; }
+.power-dsh-usage-page .power-dsh-usage-body { display:flex; flex-direction:column; gap:16px; margin-top:10px; }
+.power-dsh-usage-page .power-dsh-usage-group { display:flex; flex-direction:column; min-width:0; gap:16px; }
 .power-dsh-usage-page .power-dsh-usage-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
 .power-dsh-usage-page .power-dsh-usage-metric { display:flex; flex-direction:column; min-width:0; gap:6px; padding:12px; border:.5px solid var(--dsw-alias-settings-card-stroke); border-radius:var(--dsw-radius-xl); background:var(--dsw-alias-settings-card-fill); }
 .power-dsh-usage-page .power-dsh-usage-metric-label { align-self:flex-start; color:var(--dsw-alias-label-secondary); font-size:11px; line-height:18px; }
@@ -9,7 +10,7 @@ export const styles = `
 .power-dsh-usage-page .power-dsh-usage-metric-value { color:var(--dsw-alias-label-primary); font-size:18px; font-weight:500; line-height:26px; font-variant-numeric:tabular-nums; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .power-dsh-usage-page .power-dsh-usage-metric-detail { display:flex; flex-wrap:wrap; gap:2px 10px; margin-top:auto; color:var(--dsw-alias-label-tertiary); font-size:11px; line-height:18px; font-variant-numeric:tabular-nums; }
 .power-dsh-usage-page .power-dsh-usage-metric-detail > span { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.power-dsh-usage-page .power-dsh-usage-card { display:flex; flex-direction:column; gap:14px; padding:14px 16px; border:.5px solid var(--dsw-alias-settings-card-stroke); border-radius:var(--dsw-radius-xl); background:var(--dsw-alias-settings-card-fill); }
+.power-dsh-usage-page .power-dsh-usage-card { display:flex; flex-direction:column; min-width:0; gap:14px; padding:14px 16px; border:.5px solid var(--dsw-alias-settings-card-stroke); border-radius:var(--dsw-radius-xl); background:var(--dsw-alias-settings-card-fill); }
 .power-dsh-usage-page .power-dsh-usage-card-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
 .power-dsh-usage-page .power-dsh-usage-trend-head { display:grid; grid-template-columns:minmax(0,1fr) auto; }
 .power-dsh-usage-page .power-dsh-usage-trend-head > .power-dsh-usage-tabs { justify-self:end; white-space:nowrap; }
@@ -51,7 +52,7 @@ export const styles = `
 .power-dsh-usage-page .power-dsh-usage-legend-dot[data-model], .power-dsh-usage-page .power-dsh-usage-model-bar-fill[data-model] { background:var(--power-dsh-model-color); }
 .power-dsh-usage-page .power-dsh-usage-chart-line { stroke:var(--power-dsh-model-color); stroke-width:1.5; stroke-linejoin:round; stroke-linecap:round; fill:none; }
 .power-dsh-usage-page .power-dsh-usage-chart { display:flex; flex-direction:column; gap:6px; min-width:0; }
-.power-dsh-usage-page .power-dsh-usage-chart-svg { display:block; width:100%; height:180px; overflow:hidden; }
+.power-dsh-usage-page .power-dsh-usage-chart-svg { display:block; width:100%; height:clamp(140px,28cqw,200px); overflow:hidden; }
 .power-dsh-usage-page .power-dsh-usage-chart-plot { position:relative; min-width:0; }
 .power-dsh-usage-page .power-dsh-usage-chart-point { position:absolute; display:flex; align-items:center; justify-content:center; width:12px; height:12px; transform:translate(-50%,-50%); border-radius:50%; cursor:default; }
 .power-dsh-usage-page .power-dsh-usage-chart-point-dot { width:6px; height:6px; border-radius:50%; background:var(--power-dsh-model-color); opacity:0; pointer-events:none; }
@@ -64,17 +65,25 @@ export const styles = `
 .power-dsh-usage-page .power-dsh-usage-chart-axis-label { min-width:0; overflow:hidden; color:var(--dsw-alias-label-tertiary); font-size:10px; line-height:14px; white-space:nowrap; }
 .power-dsh-usage-page .power-dsh-usage-models { display:flex; flex-direction:column; margin:0; padding:0; list-style:none; }
 .power-dsh-usage-page .power-dsh-usage-model {
-  display:grid; align-items:center; gap:4px 10px; padding:8px 0;
-  grid-template-columns:8px minmax(0,1fr) minmax(52px,auto) 40px;
-  grid-template-areas:"dot name value share" ". bar bar bar";
+  display:grid; align-items:center; gap:3px 10px; padding:8px 0;
+  grid-template-columns:8px minmax(0,1fr) auto;
+  grid-template-areas:"dot name value" ". meta meta" ". bar bar";
 }
 .power-dsh-usage-page .power-dsh-usage-model + .power-dsh-usage-model { border-top:.5px solid var(--dsw-alias-border-l2); }
 .power-dsh-usage-page .power-dsh-usage-model > .power-dsh-usage-legend-dot { grid-area:dot; align-self:center; }
 .power-dsh-usage-page .power-dsh-usage-model-name { grid-area:name; min-width:0; overflow:hidden; color:var(--dsw-alias-label-primary); font-size:12px; line-height:18px; text-overflow:ellipsis; white-space:nowrap; }
 .power-dsh-usage-page .power-dsh-usage-model-value { grid-area:value; justify-self:end; color:var(--dsw-alias-label-secondary); font-size:11px; line-height:18px; font-variant-numeric:tabular-nums; white-space:nowrap; }
-.power-dsh-usage-page .power-dsh-usage-model-share { grid-area:share; justify-self:end; min-width:40px; color:var(--dsw-alias-label-tertiary); font-size:11px; line-height:18px; font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap; }
+.power-dsh-usage-page .power-dsh-usage-model-meta { grid-area:meta; min-width:0; overflow:hidden; color:var(--dsw-alias-label-tertiary); font-size:10.5px; line-height:16px; font-variant-numeric:tabular-nums; text-overflow:ellipsis; white-space:nowrap; }
 .power-dsh-usage-page .power-dsh-usage-model-bar { grid-area:bar; display:block; height:3px; border-radius:999px; background:color-mix(in srgb,var(--dsw-alias-label-tertiary) 14%,transparent); overflow:hidden; }
 .power-dsh-usage-page .power-dsh-usage-model-bar-fill { display:block; height:100%; border-radius:999px; }
+.power-dsh-usage-page .power-dsh-usage-workspaces { display:flex; flex-direction:column; margin:0; padding:0; list-style:none; }
+.power-dsh-usage-page .power-dsh-usage-workspace { display:grid; align-items:center; gap:3px 10px; padding:8px 0; grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"name value" "meta meta" "bar bar"; }
+.power-dsh-usage-page .power-dsh-usage-workspace + .power-dsh-usage-workspace { border-top:.5px solid var(--dsw-alias-border-l2); }
+.power-dsh-usage-page .power-dsh-usage-workspace-name { grid-area:name; min-width:0; overflow:hidden; color:var(--dsw-alias-label-primary); font-size:12px; line-height:18px; text-overflow:ellipsis; white-space:nowrap; }
+.power-dsh-usage-page .power-dsh-usage-workspace-value { grid-area:value; justify-self:end; color:var(--dsw-alias-label-secondary); font-size:11px; line-height:18px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.power-dsh-usage-page .power-dsh-usage-workspace-meta { grid-area:meta; min-width:0; overflow:hidden; color:var(--dsw-alias-label-tertiary); font-size:10.5px; line-height:16px; font-variant-numeric:tabular-nums; text-overflow:ellipsis; white-space:nowrap; }
+.power-dsh-usage-page .power-dsh-usage-workspace-bar { grid-area:bar; display:block; height:3px; border-radius:999px; background:color-mix(in srgb,var(--dsw-alias-label-tertiary) 14%,transparent); overflow:hidden; }
+.power-dsh-usage-page .power-dsh-usage-workspace-bar-fill { display:block; height:100%; border-radius:999px; background:var(--dsw-alias-state-business-primary); }
 .power-dsh-usage-page .power-dsh-usage-empty { margin:0; padding:24px 0; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; text-align:center; }
 .power-dsh-usage-page .power-dsh-usage-description-row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .power-dsh-usage-page .power-dsh-usage-description-row > .power-dsh-description { min-width:0; }
@@ -122,6 +131,11 @@ export const styles = `
 .power-dsh-usage-calendar-day[aria-current="date"]::after { content:""; position:absolute; bottom:4px; left:calc(50% - 1.5px); width:3px; height:3px; border-radius:50%; background:currentColor; }
 .power-dsh-usage-calendar-day:focus-visible, .power-dsh-usage-calendar-nav:focus-visible { z-index:1; outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:1px; }
 .power-dsh-usage-calendar-hint { min-height:18px; margin:10px 0 0; color:var(--dsw-alias-label-tertiary); font-size:11px; line-height:18px; }
+@container power-dsh-usage (max-width:420px) {
+  .power-dsh-usage-page .power-dsh-usage-card { padding:12px; }
+  .power-dsh-usage-page .power-dsh-usage-trend-head { grid-template-columns:minmax(0,1fr); }
+  .power-dsh-usage-page .power-dsh-usage-trend-head > .power-dsh-usage-tabs { justify-self:start; }
+}
 @media (hover:hover) {
   .power-dsh-usage-calendar-nav:hover, .power-dsh-usage-calendar-day:hover:not([data-endpoint="true"]) { background:var(--dsw-alias-interactive-bg-hover); }
 }

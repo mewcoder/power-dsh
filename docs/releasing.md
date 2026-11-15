@@ -14,11 +14,11 @@
 
 | 项目 | 当前约定 |
 | --- | --- |
-| 品牌 | PowerDSH |
+| 品牌 | power-dsh |
 | 技术包名 | `power-dsh` |
-| 设置入口与页面标题 | PowerDSH（中英文一致） |
+| 设置入口与页面标题 | power-dsh（中英文一致） |
 | 首版版本号 | `0.0.1`；标签 `v0.0.1`，GitHub Release 分发 |
-| 简介 | 中文「DSH 增强插件。优雅克制，专注实效。让你的 DSH 更顺手、更高效。」；英文「A DeepSeek Harness (DSH) enhancement plugin. Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.」 |
+| 简介 | 中文「dsh 增强插件。优雅克制，专注实效。让你的 dsh 更顺手、更高效。」；英文「A DeepSeek Harness (dsh) enhancement plugin. Minimal, elegant, yet deeply powerful. Making your dsh effortless and efficient.」 |
 | 分发附件名 | `power-dsh.tgz`，每版相同 |
 | 仓库地址 | `https://github.com/mewcoder/power-dsh`；origin 为 `https://github.com/mewcoder/power-dsh.git`，已核对实际改名 |
 | DSH 版本 | 最低已测基线 `0.2.0-rc.1`；`engines.dsh` 安装范围为 `>=0.2.0-rc.1 <0.3.0-0`，具体平台与功能验收见兼容记录 |
@@ -31,13 +31,13 @@
 
 ## 插件卡片的名称与描述
 
-[包清单](../package.json)的 `name` 是技术包名 `power-dsh`，`description` 是通用简介；[中文元数据](../assets/locale/zh.json)与[英文元数据](../assets/locale/en.json)的 `meta.title`、`meta.description` 是本地化名称和简介。插件显示名、Client 设置入口与页面标题中英文均为 **PowerDSH**；设置页说明独立精简为「DSH 增强插件」／`A DSH enhancement plugin`。改名或改简介时按各自用途一起核对。
+[包清单](../package.json)的 `name` 是技术包名 `power-dsh`，`description` 是通用简介；[中文元数据](../assets/locale/zh.json)与[英文元数据](../assets/locale/en.json)的 `meta.title`、`meta.description` 是本地化名称和简介。插件显示名、Client 设置入口、页面标题与市场搜索名中英文均为 **power-dsh**；设置页说明独立精简为「dsh 增强插件」／`A dsh enhancement plugin`。简介中的 dsh 统一小写，改名或改简介时按各自用途一起核对。
 
 本地开发卡片与公开市场发现卡片使用的字段可能不同，调整元数据后须在目标页面核对名称和简介的实际展示。公开市场目录描述可以比设置页简介更具体。
 
 ## GitHub 简介、标签与发现入口
 
-GitHub About、包清单和双语元数据使用已确认的完整简介，设置页只用上文的短说明。完整简介为：中文「DSH 增强插件。优雅克制，专注实效。让你的 DSH 更顺手、更高效。」；英文「A DeepSeek Harness (DSH) enhancement plugin. Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.」。README 首屏独立使用引用块：中文「优雅克制，专注实效。让你的 DSH 更顺手、更高效。」加粗，英文「Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.」斜体。项目介绍明确 DSH 插件与独立社区维护身份。具体功能和变化随版本写入更新日志与 Release，主简介保持简短。GitHub topics 与包清单 keywords 仍准确反映宿主与现有功能：
+GitHub About、包清单和双语元数据使用已确认的完整简介，设置页只用上文的短说明。完整简介为：中文「dsh 增强插件。优雅克制，专注实效。让你的 dsh 更顺手、更高效。」；英文「A DeepSeek Harness (dsh) enhancement plugin. Minimal, elegant, yet deeply powerful. Making your dsh effortless and efficient.」。README 首屏独立使用引用块：中文「优雅克制，专注实效。让你的 dsh 更顺手、更高效。」加粗，英文「Minimal, elegant, yet deeply powerful. Making your dsh effortless and efficient.」斜体。项目介绍明确 dsh 插件与独立社区维护身份。具体功能和变化随版本写入更新日志与 Release，主简介保持简短。GitHub topics 与包清单 keywords 仍准确反映宿主与现有功能：
 
 ```text
 dsh-plugin, deepseek-harness, deepseek, dsh, mcp, notifications, skill-management, customization
@@ -45,7 +45,7 @@ dsh-plugin, deepseek-harness, deepseek, dsh, mcp, notifications, skill-managemen
 
 `dsh-plugin` 同时是市场收录要求之一，其余标签用于准确表达宿主与功能。2026-11-08 的参考样本包括 [dsh-market](https://github.com/dsh-market/dsh-market) 的中英文用途、演示与安装入口，[dsh-unlag](https://github.com/regrevia/dsh-unlag) 的问题与效果说明，以及 [dsh-skill-mcp-manager](https://github.com/alone-tree/dsh-skill-mcp-manager) 的 Skills/MCP 定位与实际截图。参考的是信息表达和发现入口，stars 不作为质量或流量保证。
 
-README 面向使用者，标题使用显示名 `# PowerDSH`，并在首屏说明 `power-dsh` 是包名与仓库名；首屏使用已确认的中英品牌引用块，其后展示宽度为 560 的真实截图，保留「分类 / 功能 / 描述」三列功能表与使用入口。功能表按「通用」「界面」「管理」「精简」「其他」五类各占一行，行内逐项列出功能名称与一句说明；组内按使用频率和功能关联性排序，以 [分类 Tab](ui.md#分类-tab) 为准。通用只列任务通知；其他依次列界面刷新、重启应用与屏蔽双击重命名，刷新与重启相邻；实际设置页在 Linux 和 Web 隐藏重启行，macOS／Windows 打包桌面端显示该行，动作仍需本机 Host 能力确认，功能名称使用纯文本，不附逐项文档超链接；始终反映当前代码，不记录逐项版本号；发版时由 Git 标签保留对应代码与 README 快照，详细变化记录在更新日志与 Release。开发流程、测试命令及 SDK 验收矩阵保留在维护文档中。截图直接取自实际运行的 DSH 设置页，裁剪到设置窗口并转成 WebP（`docs/images/0.0.1/settings.webp`，由 `screenshots.json` 声明）；不制作模拟预览或改写真实图片。界面结构变化时用新截图替换，并在下次发版时随包更新。没有已发布产物、CI 或确定许可证时，不添加相应的成功徽章。本地 README 在用户确认推送后才会更新到 GitHub；Release 下载和市场入口待发布、收录后更新。
+README 面向使用者，标题使用统一名称 `# power-dsh`，显示名、包名与仓库名保持一致；首屏使用已确认的中英品牌引用块，其后展示宽度为 560 的真实截图，保留「分类 / 功能 / 描述」三列功能表与使用入口。功能表按「通用」「界面」「管理」「精简」「其他」五类各占一行，行内逐项列出功能名称与一句说明；组内按使用频率和功能关联性排序，以 [分类 Tab](ui.md#分类-tab) 为准。通用只列任务通知；其他依次列界面刷新、重启应用与屏蔽双击重命名，刷新与重启相邻；实际设置页在 Linux 和 Web 隐藏重启行，macOS／Windows 打包桌面端显示该行，动作仍需本机 Host 能力确认，功能名称使用纯文本，不附逐项文档超链接；始终反映当前代码，不记录逐项版本号；发版时由 Git 标签保留对应代码与 README 快照，详细变化记录在更新日志与 Release。开发流程、测试命令及 SDK 验收矩阵保留在维护文档中。截图直接取自实际运行的 DSH 设置页，裁剪到设置窗口并转成 WebP（`docs/images/0.0.1/settings.webp`，由 `screenshots.json` 声明）；不制作模拟预览或改写真实图片。界面结构变化时用新截图替换，并在下次发版时随包更新。没有已发布产物、CI 或确定许可证时，不添加相应的成功徽章。本地 README 在用户确认推送后才会更新到 GitHub；Release 下载和市场入口待发布、收录后更新。
 
 ## 选择分发方式
 
@@ -97,11 +97,11 @@ README 面向使用者，标题使用显示名 `# PowerDSH`，并在首屏说明
 
 ## 首次发版前的准备
 
-1. 确认品牌、简介、仓库地址与选定许可证，补充真实的 `repository`、`homepage`、`bugs` 和作者信息，保留[第三方声明](third-party-notices.md)。许可证由作者决定。
+1. 确认品牌、简介、仓库地址与选定许可证，补充真实的 `repository`、`homepage`、`bugs` 和作者信息，保留实际使用资源的[第三方许可](third-party-notices.md)。许可证由作者决定。
 2. 完成最低 DSH 版本验证，填写兼容范围，并明确实际验证的平台。
 3. 按分发渠道核对 `private`：npm 发布前移除 `private: true` 或设为 `false`，开发准备阶段保留它；仓库检查兼容两种有效状态。DSH 官方参考索引生成器会忽略 private 包。不要将这项规则套作 dsh-market 收录的明确门槛，后者按自己的贡献指南检查。
 4. 如果发布 npm，再次确认包名可用和账号权限；一次注册表查询不是名称预留。包名、patch 引用与 Client 注册 id 必须一致。
-5. 审阅项目和打包清单：安装包保留编译 JS `dist/*.js`、公开声明 `dist/*.d.ts`、模块主 Spec `src/features/*/spec.md`、图标/locale、Bundle patch、README、CHANGELOG、截图清单、发布截图及[第三方声明](third-party-notices.md)，另保留 npm 自动收录的[文档索引](README.md)。TS 编译输入、测试、构建配置/脚本、开发规范和参考仓库均排除；tsdown、TypeScript 与 Node/React 类型声明仅为开发依赖，生产安装不需要它们。确认包中没有凭据、参考仓库和个人日志，再准备实际产物验收结果。
+5. 审阅项目和打包清单：安装包保留编译 JS `dist/*.js`、公开声明 `dist/*.d.ts`、模块主 Spec `src/features/*/spec.md`、图标/locale、Bundle patch、README、CHANGELOG、截图清单、发布截图及精简的[第三方许可](third-party-notices.md)，另保留 npm 自动收录的[文档索引](README.md)。TS 编译输入、测试、构建配置/脚本、开发规范、[参考研究](reference-research.md)和参考仓库均排除；tsdown、TypeScript 与 Node/React 类型声明仅为开发依赖，生产安装不需要它们。确认包中没有凭据、参考仓库和个人日志，再准备实际产物验收结果。
 6. 官方 `@deepseek-ai/*` 包以 `peerDependencies` 声明为宿主提供、并在 `peerDependenciesMeta` 标为可选，安装时不再嵌套安装一份宿主 SDK。改动这些范围时须同时更新开发依赖与锁文件，运行完整检查、隔离安装和兼容回归；范围须覆盖所支持的预发布分支，不把宽泛范围误当成包含所有 alpha / rc。
 
 以上许可证、兼容范围与实际产物验收是本项目的发布准备要求；市场自身的收录门槛见下文，不能将两者混为一谈。

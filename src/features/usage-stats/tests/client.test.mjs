@@ -89,7 +89,7 @@ test('the page reads the browser zone once and renders the lifetime summary', as
   assert.deepEqual(labels.flat(Infinity), ['Total tokens', 'Cached tokens', 'Sessions']);
   const details = page.render().filter(node => node.props.className === 'power-dsh-usage-metric-detail')
     .map(node => descendants(node).filter(child => child.type === 'span').flatMap(child => child.props.children));
-  assert.deepEqual(details, [['Input 420', 'Output 80'], ['Cache hit rate 9.5%'], ['Duration 1h 30m']]);
+  assert.deepEqual(details, [['Input 420', 'Output 80'], ['Cache hit rate 9.5%'], ['Runtime 1h 30m']]);
   assert.ok(!page.render().some(node => node.props.className === 'power-dsh-usage-composition'), 'There is no extra composition strip.');
   const hints = page.render().filter(node => node.type === 'native-tooltip-fixture' && node.props.label?.includes('Concurrent sessions'));
   assert.equal(hints.length, 1, 'Runtime explains idle time, waits and concurrent sessions.');
@@ -264,7 +264,7 @@ test('the model list follows the page period while the trend keeps its own zoom'
   page.period('all').props.onClick();
   const all = page.render().filter(node => node.props.className === 'power-dsh-usage-model-value')
     .map(node => [node.props.children].flat(Infinity).join(''));
-  assert.deepEqual(all, ['400', '100'], 'All sums the whole history, including the earlier day.');
+  assert.deepEqual(all, ['400 · 80%', '100 · 20%'], 'All sums the whole history, including the earlier day.');
   assert.equal(page.render().filter(node => node.props['data-range']).length, 2,
     'The trend keeps its own 7/30-day control.');
   app.unmount();
@@ -328,12 +328,38 @@ test('the trend chart draws at most six models and the model list ranks them by 
   assert.equal(rows.length, 8, 'Every model keeps a row in the usage list.');
   assert.deepEqual(rows.map(node => [descendants(node).find(child => child.props.className === 'power-dsh-usage-model-name').props.children].flat(Infinity).join('')),
     models.map(model => model.modelId), 'Each row shows its route model name.');
-  assert.deepEqual(rows.map(node => [descendants(node).find(child => child.props.className === 'power-dsh-usage-model-share').props.children].flat(Infinity).join('')),
-    ['19%', '17%', '15%', '13%', '12%', '10%', '8%', '6%'], 'Each row shows its share of the period total.');
+  assert.deepEqual(rows.map(node => [descendants(node).find(child => child.props.className === 'power-dsh-usage-model-value').props.children]
+    .flat(Infinity).join('').split(' · ')[1]),
+  ['19%', '17%', '15%', '13%', '12%', '10%', '8%', '6%'], 'The combined token/share value shows its share of the period total.');
   assert.ok(rows.every(node => node.props.title.includes('2 requests')),
     'The hover title carries the summed per-day request count.');
   assert.ok(rows.every(node => descendants(node).some(child => child.props.className === 'power-dsh-usage-model-bar')),
     'Each row draws its share as a bar under the name.');
+  app.unmount();
+});
+
+test('workspace usage follows the selected period and shows token share and sessions', async () => {
+  const app = await mount({ usageSnapshot: usageSnapshotFixture({
+    workspaces: [
+      { path: '/work/alpha', totalTokens: 300, activeMs: 60_000, sessionDays: [['2026-03-03']],
+        days: [{ date: '2026-03-01', totalTokens: 100, activeMs: 30_000 },
+          { date: '2026-03-03', totalTokens: 200, activeMs: 30_000 }] },
+      { path: '/work/beta', totalTokens: 100, activeMs: 30_000, sessionDays: [['2026-03-03']],
+        days: [{ date: '2026-03-03', totalTokens: 100, activeMs: 30_000 }] },
+    ],
+  }) });
+  const page = await selector(app);
+  assert.equal(page.render().filter(node => node.props.className === 'power-dsh-usage-models').length, 1,
+    'The model dimension is selected by default.');
+  page.render().find(node => node.props['data-dimension'] === 'workspace').props.onClick();
+  const rows = () => page.render().filter(node => node.props.className === 'power-dsh-usage-workspace');
+  assert.deepEqual(rows().map(node => [descendants(node).find(child => child.props.className === 'power-dsh-usage-workspace-name').props.children].flat(Infinity).join('')),
+    ['alpha', 'beta']);
+  assert.deepEqual(rows().map(node => [descendants(node).find(child => child.props.className === 'power-dsh-usage-workspace-value').props.children].flat(Infinity).join('')),
+    ['200 · 67%', '100 · 33%'], 'Today only includes the selected day.');
+  page.period('all').props.onClick();
+  assert.deepEqual(rows().map(node => [descendants(node).find(child => child.props.className === 'power-dsh-usage-workspace-value').props.children].flat(Infinity).join('')),
+    ['300 · 75%', '100 · 25%'], 'All sums the whole workspace history.');
   app.unmount();
 });
 
@@ -529,6 +555,32 @@ test('the three cards follow calendar ranges and count each session once across 
   app.unmount();
 });
 
+test('each model row shows request quality, speed and first token', async () => {
+  const model = {
+    modelId: 'group/flash', provider: 'magpie', totalTokens: 600, requestCount: 4,
+    attemptCount: 5, failedAttemptCount: 1, retryCount: 2,
+    outputTokens: 500, ttftMs: 4_000, ttftSteps: 2, decodeMs: 1_000, decodeTokens: 500,
+  };
+  const app = await mount({ usageSnapshot: usageSnapshotFixture({
+    days: [{
+      date: '2026-03-03', totalTokens: 600, turnCount: 1, toolCallCount: 0,
+      inputTokens: 100, outputTokens: 500, cacheReadTokens: 0, cacheWriteTokens: 0,
+      requestCount: 4, activeMs: 60_000,
+    }],
+    models: [model],
+    dailyModels: [{ date: '2026-03-03', ...model }],
+  }) });
+  const page = await selector(app);
+  const meta = page.render().find(node => node.props.className === 'power-dsh-usage-model-meta');
+  assert.equal([meta.props.children].flat(Infinity).join(''),
+    '5 requests · Success 80% · Failed 1 · Retried 2 · 500 token/s · First token 2s');
+  assert.equal([page.render().find(node => node.props.className === 'power-dsh-usage-model-value').props.children]
+    .flat(Infinity).join(''), '600 · 100%');
+  assert.ok(!page.render().some(node => node.props.className === 'power-dsh-usage-quality'),
+    'Request quality stays inside each model instead of a total card.');
+  app.unmount();
+});
+
 test('cache hit rate includes cache writes in input and empty cards remain numeric in both languages', async () => {
   const app = await mount({ usageSnapshot: usageSnapshotFixture({ days: [{
     date: '2026-03-03', totalTokens: 200, inputTokens: 80, outputTokens: 20, cacheReadTokens: 60, cacheWriteTokens: 40,
@@ -537,7 +589,7 @@ test('cache hit rate includes cache writes in input and empty cards remain numer
   const page = await selector(app);
   const details = () => page.render().filter(node => node.props.className === 'power-dsh-usage-metric-detail')
     .map(node => descendants(node).filter(child => child.type === 'span').flatMap(child => child.props.children));
-  assert.deepEqual(details().slice(0, 3), [['Input 180', 'Output 20'], ['Cache hit rate 33.3%'], ['Duration 1m']]);
+  assert.deepEqual(details().slice(0, 3), [['Input 180', 'Output 20'], ['Cache hit rate 33.3%'], ['Runtime 1m']]);
   app.unmount();
   for (const language of ['en', 'zh']) {
     const empty = await mount({ usageSnapshot: usageSnapshotFixture({ days: [], models: [], dailyModels: [] }) });
@@ -546,7 +598,7 @@ test('cache hit rate includes cache writes in input and empty cards remain numer
       .map(node => node.props.children.join('')), ['0', '0', '0']);
     const text = page.render().filter(node => node.type === 'span').flatMap(node => node.props.children).join(' ');
     assert.ok(text.includes(language === 'zh' ? '缓存率 0%' : 'Cache hit rate 0%'));
-    assert.ok(text.includes(language === 'zh' ? '时长 0 分钟' : 'Duration 0m'));
+    assert.ok(text.includes(language === 'zh' ? '运行时长 0 分钟' : 'Runtime 0m'));
     assert.ok(!/NaN|Infinity/.test(text));
     empty.unmount();
   }

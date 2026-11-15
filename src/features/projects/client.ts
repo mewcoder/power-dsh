@@ -2,6 +2,7 @@ import { styles as catalogStyles } from '../../shared/client/catalog-styles.ts';
 import { createCatalogUI } from '../../shared/client/catalog-ui.ts';
 import { errorMessage } from '../../shared/client/runtime.ts';
 import { styles as shellStyles } from '../../shared/client/shell-styles.ts';
+import { standalonePageActive } from '../../shared/client/settings-form.ts';
 import type { ClientEnvironment, ClientFeature, ClientRuntime, FeatureState, IconProps, PageSlotProps, SnapshotSource } from '../../shared/client/types.ts';
 import type { ProjectCatalog, ProjectRow } from './rpc.ts';
 import { arrangeProjects, relativeTime, type ProjectSort, type RelativeTimeUnit } from './projects-catalog.ts';
@@ -213,13 +214,19 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     projectsSource.notify();
   };
 
+  const renderPage = (props: PageSlotProps) => h(ProjectsPage, { ...props, projectsSource, loadProjects, removeProject });
   preferenceSlot('projectManagerEnabled', 'settings.section', {
     id: 'power-dsh-projects', order: 54, locale: namespace, label: () => t('projectsTab'),
-  }, (props: PageSlotProps) => h(ProjectsPage, { ...props, projectsSource, loadProjects, removeProject }));
-  preferenceSlot('projectManagerEnabled', 'settings.section.icon', { id: 'power-dsh-projects' }, ProjectsIcon);
+  }, renderPage, () => !standalonePageActive(env.source));
+  preferenceSlot('projectManagerEnabled', 'settings.section.icon', { id: 'power-dsh-projects' }, ProjectsIcon, () => !standalonePageActive(env.source));
   return {
     settings: [{ field: 'projectManagerEnabled', description: 'projectManagerDescription',
       save: next => savePreference('projectManagerEnabled', next === true, 'projectsOutdated'), hideError: true }],
+    pages: [{
+      id: 'projects', label: 'projectsTab', icon: ProjectsIcon, order: 50,
+      available: snapshot => snapshot.status === 'ready' && snapshot.value?.projectManagerEnabled === true,
+      render: renderPage,
+    }],
     api: { projectsSource, loadProjects, removeProject },
   } satisfies ClientFeature;
 }

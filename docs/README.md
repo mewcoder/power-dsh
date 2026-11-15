@@ -16,16 +16,18 @@
 | [版本兼容性](compatibility.md) | 各功能宿主接口依赖、兼容矩阵、升级验证与发版条件 |
 | [发布与升级](releasing.md) | 品牌、分发方式、版本发布、市场收录与后续更新 |
 | [固定发版 Skill](../.agents/skills/power-dsh-release/SKILL.md) | 继承兼容证据、复用检查、同一安装包发布、注册表核验与市场投稿的可恢复执行入口 |
-| [第三方资源声明](third-party-notices.md) | 随包资源来源、参考实现与许可 |
+| [第三方许可](third-party-notices.md) | 随安装包保留的版权与许可文本 |
+| [参考研究](reference-research.md) | 仅供开发核对的来源、接口与参考记录，不随安装包发布 |
 
 ## 功能规格（Spec）
 
-每项用户功能的唯一主 Spec 与实现、文案和行为测试位于同一特性目录。维护要求见[功能 Spec 规范](feature-spec.md)，模块归属与索引由仓库检查核对。下表汇总各功能；界面顺序为「通用」「界面」「管理」「精简」「其他」，默认通用，分类范围与关联设置见[分类 Tab](ui.md#分类-tab)。
+每项用户功能的唯一主 Spec 与实现、文案和行为测试位于同一特性目录。维护要求见[功能 Spec 规范](feature-spec.md)，模块归属与索引由仓库检查核对。下表汇总各功能；界面顺序为「通用」「界面」「功能」「精简」「其他」，默认通用，分类范围与关联设置见[分类 Tab](ui.md#分类-tab)。
 
 | 功能 | 主要职责 |
 | --- | --- |
 | [插件更新](../src/features/plugin-updates/spec.md) | 通用设置的插件版本行、手动检查、正式目标校验、确认后交给市场更新与进度读回 |
 | [壁纸](../src/features/wallpaper/spec.md) | 界面首行「开启自定义壁纸」、原生设置左侧壁纸入口（全局指令上方）、四项缩略图选择、自定义图片卡片底部操作、共享可见度／模糊、拖动预览与提交、Host 存储校验及旧背景兼容 |
+| [侧边栏独立页面](../src/features/standalone-page/spec.md) | 「功能」首行的独立页面开关、七个功能页、带图标的导航与响应式布局 |
 | [任务通知](../src/features/notifications/spec.md) | 事件触发、权限、前台抑制与系统提示音 |
 | [界面刷新](../src/features/refresh-button/spec.md) | 原生页面重载、状态边界与按钮显隐 |
 | [重启应用](../src/features/restart-button/spec.md) | macOS／Windows 桌面的设置入口、确认、当前实例退出与同路径重开，以及平台和验收限制 |
@@ -33,11 +35,13 @@
 | [外观快捷切换](../src/features/appearance-shortcut/spec.md) | 原生主题同步、按钮定位与生命周期 |
 | [退役流动背景兼容与挂载授权](../src/features/flowing-background/spec.md) | 五个隐藏旧键的无 UI 兼容、公共结构表面适配边界及既有流动图案算法依据；现行入口归壁纸 |
 | [显示版本号](../src/features/version-display/spec.md) | 宿主版本展示、桌面更新入口与侧栏定位 |
+| [会话搜索](../src/features/search-popup/spec.md) | 一个开关开启会话搜索弹窗，自带标题与正文搜索、最近消息摘要、工作区筛选与查询词高亮，键盘选择并打开会话；首次启用全文引擎需重启 DSH |
 | [技能管理](../src/features/skills/spec.md) | 全局与逐项目分组、目录堆叠展示、多来源导入、仅对 DSH 生效的启停 |
 | [MCP 管理](../src/features/mcp/spec.md) | 全局服务器、原生启停、真实连接状态与只读测试连接、工具列表与脱敏详情 |
 | [全局指令](../src/features/personalization/spec.md) | 全局指令编辑、原生文件保存与入口关闭行为 |
+| [记忆](../src/features/memory/spec.md) | 全局与项目长期记忆、显式／自动记录、模型四动作工具、索引注入及查看／删除管理 |
 | [归档](../src/features/archive/spec.md) | 归档会话的可折叠分组列表（含工作区路径）、搜索、排序、工作区筛选与恢复、永久删除与自动归档 |
-| [使用统计](../src/features/usage-stats/spec.md) | 本地会话 Token 汇总、53 周活动热力图、每日趋势与模型用量，只读聚合与缓存边界 |
+| [使用统计](../src/features/usage-stats/spec.md) | 本地会话 Token 汇总、模型／工作区分布、按模型的请求质量与速度/首字延迟、53 周活动热力图与每日趋势，只读聚合与缓存边界 |
 | [工作区管理](../src/features/projects/spec.md) | 工作区名称／目录／会话数／最近活动列表，搜索、最近活动与原生顺序排序、二次确认后移除登记 |
 | [停用官方登录与模型接入](../src/features/account-blocking/spec.md) | 登录与模型目标、保留范围与启停行为 |
 | [停用官方搜索](../src/features/search-blocking/spec.md) | 独立搜索开关、抓取保留、旧会话限制与恢复 |
@@ -54,6 +58,8 @@
 | 资料 | 用途与边界 |
 | --- | --- |
 | [首版兼容性调查](compatibility-audit.md) | 同类插件声明、官方标签差异、隔离 SDK 与 Host 装配结果；正式支持范围以[版本兼容性](compatibility.md)为准 |
+| [Claude Code／OpenCode 记忆补充研究](memory-claude-opencode-research-2026-11-15.md) | 固定版本对比文件粒度、索引、保存与整理；研究建议不代替记忆主 Spec |
+| [Codex 开源记忆源码核验](memory-codex-source-research-2026-11-15.md) | V1／V2、会话提取与批量整合、使用记录及保留策略；源码研究不代替本功能验收 |
 | [更新日志](../CHANGELOG.md) | 已有版本记录、待发布功能、用户可感知变化与升级说明 |
 
 每项事实保留一个主要出处，其他文档链接引用。现行规范记录已采用的约定；设计提案、历史备选与未验证结论明确标注。验证记录保留方法和限制，不累积逐版本试验日记。

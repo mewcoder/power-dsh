@@ -1,7 +1,8 @@
 import { styles as shellStyles } from '../../shared/client/shell-styles.ts';
+import { standalonePageActive } from '../../shared/client/settings-form.ts';
 import { errorMessage } from '../../shared/client/runtime.ts';
 import type { ClientEnvironment, ClientFeature, ClientRuntime, FeatureState, IconProps, PageSlotProps, SnapshotSource } from '../../shared/client/types.ts';
-import type { UsageCardSummary, UsageDayRow, UsageModelRow, UsageSnapshot } from './rpc.ts';
+import type { UsageCardSummary, UsageDayRow, UsageModelRow, UsageSnapshot, UsageWorkspaceRow } from './rpc.ts';
 import { styles as featureStyles } from './styles.ts';
 import { monthCells, rangeAfterClick, shiftMonth } from './usage-calendar.ts';
 
@@ -130,6 +131,23 @@ export function summarizeCards(data: UsageSnapshot, window: UsageWindow | null):
   };
 }
 
+/** Sum each workspace over the selected window and count its main-session families once. */
+export function summarizeWorkspaces(data: UsageSnapshot, window: UsageWindow | null): {
+  path: string; totalTokens: number; activeMs: number; sessionCount: number;
+}[] {
+  return (data.workspaces ?? []).map(workspace => {
+    const days = withinWindow(workspace.days, window);
+    return {
+      path: workspace.path,
+      totalTokens: days.reduce((total, day) => total + day.totalTokens, 0),
+      activeMs: days.reduce((total, day) => total + day.activeMs, 0),
+      sessionCount: workspace.sessionDays.filter(dates =>
+        dates.some(date => window === null || (date >= window.start && date <= window.end))).length,
+    };
+  }).filter(workspace => workspace.totalTokens > 0)
+    .sort((left, right) => right.totalTokens - left.totalTokens || left.path.localeCompare(right.path));
+}
+
 /** The 53-week daily grid, ending with the Monday-first week that contains the report day. */
 export function heatmapGrid(days: readonly UsageDayRow[], today: string): { date: string; row: UsageDayRow }[][] {
   const end = dayIndex(today);
@@ -233,6 +251,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const data = snapshot.value;
     const [period, setPeriod] = React.useState<UsagePeriod>('today');
     const [range, setRange] = React.useState<UsageRange>('7d');
+    const [dimension, setDimension] = React.useState<'model' | 'workspace'>('model');
     const [hiddenTrendModels, setHiddenTrendModels] = React.useState<ReadonlySet<string>>(() => new Set());
     const [trendFocus, setTrendFocus] = React.useState('');
     const trendPointRefs = React.useRef(new Map<string, HTMLSpanElement>());
@@ -282,7 +301,6 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         detailTitle: summary ? `${t('usageDuration')} ${duration(summary.activeMs)}` : '',
         hint: `${t('usageSessionsHint')} ${t('usageRuntimeHint')}` },
     ];
-
     const columns = data ? heatmapGrid(data.days, today) : [];
     const heatRows = columns.flat();
     const dailyMax = Math.max(0, ...heatRows.map(cell => cell.row.totalTokens));
@@ -334,8 +352,19 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       for (const row of rows) {
         const key = `${row.provider}/${row.modelId}`;
         const current = totals.get(key);
-        totals.set(key, { modelId: row.modelId, provider: row.provider, totalTokens: (current?.totalTokens ?? 0) + row.totalTokens,
-          requestCount: (current?.requestCount ?? 0) + row.requestCount });
+        totals.set(key, {
+          modelId: row.modelId, provider: row.provider,
+          totalTokens: (current?.totalTokens ?? 0) + row.totalTokens,
+          requestCount: (current?.requestCount ?? 0) + row.requestCount,
+          attemptCount: (current?.attemptCount ?? 0) + row.attemptCount,
+          failedAttemptCount: (current?.failedAttemptCount ?? 0) + row.failedAttemptCount,
+          retryCount: (current?.retryCount ?? 0) + row.retryCount,
+          outputTokens: (current?.outputTokens ?? 0) + row.outputTokens,
+          ttftMs: (current?.ttftMs ?? 0) + row.ttftMs,
+          ttftSteps: (current?.ttftSteps ?? 0) + row.ttftSteps,
+          decodeMs: (current?.decodeMs ?? 0) + row.decodeMs,
+          decodeTokens: (current?.decodeTokens ?? 0) + row.decodeTokens,
+        });
       }
       return totals;
     };
@@ -380,19 +409,50 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const periodModelRows = [...modelTotals.values()].sort((left, right) => right.totalTokens - left.totalTokens);
     const modelTotal = periodModelRows.reduce((sum, model) => sum + model.totalTokens, 0);
     const modelShare = (model: UsageModelRow) => modelTotal > 0 ? Math.max(1, Math.round((model.totalTokens / modelTotal) * 100)) : 0;
+    const modelSpeed = (model: UsageModelRow) => model.decodeMs > 0 && model.decodeTokens > 0
+      ? new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(model.decodeTokens / (model.decodeMs / 1000))
+      : null;
+    const modelTtft = (model: UsageModelRow) => model.ttftSteps > 0 ? model.ttftMs / model.ttftSteps : null;
+    const modelMeta = (model: UsageModelRow) => {
+      const attempts = model.attemptCount || model.requestCount;
+      const success = attempts > 0
+        ? new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 })
+          .format((attempts - model.failedAttemptCount) / attempts)
+        : '—';
+      const parts = [
+        t('usageModelRequests').replace('{count}', () => String(attempts)),
+        t('usageModelSuccess').replace('{rate}', () => success),
+      ];
+      if (model.failedAttemptCount > 0) parts.push(t('usageModelFailed').replace('{count}', () => String(model.failedAttemptCount)));
+      if (model.retryCount > 0) parts.push(t('usageModelRetried').replace('{count}', () => String(model.retryCount)));
+      const speed = modelSpeed(model);
+      const ttft = modelTtft(model);
+      if (speed !== null) parts.push(`${speed} ${t('usageTokenPerSecond')}`);
+      if (ttft !== null) {
+        parts.push(`${t('usageModelFirstToken')} ${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(ttft / 1000)}${t('usageUnitSecond')}`);
+      }
+      return parts;
+    };
 
-    const modelRows = periodModelRows.map((model, index) => h('li', {
-      key: `${model.provider}/${model.modelId}`, className: 'power-dsh-usage-model', 'data-model': index,
-      title: `${model.modelId || t('usageUnknownModel')} · ${formatTokens(model.totalTokens, locale)} · `
-        + t('usageModelRequests').replace('{count}', () => String(model.requestCount)),
-    },
-    h('span', { className: 'power-dsh-usage-legend-dot', 'data-model': index }),
-    h('span', { className: 'power-dsh-usage-model-name' }, model.modelId || t('usageUnknownModel')),
-    h('span', { className: 'power-dsh-usage-model-value' }, formatTokens(model.totalTokens, locale)),
-    h('span', { className: 'power-dsh-usage-model-share' },
-      t('usageModelShare').replace('{rate}', () => `${modelShare(model)}%`)),
-    h('span', { className: 'power-dsh-usage-model-bar', 'aria-hidden': true },
-      h('span', { className: 'power-dsh-usage-model-bar-fill', 'data-model': index, style: { width: `${modelShare(model)}%` } }))));
+    const modelRows = periodModelRows.map((model, index) => {
+      const meta = modelMeta(model);
+      return h('li', {
+        key: `${model.provider}/${model.modelId}`, className: 'power-dsh-usage-model', 'data-model': index,
+        title: `${model.modelId || t('usageUnknownModel')} · ${formatTokens(model.totalTokens, locale)} · ${meta.join(' · ')}`,
+      },
+      h('span', { className: 'power-dsh-usage-legend-dot', 'data-model': index }),
+      h('span', { className: 'power-dsh-usage-model-name' }, model.modelId || t('usageUnknownModel')),
+      h('span', { className: 'power-dsh-usage-model-value' },
+        `${formatTokens(model.totalTokens, locale)} · ${t('usageModelShare').replace('{rate}', () => `${modelShare(model)}%`)}`),
+      h('span', { className: 'power-dsh-usage-model-meta' }, meta.join(' · ')),
+      h('span', { className: 'power-dsh-usage-model-bar', 'aria-hidden': true },
+        h('span', { className: 'power-dsh-usage-model-bar-fill', 'data-model': index, style: { width: `${modelShare(model)}%` } })));
+    });
+    const workspaceRows = data ? summarizeWorkspaces(data, activeWindow) : [];
+    const workspaceTotal = workspaceRows.reduce((sum, workspace) => sum + workspace.totalTokens, 0);
+    const workspaceShare = (workspace: typeof workspaceRows[number]) => workspaceTotal > 0
+      ? Math.max(1, Math.round((workspace.totalTokens / workspaceTotal) * 100)) : 0;
+    const workspaceName = (path: string) => path.split(/[\\/]/).filter(Boolean).at(-1) || t('usageWorkspaceUnknown');
     // Empty history is a valid result; a date picker should not restrict choices to recorded days.
     const customValid = dayIndex(draftStart) !== null && dayIndex(draftEnd) !== null && draftStart <= draftEnd;
     const customId = `${React.useId()}-usage-period`;
@@ -578,10 +638,33 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             h('div', { className: 'power-dsh-usage-metric-detail', title: metric.detailTitle },
               ...metric.details.map(detail => h('span', { key: detail }, detail)))))),
           h('section', { className: 'power-dsh-usage-card' },
-            h('h3', { className: 'power-dsh-usage-card-title' }, t('usageModelTitle')),
-            modelRows.length > 0
-              ? h('ul', { className: 'power-dsh-usage-models' }, ...modelRows)
-              : h('p', { className: 'power-dsh-usage-empty' }, t('usageEmpty')))),
+            h('div', { className: 'power-dsh-usage-card-head' },
+              h('h3', { className: 'power-dsh-usage-card-title' }, t('usageBreakdownTitle')),
+              h('div', { className: 'power-dsh-usage-tabs', role: 'tablist', 'aria-label': t('usageDimensionTitle') },
+                ...(['model', 'workspace'] as const).map(kind => h('button', {
+                  key: kind, type: 'button', role: 'tab', className: 'power-dsh-usage-tab', 'data-dimension': kind,
+                  'aria-selected': dimension === kind,
+                  onClick: () => { if (mounted.current) setDimension(kind); },
+                }, t(kind === 'model' ? 'usageModelTab' : 'usageWorkspaceTab'))))),
+            dimension === 'model'
+              ? modelRows.length > 0
+                ? h('ul', { className: 'power-dsh-usage-models' }, ...modelRows)
+                : h('p', { className: 'power-dsh-usage-empty' }, t('usageEmpty'))
+              : dimension === 'workspace'
+                ? workspaceRows.length > 0
+                  ? h('ul', { className: 'power-dsh-usage-workspaces' },
+                    ...workspaceRows.map((workspace, index) => h('li', {
+                      key: workspace.path || `workspace-${index}`, className: 'power-dsh-usage-workspace',
+                      title: workspace.path || t('usageWorkspaceUnknown'),
+                    },
+                    h('span', { className: 'power-dsh-usage-workspace-name' }, workspaceName(workspace.path)),
+                    h('span', { className: 'power-dsh-usage-workspace-value' },
+                      `${formatTokens(workspace.totalTokens, locale)} · ${t('usageModelShare').replace('{rate}', () => `${workspaceShare(workspace)}%`)}`),
+                    h('span', { className: 'power-dsh-usage-workspace-meta' },
+                      `${t('usageWorkspaceSessions').replace('{count}', () => `${workspace.sessionCount}`)} · ${t('usageWorkspaceRuntime').replace('{duration}', () => duration(workspace.activeMs))}`),
+                    h('span', { className: 'power-dsh-usage-workspace-bar', 'aria-hidden': true },
+                      h('span', { className: 'power-dsh-usage-workspace-bar-fill', style: { width: `${workspaceShare(workspace)}%` } })))))
+                  : h('p', { className: 'power-dsh-usage-empty' }, t('usageEmpty'))                : h('p', { className: 'power-dsh-usage-empty' }, t('usageEmpty')))),
         h('section', { className: 'power-dsh-usage-group', 'aria-label': t('usageGroupHistory') },
         h('section', { className: 'power-dsh-usage-card' },
           h('div', { className: 'power-dsh-usage-card-head' },
@@ -689,13 +772,19 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     usageSource.notify();
   };
 
+  const renderPage = (props: PageSlotProps) => h(UsagePage, { ...props, usageSource, loadUsageStats });
   preferenceSlot('usageStatsEnabled', 'settings.section', {
     id: 'power-dsh-usage', order: 55, locale: namespace, label: () => t('usageTab'),
-  }, (props: PageSlotProps) => h(UsagePage, { ...props, usageSource, loadUsageStats }));
-  preferenceSlot('usageStatsEnabled', 'settings.section.icon', { id: 'power-dsh-usage' }, UsageIcon);
+  }, renderPage, () => !standalonePageActive(env.source));
+  preferenceSlot('usageStatsEnabled', 'settings.section.icon', { id: 'power-dsh-usage' }, UsageIcon, () => !standalonePageActive(env.source));
   return {
     settings: [{ field: 'usageStatsEnabled', description: 'usageStatsDescription',
       save: next => savePreference('usageStatsEnabled', next === true, 'usageOutdated'), hideError: true }],
+    pages: [{
+      id: 'usage', label: 'usageTab', icon: UsageIcon, order: 70,
+      available: snapshot => snapshot.status === 'ready' && snapshot.value?.usageStatsEnabled === true,
+      render: renderPage,
+    }],
     api: { usageSource, loadUsageStats },
   } satisfies ClientFeature;
 }

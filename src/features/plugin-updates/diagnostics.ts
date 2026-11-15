@@ -50,7 +50,7 @@ export class UpdateFailure extends Error {
 }
 
 export function updateDiagnosticContext(diagnostic: PluginUpdateDiagnostic | null, version: string, phase: string, t: Translate): DiagnosticContext {
-  if (!diagnostic) return { stage: 'release.rpc', result: t('pluginUpdateDiagnosticUnavailable'), state: `PowerDSH ${version}; ${phase}` };
+  if (!diagnostic) return { stage: 'release.rpc', result: t('pluginUpdateDiagnosticUnavailable'), state: `power-dsh ${version}; ${phase}` };
   return {
     stage: `${diagnostic.stage} (${t(`pluginUpdateStage_${diagnostic.stage}`)})`,
     check: diagnostic.stage === 'git.tags' ? 'git.ls-remote --tags'
@@ -64,7 +64,7 @@ export function updateDiagnosticContext(diagnostic: PluginUpdateDiagnostic | nul
     actual: [diagnostic.httpStatus !== undefined ? `HTTP ${diagnostic.httpStatus}` : '',
       diagnostic.exitCode !== undefined ? `exit ${diagnostic.exitCode}` : '', diagnostic.systemCode,
       diagnostic.elapsedMs !== undefined ? `${diagnostic.elapsedMs} ms` : ''].filter(Boolean).join('; ') || undefined,
-    state: `PowerDSH ${version}; ${phase}`,
+    state: `power-dsh ${version}; ${phase}`,
     recovery: t(diagnostic.reason === 'not-found' ? 'pluginUpdateRecoveryGit'
       : diagnostic.stage.startsWith('market.') ? 'pluginUpdateRecoveryMarket'
         : diagnostic.reason === 'tag-mismatch' || diagnostic.reason === 'invalid-response' ? 'pluginUpdateRecoveryRelease' : 'pluginUpdateRecoveryNetwork'),

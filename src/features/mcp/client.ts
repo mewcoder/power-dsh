@@ -2,6 +2,7 @@ import { styles as catalogStyles } from '../../shared/client/catalog-styles.ts';
 import { createCatalogUI } from '../../shared/client/catalog-ui.ts';
 import { errorMessage } from '../../shared/client/runtime.ts';
 import { styles as shellStyles } from '../../shared/client/shell-styles.ts';
+import { standalonePageActive } from '../../shared/client/settings-form.ts';
 import type { ClientEnvironment, ClientFeature, ClientRuntime, FeatureState, FormSnapshot, IconProps, PageSlotProps, SnapshotSource, StateDotState } from '../../shared/client/types.ts';
 import { parseMcpProbe, parseMcpServerDetail, type McpCatalog, type McpConnection, type McpProbe, type McpRuntimeState, type McpServer, type McpServerDetail } from './rpc.ts';
 import { styles as featureStyles } from './styles.ts';
@@ -38,6 +39,14 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     h('path', { d: 'M3 5V3' }),
     h('path', { d: 'M4 10a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2a2 2 0 0 1-2 2z' }),
     h('path', { d: 'M7 5V3' }));
+  }
+  function ProbeIcon({ state }: { state: string }) {
+    if (state === 'idle') return h(McpIcon);
+    return h('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none',
+      stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
+      'aria-hidden': true, focusable: false },
+    h('path', { d: state === 'done' ? 'M20 6 9 17 4 12'
+      : state === 'warning' ? 'M12 3 2 21h20L12 3Zm0 6v4m0 4h.01' : 'm6 6 12 12M6 18 18 6' }));
   }
   function canChangeMcp(server: McpServer | undefined): server is McpServer {
     return Boolean(server && server.stateKnown && server.canToggle
@@ -87,6 +96,18 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         ? raw.replace('{attempt}', String(connection.attempt ?? 0)).replace('{max}', String(connection.maxAttempts ?? 0))
         : raw;
       return { key, label, dot: connectionDots[connection.state], transitioning: transitionConnection(connection.state), state: connection.state };
+    };
+    const probeMessage = (current: McpProbeState | null) => {
+      if (current?.status === 'running') return t('mcpProbing');
+      if (!current) return t('mcpProbe');
+      const value = current.value;
+      if (value?.ok) {
+        return [t('mcpProbeSuccess').replace('{count}', String(value.toolNames.length))
+          .replace('{ms}', String(Math.round(value.durationMs))),
+        value.serverInfo && `${value.serverInfo.name} ${value.serverInfo.version}`,
+        value.truncated && t('mcpProbeTruncated'), value.cleanupFailed && t('mcpProbeCleanup')].filter(Boolean).join(' · ');
+      }
+      return current.error || t(value && !value.ok && value.stage === 'list' ? 'mcpProbeListFailed' : 'mcpProbeConnectFailed');
     };
     const needle = query.trim().toLocaleLowerCase();
     const rows = (catalog?.servers ?? []).filter(server =>
@@ -179,6 +200,9 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       const describedBy = [reason && `${control}-reason`, error?.id === server.id && `${control}-error`].filter(Boolean).join(' ') || undefined;
       const currentProbe = probe?.id === server.id ? probe : null;
       const probing = currentProbe?.status === 'running';
+      const probeState = probing ? 'running' : !currentProbe ? 'idle' : currentProbe.value?.ok
+        ? currentProbe.value.cleanupFailed ? 'warning' : 'done' : 'error';
+      const probeLabel = [probeMessage(currentProbe), probeState === 'error' && t('mcpProbeSeeDetails')].filter(Boolean).join(' ');
       return h('li', { key: server.id, className: 'power-dsh-skill-card', 'data-mcp': server.id, 'aria-labelledby': `${control}-name`, 'aria-describedby': describedBy },
         h('div', { className: 'power-dsh-skill-card-content' },
           h('div', { className: 'power-dsh-skill-card-main' },
@@ -204,41 +228,20 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
           // Count, test and details share the last row: the count is text, not a disclosure.
           h('div', { className: 'power-dsh-mcp-card-actions' },
             summary && h('span', { id: `${control}-summary`, className: 'power-dsh-mcp-tools-summary' }, summary),
-            h('button', {
+            h(Tooltip, { label: probeLabel, side: 'top', portal: true, delayMs: 0, maxWidth: 400 }, h('button', {
               type: 'button', className: 'power-dsh-mcp-card-probe', 'data-probe': server.id,
-              'aria-label': `${t('mcpProbe')}: ${server.name}`,
+              'data-probe-state': probeState,
+              'aria-label': `${t('mcpProbe')}: ${server.name} · ${probeLabel}`,
               'aria-busy': probing || undefined,
               disabled: Boolean(busy || snapshot.status !== 'ready' || !catalog?.complete || probing),
               onClick: () => { void runProbe(server); },
-            }, probing ? t('mcpProbing') : t('mcpProbe')),
+            }, probing ? h(StateDot, { state: 'ongoing' }) : h(ProbeIcon, { state: probeState }))),
             h('button', {
               type: 'button', className: 'power-dsh-mcp-card-detail', 'data-detail': server.id,
               'aria-haspopup': 'dialog', 'aria-label': `${t('mcpDetail')}: ${server.name}`,
               'aria-describedby': describedBy,
               onClick: () => { void openDetail(server, detailTrigger.current); },
-            }, t('mcpDetail'))),
-          currentProbe?.status === 'ready' && currentProbe.value
-            && probeResult(currentProbe.value),
-          currentProbe?.status === 'error'
-            && errorFeedback({ t, id: `${control}-probe-error`, message: currentProbe.error,
-              code: 'PD-MCP-PROBE', operation: 'probeMcpServer', placement: 'inline',
-              retry: () => { void runProbe(server); }, disabled: probing })));
-    };
-    // A successful probe is reported as plain status text; a failure uses shared error feedback.
-    const probeResult = (value: McpProbe) => {
-      if (value.ok) {
-        const label = t('mcpProbeSuccess')
-          .replace('{count}', String(value.toolNames.length))
-          .replace('{ms}', String(Math.round(value.durationMs)));
-        const detail = [value.serverInfo && `${value.serverInfo.name} ${value.serverInfo.version}`,
-          value.truncated && t('mcpProbeTruncated'), value.cleanupFailed && t('mcpProbeCleanup')].filter(Boolean).join(' · ');
-        return h('p', { className: 'power-dsh-mcp-probe-result', role: 'status', 'data-ok': 'true' },
-          h(StateDot, { state: value.cleanupFailed ? 'warning' : 'done' }),
-          h('span', null, detail ? `${label} · ${detail}` : label));
-      }
-      return errorFeedback({ t, message: t(value.stage === 'list' ? 'mcpProbeListFailed' : 'mcpProbeConnectFailed'),
-        code: 'PD-MCP-PROBE', operation: 'probeMcpServer', placement: 'inline',
-        context: { stage: value.stage, result: value.cleanupFailed ? 'cleanup-unconfirmed' : 'failed', actual: value.message || undefined } });
+            }, t('mcpDetail')))));
     };
     const renderGroup = (group: McpServer['group']) => {
       const selectedRows = rows.filter(server => server.group === group);
@@ -252,7 +255,6 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             'aria-expanded': open, 'aria-controls': `${titleId}-body`,
             onClick: () => { if (!needle) setGroupsOpen(current => ({ ...current, [group]: !current[group] })); },
           }, h(SkillChevron), h('span', { className: 'power-dsh-skill-group-title' }, groupLabel(group)))),
-        h('p', { className: 'power-dsh-skill-group-description' }, t(group === 'builtin' ? 'mcpPreinstalledDescription' : 'mcpPersonalDescription')),
         open && h('div', { id: `${titleId}-body`, className: 'power-dsh-skill-group-body' },
           h('ul', { className: 'power-dsh-skill-cards' }, selectedRows.map(renderCard))));
     };
@@ -263,6 +265,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       const config = current.value?.config ?? null;
       const catalogServer = catalog?.servers.find(row => row.id === current.id) ?? null;
       const server = current.status === 'ready' ? current.value?.server ?? null : catalogServer;
+      const failedProbe = probe?.id === current.id && (probe.status === 'error' || probe.value?.ok === false) ? probe : null;
+      const failedValue = failedProbe?.value?.ok === false ? failedProbe.value : null;
       // Transport and runtime state stay in the dialog: the card's compact second row
       // is easy to miss, and this is where the full picture belongs.
       const off = server?.stateKnown === true && server.enabled === false;
@@ -288,8 +292,12 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       return h(Modal, {
         open: true, onClose: closeDetail, title: t('mcpDetailTitle'), closeLabel: t('close'),
         className: 'power-dsh-mcp-detail', description: server?.name ?? catalogServer?.name ?? current.id,
-        footer: h(Button, { variant: 'outline', 'data-modal-autofocus': true, onClick: closeDetail }, t('close')),
       },
+      failedProbe && errorFeedback({ t, message: probeMessage(failedProbe),
+        code: 'PD-MCP-PROBE', operation: 'probeMcpServer', placement: 'modal',
+        context: failedValue ? { stage: failedValue.stage, result: failedValue.cleanupFailed ? 'cleanup-unconfirmed' : 'failed',
+          actual: failedValue.message || undefined } : undefined,
+        retry: server ? () => { void runProbe(server); } : undefined }),
       current.status === 'loading' && loadingFeedback({ label: t('mcpDetailLoading') }),
       current.status === 'error' && errorFeedback({ t, message: current.error, code: 'PD-MCP-DETAIL', placement: 'modal',
         operation: 'readMcpServer', retry: () => { if (server) void openDetail(server, detailTrigger.current); } }),
@@ -431,9 +439,15 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     if (!result.ok) throw new Error(result.error.message);
     return parseMcpProbe(result.value);
   };
+  const renderPage = (props: PageSlotProps) => h(McpPage, { ...props, source, mcpSource, loadMcpServers, setMcpServerEnabled, readMcpServer, probeMcpServer });
   preferenceSlot('mcpManagerEnabled', 'settings.section', {
     id: 'power-dsh-mcp', order: 53, locale: namespace, label: () => t('mcpTab'),
-  }, (props: PageSlotProps) => h(McpPage, { ...props, source, mcpSource, loadMcpServers, setMcpServerEnabled, readMcpServer, probeMcpServer }));
-  preferenceSlot('mcpManagerEnabled', 'settings.section.icon', { id: 'power-dsh-mcp' }, McpIcon);
-  return { settings: [{ field: 'mcpManagerEnabled', description: 'mcpManagerDescription', save: next => savePreference('mcpManagerEnabled', next === true, 'mcpManagerOutdated') }], api: { mcpSource, loadMcpServers, setMcpServerEnabled, readMcpServer, probeMcpServer } } satisfies ClientFeature;
+  }, renderPage, () => !standalonePageActive(source));
+  preferenceSlot('mcpManagerEnabled', 'settings.section.icon', { id: 'power-dsh-mcp' }, McpIcon, () => !standalonePageActive(source));
+  return { settings: [{ field: 'mcpManagerEnabled', description: 'mcpManagerDescription', save: next => savePreference('mcpManagerEnabled', next === true, 'mcpManagerOutdated') }],
+    pages: [{
+      id: 'mcp', label: 'mcpTab', icon: McpIcon, order: 40,
+      available: snapshot => snapshot.status === 'ready' && snapshot.value?.mcpManagerEnabled === true,
+      render: renderPage,
+    }], api: { mcpSource, loadMcpServers, setMcpServerEnabled, readMcpServer, probeMcpServer } } satisfies ClientFeature;
 }

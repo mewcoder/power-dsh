@@ -49,6 +49,8 @@ export interface NativeWorkspaceController {
 /** Session list surface: the same activity order the native sidebar dates rows with. */
 export interface NativeSessionController {
   list(request: Record<string, never>, signal?: AbortSignal): Promise<{ items: readonly { sessionId: string; updatedAt: number }[] }>;
+  canOpenWorkspacePath?(): boolean;
+  openWorkspacePath?(request: { path: string }, signal: AbortSignal): Promise<{ opened: boolean }>;
 }
 export type NativeSessionTitleObservation =
   | { sessionId: string; status: 'fulfilled'; value: { session: { createdAt: number }; title?: { title: string; updatedAt: number } } }
@@ -62,6 +64,12 @@ export interface NativeSessionPersistence {
     header: { id: string; cwd?: string };
     location?: { kind: string; path: string };
   } | undefined>;
+}
+export interface NativeSearchSession {
+  id: string;
+  header: { createdAt: number };
+  seq: number;
+  surface: { contentGeneration: number; nodes: readonly number[] };
 }
 export interface NativeSkill {
   name: string; description: string; source: string; provider: string; path?: string; origin?: string;
@@ -117,6 +125,9 @@ interface NativeServices {
 export interface NativeScope { ctx: NativeContext; dispose(): Promise<void> }
 export type CreateScope = (ctx: NativeContext, key: unknown) => NativeScope;
 interface NativeEvents {
+  'session/created': [session: NativeSearchSession];
+  'session/disposed': [session: NativeSearchSession];
+  'session/event': [session: NativeSearchSession, event: unknown];
   'agent/created': [event: { agent: NativeAgent }];
   'agent/disposed': [event: { agent: NativeAgent }];
   'agent-preset/selected': [id: string];

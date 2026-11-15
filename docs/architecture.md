@@ -1,10 +1,14 @@
 # 架构规范
 
-PowerDSH 按用户特性组织 Host、Client、配置、协议、文案与测试，交付一个 Cordis bundle。目录契约与新增功能步骤见[特性模块约定](feature-modules.md)；每项功能的唯一主 Spec 位于模块目录，遵循[功能 Spec 规范](feature-spec.md)。
+## 长期记忆
+
+[记忆模块](../src/features/memory/spec.md)通过功能内可选 `systemPrompt` 服务注册策略与动态索引，Host 在每步开始前预热缓存，provider 仅读内存。自动记录开关改变策略，日常记录使用对话模型；单一 `power_dsh_memory` 工具完成 list/read/save/forget，list 可查找相关主题，新建时精确查重。页面使用 owner-only RPC 查看、单条删除、打开存储目录及手动整理。整理复用公开 `sessionController.modelCatalog()` 与 `llm.stream()`，模型只提建议，无文件工具权限；完整预览保存在 Host 内存，确认后重新验证作用域版本，备份与恢复日志保护批量修改。生成和取消不占用共享操作队列，存储修改仍串行。`MemoryStore` 独占 `$DSH_HOME/power-dsh/memory/` 的文件写入，备份独立位于 `power-dsh/memory-backups/`；条目为事实源、索引可重建，使用跨 profile 磁盘锁、哈希版本和原子替换。打开目录复用可选 `sessionController` 的公开原生打开接口。关闭功能释放工具、提示词与页面，取消整理并保留文件；删除不回写旧会话日志。
+
+power-dsh 按用户特性组织 Host、Client、配置、协议、文案与测试，交付一个 Cordis bundle。目录契约与新增功能步骤见[特性模块约定](feature-modules.md)；每项功能的唯一主 Spec 位于模块目录，遵循[功能 Spec 规范](feature-spec.md)。
 
 ## 包与文件职责
 
-包名为 `power-dsh`，品牌与设置显示名为 **PowerDSH**；Loader 条目、设置命名空间、设置页 id、Host/Client 标识与 RPC 描述符保持原值。保留 `private: true`，未发布到 npm。
+包名、品牌与设置显示名统一为 **power-dsh**；Loader 条目、设置命名空间、设置页 id、Host/Client 标识与 RPC 描述符保持原值。保留 `private: true`，未发布到 npm。
 
 | 位置 | 职责 |
 | --- | --- |
@@ -14,8 +18,8 @@ PowerDSH 按用户特性组织 Host、Client、配置、协议、文案与测试
 | [dist/client.js](../dist/client.js) | 已生成并随源码提交的单个 ModuleLoader factory，作为 `./client` 公开导出 |
 | [src/app/host-features.ts](../src/app/host-features.ts)、[client-features.ts](../src/app/client-features.ts) | Host 与 Client 的显式特性选择 |
 | [src/app/host.ts](../src/app/host.ts)、[client.ts](../src/app/client.ts) | 宿主接入、共享状态与贡献装配，不实现各功能业务 |
-| [src/app/config.ts](../src/app/config.ts)、[settings-tool.ts](../src/app/settings-tool.ts)、[rpc.ts](../src/app/rpc.ts) | 聚合配置、具名设置工具和严格 RPC，拒绝重复与缺项 |
-| [src/features/](../src/features/) | 二十项特性的定义、配置、实现、文案、主 Spec 和行为测试 |
+| [src/app/config.ts](../src/app/config.ts)、[rpc.ts](../src/app/rpc.ts) | 聚合配置和严格 RPC，拒绝重复与缺项 |
+| [src/features/](../src/features/) | 二十五项特性的定义、配置、实现、文案、主 Spec 和行为测试 |
 | [src/shared/host/](../src/shared/host/)、[client/](../src/shared/client/)、[rpc/](../src/shared/rpc/) | 队列与原生启停、设置/目录/侧栏外壳、复用 codec |
 | [tests/integration/](../tests/integration/)、[shared/](../tests/shared/)、[helpers/](../tests/helpers/) | 完整装配与组合、共享机制测试及内存夹具 |
 | [assets/](../assets/)、[cordis.patch.yml](../cordis.patch.yml)、[screenshots.json](../screenshots.json) | 元数据、图标、Bundle 与市场截图入口 |
@@ -29,9 +33,9 @@ PowerDSH 按用户特性组织 Host、Client、配置、协议、文案与测试
 
 ## Host 与 Client
 
-每个特性的 `definition.ts` 是纯元数据，`config.ts` 拥有本功能 schema 与具名工具贡献；有 Host 行为时由 `host.ts` 提供实例创建与具名方法。装配只组合这些声明，所有受控配置键、默认值、操作顺序、工具参数和输出保持兼容。具体行为由[二十项主 Spec](README.md#功能规格spec)维护。
+每个特性的 `definition.ts` 是纯元数据，`config.ts` 拥有本功能 schema；有 Host 行为时由 `host.ts` 提供实例创建与具名方法。装配只组合这些声明，保留受控配置键、默认值与操作顺序。具体行为由[二十五项主 Spec](README.md#功能规格spec)维护。
 
-Host 负责持久配置、文件、进程、策略与安全数据投影；Client 负责设置贡献、页面、观察与交互。普通偏好通过原生 `configForms` 保存；精简等操作由 UI 与工具共用 Host 方法，不监听布尔配置异步执行。可选服务在特性内部子 context 接入，缺少辅助服务不应阻断其他入口。
+Host 负责持久配置、文件、进程、策略与安全数据投影；Client 负责设置贡献、页面、观察与交互。普通偏好通过原生 `configForms` 保存；精简等操作由设置界面通过 owner-only RPC 调用 Host 方法，不监听布尔配置异步执行。不注册 `power_dsh_settings` 对话工具，不向模型暴露插件偏好读写；记忆模块的 `power_dsh_memory` 工具独立保留。可选服务在特性内部子 context 接入，缺少辅助服务不应阻断其他入口。
 
 特性内部 `rpc.ts` 同时供 Host 与 Client 使用，保持严格 codec、具名方法和 owner 校验，不暴露任意字符串分发接口。装配从选择的特性过滤稳定协议清单；Client 先 `remote.$mount`，再在依赖 `remote.powerDsh` 的子 context 中注册页面。运行时拒绝重复 id、配置键、设置项和 RPC；仓库检查还核对两端清单、Spec、源码依赖与文案。
 
@@ -55,7 +59,7 @@ DSH `0.2.2-rc.1` 的原生 logger 提供内存缓冲与 exporter；插件安装�
 
 ## 技能发现与导入
 
-[技能管理](../src/features/skills/spec.md)的来源扫描、包指纹和导入归 `skills` 模块。发现结果投影本次原生目录中的已存在状态，保留卡片并在名称右侧标注「已存在」，禁止重复导入，不维护独立导入历史或受管更新基线。目标确认通过 owner-only RPC 返回实际路径、完整性和已有状态；来源范围与目标范围独立校验，目标仅允许全局或已登记工作区。导入共用已有 Host 队列，接收候选和版本指纹；写前重查，写后使原生目录失效并核对注册路径与内容，不能以磁盘存在冒充注册成功。包在目标文件系统暂存，独占创建目标、最后写入定义；失败只清理仍属于本次操作且未被外部修改的内容。全局与工作区删除支持原生列出的非内置本地文件技能，包括 `.agents` 和自定义目录；Host 校验来源、范围、实际路径及确认指纹，链接仅移除链接，共享文件删除须明确确认。内置提供方、无法确认身份的路径与发现页不开放删除。旧历史文件不读写，也不自动删除。
+[技能管理](../src/features/skills/spec.md)的来源扫描、包指纹和导入归 `skills` 模块。发现结果投影本次原生目录中的已存在状态，Client 据此过滤已存在项并禁止重复导入，不维护独立导入历史或受管更新基线。目标确认通过 owner-only RPC 返回实际路径、完整性和已有状态；来源范围与目标范围独立校验，目标仅允许全局或已登记工作区。导入共用已有 Host 队列，接收候选和版本指纹；写前重查，写后使原生目录失效并核对注册路径与内容，不能以磁盘存在冒充注册成功。包在目标文件系统暂存，独占创建目标、最后写入定义；失败只清理仍属于本次操作且未被外部修改的内容。全局与工作区删除支持原生列出的非内置本地文件技能，包括 `.agents` 和自定义目录；Host 校验来源、范围、实际路径及确认指纹，链接仅移除链接，共享文件删除须明确确认。内置提供方、无法确认身份的路径与发现卡片不开放删除。旧历史文件不读写，也不自动删除。
 
 ## MCP 详情
 
@@ -94,6 +98,8 @@ Host 保持一个[操作队列](../src/shared/host/operation-queue.ts)，核对�
 ## 侧栏接入
 
 设置页与图标使用 `settings.section`、`settings.section.icon`。侧栏共用 `sidebar.footer.action` 中零高度满宽的自有容器 `power-dsh-footer`，不新增底部行、不替换宿主控件。设置外壳消费特性设置贡献；侧栏外壳消费特性展示和动作贡献，不维护逐功能保存分支。
+
+[侧边栏独立页面](../src/features/standalone-page/spec.md)按 `standalonePageEnabled` 注册 root 作用域 `main` keyed slot 与同 id 的 `sidebar.panellist` 图标入口；两个 slot 均可用时才挂载，关闭、卸载或 slot 移除时释放，并在当前主面板仍属于 power-dsh 时通过 `ctx.layout.selectPanel(null)` 返回会话。功能页由七个特性的 `pages` 贡献装配，每项同时贡献设置入口共用的 `icon` 组件，不跨特性导入实现；同一偏好开启时注销这七个设置侧栏入口，壁纸不参与迁移。`ResizeObserver` 只观察自有根节点，达到 960px 切为左导航，窄屏优先复用公共 `SegmentedTabs`，组件缺席时保留自有分段按钮，三条路径均显示图标与文字；功能正文保持同一挂载位置与状态，观察器随页面卸载释放。选中按钮查询限于自有导航容器，选择只保留在 Client context 内。不显示插件标题或设置齿轮，设置继续沿用原生入口。页面不新增宿主 DOM 或全局样式覆盖。
 
 刷新与重启共用[侧栏菜单外壳](../src/shared/client/sidebar-shell.ts)，两项功能独立贡献动作；移除其中一项不移除另一项，没有可用动作时不显示空菜单。版本和主题由各自模块控制展示及释放。定位、主题同步、Windows 顶栏入口与原生菜单间距变量的局部适配范围等分别见[版本](../src/features/version-display/spec.md)、[外观](../src/features/appearance-shortcut/spec.md)与[刷新](../src/features/refresh-button/spec.md) Spec。
 

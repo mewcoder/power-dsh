@@ -4,7 +4,7 @@ export const locales = {
   zh: {
     pluginUpdateVersion: '插件版本',
     pluginUpdateCheck: '检查更新', pluginUpdateChecking: '正在检查…', pluginUpdateAction: '更新',
-    pluginUpdateConfirm: '更新 PowerDSH', pluginUpdateConfirmDescription: '由插件市场完成安装，过程中插件可能重新加载。完成后可能需要刷新界面或重启 DSH。',
+    pluginUpdateConfirm: '更新 power-dsh', pluginUpdateConfirmDescription: '由插件市场完成安装，过程中插件可能重新加载。完成后可能需要刷新界面或重启 DSH。',
     pluginUpdateReleaseNotes: '更新日志', pluginUpdateCurrent: '无需更新',
     pluginUpdateUnconfirmed: '未确认可用更新，请到插件市场核对当前安装来源。',
     pluginUpdateRunning: '插件市场正在处理更新…', pluginUpdateDone: '已安装',
@@ -71,7 +71,7 @@ export const locales = {
   en: {
     pluginUpdateVersion: 'Plugin version',
     pluginUpdateCheck: 'Check for updates', pluginUpdateChecking: 'Checking…', pluginUpdateAction: 'Update',
-    pluginUpdateConfirm: 'Update PowerDSH', pluginUpdateConfirmDescription: 'The plugin market handles installation. The plugin may reload during the update, and DSH may need a refresh or restart afterward.',
+    pluginUpdateConfirm: 'Update power-dsh', pluginUpdateConfirmDescription: 'The plugin market handles installation. The plugin may reload during the update, and DSH may need a refresh or restart afterward.',
     pluginUpdateReleaseNotes: 'Release notes', pluginUpdateCurrent: 'No update needed',
     pluginUpdateUnconfirmed: 'No update target confirmed. Check the installation source in the plugin market.',
     pluginUpdateRunning: 'The plugin market is processing the update…', pluginUpdateDone: 'Installed',

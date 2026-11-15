@@ -75,7 +75,7 @@ jobs:
           const changelog = await readFile('CHANGELOG.md', 'utf8');
           const section = changelog.split(/^## /m).find(text => text.startsWith(`${version}（`));
           assert.ok(section, `Missing changelog section for ${version}`);
-          const notes = `# PowerDSH ${section.trim()}\n`;
+          const notes = `# power-dsh ${section.trim()}\n`;
           await writeFile('release/notes.md', notes);
           NODE
 
@@ -91,6 +91,5 @@ jobs:
           esac
           gh release create "$GITHUB_REF_NAME" release/power-dsh.tgz \
             --title "power-dsh ${GITHUB_REF_NAME#v}" \
-            --generate-notes \
             "${prerelease[@]}" \
             --notes-file release/notes.md

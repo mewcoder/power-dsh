@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  dayKeyFormatter, fillDays, foldSession, mergeUsage, streakDays, usageOf,
+  dayKeyFormatter, fillDays, firstTokenTime, foldSession, mergeUsage, streakDays, usageOf,
 } from '../usage-fold.ts';
 
 const DAY = 86_400_000;
 const at = (date) => Date.parse(`${date}T12:00:00.000Z`);
+const zeroDay = date => ({
+  date, totalTokens: 0, turnCount: 0, toolCallCount: 0, inputTokens: 0, outputTokens: 0,
+  cacheReadTokens: 0, cacheWriteTokens: 0, requestCount: 0, activeMs: 0,
+});
 
 // One model request settles in its own step, so every helper message gets a fresh slot.
 let nextStep = 0;
@@ -50,10 +54,10 @@ test('foldSession buckets tokens, turns and tools per day in the requested zone'
   assert.equal(fold.totalTokens, 180);
   assert.equal(fold.turnCount, 2);
   assert.deepEqual(fold.days, [
-    { date: '2026-03-01', totalTokens: 120, turnCount: 1, toolCallCount: 1,
-      inputTokens: 100, outputTokens: 20, cacheReadTokens: 0, cacheWriteTokens: 0, requestCount: 1, activeMs: 0 },
-    { date: '2026-03-02', totalTokens: 60, turnCount: 1, toolCallCount: 1,
-      inputTokens: 50, outputTokens: 10, cacheReadTokens: 0, cacheWriteTokens: 0, requestCount: 1, activeMs: 0 },
+    { ...zeroDay('2026-03-01'), totalTokens: 120, turnCount: 1, toolCallCount: 1,
+      inputTokens: 100, outputTokens: 20, requestCount: 1 },
+    { ...zeroDay('2026-03-02'), totalTokens: 60, turnCount: 1, toolCallCount: 1,
+      inputTokens: 50, outputTokens: 10, requestCount: 1 },
   ]);
   assert.deepEqual(fold.models.map(row => [row.modelId, row.totalTokens, row.requestCount]).sort(),
     [['group/flash', 120, 1], ['group/sol', 60, 1]]);
@@ -62,6 +66,33 @@ test('foldSession buckets tokens, turns and tools per day in the requested zone'
     ['2026-03-02', 'group/sol', 60, 1],
   ]);
   assert.equal(fold.longestSpanMs, DAY, 'The span runs from creation to the last event.');
+});
+
+test('request quality and stream timing aggregate per model without inventing samples', () => {
+  const start = at('2026-03-01');
+  const fold = foldSession({ events: [
+    { type: 'request/context', time: start, data: { provider: 'magpie', model: 'group/flash' } },
+    { type: 'step/start', time: start, data: { turn: 1, step: 1 } },
+    { type: 'assistant/message', time: start + 6_000, data: {
+      turn: 1, step: 1, usage: { inputTokens: 10, outputTokens: 50 },
+      stream: [{ type: 'chunk', time: start + 1_000, chunk: { type: 'reasoning-delta', index: 0, text: 'a' } }],
+      message: { source: { provider: 'magpie', model: 'group/flash' } },
+    } },
+    { type: 'step/end', time: start + 7_000, data: { turn: 1, step: 1 } },
+    { type: 'assistant/attempt', time: start + 8_000, data: { turn: 1, step: 2, stream: [] } },
+    { type: 'llm/retry', time: start + 8_100, data: { turn: 1, step: 2, failure: { code: 'TRANSPORT' } } },
+    { type: 'turn/end', time: start + 8_200, data: { turn: 1, reason: { kind: 'aborted' } } },
+  ] }, dayKeyFormatter('UTC'));
+  assert.deepEqual(fold.models[0], {
+    modelId: 'group/flash', provider: 'magpie', totalTokens: 60, requestCount: 1,
+    attemptCount: 2, failedAttemptCount: 1, retryCount: 1,
+    outputTokens: 50, ttftMs: 1_000, ttftSteps: 1, decodeMs: 5_000, decodeTokens: 50,
+  });
+  assert.equal(fold.models[0].attemptCount, 2, 'A failed attempt counts alongside the assembled message.');
+  assert.equal(firstTokenTime([{ type: 'text-chunks', time0: 1_000, index: 0, dt: [100], texts: ['', 'x'] }]), 1_100,
+    'Packed text runs reconstruct the first non-empty member time.');
+  assert.equal(firstTokenTime([{ type: 'chunk', time: 1_000, chunk: { type: 'block-start', index: 0, blockType: 'reasoning' } }]), null,
+    'Block boundaries are not tokens.');
 });
 
 test('dayKeyFormatter buckets by the requested zone instead of UTC', () => {
@@ -89,8 +120,7 @@ test('fillDays inserts quiet days between the first and last activity', () => {
   const rows = [{ date: '2026-03-01', totalTokens: 5, turnCount: 1, toolCallCount: 0 }];
   const filled = fillDays(rows, '2026-03-01', '2026-03-04');
   assert.deepEqual(filled.map(row => row.date), ['2026-03-01', '2026-03-02', '2026-03-03', '2026-03-04']);
-  assert.deepEqual(filled[1], { date: '2026-03-02', totalTokens: 0, turnCount: 0, toolCallCount: 0,
-    inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, requestCount: 0, activeMs: 0 });
+  assert.deepEqual(filled[1], zeroDay('2026-03-02'));
   assert.deepEqual(fillDays([], '', ''), []);
 });
 
@@ -163,8 +193,8 @@ test('retried attempts add their billed usage while samples in one attempt are r
     { type: 'step/end', time: time + 1 },
   ] }, dayKeyFormatter('UTC'));
   assert.deepEqual(fold.days[0], {
-    date: '2026-03-01', totalTokens: 43, turnCount: 0, toolCallCount: 0,
-    inputTokens: 24, outputTokens: 7, cacheReadTokens: 11, cacheWriteTokens: 1, requestCount: 2, activeMs: 1,
+    ...zeroDay('2026-03-01'), totalTokens: 43, inputTokens: 24, outputTokens: 7,
+    cacheReadTokens: 11, cacheWriteTokens: 1, requestCount: 2, activeMs: 1,
   });
   const replaced = foldSession({ events: [
     { type: 'assistant/attempt', time, data: { turn: 2, step: 1, stream: streamUsage(5, 1, 0) } },
@@ -173,7 +203,8 @@ test('retried attempts add their billed usage while samples in one attempt are r
   ] }, dayKeyFormatter('UTC'));
   assert.equal(replaced.days[0].totalTokens, 15, 'A later sample in the same slot replaces the earlier one.');
   assert.equal(replaced.days[0].requestCount, 1);
-  assert.deepEqual(replaced.models, [{ modelId: 'group/flash', provider: 'magpie', totalTokens: 15, requestCount: 1 }]);
+  assert.deepEqual(replaced.models.map(row => [row.modelId, row.provider, row.totalTokens, row.requestCount]),
+    [['group/flash', 'magpie', 15, 1]]);
 });
 
 test('same-slot replacement uses the final four buckets, day and model, and can clear a slot', () => {
@@ -191,8 +222,8 @@ test('same-slot replacement uses the final four buckets, day and model, and can 
     sample(day2, 3, 'kept', { inputTokens: 1 }),
     sample(day2, 3, 'kept', undefined),
   ] }, dayKeyFormatter('UTC'));
-  assert.deepEqual(fold.days, [{ date: '2026-03-02', totalTokens: 25, turnCount: 0, toolCallCount: 0,
-    inputTokens: 4, outputTokens: 1, cacheReadTokens: 20, cacheWriteTokens: 0, requestCount: 2, activeMs: 0 }]);
+  assert.deepEqual(fold.days, [{ ...zeroDay('2026-03-02'), totalTokens: 25,
+    inputTokens: 4, outputTokens: 1, cacheReadTokens: 20, requestCount: 2 }]);
   assert.equal(fold.totalTokens, 25);
   assert.deepEqual(fold.dailyModels.map(row => [row.date, row.modelId, row.totalTokens, row.requestCount]), [
     ['2026-03-02', 'final', 24, 1], ['2026-03-02', 'kept', 1, 1],

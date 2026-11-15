@@ -19,6 +19,10 @@ interface Preferences {
   notificationSoundEnabled: boolean;
   notificationSound: string;
   personalizationEnabled: boolean;
+  memoryEnabled: boolean;
+  memoryAutoCapture: boolean;
+  memoryGlobalEnabled: boolean;
+  memoryWorkspaceEnabled: boolean;
   skillManagerEnabled: boolean;
   disabledSkills: DisabledSkillPreference[];
   mcpManagerEnabled: boolean;
@@ -31,6 +35,7 @@ interface Preferences {
   blockDoubleClickRename: boolean;
   showThinkingEffortSwitcher: boolean;
   thinkingEffortGlyph: string;
+  standalonePageEnabled: boolean;
   flowingBackgroundEnabled: boolean;
   flowingBackgroundKind: string;
   flowingBackgroundOpacity: number;
@@ -45,27 +50,14 @@ interface Preferences {
   autoArchivedSessions: string[];
   usageStatsEnabled: boolean;
   projectManagerEnabled: boolean;
+  searchPopupEnabled: boolean;
 }
 type PreferenceKey = keyof Preferences;
 interface LiveValue<T> {
   get(): T;
 }
 type LivePreferences = { [K in PreferenceKey]: LiveValue<Preferences[K]>; };
-type SettingsParameter = 'showVersion' | 'showThemeSwitcher' | 'showRefreshButton' | 'showRestartButton' | 'blockDoubleClickRename' | 'blockOfficialAccount' | 'blockOfficialTelemetry' | 'blockTodo' | 'blockPlan' | 'blockGoal' | 'blockOfficialSearch';
-interface TelemetryStatus {
-  protected: boolean;
-  senders: {
-    id: string;
-    enabled: boolean;
-    active: boolean;
-    available: boolean;
-  }[];
-}
-type SettingsOutput = Pick<Preferences, SettingsParameter> & {
-  version: string | null;
-  telemetry: TelemetryStatus;
-};
-type FeatureId = 'version-display' | 'appearance-shortcut' | 'refresh-button' | 'restart-button' | 'notifications' | 'personalization' | 'skills' | 'mcp' | 'account-blocking' | 'search-blocking' | 'telemetry-blocking' | 'todo-blocking' | 'plan-blocking' | 'goal-blocking' | 'double-click-rename' | 'thinking-effort' | 'flowing-background' | 'archive' | 'usage-stats' | 'projects' | 'wallpaper' | 'plugin-updates';
+type FeatureId = 'version-display' | 'appearance-shortcut' | 'refresh-button' | 'restart-button' | 'notifications' | 'personalization' | 'skills' | 'mcp' | 'account-blocking' | 'search-blocking' | 'telemetry-blocking' | 'todo-blocking' | 'plan-blocking' | 'goal-blocking' | 'double-click-rename' | 'thinking-effort' | 'flowing-background' | 'archive' | 'usage-stats' | 'projects' | 'wallpaper' | 'plugin-updates' | 'standalone-page' | 'search-popup' | 'memory';
 type FeatureCategory = 'general' | 'interface' | 'enhance' | 'simplify' | 'other';
 interface FeatureDefinition {
   readonly id: FeatureId;
@@ -164,12 +156,22 @@ interface SkillDetail {
   enabled: boolean;
   modelInvocable: boolean;
   userInvocable: boolean;
+  /** The currently opened copy, kept for older clients and single-path deletion. */
   deletion?: SkillDeletion;
+  /** Every deletable DSH copy of this skill across the current scope and workspaces. */
+  deletions?: SkillDeletionOption[];
 }
 interface SkillDeletion {
   path: string;
   linked: boolean;
   revision: string;
+}
+interface SkillDeletionOption extends SkillDeletion {
+  /** Empty for the global copy; workspace path for a project copy. */
+  cwd: string;
+  scope: SkillScope;
+  /** Saved workspace title; empty for the global copy. */
+  workspaceTitle: string;
 }
 type McpRuntimeState = 'pending' | 'loading' | 'active' | 'failed' | 'unloading' | 'inactive' | 'disabled' | 'unknown';
 type McpTransport = 'stdio' | 'streamable-http' | 'unknown';
@@ -376,6 +378,17 @@ interface UsageModelRow {
   provider: string;
   totalTokens: number;
   requestCount: number;
+  /** Model settlements attempted, including failed attempts. */
+  attemptCount: number;
+  /** Attempts that settled without an assembled assistant message. */
+  failedAttemptCount: number;
+  /** Scheduled retry attempts attributed to this model. */
+  retryCount: number;
+  outputTokens: number;
+  ttftMs: number;
+  ttftSteps: number;
+  decodeMs: number;
+  decodeTokens: number;
 }
 /** One model's tokens on one day, for the per-model trend lines. */
 interface UsageDailyModelRow {
@@ -385,6 +398,32 @@ interface UsageDailyModelRow {
   totalTokens: number;
   /** Billed settlements attributed to this model on this day. */
   requestCount: number;
+  /** Model settlements attempted, including failed attempts. */
+  attemptCount: number;
+  /** Attempts that settled without an assembled assistant message. */
+  failedAttemptCount: number;
+  /** Scheduled retry attempts attributed to this model. */
+  retryCount: number;
+  outputTokens: number;
+  ttftMs: number;
+  ttftSteps: number;
+  decodeMs: number;
+  decodeTokens: number;
+}
+interface UsageWorkspaceDayRow {
+  date: string;
+  totalTokens: number;
+  activeMs: number;
+}
+/** One workspace's usage in the selected range, derived from session cwd. */
+interface UsageWorkspaceRow {
+  path: string;
+  totalTokens: number;
+  activeMs: number;
+  /** Activity dates per main-session family in this workspace, without identifiers. */
+  sessionDays: string[][];
+  /** Continuous daily series over the whole history, zero-filled for quiet days. */
+  days: UsageWorkspaceDayRow[];
 }
 interface UsageSummary {
   totalTokens: number;
@@ -418,6 +457,8 @@ interface UsageSnapshot {
   dailyModels: UsageDailyModelRow[];
   /** Models ordered by total tokens, largest first. */
   models: UsageModelRow[];
+  /** Workspaces ordered by total tokens in the selected range. */
+  workspaces: UsageWorkspaceRow[];
 }
 interface ProjectRow {
   workspaceId: string;
@@ -434,8 +475,93 @@ interface ProjectCatalog {
   /** Native registry order, so manual sorting mirrors the sidebar. */
   projects: ProjectRow[];
 }
+type MemoryType = 'user' | 'feedback' | 'project' | 'reference';
+interface MemoryEntry {
+  id: string;
+  name: string;
+  description: string;
+  type: MemoryType;
+  created: string;
+  updated: string;
+  originSessionId: string;
+  revision: string;
+  invalid: boolean;
+}
+interface MemoryDetail extends MemoryEntry {
+  content: string;
+}
+interface MemoryFileDetail extends MemoryDetail {
+  path: string;
+}
+interface MemoryScope {
+  id: string;
+  cwd: string;
+  revision: string;
+  complete: boolean;
+  entries: MemoryEntry[];
+}
+interface MemoryCatalog {
+  path: string;
+  available: boolean;
+  error: string;
+  scopes: MemoryScope[];
+}
+interface MemoryWriteResult {
+  indexUpdated: boolean;
+}
+interface MemoryModel {
+  provider: string;
+  model: string;
+  reasoningEffort?: string;
+}
+interface MemoryModels {
+  models: (MemoryModel & {
+    label: string;
+  })[];
+  default: MemoryModel | null;
+}
+interface MemoryCleanupChange {
+  before: MemoryDetail;
+  description: string;
+  content: string;
+  removed: MemoryDetail[];
+  reason: string;
+}
+interface MemoryCleanupPreview {
+  token: string;
+  scope: string;
+  revision: string;
+  changes: MemoryCleanupChange[];
+}
+interface MemoryCleanupResult extends MemoryWriteResult {
+  backup: string;
+}
+/** One content-search hit: a session id plus a bounded snippet centered on the match. */
+interface SearchContentHit {
+  sessionId: string;
+  snippet: string;
+}
+/** Result of one content search over the derived session index. */
+interface SearchContentResult {
+  available: boolean;
+  items: SearchContentHit[];
+  /**
+   * Recent-message previews for sessions the caller named. A title match has no
+   * content hit, so the row would otherwise leave its snippet line blank.
+   */
+  previews: SearchContentHit[];
+}
 /** Named Host operations, before the transport adds its result envelope. */
 interface PowerDshMethods {
+  memoryCleanupModels(): Promise<MemoryModels>;
+  prepareMemoryCleanup(scope: string, model: string, token: string): Promise<MemoryCleanupPreview>;
+  cancelMemoryCleanup(token: string): Promise<boolean>;
+  applyMemoryCleanup(token: string): Promise<MemoryCleanupResult>;
+  listMemoryEntries(): Promise<MemoryCatalog>;
+  readMemoryEntry(scope: string, id: string): Promise<MemoryFileDetail>;
+  deleteMemoryEntry(scope: string, id: string, revision: string): Promise<MemoryWriteResult>;
+  clearMemoryScope(scope: string, revision: string): Promise<MemoryWriteResult>;
+  openMemoryFolder(scope: string): Promise<boolean>;
   restartStatus(): Promise<RestartStatus>;
   restartApp(): Promise<RestartAccepted>;
   restartAfterUpdate(): Promise<RestartAccepted>;
@@ -452,6 +578,9 @@ interface PowerDshMethods {
   setPlanBlocked(blocked: boolean): Promise<PolicyResult>;
   setGoalBlocked(blocked: boolean): Promise<PolicyResult>;
   setSearchBlocked(blocked: boolean): Promise<PolicyResult>;
+  setSearchPopupEnabled(enabled: boolean): Promise<PolicyResult>;
+  searchSessionContent(query: string, limit: number, previewIds: readonly string[], sessionIds: readonly string[]): Promise<SearchContentResult>;
+  readRecentSessionPreviews(sessionIds: readonly string[], versions: readonly string[]): Promise<SearchContentResult>;
   readPersonalization(): Promise<PersonalizationFile>;
   savePersonalization(text: string, revision: string): Promise<PersonalizationFile>;
   readWallpaper(): Promise<WallpaperAsset | null>;
@@ -612,6 +741,12 @@ interface NativeSessionController {
       updatedAt: number;
     }[];
   }>;
+  canOpenWorkspacePath?(): boolean;
+  openWorkspacePath?(request: {
+    path: string;
+  }, signal: AbortSignal): Promise<{
+    opened: boolean;
+  }>;
 }
 type NativeSessionTitleObservation = {
   sessionId: string;
@@ -652,6 +787,17 @@ interface NativeSessionPersistence {
       path: string;
     };
   } | undefined>;
+}
+interface NativeSearchSession {
+  id: string;
+  header: {
+    createdAt: number;
+  };
+  seq: number;
+  surface: {
+    contentGeneration: number;
+    nodes: readonly number[];
+  };
 }
 interface NativeSkill {
   name: string;
@@ -823,6 +969,9 @@ interface NativeScope {
 }
 type CreateScope = (ctx: NativeContext, key: unknown) => NativeScope;
 interface NativeEvents {
+  'session/created': [session: NativeSearchSession];
+  'session/disposed': [session: NativeSearchSession];
+  'session/event': [session: NativeSearchSession, event: unknown];
   'agent/created': [event: {
     agent: NativeAgent;
   }];
@@ -929,41 +1078,10 @@ interface HostOptions {
   owner: NativeContext;
   ensureActive(): void;
 }
-type PolicyMethod = 'setAccountBlocked' | 'setTelemetryBlocked' | 'setTodoBlocked' | 'setPlanBlocked' | 'setGoalBlocked' | 'setSearchBlocked';
-interface SettingsService {
-  setAccountBlocked(blocked: boolean): Promise<PolicyResult>;
-  setTelemetryBlocked(blocked: boolean): Promise<PolicyResult>;
-  setTodoBlocked(blocked: boolean): Promise<PolicyResult>;
-  setPlanBlocked(blocked: boolean): Promise<PolicyResult>;
-  setGoalBlocked(blocked: boolean): Promise<PolicyResult>;
-  setSearchBlocked(blocked: boolean): Promise<PolicyResult>;
-  telemetry: {
-    status(): Promise<TelemetryStatus>;
-  };
-}
-type ToolSchema = import('@deepseek-ai/dsh-tools').ParameterPropertySpec;
-interface SettingsToolContribution {
-  parameters: Partial<Record<SettingsParameter, ToolSchema>>;
-  output: Partial<Record<keyof SettingsOutput, ToolSchema>>;
-  mutations?: {
-    field: SettingsParameter;
-    order: number;
-    method?: PolicyMethod;
-  }[];
-  reads?: {
-    order: number;
-    read(input: {
-      ctx: NativeContext;
-      config: LivePreferences;
-      service: SettingsService;
-    }): Partial<SettingsOutput> | Promise<Partial<SettingsOutput>>;
-  }[];
-}
 type ConfigFields = Partial<{ [K in PreferenceKey]: z<Preferences[K], Preferences[K], 'volatile-defined'>; }>;
 interface HostFeature {
   definition: FeatureDefinition;
   configFields: ConfigFields;
-  settingsTool?: SettingsToolContribution;
   createHost?(ctx: NativeContext, config: LivePreferences, options: HostOptions): object;
   methods?: Partial<PowerDshMethods>;
   rpc?: RpcDescriptor<PowerDshMethod>[];

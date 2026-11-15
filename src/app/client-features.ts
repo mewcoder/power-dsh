@@ -1,8 +1,15 @@
 import type { ClientFeatureSelection } from '../shared/client/types.ts';
+import { createClientFeature as memory } from '../features/memory/client.ts';
+import { definition as memoryDefinition } from '../features/memory/definition.ts';
+import { locales as memoryLocales } from '../features/memory/locales.ts';
+import { rpc as memoryRpc } from '../features/memory/rpc.ts';
 import { createClientFeature as pluginUpdates } from '../features/plugin-updates/client.ts';
 import { definition as pluginUpdatesDefinition } from '../features/plugin-updates/definition.ts';
 import { locales as pluginUpdatesLocales } from '../features/plugin-updates/locales.ts';
 import { rpc as pluginUpdatesRpc } from '../features/plugin-updates/rpc.ts';
+import { createClientFeature as standalonePage } from '../features/standalone-page/client.ts';
+import { definition as standalonePageDefinition } from '../features/standalone-page/definition.ts';
+import { locales as standalonePageLocales } from '../features/standalone-page/locales.ts';
 // Explicit Client selection: each entry carries its UI factory, metadata, locale and wire contributions.
 import { createClientFeature as accountBlocking } from '../features/account-blocking/client.ts';
 import { definition as accountBlockingDefinition } from '../features/account-blocking/definition.ts';
@@ -82,8 +89,13 @@ import { createClientFeature as projects } from '../features/projects/client.ts'
 import { definition as projectsDefinition } from '../features/projects/definition.ts';
 import { locales as projectsLocales } from '../features/projects/locales.ts';
 import { rpc as projectsRpc } from '../features/projects/rpc.ts';
+import { createClientFeature as searchPopup } from '../features/search-popup/client.ts';
+import { definition as searchPopupDefinition } from '../features/search-popup/definition.ts';
+import { locales as searchPopupLocales } from '../features/search-popup/locales.ts';
+import { rpc as searchPopupRpc } from '../features/search-popup/rpc.ts';
 
 export const clientFeatures: ClientFeatureSelection[] = [
+  { definition: memoryDefinition, create: memory, locales: memoryLocales, rpc: memoryRpc },
   { definition: pluginUpdatesDefinition, create: pluginUpdates, locales: pluginUpdatesLocales, rpc: pluginUpdatesRpc },
   { definition: versionDisplayDefinition, create: versionDisplay, locales: versionDisplayLocales, rpc: [] },
   { definition: appearanceShortcutDefinition, create: appearanceShortcut, locales: appearanceShortcutLocales, rpc: [] },
@@ -103,7 +115,9 @@ export const clientFeatures: ClientFeatureSelection[] = [
   { definition: thinkingEffortDefinition, create: thinkingEffort, locales: thinkingEffortLocales, rpc: [] },
   { definition: flowingBackgroundDefinition, create: flowingBackground, locales: flowingBackgroundLocales, rpc: [] },
   { definition: wallpaperDefinition, create: wallpaper, locales: wallpaperLocales, rpc: wallpaperRpc },
+  { definition: standalonePageDefinition, create: standalonePage, locales: standalonePageLocales, rpc: [] },
   { definition: archiveDefinition, create: archive, locales: archiveLocales, rpc: archiveRpc },
   { definition: usageStatsDefinition, create: usageStats, locales: usageStatsLocales, rpc: usageStatsRpc },
   { definition: projectsDefinition, create: projects, locales: projectsLocales, rpc: projectsRpc },
+  { definition: searchPopupDefinition, create: searchPopup, locales: searchPopupLocales, rpc: searchPopupRpc },
 ];

@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { webcrypto } from 'node:crypto';
 
 export const clientBundleUrl = new URL('../../dist/client.js', import.meta.url);
 const pluginVersion = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8')).version;
+export const nextPluginVersion = `${Number(pluginVersion.split('.')[0]) + 1}.0.0`;
 
 let compositionBundle;
 async function getCompositionBundle() {
@@ -80,6 +82,10 @@ export function usageSnapshotFixture(overrides = {}) {
     day('2026-03-02', 0, 0, 0, 0, 0, 0, 0, 0),
     day('2026-03-03', 400, 3, 5, 300, 60, 40, 3, 3_600_000),
   ]).map(row => ({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, requestCount: 0, activeMs: 0, ...row }));
+  const modelRow = row => ({
+    attemptCount: row.requestCount ?? 0, failedAttemptCount: 0, retryCount: 0,
+    outputTokens: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0, ...row,
+  });
   const sessionDays = overrides.sessionDays ?? (days.some(row => row.totalTokens || row.turnCount || row.toolCallCount)
     ? [days.filter(row => row.totalTokens || row.turnCount || row.toolCallCount).map(row => row.date)] : []);
   const sum = (rows, field) => rows.reduce((total, row) => total + row[field], 0);
@@ -97,19 +103,20 @@ export function usageSnapshotFixture(overrides = {}) {
     },
     days,
     sessionDays,
-    dailyModels: overrides.dailyModels ?? [
+    dailyModels: (overrides.dailyModels ?? [
       { date: '2026-03-01', modelId: 'group/flash', provider: 'magpie', totalTokens: 100, requestCount: 1 },
       { date: '2026-03-03', modelId: 'group/flash', provider: 'magpie', totalTokens: 300, requestCount: 2 },
       { date: '2026-03-03', modelId: 'group/sol', provider: 'magpie', totalTokens: 100, requestCount: 1 },
-    ],
-    models: overrides.models ?? [
+    ]).map(modelRow),
+    models: (overrides.models ?? [
       { modelId: 'group/flash', provider: 'magpie', totalTokens: 400, requestCount: 3 },
       { modelId: 'group/sol', provider: 'magpie', totalTokens: 100, requestCount: 1 },
-    ],
+    ]).map(modelRow),
+    workspaces: overrides.workspaces ?? [],
   };
 }
 
-export async function mount({ featureIds, localeLanguage, restartStatus = { supported: true, running: false, error: '' }, restartReply, desktop = false, themeAvailable = true, updates, rpcError, rpcReply, formReply, formLoad, fileText = '', fileReply, fileReadError, wallpaper, wallpaperReply, wallpaperReadError, wallpaperClearError, skillCatalog, skillList, skillReply, skillReadError, skillDetail, skillDetailReply, skillDetailError, externalSkillCatalog, externalSkillList, externalSkillReply, externalDetailReply, importDestinationReply, mcpCatalog, mcpList, mcpReply, mcpReadError, mcpDetail, mcpDetailReply, mcpDetailError, mcpProbe, mcpProbeReply, mcpProbeError, archiveCatalog, archiveList, archiveReply, archiveReadError, usageSnapshot, usageList, usageReply, usageReadError, projectCatalog, projectList, projectReply, projectReadError, writable = true, reload = () => {}, windows = false, notificationPermission = 'granted', notificationRequest, notificationFailure = false, notificationServices = true, notificationsAvailable = true, nativeNotificationReply, nativeClearReply, notificationTransportReply, platformMarker = true, localConnection = true, soundCatalog, soundReply, soundListError, updateFetch, updateStorage, modelDirectory, modelSelectReply, modelDirectoriesAvailable = true } = {}) {
+export async function mount({ featureIds, localeLanguage, restartStatus = { supported: true, running: false, error: '' }, restartReply, desktop = false, themeAvailable = true, updates, rpcError, rpcReply, formReply, formLoad, fileText = '', fileReply, fileReadError, wallpaper, wallpaperReply, wallpaperReadError, wallpaperClearError, skillCatalog, skillList, skillReply, skillReadError, skillDetail, skillDetailReply, skillDetailError, externalSkillCatalog, externalSkillList, externalSkillReply, externalDetailReply, importDestinationReply, mcpCatalog, mcpList, mcpReply, mcpReadError, mcpDetail, mcpDetailReply, mcpDetailError, mcpProbe, mcpProbeReply, mcpProbeError, archiveCatalog, archiveList, archiveReply, archiveReadError, usageSnapshot, usageList, usageReply, usageReadError, projectCatalog, projectList, projectReply, projectReadError, writable = true, reload = () => {}, windows = false, notificationPermission = 'granted', notificationRequest, notificationFailure = false, notificationServices = true, notificationsAvailable = true, nativeNotificationReply, nativeClearReply, notificationTransportReply, platformMarker = true, localConnection = true, soundCatalog, soundReply, soundListError, updateFetch, updateStorage, modelDirectory, modelSelectReply, modelDirectoriesAvailable = true, segmentedTabs } = {}) {
   let plugin;
   const nativeLauncher = { native: true };
   const entries = new Map([['settings.launcher:single', nativeLauncher]]);
@@ -160,6 +167,23 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   const focusListeners = new Set();
   const blurListeners = new Set();
   const doubleClickListeners = new Set();
+  const clickListeners = new Set();
+  const keyDownListeners = new Set();
+  const sessionSearches = [];
+  const contentSearches = [];
+  const recentPreviewReads = [];
+  let recentPreviewReply = () => [];
+  let recentPreviewError = null;
+  let contentSearchReply = () => [];
+  let contentPreviewReply = () => [];
+  let contentSearchError = null;
+  let contentSearchUnavailable = false;
+  const uiWorkspaceOpens = [];
+  const workspaceListeners = new Set();
+  let workspaceItems = [];
+  let archivedSessionIds = [];
+  let sessionSearchReply = null;
+  let sessionSearchError = null;
   const intervals = new Map();
   let intervalId = 0;
   const chromeListeners = new Set();
@@ -168,6 +192,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   let modalLayers = 0;
   const bodyObservers = new Set();
   const menuResizeListeners = new Set();
+  const elementResizeListeners = new Map();
   let menuRect = null;
   const menuElement = { getBoundingClientRect: () => menuRect };
   const hookScopes = new Map();
@@ -184,6 +209,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   let settingsOpen = true;
   let settingsCloses = 0;
   let settingsOpens = 0;
+  let activePanelId = null;
   function disposeComponent(type) {
     hookScopes.get(type)?.effects.forEach(effect => effect?.dispose?.());
     hookScopes.delete(type);
@@ -198,10 +224,17 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   let observeCount = 0;
   let disconnectCount = 0;
   let edge = 280;
-  let settings = { status: 'ready', writable, value: { notificationMode: 'background', blockDoubleClickRename: false, notificationsEnabled: false, notificationSoundEnabled: true, notificationSound: 'default', blockTodo: false, blockPlan: false, blockGoal: false, showThemeSwitcher: false, personalizationEnabled: false, skillManagerEnabled: false, mcpManagerEnabled: false, globalPrompt: '', thinkingEffortGlyph: 'arc', flowingBackgroundKind: 'pattern', flowingBackgroundOpacity: 100, flowingBackgroundBlur: 0, autoArchiveDays: 0 } };
+  let settings = { status: 'ready', writable, value: { notificationMode: 'background', blockDoubleClickRename: false, notificationsEnabled: false, notificationSoundEnabled: true, notificationSound: 'default', blockTodo: false, blockPlan: false, blockGoal: false, showThemeSwitcher: false, personalizationEnabled: false, skillManagerEnabled: false, mcpManagerEnabled: false, globalPrompt: '', thinkingEffortGlyph: 'arc', standalonePageEnabled: false, flowingBackgroundKind: 'pattern', flowingBackgroundOpacity: 100, flowingBackgroundBlur: 0, autoArchiveDays: 0, searchPopupEnabled: false, searchEnhanceEnabled: false } };
   let theme = { preference: 'system' };
+  settings.value = { ...settings.value, memoryEnabled: false, memoryAutoCapture: true, memoryGlobalEnabled: true,
+    memoryWorkspaceEnabled: true };
   const calls = [];
   const rpcCalls = [];
+  const memoryCalls = [];
+  let memoryReply = async method => method === 'listMemoryEntries'
+    ? { ok: true, value: { path: '/test/dsh/power-dsh/memory', available: true, error: '',
+      scopes: [{ id: 'global', cwd: '', revision: 'b'.repeat(64), complete: true, entries: [] }] } }
+    : { ok: false, error: { message: 'memoryNotFound' } };
   const fileWrites = [];
   const skillReads = [];
   const skillDetailReads = [];
@@ -357,6 +390,8 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
           querySelector: selector => selector === '.power-dsh-appearance-button'
             && settings.value?.showThemeSwitcher === true ? { getBoundingClientRect: () => ({}) } : null,
         },
+        // The search popup focuses its input on open; a mounted element accepts focus.
+        focus() { focusedElementId = 'fixture-object-ref'; },
       } };
     },
     useLayoutEffect(fn, deps) {
@@ -369,8 +404,19 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   };
   // The host marks dialogs with aria-modal="true"; the fixture exposes that
   // contract so the background panel can observe it going from closed to open.
+  const documentListeners = new Map();
   const documentStub = {
     baseURI: 'https://dsh.example/app/',
+    addEventListener(name, fn, capture) {
+      const list = documentListeners.get(name) ?? [];
+      list.push({ fn, capture });
+      documentListeners.set(name, list);
+    },
+    removeEventListener(name, fn) {
+      const list = documentListeners.get(name);
+      if (!list) return;
+      documentListeners.set(name, list.filter(entry => entry.fn !== fn));
+    },
     get hidden() { return documentHidden; },
     hasFocus: () => documentFocused,
     body: {},
@@ -387,6 +433,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   };
   const context = vm.createContext({
     URL,
+    crypto: webcrypto,
     AbortController, AbortSignal,
     fetch: updateFetch || (() => assert.fail('Updates must not request the network without a user action.')),
     // Minimal reader so the wallpaper picker can be exercised without a real File API.
@@ -400,9 +447,14 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     },
     ResizeObserver: class {
       constructor(callback) { this.callback = callback; }
-      observe(element) { observeCount++; if (element === menuElement) menuResizeListeners.add(this.callback); }
-      unobserve(element) { if (element === menuElement) menuResizeListeners.delete(this.callback); }
-      disconnect() { disconnectCount++; menuResizeListeners.delete(this.callback); }
+      observe(element) {
+        observeCount++;
+        if (!elementResizeListeners.has(this.callback)) elementResizeListeners.set(this.callback, new Set());
+        elementResizeListeners.get(this.callback).add(element);
+        if (element === menuElement) menuResizeListeners.add(this.callback);
+      }
+      unobserve(element) { elementResizeListeners.get(this.callback)?.delete(element); if (element === menuElement) menuResizeListeners.delete(this.callback); }
+      disconnect() { disconnectCount++; elementResizeListeners.delete(this.callback); menuResizeListeners.delete(this.callback); }
     },
     MutationObserver: class {
       constructor(callback) { this.callback = callback; }
@@ -429,16 +481,20 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       clearInterval(id) { intervals.delete(id); },
       addEventListener(name, fn, capture) {
         if (name === 'dblclick') assert.equal(capture, true, 'Block before the native React title handler.');
-        (name === 'focus' ? focusListeners : name === 'blur' ? blurListeners : name === 'dblclick' ? doubleClickListeners : resizeListeners).add(fn);
+        if (name === 'click' || name === 'keydown') assert.equal(capture, true, 'Intercept the search entry before native handlers.');
+        (name === 'focus' ? focusListeners : name === 'blur' ? blurListeners : name === 'dblclick' ? doubleClickListeners
+          : name === 'click' ? clickListeners : name === 'keydown' ? keyDownListeners : resizeListeners).add(fn);
       },
       removeEventListener(name, fn, capture) {
         if (name === 'dblclick') assert.equal(capture, true);
-        (name === 'focus' ? focusListeners : name === 'blur' ? blurListeners : name === 'dblclick' ? doubleClickListeners : resizeListeners).delete(fn);
+        if (name === 'click' || name === 'keydown') assert.equal(capture, true);
+        (name === 'focus' ? focusListeners : name === 'blur' ? blurListeners : name === 'dblclick' ? doubleClickListeners
+          : name === 'click' ? clickListeners : name === 'keydown' ? keyDownListeners : resizeListeners).delete(fn);
       },
       __ModuleLoader__: { load(value) { plugin = value.factory(specifier => {
         if (specifier === 'react') return React;
         assert.equal(specifier, '@deepseek-ai/dsh-client-ui-primitives');
-        return { Menu: FakeMenu, MenuSurface: FakeMenuSurface, Tooltip: FakeTooltip, StateDot: FakeStateDot, Modal: FakeModal, Button: FakeButton, MarkdownText: FakeMarkdownText };
+        return { Menu: FakeMenu, MenuSurface: FakeMenuSurface, Tooltip: FakeTooltip, StateDot: FakeStateDot, Modal: FakeModal, Button: FakeButton, MarkdownText: FakeMarkdownText, SegmentedTabs: segmentedTabs };
       }); } },
     },
   });
@@ -446,7 +502,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   if (featureIds) {
     vm.runInContext(await getCompositionBundle(), context);
     const { createClient, clientFeatures } = context.PowerDshComposition;
-    plugin = createClient(React, { Menu: FakeMenu, MenuSurface: FakeMenuSurface, Tooltip: FakeTooltip, StateDot: FakeStateDot, Modal: FakeModal, Button: FakeButton, MarkdownText: FakeMarkdownText },
+    plugin = createClient(React, { Menu: FakeMenu, MenuSurface: FakeMenuSurface, Tooltip: FakeTooltip, StateDot: FakeStateDot, Modal: FakeModal, Button: FakeButton, MarkdownText: FakeMarkdownText, SegmentedTabs: segmentedTabs },
       clientFeatures.filter(feature => featureIds.includes(feature.definition.id)));
   }
   const form = {
@@ -477,6 +533,15 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     sessions: { list: {
       getSnapshot: () => sessionList,
       subscribe(fn) { sessionListeners.add(fn); return () => sessionListeners.delete(fn); },
+    }, searchResultLimit: 40, async search(query, signal) {
+      sessionSearches.push({ query, aborted: signal.aborted });
+      if (sessionSearchError) return { ok: false, error: { message: sessionSearchError } };
+      return sessionSearchReply ? await sessionSearchReply(query, signal) : { ok: true, value: { items: [], hasMore: false } };
+    } },
+    uiWorkspace: { openSession(sessionId) { uiWorkspaceOpens.push(sessionId); } },
+    workspaces: { list: {
+      getSnapshot: () => ({ items: workspaceItems, archivedSessionIds }),
+      subscribe(fn) { workspaceListeners.add(fn); return () => workspaceListeners.delete(fn); },
     } },
     uiSession: { sessionStatus: {
       getSnapshot: () => sessionStatus,
@@ -489,7 +554,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
         ctx.remote.powerDsh = Object.fromEntries(rpcDescriptors.map(descriptor => [descriptor.method, async (...rpcArgs) => {
           const [blocked, revision, name, enabled] = rpcArgs;
           const third = rpcArgs[2];
-          if (descriptor.method === 'readPluginRelease') return { ok: true, value: { status: 'ready', version: '0.0.999', commit: 'a'.repeat(40) } };
+          if (descriptor.method === 'readPluginRelease') return { ok: true, value: { status: 'ready', version: nextPluginVersion, commit: 'a'.repeat(40) } };
           if (descriptor.method === 'pluginRuntimeVersion') return { ok: true, value: pluginVersion };
           if (descriptor.method === 'notificationTransport') return notificationTransportReply ? await notificationTransportReply() : {
             ok: true, value: { platform: windows ? 'win32' : 'darwin', nativeAvailable: windows, version: pluginVersion },
@@ -714,6 +779,22 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
             wallpaperValue = null;
             return { ok: true, value: { cleared: true } };
           }
+          if (descriptor.method === 'readRecentSessionPreviews') {
+            recentPreviewReads.push({ sessionIds: blocked, versions: revision });
+            if (recentPreviewError) return { ok: false, error: { message: recentPreviewError } };
+            return { ok: true, value: { available: true, items: [], previews: await recentPreviewReply(blocked, revision) } };
+          }
+          if (descriptor.method === 'searchSessionContent') {
+            const previewIds = rpcArgs[2] ?? [];
+            contentSearches.push({ query: blocked, limit: rpcArgs[1], previewIds, sessionIds: rpcArgs[3] ?? [] });
+            if (contentSearchError) return { ok: false, error: { message: contentSearchError } };
+            if (contentSearchUnavailable) return { ok: true, value: { available: false, items: [], previews: [] } };
+            return { ok: true, value: {
+              available: true,
+              items: await contentSearchReply(blocked, rpcArgs[1]),
+              previews: contentPreviewReply(previewIds),
+            } };
+          }
           if (descriptor.method === 'readPersonalization') return fileReadError
             ? { ok: false, error: { message: fileReadError } } : { ok: true, value: fileValue() };
           if (descriptor.method === 'savePersonalization') {
@@ -723,6 +804,11 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
             fileText = blocked;
             fileVersion++;
             return { ok: true, value: fileValue() };
+          }
+          if (['listMemoryEntries', 'readMemoryEntry', 'deleteMemoryEntry', 'clearMemoryScope', 'openMemoryFolder',
+            'memoryCleanupModels', 'prepareMemoryCleanup', 'cancelMemoryCleanup', 'applyMemoryCleanup'].includes(descriptor.method)) {
+            memoryCalls.push({ method: descriptor.method, args: rpcArgs });
+            return memoryReply(descriptor.method, rpcArgs);
           }
           rpcCalls.push({ method: descriptor.method, blocked });
           const result = rpcReply ? await rpcReply : rpcError ? { ok: false, error: { message: rpcError } } : { ok: true, value: { blocked } };
@@ -734,9 +820,11 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
               setPlanBlocked: 'blockPlan',
               setGoalBlocked: 'blockGoal',
               setSearchBlocked: 'blockOfficialSearch',
+              setSearchPopupEnabled: 'searchPopupEnabled',
             }[descriptor.method];
             assert.ok(field, `Unexpected policy method: ${descriptor.method}`);
             settings = { ...settings, value: { ...settings.value, [field]: blocked } };
+            listeners.forEach(fn => fn());
           }
           return result;
         }]));
@@ -754,6 +842,10 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       getTheme: () => theme,
       setTheme(id) { calls.push(id); theme = { preference: id }; themeListeners.forEach(fn => fn()); },
     },
+    layout: {
+      panelInfo: { getSnapshot: () => ({ activePanelId }) },
+      selectPanel(id) { activePanelId = id; },
+    },
     on(event, listener) {
       const listeners = event === 'connection/reset' ? connectionListeners : themeListeners;
       listeners.add(listener);
@@ -767,7 +859,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       inject(_name, fn) { const dispose = fn(); effects.push(dispose); return dispose; },
       register(options, component) {
         const entry = { options, component };
-        const key = options.name + ':' + (options.id || 'single');
+        const key = options.name + ':' + (options.key || options.id || 'single');
         entries.set(key, entry);
         return () => {
           if (entries.get(key) === entry) entries.delete(key);
@@ -777,6 +869,11 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   };
   await plugin.apply(ctx);
   const app = {
+    memoryCalls,
+    setMemoryReply(reply) { memoryReply = reply; },
+    renderMemory(language) {
+      return renderComponent(entries.get('settings.section:power-dsh-memory').component({ t: key => dictionaries.get(language)?.[key] ?? key }));
+    },
     setConnectionState(state) { connectionState = state; connectionStateListeners.forEach(fn => fn()); },
     timers,
     connectionStateListeners,
@@ -792,6 +889,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       sessionList = { ids: rows.map(row => row.id), byId: Object.fromEntries(rows.map(row => [row.id, row])), phase, projectionsBySession: {} };
       sessionListeners.forEach(fn => fn());
     },
+    documentListeners: () => documentListeners,
     setSessionStatus(entries) { sessionStatus = new Map(entries); statusListeners.forEach(fn => fn()); },
     setConnectionGeneration(value) { connectionGeneration = value; connectionListeners.forEach(fn => fn()); },
     resetConnection() { app.setConnectionGeneration(undefined); app.setConnectionGeneration({ id: 2 }); },
@@ -856,6 +954,37 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
       doubleClickListeners.forEach(fn => fn(event));
       return stopped;
     },
+    clickListeners,
+    click(path, button = 0) {
+      let stopped = false;
+      const event = { button, composedPath: () => path, stopPropagation() { stopped = true; }, preventDefault() {} };
+      clickListeners.forEach(fn => fn(event));
+      return stopped;
+    },
+    keyDownListeners,
+    keyDown(gesture) {
+      let stopped = false;
+      let prevented = false;
+      const event = { ...gesture, stopPropagation() { stopped = true; }, preventDefault() { prevented = true; } };
+      keyDownListeners.forEach(fn => fn(event));
+      return { stopped, prevented };
+    },
+    setSearch(reply, error = null) { sessionSearchReply = reply; sessionSearchError = error; },
+    setContentSearch(reply, { error = null, unavailable = false, preview = () => [] } = {}) {
+      contentSearchReply = reply; contentSearchError = error; contentSearchUnavailable = unavailable;
+      contentPreviewReply = preview;
+    },
+    contentSearches,
+    recentPreviewReads,
+    setRecentPreviews(reply, error = null) { recentPreviewReply = reply; recentPreviewError = error; },
+    setWorkspaces(items, archived = []) { workspaceItems = items; archivedSessionIds = archived; workspaceListeners.forEach(fn => fn()); },
+    sessionSearches,
+    uiWorkspaceOpens,
+    renderSearchPopup() {
+      const entry = entries.get('shell.overlay:power-dsh-search-popup');
+      if (!entry) return null;
+      return renderComponent(React.createElement(entry.component, { t: key => key }));
+    },
     setFormStatus(status) { settings = { ...settings, status }; listeners.forEach(fn => fn()); },
     intervals: () => [...intervals.values()].map(timer => timer.ms),
     tickIntervals: () => Promise.all([...intervals.values()].map(timer => timer.fn())),
@@ -875,6 +1004,13 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     settingsProps() {
       return entries.get('settings.section:power-dsh').component({ t: key => key }).props;
     },
+    renderStandalone(language) {
+      const entry = entries.get('main:power-dsh');
+      assert.ok(entry, 'Expected the standalone main panel to be registered.');
+      return renderComponent(entry.component({ t: key => dictionaries.get(language)?.[key] ?? key }));
+    },
+    selectPanel(id) { activePanelId = id; },
+    activePanelId: () => activePanelId,
     renderSettings() {
       if (!settingsOpen) return null;
       const wrapped = entries.get('settings.section:power-dsh').component({ t: key => key, close: closeSettings });
@@ -953,6 +1089,11 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     },
     chromeGeometry: () => ({ mutations: chromeListeners.size, menuResizes: menuResizeListeners.size }),
     resize(right) { edge = right; resizeListeners.forEach(fn => fn()); },
+    resizeElement(element, width) {
+      elementResizeListeners.forEach((elements, callback) => {
+        if (elements.has(element)) callback([{ target: element, contentRect: { width } }]);
+      });
+    },
     geometry: () => ({ observeCount, disconnectCount, listeners: resizeListeners.size }),
     unmount() {
       for (const scope of hookScopes.values()) scope.effects.forEach(effect => effect?.dispose?.());
@@ -1028,6 +1169,19 @@ export async function skillsPage(app, scope = 'user') {
   const workspace = path => render().find(node => node.type === 'section' && node.props['data-workspace'] === path);
   const workspaceToggle = path => descendants(workspace(path)).find(node => node.type === 'button' && node.props['aria-controls']);
   const row = (name, path) => (path ? descendants(workspace(path)) : render()).find(node => node.type === 'li' && node.props['data-skill'] === name);
+  const discovery = (name, path) => (path ? descendants(workspace(path)) : render()).find(node => node.type === 'li' && node.props['data-import'] === name);
+  const discoveryGroup = () => render().find(node => node.type === 'section' && node.props['data-import-group'] === 'user');
+  const openDiscovery = async () => {
+    const group = discoveryGroup();
+    if (!group) return;
+    const toggle = descendants(group).find(node => node.type === 'button' && node.props['aria-controls']);
+    if (!toggle.props['aria-expanded']) {
+      toggle.props.onClick();
+      render();
+      await new Promise(resolve => setImmediate(resolve));
+      render();
+    }
+  };
   const control = (name, path) => descendants(row(name, path)).find(node => node.props.role === 'switch');
   const search = () => render().find(node => node.type === 'input' && node.props.type === 'search');
   const select = label => render().find(node => node.type === 'select' && node.props['aria-label'] === label);
@@ -1041,7 +1195,7 @@ export async function skillsPage(app, scope = 'user') {
     render();
     await new Promise(resolve => setImmediate(resolve));
   }
-  return { render, row, control, search, select, tab, projectTrigger, projectMenu, workspace, workspaceToggle, detail, dialog };
+  return { render, row, discovery, discoveryGroup, openDiscovery, control, search, select, tab, projectTrigger, projectMenu, workspace, workspaceToggle, detail, dialog };
 }
 
 export async function mcpPage(app, language) {

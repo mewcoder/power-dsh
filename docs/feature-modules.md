@@ -1,6 +1,6 @@
 # 特性模块约定
 
-按特性拆分已经实施。当前代码与宿主接入见[架构规范](architecture.md)，功能行为以模块内的[唯一主 Spec](README.md#功能规格spec)为准。各项功能包含在同一个 PowerDSH 安装项中，不单独发布功能包或提供新的动态插件市场。
+按特性拆分已经实施。当前代码与宿主接入见[架构规范](architecture.md)，功能行为以模块内的[唯一主 Spec](README.md#功能规格spec)为准。各项功能包含在同一个 power-dsh 安装项中，不单独发布功能包或提供新的动态插件市场。
 
 ## 目录与所有权
 
@@ -13,7 +13,6 @@ src/
     host-features.ts            # Host 显式清单
     client-features.ts          # Client 显式清单
     config.ts / rpc.ts          # 配置及严格协议聚合
-    settings-tool.ts            # 具名工具贡献聚合
     locales.ts                  # 由 Client 清单组合文案
   shared/
     host/                      # 单队列、原生插件启停
@@ -22,7 +21,7 @@ src/
     types/                     # 偏好、wire 与具名方法契约
   features/<id>/
     definition.ts              # 纯元数据：id、分类、顺序、配置键、Spec
-    config.ts                  # 本功能 schema，必要的设置工具贡献
+    config.ts                  # 本功能 schema
     client.ts / locales.ts     # 展示、交互、订阅与双语文案
     spec.md                    # 唯一主规格
     tests/                     # 功能行为测试
@@ -35,9 +34,11 @@ src/
 
 ## 装配契约
 
+独立页的 `pages` 贡献包含 `icon`，各功能复用自身设置导航的同一图标组件，外壳统一渲染图标与文字，不跨特性引用实现或另建图标映射。
+
 - `definition.ts` 不导入 Host 或 Client，实现无关的数据可供两端使用。`config.ts` 拥有本功能全部配置，装配核对键归属；目录或 id 变化不构成用户配置迁移。
-- [Host 清单](../src/app/host-features.ts)组合 schema、具名设置工具、`createHost`、具名方法和 RPC；[Client 清单](../src/app/client-features.ts)组合对应定义、工厂、文案和协议。默认两端清单覆盖相同功能。
-- Client 工厂只贡献自己的设置、页面、侧栏、装饰层或动作；共享外壳处理布局和保存反馈，不判断某个功能的业务流程。刷新与重启共享菜单，各自拥有动作行为。自定义背景独立拥有 `flowingBackgroundEnabled`、`flowingBackgroundOpacity` 与 `flowingBackgroundBlur` 配置，经原生 `configForms` 保存，通过 `shell.overlay` additive slot 仅注册返回 null 的生命周期控制组件。按用户明确授权，在唯一已核对的 AppFrame 底层挂单张全局 Canvas，并只适配主 Spec 列明的原生结构表面；不借用侧栏外壳、不读取会话内容，不将此例外扩大为任意宿主 DOM 改写。
+- [Host 清单](../src/app/host-features.ts)组合 schema、`createHost`、具名方法和 RPC；[Client 清单](../src/app/client-features.ts)组合对应定义、工厂、文案和协议。默认两端清单覆盖相同功能。插件设置不注册对话工具，功能自身需要的工具由功能模块管理。
+- Client 工厂只贡献自己的设置、页面、侧栏、装饰层或动作；`pages` 贡献独立页可承载的功能内容，由共享独立页面外壳组合，不跨特性导入实现。共享外壳处理布局和保存反馈，不判断某个功能的业务流程。刷新与重启共享菜单，各自拥有动作行为。自定义背景独立拥有 `flowingBackgroundEnabled`、`flowingBackgroundOpacity` 与 `flowingBackgroundBlur` 配置，经原生 `configForms` 保存，通过 `shell.overlay` additive slot 仅注册返回 null 的生命周期控制组件。按用户明确授权，在唯一已核对的 AppFrame 底层挂单张全局 Canvas，并只适配主 Spec 列明的原生结构表面；不借用侧栏外壳、不读取会话内容，不将此例外扩大为任意宿主 DOM 改写。
 - RPC 在功能目录定义，Host/Client 复用同一组严格 codec；稳定聚合保留公开 id、方法与顺序，裁剪组合只挂载所选协议。不得改为可调用任意字符串方法的远程分发器。
 - 配置、设置、RPC 和文案聚合拒绝重复；每项操作仅改所属偏好，保留其他功能当前值。共享策略不维护全功能字段白名单。
 - 只依赖本特性、`shared/` 与已核对的宿主能力。禁止跨特性实现导入、特性反向依赖 `app/`，或共享层反向依赖特性。Client 模块图不得包含 Host、schema、Node、测试或独立 React。

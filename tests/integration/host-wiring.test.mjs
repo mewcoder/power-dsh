@@ -68,7 +68,7 @@ async function fixture(t, { hostWorkspace = true, managedId = 'power-dsh' } = {}
     autoArchiveDays: { get: () => 0 },
     autoArchivedSessions: { get: () => [] },
     ...Object.fromEntries([
-      'blockDoubleClickRename', 'blockTodo', 'blockPlan', 'blockGoal', 'blockOfficialTelemetry', 'blockOfficialAccount', 'blockOfficialSearch', 'showVersion', 'showThemeSwitcher', 'showRefreshButton', 'showRestartButton',
+      'blockDoubleClickRename', 'blockTodo', 'blockPlan', 'blockGoal', 'blockOfficialTelemetry', 'blockOfficialAccount', 'blockOfficialSearch', 'showVersion', 'showThemeSwitcher', 'showRefreshButton', 'showRestartButton', 'searchPopupEnabled',
     ].map(field => [field, { get: () => false }])),
   };
   function fixtureMod(ctx) {
@@ -77,37 +77,24 @@ async function fixture(t, { hostWorkspace = true, managedId = 'power-dsh' } = {}
   }
   fixtureMod.inject = inject;
   const fiber = await root.plugin(fixtureMod);
-  assert.equal(root.get('tools').get('power_dsh_settings')?.name, 'power_dsh_settings');
+  assert.equal(root.get('tools').get('power_dsh_settings'), undefined);
   const session = { id: 'unopened-host-fixture', header: {}, inheritedEventCount: 0,
     seq: 0, snapshotEvents: () => [], eventAt: () => undefined };
   assert.deepEqual(root.get('sessionProjections').snapshot(session).values.powerDshNotifications, { seq: -1, turn: 0, reason: '' });
-  return { root, fiber, session, service: root.get('powerDsh'), providers, lookups, writes, tool: root.get('tools').get('power_dsh_settings') };
+  return { root, fiber, session, service: root.get('powerDsh'), providers, lookups, writes };
 }
 
-test('the renamed settings tool writes to the actual managed entry, including an existing legacy install', async t => {
+test('the Host exposes no settings tool and preserves preferences for canonical and legacy managed entries', async t => {
   for (const managedId of ['power-dsh', 'dsh-x-mod', 'dsh-mod']) {
-    const { root, fiber, session, service, providers, tool, writes } = await fixture(t, { managedId });
-    const preferences = await tool.execute({}, { signal: new AbortController().signal });
-    assert.equal(preferences.showVersion, false);
-    assert.equal(preferences.blockOfficialSearch, false);
-    assert.equal(preferences.blockDoubleClickRename, false);
+    const { root, fiber, session, service, providers, writes } = await fixture(t, { managedId });
     assert.equal(Config.dict.blockDoubleClickRename.meta.default, false);
-    assert.equal(tool.parameters.properties.blockDoubleClickRename.type, 'boolean');
-    assert.equal(tool.parameters.properties.blockOfficialSearch.type, 'boolean');
-    assert.equal(tool.output.schema.properties.showRestartButton.type, 'boolean');
-    assert.ok(tool.output.schema.required.includes('showRestartButton'), 'Restart visibility must remain a required output field.');
-    assert.deepEqual(writes, [], 'Reading preferences must not migrate or save an existing managed entry.');
-    await tool.execute({ showVersion: true, blockDoubleClickRename: true }, { signal: new AbortController().signal });
-    assert.deepEqual(writes, [
-      { namespace: managedId, ops: [{ op: 'set', path: ['showVersion'], value: true }] },
-      { namespace: managedId, ops: [{ op: 'set', path: ['blockDoubleClickRename'], value: true }] },
-    ]);
+    assert.deepEqual(writes, [], 'Loading must not migrate or save an existing managed entry.');
     await fiber.dispose();
     assert.equal(root.get('tools').get('power_dsh_settings'), undefined);
     assert.equal(Object.hasOwn(root.get('sessionProjections').snapshot(session).values, 'powerDshNotifications'), false);
     assert.equal(providers.size, 0);
     await assert.rejects(service.setAccountBlocked(true), /unloaded/);
-    assert.equal(writes.length, 2, 'Unloading must not migrate or save preferences.');
+    assert.deepEqual(writes, [], 'Unloading must not migrate or save preferences.');
   }
 });
 
@@ -160,8 +147,11 @@ test('feature-owned RPC methods retain the invocation owner check through the ac
   for (const [method, args] of [
     ['restartStatus', []], ['restartApp', []], ['restartAfterUpdate', []], ['pluginRuntimeVersion', []], ['listSystemSounds', []], ['notificationTransport', []], ['readPluginRelease', []],
     ['setAccountBlocked', [true]], ['setTelemetryBlocked', [true]],
-    ['setTodoBlocked', [true]], ['setPlanBlocked', [true]], ['setGoalBlocked', [true]], ['setSearchBlocked', [true]],
+    ['setTodoBlocked', [true]], ['setPlanBlocked', [true]], ['setGoalBlocked', [true]], ['setSearchBlocked', [true]], ['setSearchPopupEnabled', [true]],
     ['readPersonalization', []], ['savePersonalization', ['text', 'revision']],
+    ['listMemoryEntries', []], ['readMemoryEntry', ['global', 'user/example']],
+    ['deleteMemoryEntry', ['global', 'user/example', 'revision']],
+    ['clearMemoryScope', ['global', 'revision']],
     ['listSkills', ['', '']], ['readSkill', ['', '', 'review']], ['setSkillEnabled', ['', '', 'review', false]],
     ['listMcpServers', []], ['readMcpServer', ['include:browser']], ['setMcpServerEnabled', ['server', false]],
   ]) {
@@ -184,16 +174,18 @@ test('duplicate feature and RPC ids fail before Host resources or contexts are a
   ]), /Duplicate Host RPC: power-dsh#powerDsh\/test/);
 });
 
-test('all feature configuration defaults and settings tool output requirements survive composition', async t => {
-  const { tool } = await fixture(t);
+test('all feature configuration defaults survive composition without a settings tool', async t => {
+  await fixture(t);
   const expected = {
     showVersion: false, showThemeSwitcher: false, showRefreshButton: false, showRestartButton: false,
     notificationsEnabled: false, notificationMode: 'background', notificationSoundEnabled: true, notificationSound: 'default',
     blockOfficialAccount: false, blockOfficialSearch: false, blockOfficialTelemetry: false,
     blockTodo: false, blockPlan: false, blockGoal: false, blockDoubleClickRename: false, personalizationEnabled: false,
     skillManagerEnabled: false, mcpManagerEnabled: false, disabledSkills: [],
+    memoryEnabled: false, memoryAutoCapture: true, memoryGlobalEnabled: true, memoryWorkspaceEnabled: true,
     showThinkingEffortSwitcher: false,
     thinkingEffortGlyph: 'arc',
+    standalonePageEnabled: false,
     flowingBackgroundEnabled: false,
     showBackgroundShortcut: false,
     flowingBackgroundKind: 'pattern',
@@ -208,13 +200,8 @@ test('all feature configuration defaults and settings tool output requirements s
     autoArchivedSessions: [],
     projectManagerEnabled: false,
     usageStatsEnabled: false,
+    searchPopupEnabled: false,
   };
   assert.deepEqual(Object.keys(Config.dict).sort(), Object.keys(expected).sort());
   for (const [key, value] of Object.entries(expected)) assert.deepEqual(Config.dict[key].meta.default, value, key);
-  const fields = ['showVersion', 'showThemeSwitcher', 'showRefreshButton', 'showRestartButton',
-    'blockOfficialAccount', 'blockOfficialSearch', 'blockDoubleClickRename', 'blockOfficialTelemetry', 'blockTodo', 'blockPlan', 'blockGoal'];
-  assert.deepEqual(Object.keys(tool.parameters.properties).sort(), fields.slice().sort());
-  assert.deepEqual(Object.keys(tool.output.schema.properties).sort(), [...fields, 'telemetry', 'version'].sort());
-  assert.deepEqual(tool.output.schema.required.slice().sort(), [...fields, 'telemetry', 'version'].sort());
-  assert.equal(tool.output.schema.additionalProperties, false);
 });

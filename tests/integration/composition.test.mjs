@@ -59,7 +59,7 @@ test('MCP has no project controls while skills retain their independent project 
 });
 
 const featureIds = clientFeatures.map(feature => feature.definition.id);
-const enabledPreferences = Object.fromEntries(clientFeatures.flatMap(feature => feature.definition.keys.filter(key => key !== 'disabledSkills').map(key => [key, key === 'notificationSound' ? 'default' : true])));
+const enabledPreferences = Object.fromEntries(clientFeatures.flatMap(feature => feature.definition.keys.filter(key => key !== 'disabledSkills' && key !== 'standalonePageEnabled').map(key => [key, key === 'notificationSound' ? 'default' : true])));
 
 test('each Client feature can be omitted without removing another feature setting or side effect owner', async t => {
   const complete = await mount({ desktop: true });

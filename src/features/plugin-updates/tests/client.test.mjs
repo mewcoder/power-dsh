@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { descendants, mount } from '../../../../tests/helpers/client-fixture.mjs';
+import { descendants, mount, nextPluginVersion } from '../../../../tests/helpers/client-fixture.mjs';
 
 test('plugin version is the last General setting row, always shown in General and stays manual', async () => {
   const app = await mount();
@@ -8,7 +8,7 @@ test('plugin version is the last General setting row, always shown in General an
   const row = () => descendants(app.renderSettings()).find(node => node.props.role === 'group' && node.props['aria-label'] === 'pluginUpdateVersion');
   assert.ok(row().props.className.includes('power-dsh-setting-row'));
   assert.ok(descendants(row()).some(node => node.type === 'span' && node.props.children.includes(version)));
-  assert.equal(descendants(row()).some(node => node.props.children.includes(`PowerDSH ${version}`)), false);
+  assert.equal(descendants(row()).some(node => node.props.children.includes(`power-dsh ${version}`)), false);
   assert.ok(descendants(row()).some(node => node.props.children.includes('pluginUpdateCheck')));
   const panel = descendants(app.renderSettings()).find(node => node.props.role === 'tabpanel');
   assert.equal(panel.props.children.at(-1).props['aria-label'], 'pluginUpdateVersion');
@@ -82,8 +82,8 @@ test('checking and opening the confirmation never installs; only the current con
       data = { schema, operation: { schema, operationId: 'boot-op', kind: 'update', packageName: 'power-dsh', state: 'queued' } };
     } else if (url.includes('/updates?')) data = { schema, package: { name: 'power-dsh', source: 'github', installedVersion: 'b'.repeat(40), latestVersion: 'a'.repeat(40), updateAvailable: true } };
     else if (url.includes('/git/ref/')) data = { object: { type: 'commit', sha: 'a'.repeat(40) } };
-    else data = { tag_name: 'v0.0.999', draft: false, prerelease: false, html_url: 'https://github.com/mewcoder/power-dsh/releases/tag/v0.0.999',
-      assets: [{ name: 'power-dsh.tgz', state: 'uploaded', browser_download_url: 'https://github.com/mewcoder/power-dsh/releases/download/v0.0.999/power-dsh.tgz' }] };
+    else data = { tag_name: `v${nextPluginVersion}`, draft: false, prerelease: false, html_url: `https://github.com/mewcoder/power-dsh/releases/tag/v${nextPluginVersion}`,
+      assets: [{ name: 'power-dsh.tgz', state: 'uploaded', browser_download_url: `https://github.com/mewcoder/power-dsh/releases/download/v${nextPluginVersion}/power-dsh.tgz` }] };
     return new Response(JSON.stringify(data));
   } });
   const view = () => descendants(app.renderSettings());
@@ -91,8 +91,8 @@ test('checking and opening the confirmation never installs; only the current con
   assert.equal(posts, 0);
   assert.equal(view().some(node => node.type === 'button' && node.props.children.includes('pluginUpdateCheck')), false);
   const versionLine = view().find(node => node.props.className === 'power-dsh-description power-dsh-plugin-version');
-  assert.ok(descendants(versionLine).some(node => node.type === 'a' && node.props.href === 'https://github.com/mewcoder/power-dsh/releases/tag/v0.0.999'));
-  const open = () => view().find(node => node.type === 'button' && node.props.children.includes('pluginUpdateAction 0.0.999'));
+  assert.ok(descendants(versionLine).some(node => node.type === 'a' && node.props.href === `https://github.com/mewcoder/power-dsh/releases/tag/v${nextPluginVersion}`));
+  const open = () => view().find(node => node.type === 'button' && node.props.children.includes(`pluginUpdateAction ${nextPluginVersion}`));
   open().props.onClick();
   let dialog = view().find(node => node.type === 'native-modal-fixture');
   assert.ok(dialog);
@@ -118,7 +118,7 @@ test('checking and opening the confirmation never installs; only the current con
   app.unmount();
 });
 
-const updateTarget = { version: '0.0.999', url: 'https://github.com/mewcoder/power-dsh/releases/tag/v0.0.999',
+const updateTarget = { version: nextPluginVersion, url: `https://github.com/mewcoder/power-dsh/releases/tag/v${nextPluginVersion}`,
   source: 'github', installed: 'b'.repeat(40), latest: 'a'.repeat(40), bootId: 'boot' };
 const updateView = app => descendants(app.renderSettings());
 const updateButton = (app, label) => updateView(app).find(node => node.type === 'button' && node.props.children.includes(label));

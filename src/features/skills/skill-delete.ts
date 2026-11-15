@@ -1,5 +1,5 @@
 import { lstat, mkdtemp, readdir, readlink, realpath, rename, rm, rmdir, unlink } from 'node:fs/promises';
-import { join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import type { SkillDeletion } from '../../shared/types/wire.ts';
 import { pathExists, skillIdentity } from './skill-content.ts';
 
@@ -19,15 +19,13 @@ async function fingerprint(path: string): Promise<string> {
 
 export async function skillDeletion(base: string, root: string, name: string, sourcePath: string): Promise<SkillDeletion | null> {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) return null;
-  const bundle = join(root, name);
-  const flat = join(root, `${name}.md`);
   const source = resolve(sourcePath);
-  const path = source === bundle || source === join(bundle, 'SKILL.md') ? bundle : source === flat ? flat : '';
-  if (!path) return null;
+  const path = basename(source) === 'SKILL.md' ? dirname(source) : source;
+  if (dirname(path) !== resolve(root) || basename(path).startsWith('.')) return null;
   if (await realpath(root) !== resolve(await realpath(base), relative(base, root))) return null;
   const info = await lstat(path);
   const linked = info.isSymbolicLink();
-  if (!linked && (path === flat ? !info.isFile() : !info.isDirectory())) return null;
+  if (!linked && !info.isDirectory() && !(source === path && path.endsWith('.md') && info.isFile())) return null;
   const revision = skillIdentity(path, await fingerprint(path));
   return { path, linked, revision };
 }

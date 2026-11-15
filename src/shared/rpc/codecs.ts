@@ -29,3 +29,19 @@ export function policyRpc<M extends string>(method: M, resultType: string): RpcD
     },
   };
 }
+
+export const numberCodec: Codec<number> = {
+  mode: 'strict', typeSymbol: 'number',
+  create: () => ({ parse(value) {
+    if (typeof value !== 'number' || !Number.isSafeInteger(value)) throw new TypeError('Expected a safe integer');
+    return value;
+  } }),
+};
+
+export const stringArrayCodec: Codec<string[]> = {
+  mode: 'strict', typeSymbol: 'string[]',
+  create: () => ({ parse(value) {
+    if (!Array.isArray(value) || !value.every(item => typeof item === 'string')) throw new TypeError('Expected a string array');
+    return value;
+  } }),
+};

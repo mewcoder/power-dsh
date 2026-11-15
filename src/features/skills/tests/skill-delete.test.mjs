@@ -57,7 +57,7 @@ test('root links and broken links are unlinked without touching source files', a
 }));
 
 test('only exact DSH-owned entries are eligible and shared skill roots are refused', async () => fixture(async ({ base, root, path }) => {
-  assert.equal(await skillDeletion(base, root, 'other', join(path, 'SKILL.md')), null);
+  assert.equal(await skillDeletion(base, root, 'guide', join(base, 'other', 'SKILL.md')), null);
   assert.equal(await skillDeletion(base, root, '../guide', join(path, 'SKILL.md')), null);
   assert.equal(await skillDeletion(base, root, 'guide', join(path, 'assets', 'sample.txt')), null);
   const shared = join(base, 'shared');
@@ -66,6 +66,24 @@ test('only exact DSH-owned entries are eligible and shared skill roots are refus
   assert.equal(await skillDeletion(base, root, 'guide', join(path, 'SKILL.md')), null);
   await assert.rejects(deleteOwnedSkill(base, root, 'guide', join(path, 'SKILL.md'), 'a'.repeat(64), () => {}));
   assert.equal(await readFile(join(shared, 'guide', 'SKILL.md'), 'utf8'), 'Guide instructions');
+}));
+
+test('declared names may differ from directory and file names without exposing the root or hidden entries', async () => fixture(async ({ base, root, path }) => {
+  const deletion = await skillDeletion(base, root, 'display-name', join(path, 'SKILL.md'));
+  assert.equal(deletion.path, path);
+  await deleteOwnedSkill(base, root, 'display-name', join(path, 'SKILL.md'), deletion.revision, () => {});
+  await assert.rejects(access(path));
+  const flat = join(root, 'instructions.md');
+  await writeFile(flat, 'Instructions');
+  const flatDeletion = await skillDeletion(base, root, 'display-name', flat);
+  await deleteOwnedSkill(base, root, 'display-name', flat, flatDeletion.revision, () => {});
+  await assert.rejects(access(flat));
+  await writeFile(join(root, 'SKILL.md'), 'Root definition');
+  assert.equal(await skillDeletion(base, root, 'display-name', join(root, 'SKILL.md')), null);
+  const hidden = join(root, '.system');
+  await mkdir(hidden);
+  await writeFile(join(hidden, 'SKILL.md'), 'Keep internal files');
+  assert.equal(await skillDeletion(base, root, 'display-name', join(hidden, 'SKILL.md')), null);
 }));
 
 test('confirmation refuses changed resources and replacement paths', async () => fixture(async ({ base, root, path }) => {

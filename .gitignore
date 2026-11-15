@@ -17,3 +17,6 @@ coverage/
 
 # Local design previews, not shipped
 /assets/previews/
+
+# Local editor settings
+/.zcode/

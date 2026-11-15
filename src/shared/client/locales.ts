@@ -1,10 +1,10 @@
 import type { Locales } from './types.ts';
 export const locales = {
   "en": {
-    "title": "PowerDSH",
+    "title": "power-dsh",
     "generalTab": "General",
     "interfaceTab": "Interface",
-    "enhancementsTab": "Management",
+    "enhancementsTab": "Features",
     "simplifyTab": "Simplify",
     "otherTab": "Other",
     "skillPreinstalledGroup": "Built-in",
@@ -18,7 +18,7 @@ export const locales = {
     "save": "Save",
     "cancel": "Cancel",
     "saving": "Saving…",
-    "description": "A DSH enhancement plugin",
+    "description": "A dsh enhancement plugin",
     "close": "Close",
     "moreActions": "More actions",
     "loading": "Loading…",
@@ -29,10 +29,10 @@ export const locales = {
     "settingsOutdated": "This feature has not loaded in the Host yet. Re-enable power-dsh in plugin management, then try again."
   },
   "zh": {
-    "title": "PowerDSH",
+    "title": "power-dsh",
     "generalTab": "通用",
     "interfaceTab": "界面",
-    "enhancementsTab": "管理",
+    "enhancementsTab": "功能",
     "simplifyTab": "精简",
     "otherTab": "其他",
     "skillPreinstalledGroup": "内置",
@@ -46,7 +46,7 @@ export const locales = {
     "save": "保存",
     "cancel": "取消",
     "saving": "正在保存…",
-    "description": "DSH 增强插件",
+    "description": "dsh 增强插件",
     "close": "关闭",
     "moreActions": "更多操作",
     "loading": "正在加载…",

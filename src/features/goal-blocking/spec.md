@@ -2,7 +2,7 @@
 
 ## 入口与范围
 
-模块 id 为 `goal-blocking`，在 **设置 → PowerDSH → 精简** 的 Plan 下方提供「停用 Goal 模式」开关，说明「停用新对话的内置目标模式」。独立持久偏好 `blockGoal` 默认 `false`。UI 与 `power_dsh_settings` 共用 owner-only `setGoalBlocked`，由共享 Host 队列串行执行。
+模块 id 为 `goal-blocking`，在 **设置 → power-dsh → 精简** 的 Plan 下方提供「停用 Goal 模式」开关，说明「停用新对话的内置目标模式」。独立持久偏好 `blockGoal` 默认 `false`。设置界面通过 owner-only `setGoalBlocked` 应用开关，由共享 Host 队列串行执行，不提供对话设置工具。
 
 用户确认仅针对新对话，不主动停止已有目标。只匹配 `@deepseek-ai/dsh-command-goal` 与 `@deepseek-ai/dsh-tool-goal`：全局条目走原生 Plugin Manager，模式直接与嵌套 group 声明走 ConfigEditor 修改 `disabled`。开启停用，关闭启用，包括原先已停用的匹配条目，不保存原启用状态。保留其他模块、模式元数据、group/isolate 和工具配置。
 
@@ -28,6 +28,6 @@ Host 通过 `agentPresets` 子 context 绑定，服务缺席时报不可用，�
 
 当前工具目录未提供 `cordis_inspect_list`，依据本机 DSH `0.2.2-rc.1` 桌面发行包、同版 SDK 及干净官方参考提交 `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159`。核对 Goal 服务、续轮驱动、工具、命令、UI、Agent Preset Registry 和 base/Web 声明；发行包的 standard/ptc/cordis/minimal 模式声明与参考逐字相同。Web 只把工具与命令移入模式，服务和续轮驱动留在 Host。没有运行时导入内部 UI、DOM 操作、网络、进程、凭据读取或直接 profile 写入。
 
-开发前检索 [dsh-market](https://dshmarket.com/browse/)并阅读邻近 Goal UI 增强条目与源码，其通过 Remote 创建目标和替换 UI 的行为不在本功能范围；确切提交、许可和参考范围集中在[第三方资源声明](../../../docs/third-party-notices.md)。没有复制代码或安装该插件，原生源码仅用于接口核对。
+开发前检索 [dsh-market](https://dshmarket.com/browse/)并阅读邻近 Goal UI 增强条目与源码，其通过 Remote 创建目标和替换 UI 的行为不在本功能范围；确切提交、许可和参考范围集中在[参考研究](../../../docs/reference-research.md#goal-模式精简参考)。没有复制代码或安装该插件，原生源码仅用于接口核对。
 
 行为测试覆盖双模块的全局/嵌套双向启停、逐模块清单数量、无关 Plan/Todo 与目标服务/驱动/UI 保留、新旧模式代际的工具可见性、保存读回失败、重复执行和卸载等待写锁。作用域测试使用真实 Cordis/Tools 与受控原生配置夹具，代际租约保留另由原生源码核对。Client 测试覆盖独立 RPC、双语文案、即时反馈、重复操作拦截和行内失败恢复。本次已通过严格类型、构建新鲜度、344 项全仓测试（Goal 15 项）、实际打包、独立生产安装及 diff 空白检查。实际 DSH 安装、注册、页面、跨版本与平台验收须另行记录，源码/SDK 测试不代替完整宿主验收。

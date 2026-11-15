@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { UsageService } from '../usage-service.ts';
 
 const at = (date) => Date.parse(`${date}T12:00:00.000Z`);
@@ -8,8 +11,8 @@ function assistant(time, usage, model = 'group/flash') {
   return { type: 'assistant/message', time, data: { turn: 1, step: 1, usage, message: { source: { kind: 'model', provider: 'magpie', model } } } };
 }
 
-function entry(id, createdAt, events, revision = `${id}:1`) {
-  return { id, createdAt, revision, events };
+function entry(id, createdAt, events, revision = `${id}:1`, header = {}) {
+  return { id, createdAt, revision, events, header };
 }
 
 function persistence(sessions) {
@@ -78,6 +81,22 @@ test('snapshot reuses cached folds until the revision changes', async () => {
   assert.equal(otherZone.timeZone, 'Asia/Shanghai');
 });
 
+test('workspace rows group family activity by session cwd', async () => {
+  const store = persistence([
+    entry('a', at('2026-03-01'), [assistant(at('2026-03-01'), { inputTokens: 1, outputTokens: 1, totalTokens: 2 })], 'a:1', { cwd: '/work/alpha' }),
+    entry('child', at('2026-03-01'), [assistant(at('2026-03-01'), { inputTokens: 1, outputTokens: 1, totalTokens: 2 })], 'child:1',
+      { cwd: '/work/alpha', origin: 'subagent', parentSession: 'a' }),
+    entry('b', at('2026-03-02'), [assistant(at('2026-03-02'), { inputTokens: 1, outputTokens: 1, totalTokens: 2 })], 'b:1', { cwd: '/work/beta' }),
+  ]);
+  const service = new UsageService();
+  service.persistence = store;
+  const snapshot = await service.snapshot('UTC');
+  assert.deepEqual(snapshot.workspaces.map(row => [row.path, row.totalTokens, row.sessionDays.length]), [
+    ['/work/alpha', 4, 1], ['/work/beta', 2, 1],
+  ], 'Subagent usage stays with its parent workspace and counts one family.');
+  assert.deepEqual(snapshot.workspaces[0].days.map(day => [day.date, day.totalTokens]), [['2026-03-01', 4]]);
+});
+
 test('snapshot keeps reading after a broken session and marks the history incomplete', async () => {
   const store = persistence([
     entry('a', at('2026-03-01'), [assistant(at('2026-03-01'), { inputTokens: 1, outputTokens: 1, totalTokens: 2 })]),
@@ -120,7 +139,7 @@ test('snapshot drops cached sessions that disappeared from storage', async () =>
   const remaining = store.list.bind(store);
   store.list = async () => (await remaining()).filter(row => row.header.id !== 'b');
   await service.snapshot('UTC');
-  assert.deepEqual([...service.cache.keys()], ['a']);
+  assert.deepEqual([...service.cache.values()].map(entry => entry.id), ['a']);
 });
 
 test('fork history is read once and nested subagent activity counts as one family', async () => {
@@ -163,4 +182,47 @@ test('fork history is read once and nested subagent activity counts as one famil
   assert.deepEqual(report.sessionDays, [['2026-03-01', '2026-03-02'], ['2026-03-03']]);
   assert.deepEqual(store.state.readOffsets.sort(([a], [b]) => a.localeCompare(b)),
     [['child', parentEvents.length], ['fork', parentEvents.length], ['grandchild', childEvents.length], ['parent', 0]]);
+});
+
+test('a cache written by an older fold shape is ignored instead of feeding the page', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'power-dsh-usage-stale-'));
+  try {
+    const cacheFile = join(directory, 'usage-cache.json');
+    await writeFile(cacheFile, JSON.stringify({ version: 1, entries: [{
+      id: 'a', revision: 'a:1', zone: 'UTC',
+      fold: { days: [], models: [], dailyModels: [], inputTokens: 0, outputTokens: 0, cacheReadTokens: 0,
+        cacheWriteTokens: 0, totalTokens: 0, turnCount: 0, hasUsage: false, firstTime: null, lastTime: null, longestSpanMs: 0 },
+    }] }), 'utf8');
+    const store = persistence([
+      entry('a', at('2026-03-01'), [assistant(at('2026-03-01'), { inputTokens: 1, outputTokens: 1, totalTokens: 2 })]),
+    ]);
+    const service = new UsageService(cacheFile);
+    service.persistence = store;
+    const snapshot = await service.snapshot('UTC');
+    assert.equal(store.state.reads, 1, 'A stale cache version forces a real read.');
+    assert.equal(snapshot.summary.totalTokens, 2);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('snapshot reuses the persisted aggregate cache across service instances', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'power-dsh-usage-'));
+  try {
+    const store = persistence([
+      entry('a', at('2026-03-01'), [assistant(at('2026-03-01'), { inputTokens: 1, outputTokens: 1, totalTokens: 2 })]),
+    ]);
+    const cacheFile = join(directory, 'usage-cache.json');
+    const first = new UsageService(cacheFile);
+    first.persistence = store;
+    await first.snapshot('UTC');
+    const reads = store.state.reads;
+    const second = new UsageService(cacheFile);
+    second.persistence = store;
+    const snapshot = await second.snapshot('UTC');
+    assert.equal(store.state.reads, reads, 'A matching revision is served from the persisted fold cache.');
+    assert.equal(snapshot.summary.totalTokens, 2);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });

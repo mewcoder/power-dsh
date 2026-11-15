@@ -19,6 +19,10 @@ export interface Preferences {
   notificationSoundEnabled: boolean;
   notificationSound: string;
   personalizationEnabled: boolean;
+  memoryEnabled: boolean;
+  memoryAutoCapture: boolean;
+  memoryGlobalEnabled: boolean;
+  memoryWorkspaceEnabled: boolean;
   skillManagerEnabled: boolean;
   disabledSkills: DisabledSkillPreference[];
   mcpManagerEnabled: boolean;
@@ -31,6 +35,7 @@ export interface Preferences {
   blockDoubleClickRename: boolean;
   showThinkingEffortSwitcher: boolean;
   thinkingEffortGlyph: string;
+  standalonePageEnabled: boolean;
   flowingBackgroundEnabled: boolean;
   flowingBackgroundKind: string;
   flowingBackgroundOpacity: number;
@@ -45,16 +50,13 @@ export interface Preferences {
   autoArchivedSessions: string[];
   usageStatsEnabled: boolean;
   projectManagerEnabled: boolean;
+  searchPopupEnabled: boolean;
 }
 export type PreferenceKey = keyof Preferences;
 export type PowerDshPreferences = Preferences;
 export interface LiveValue<T> { get(): T }
 export type LivePreferences = { [K in PreferenceKey]: LiveValue<Preferences[K]> };
-export type SettingsParameter = 'showVersion' | 'showThemeSwitcher' | 'showRefreshButton' | 'showRestartButton'
-  | 'blockDoubleClickRename' | 'blockOfficialAccount' | 'blockOfficialTelemetry' | 'blockTodo' | 'blockPlan' | 'blockGoal' | 'blockOfficialSearch';
-export type SettingsArguments = Partial<Pick<Preferences, SettingsParameter>>;
 export interface TelemetryStatus {
   protected: boolean;
   senders: { id: string; enabled: boolean; active: boolean; available: boolean }[];
 }
-export type SettingsOutput = Pick<Preferences, SettingsParameter> & { version: string | null; telemetry: TelemetryStatus };

@@ -121,6 +121,61 @@ function streamUsage(stream: unknown): Record<string, unknown> | null {
   return null;
 }
 
+function finiteTime(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/** First member time of one packed delta run, matching the Host's assistant stream helper. */
+function firstRunMemberTime(time0: unknown, dt: unknown, members: readonly unknown[]): number | null {
+  const start = finiteTime(time0);
+  if (start === null || !Array.isArray(dt)) return null;
+  let time = start;
+  for (let index = 0; index < members.length; index++) {
+    if (index > 0) {
+      const gap = dt[index - 1];
+      if (typeof gap !== 'number' || !Number.isFinite(gap) || gap < 0) return null;
+      time += gap;
+    }
+    if (typeof members[index] === 'string' && members[index] !== '') return time;
+  }
+  return null;
+}
+
+/** Earliest token instant in a durable Assistant stream; block, usage and finish chunks do not count. */
+export function firstTokenTime(stream: unknown): number | null {
+  if (!Array.isArray(stream)) return null;
+  for (const record of stream) {
+    if (!isRecord(record)) continue;
+    if (record.type === 'chunk') {
+      const time = finiteTime(record.time);
+      const chunk = record.chunk;
+      if (time === null || !isRecord(chunk)) continue;
+      if ((chunk.type === 'text-delta' || chunk.type === 'reasoning-delta')
+        && typeof chunk.text === 'string' && chunk.text !== '') return time;
+      if (chunk.type === 'tool-call-delta'
+        && ((typeof chunk.argumentsDelta === 'string' && chunk.argumentsDelta !== '')
+          || (typeof chunk.name === 'string' && chunk.name !== ''))) return time;
+      continue;
+    }
+    if (record.type === 'text-chunks' || record.type === 'reasoning-chunks') {
+      const texts = Array.isArray(record.texts) ? record.texts : [];
+      const time = firstRunMemberTime(record.time0, record.dt, texts);
+      if (time !== null) return time;
+      continue;
+    }
+    if (record.type === 'tool-call-chunks') {
+      if (typeof record.name === 'string' && record.name !== '') {
+        const time = finiteTime(record.time0);
+        if (time !== null) return time;
+      }
+      const args = Array.isArray(record.args) ? record.args : [];
+      const time = firstRunMemberTime(record.time0, record.dt, args);
+      if (time !== null) return time;
+    }
+  }
+  return null;
+}
+
 /**
  * Provider-reported usage of one durable Assistant settlement.
  *
@@ -227,25 +282,75 @@ export function foldSession(session: UsageSessionLike, toDay: (time: number) => 
   const modelRows = new Map<string, UsageModelRow>();
   const dailyModelRows = new Map<string, UsageDailyModelRow>();
   const fold: SessionUsageFold = {
-    days: [], models: [], dailyModels: [], inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0,
+    days: [], models: [], dailyModels: [],
+    inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0,
     totalTokens: 0, turnCount: 0, hasUsage: false, firstTime: null, lastTime: null, longestSpanMs: 0,
   };
-  const bump = (time: number, field: 'turnCount' | 'toolCallCount') => {
+  const bump = (time: number | null, field: 'turnCount' | 'toolCallCount') => {
+    if (time === null) return;
     const date = toDay(time);
     const row = dayRows.get(date) ?? emptyDay(date);
     row[field] += 1;
     dayRows.set(date, row);
   };
+  const modelEntry = (model: ModelRoute): UsageModelRow => {
+    const key = `${model.provider}\u0000${model.modelId}`;
+    const current = modelRows.get(key);
+    if (current) return current;
+    const created: UsageModelRow = {
+      modelId: model.modelId, provider: model.provider, totalTokens: 0, requestCount: 0,
+      attemptCount: 0, failedAttemptCount: 0, retryCount: 0, outputTokens: 0,
+      ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0,
+    };
+    modelRows.set(key, created);
+    return created;
+  };
+  const dailyModelEntry = (date: string, model: ModelRoute): UsageDailyModelRow => {
+    const key = `${date}\u0000${model.provider}\u0000${model.modelId}`;
+    const current = dailyModelRows.get(key);
+    if (current) return current;
+    const created: UsageDailyModelRow = {
+      date, modelId: model.modelId, provider: model.provider, totalTokens: 0, requestCount: 0,
+      attemptCount: 0, failedAttemptCount: 0, retryCount: 0, outputTokens: 0,
+      ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0,
+    };
+    dailyModelRows.set(key, created);
+    return created;
+  };
+  const recordAttempt = (time: number, model: ModelRoute, failed: boolean) => {
+    const entry = modelEntry(model);
+    entry.attemptCount += 1;
+    if (failed) entry.failedAttemptCount += 1;
+    const daily = dailyModelEntry(toDay(time), model);
+    daily.attemptCount += 1;
+    if (failed) daily.failedAttemptCount += 1;
+  };
+  const recordRetry = (time: number, model: ModelRoute) => {
+    modelEntry(model).retryCount += 1;
+    dailyModelEntry(toDay(time), model).retryCount += 1;
+  };
   let activeStart: number | null = null;
+  const stepStarts = new Map<string, number>();
   let requestRoute: ModelRoute | null = null;
-  type Settlement = { coords: ReturnType<typeof settlementOf>; usage: UsageBuckets; time: number; model: ModelRoute };
+  type Settlement = {
+    coords: ReturnType<typeof settlementOf>;
+    usage: UsageBuckets;
+    time: number;
+    model: ModelRoute;
+    stepStart: number | null;
+    firstTokenTime: number | null;
+    settled: boolean;
+    messageCount: boolean;
+  };
   let slot: Settlement | null = null;
   // Aggregate only the final sample of a slot, keeping its day and route together with its usage.
   const flushSlot = () => {
     const settlement = slot;
     slot = null;
-    if (!settlement || settlement.usage.totalTokens === 0) return;
-    const { time, usage, model: { provider, modelId } } = settlement;
+    if (!settlement) return;
+    const { time, usage, model, stepStart, firstTokenTime, settled, messageCount } = settlement;
+    if (messageCount) recordAttempt(time, model, false);
+    if (usage.totalTokens === 0) return;
     const date = toDay(time);
     const row = dayRows.get(date) ?? emptyDay(date);
     for (const field of ['totalTokens', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens'] as const) {
@@ -255,16 +360,26 @@ export function foldSession(session: UsageSessionLike, toDay: (time: number) => 
     row.requestCount += 1;
     dayRows.set(date, row);
     fold.hasUsage = true;
-    const key = `${provider}\u0000${modelId}`;
-    const entry = modelRows.get(key) ?? { modelId, provider, totalTokens: 0, requestCount: 0 };
+    const entry = modelEntry(model);
     entry.totalTokens += usage.totalTokens;
     entry.requestCount += 1;
-    modelRows.set(key, entry);
-    const dayKey = `${date}\u0000${key}`;
-    const daily = dailyModelRows.get(dayKey) ?? { date, modelId, provider, totalTokens: 0, requestCount: 0 };
+    entry.outputTokens += usage.outputTokens;
+    const daily = dailyModelEntry(date, model);
     daily.totalTokens += usage.totalTokens;
     daily.requestCount += 1;
-    dailyModelRows.set(dayKey, daily);
+    daily.outputTokens += usage.outputTokens;
+    if (settled && stepStart !== null && firstTokenTime !== null && usage.outputTokens > 0) {
+      const ttftMs = Math.max(0, firstTokenTime - stepStart);
+      const decodeMs = Math.max(0, time - firstTokenTime);
+      entry.ttftMs += ttftMs;
+      entry.ttftSteps += 1;
+      entry.decodeMs += decodeMs;
+      entry.decodeTokens += usage.outputTokens;
+      daily.ttftMs += ttftMs;
+      daily.ttftSteps += 1;
+      daily.decodeMs += decodeMs;
+      daily.decodeTokens += usage.outputTokens;
+    }
   };
   const observe = (time: number) => {
     if (fold.firstTime === null || time < fold.firstTime) fold.firstTime = time;
@@ -274,8 +389,12 @@ export function foldSession(session: UsageSessionLike, toDay: (time: number) => 
     const time = timeOf(event);
     if (time !== null) observe(time);
     if (event.type === 'step/start') {
+      const coords = settlementOf(event);
+      if (coords && time !== null) stepStarts.set(`${coords.turn}/${coords.step}`, time);
       activeStart = time;
     } else if (event.type === 'step/end') {
+      const coords = settlementOf(event);
+      if (coords) stepStarts.delete(`${coords.turn}/${coords.step}`);
       if (activeStart !== null && time !== null && time > activeStart
         && !isSyntheticStepEnd(event, session.events[index + 1])) {
         addRuntime(dayRows, activeStart, time, toDay);
@@ -285,21 +404,37 @@ export function foldSession(session: UsageSessionLike, toDay: (time: number) => 
       activeStart = null;
       if (event.type === 'turn/start') {
         fold.turnCount += 1;
-        if (time !== null) bump(time, 'turnCount');
+        bump(time, 'turnCount');
       }
     } else if (event.type === 'request/context') {
       // The loop only logs changes to the effective route; a known route persists until superseded.
       const route = modelRoute(event.data);
       requestRoute = route?.provider ? route : null;
+    } else if (event.type === 'llm/retry') {
+      if (time !== null && requestRoute !== null) recordRetry(time, requestRoute);
     } else if (event.type === 'llm/retry-started') {
       const retried = settlementOf(event);
       if (retried && slot?.coords?.turn === retried.turn && slot.coords.step === retried.step) flushSlot();
     } else if (event.type === 'assistant/message' || event.type === 'assistant/attempt') {
+      const isMessage = event.type === 'assistant/message';
+      const model = modelOf(event) ?? requestRoute ?? { provider: '', modelId: '' };
+      if (!isMessage && time !== null) recordAttempt(time, model, true);
       const usage = usageOf(event);
-      if (!usage || time === null) continue;
+      if (!usage || time === null) {
+        if (isMessage && time !== null) recordAttempt(time, model, false);
+        continue;
+      }
       const coords = settlementOf(event);
       if (!coords || slot?.coords?.turn !== coords.turn || slot.coords.step !== coords.step) flushSlot();
-      slot = { coords, time, usage, model: modelOf(event) ?? requestRoute ?? { provider: '', modelId: '' } };
+      const data = isRecord(event.data) ? event.data : null;
+      const stepStart = coords ? stepStarts.get(`${coords.turn}/${coords.step}`) ?? null : null;
+      slot = {
+        coords, time, usage, model,
+        stepStart,
+        firstTokenTime: isMessage ? firstTokenTime(data?.stream) : null,
+        settled: isMessage,
+        messageCount: isMessage,
+      };
       if (!coords) flushSlot();
     } else if (event.type === 'tool/call' && time !== null) {
       bump(time, 'toolCallCount');
@@ -312,8 +447,9 @@ export function foldSession(session: UsageSessionLike, toDay: (time: number) => 
     fold.longestSpanMs = Math.max(0, fold.lastTime - start);
   }
   fold.days = [...dayRows.values()].sort((left, right) => left.date.localeCompare(right.date));
-  fold.models = [...modelRows.values()];
+  fold.models = [...modelRows.values()].filter(model => model.totalTokens > 0 || model.requestCount > 0);
   fold.dailyModels = [...dailyModelRows.values()]
+    .filter(model => model.totalTokens > 0 || model.requestCount > 0)
     .sort((left, right) => left.date.localeCompare(right.date) || left.modelId.localeCompare(right.modelId));
   return fold;
 }
@@ -352,17 +488,41 @@ export function mergeUsage(input: UsageMergeInput): UsageSnapshot {
     }
     for (const model of session.models) {
       const key = `${model.provider}\u0000${model.modelId}`;
-      const target = modelRows.get(key) ?? { modelId: model.modelId, provider: model.provider, totalTokens: 0, requestCount: 0 };
+      const target = modelRows.get(key) ?? {
+        modelId: model.modelId, provider: model.provider, totalTokens: 0, requestCount: 0,
+        attemptCount: 0, failedAttemptCount: 0, retryCount: 0,
+        outputTokens: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0,
+      };
       target.totalTokens += model.totalTokens;
       target.requestCount += model.requestCount;
+      target.attemptCount += model.attemptCount;
+      target.failedAttemptCount += model.failedAttemptCount;
+      target.retryCount += model.retryCount;
+      target.outputTokens += model.outputTokens;
+      target.ttftMs += model.ttftMs;
+      target.ttftSteps += model.ttftSteps;
+      target.decodeMs += model.decodeMs;
+      target.decodeTokens += model.decodeTokens;
       modelRows.set(key, target);
     }
     for (const daily of session.dailyModels) {
       const key = `${daily.date}\u0000${daily.provider}\u0000${daily.modelId}`;
       const target = dailyModelRows.get(key)
-        ?? { date: daily.date, modelId: daily.modelId, provider: daily.provider, totalTokens: 0, requestCount: 0 };
+        ?? {
+          date: daily.date, modelId: daily.modelId, provider: daily.provider, totalTokens: 0, requestCount: 0,
+          attemptCount: 0, failedAttemptCount: 0, retryCount: 0,
+          outputTokens: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0,
+        };
       target.totalTokens += daily.totalTokens;
       target.requestCount += daily.requestCount;
+      target.attemptCount += daily.attemptCount;
+      target.failedAttemptCount += daily.failedAttemptCount;
+      target.retryCount += daily.retryCount;
+      target.outputTokens += daily.outputTokens;
+      target.ttftMs += daily.ttftMs;
+      target.ttftSteps += daily.ttftSteps;
+      target.decodeMs += daily.decodeMs;
+      target.decodeTokens += daily.decodeTokens;
       dailyModelRows.set(key, target);
     }
     summary.totalTokens += session.totalTokens;
@@ -401,5 +561,6 @@ export function mergeUsage(input: UsageMergeInput): UsageSnapshot {
       .sort((left, right) => left.date.localeCompare(right.date) || left.modelId.localeCompare(right.modelId)),
     models: [...modelRows.values()].sort((left, right) => right.totalTokens - left.totalTokens
       || left.modelId.localeCompare(right.modelId)),
+    workspaces: [],
   };
 }

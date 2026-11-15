@@ -30,6 +30,8 @@ export const styles = `
 /* The dialog is portaled out of the page, so it carries its own notice spacing. */
 .power-dsh-mcp-detail .power-dsh-notice { margin:0; color:var(--dsw-alias-label-tertiary); font-size:13px; line-height:20px; }
 .power-dsh-mcp-page .power-dsh-mcp-card-probe[aria-busy="true"] { opacity:.6; cursor:default; }
-.power-dsh-mcp-page .power-dsh-mcp-probe-result { display:flex; align-items:center; gap:6px; margin:6px 0 0; min-width:0; color:var(--dsw-alias-label-secondary); font-size:12px; line-height:18px; overflow-wrap:anywhere; }
-.power-dsh-mcp-page .power-dsh-mcp-probe-result > span { min-width:0; }
+.power-dsh-mcp-page .power-dsh-mcp-card-probe { width:28px; padding:0; border:0; color:var(--dsw-alias-label-secondary); }
+.power-dsh-mcp-page .power-dsh-mcp-card-probe[data-probe-state="done"] { color:var(--dsw-alias-state-success-primary); }
+.power-dsh-mcp-page .power-dsh-mcp-card-probe[data-probe-state="error"] { color:var(--dsw-alias-state-error-primary); }
+.power-dsh-mcp-page .power-dsh-mcp-card-probe[data-probe-state="warning"] { color:var(--dsw-alias-state-warning-primary); }
 `;

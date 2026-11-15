@@ -22,8 +22,8 @@ export const locales = {
     flowingBackgroundResultChanged: 'Changed after attachment',
     flowingBackgroundResultFailed: 'Initialization failed',
     flowingBackgroundStatePreserved: 'The saved background setting is unchanged. The background is hidden and the native interface is preserved.',
-    flowingBackgroundRecoveryWait: 'Checks resume automatically when the page layout or styles change. If the problem persists after loading, update PowerDSH and reload the interface; copy the error information if it still fails.',
-    flowingBackgroundRecoveryUpdate: 'Update PowerDSH and reload the interface. If the problem persists, copy the error information for a bug report.',
+    flowingBackgroundRecoveryWait: 'Checks resume automatically when the page layout or styles change. If the problem persists after loading, update power-dsh and reload the interface; copy the error information if it still fails.',
+    flowingBackgroundRecoveryUpdate: 'Update power-dsh and reload the interface. If the problem persists, copy the error information for a bug report.',
     flowingBackgroundRecoveryRetry: 'Turn the background off and on to retry. If the problem persists, copy the error information for a bug report.',
   },
   zh: {
@@ -48,8 +48,8 @@ export const locales = {
     flowingBackgroundResultChanged: '挂载后发生变化',
     flowingBackgroundResultFailed: '初始化失败',
     flowingBackgroundStatePreserved: '背景开关的已保存值未更改，背景暂时隐藏，原生界面已保留。',
-    flowingBackgroundRecoveryWait: '页面布局或样式变化后会自动重新检查。加载完成后仍失败，请更新 PowerDSH 并重新加载界面；仍无法恢复请复制错误信息反馈。',
-    flowingBackgroundRecoveryUpdate: '请更新 PowerDSH 并重新加载界面；仍失败请复制错误信息反馈。',
+    flowingBackgroundRecoveryWait: '页面布局或样式变化后会自动重新检查。加载完成后仍失败，请更新 power-dsh 并重新加载界面；仍无法恢复请复制错误信息反馈。',
+    flowingBackgroundRecoveryUpdate: '请更新 power-dsh 并重新加载界面；仍失败请复制错误信息反馈。',
     flowingBackgroundRecoveryRetry: '可关闭后重新开启背景重试；仍失败请复制错误信息反馈。',
   },
 } satisfies Locales;

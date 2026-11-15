@@ -2,7 +2,7 @@
 
 模块 id：`search-blocking`；主开关 `blockOfficialSearch` 默认 `false`。模块的[定义](definition.ts)、[配置](config.ts)、[Client](client.ts)与[行为测试](tests/)在本目录维护。
 
-入口：**设置 → PowerDSH → 精简 → 停用官方搜索**，默认关闭，通过 `blockOfficialSearch` 独立持久化。说明为「关闭内置 WebSearch，保留 WebFetch」。[停用官方登录与模型接入](../account-blocking/spec.md)继续使用已有 `blockOfficialAccount`，两个开关互不联动。
+入口：**设置 → power-dsh → 精简 → 停用官方搜索**，默认关闭，通过 `blockOfficialSearch` 独立持久化。说明为「关闭内置 WebSearch，保留 WebFetch」。[停用官方登录与模型接入](../account-blocking/spec.md)继续使用已有 `blockOfficialAccount`，两个开关互不联动。
 
 ## 范围与行为
 
@@ -14,9 +14,9 @@
 
 ## 保存与恢复
 
-UI 与 `power_dsh_settings(blockOfficialSearch: ...)` 共用 owner-only Host 操作并进入同一个操作队列。先由 ConfigEditor 保存原生搜索配置并核对读回值，再检查目标模式组合没有缺失或加载错误，最后保存偏好并同步已有 Agent。失败明确返回错误，不把部分写入当作成功；重新执行可重新应用期望值，不维护回滚或旧状态记录。
+设置界面通过 owner-only Host 操作应用开关并进入共享操作队列，不提供对话设置工具。先由 ConfigEditor 保存原生搜索配置并核对读回值，再检查目标模式组合没有缺失或加载错误，最后保存偏好并同步已有 Agent。失败明确返回错误，不把部分写入当作成功；重新执行可重新应用期望值，不维护回滚或旧状态记录。
 
-关闭开关释放当前会话的搜索限制，并把可编辑声明设为 `search: true`。如果会话打开于搜索已停用的模式代际，需重新打开会话以取得新代际的工具。停用或卸载 PowerDSH 释放 guard、事件监听和作用域限制，不自动恢复已保存的原生搜索配置；旧代际中的工具可能随限制释放而重新可用。要撤销精简，先关闭本开关。
+关闭开关释放当前会话的搜索限制，并把可编辑声明设为 `search: true`。如果会话打开于搜索已停用的模式代际，需重新打开会话以取得新代际的工具。停用或卸载 power-dsh 释放 guard、事件监听和作用域限制，不自动恢复已保存的原生搜索配置；旧代际中的工具可能随限制释放而重新可用。要撤销精简，先关闭本开关。
 
 ## 实现与验证依据
 

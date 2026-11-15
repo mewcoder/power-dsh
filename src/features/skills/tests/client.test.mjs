@@ -83,7 +83,7 @@ test('the skill management switch controls only its own native page and icon and
     app.set({ skillManagerEnabled: false });
     assert.ok(!app.entries.has(section));
     assert.ok(!app.entries.has(icon));
-    assert.equal(app.entries.size, baseline);
+      assert.equal(app.entries.size, baseline);
     assert.equal(app.subscriptions(), subscriptions);
   }
   app.set({ skillManagerEnabled: true, personalizationEnabled: true });
@@ -110,6 +110,8 @@ test('skill management requests real scopes, keeps full hover text and searches 
   assert.equal(page.render().filter(node => node.type === 'li').length, 5);
   assert.ok(page.render().some(node => node.type === 'h2' && node.props.children.includes('skillsTab')));
   assert.ok(page.render().some(node => node.type === 'p' && node.props.children.includes('skillsDescription')));
+  assert.ok(page.render().some(node => node.props.className === 'power-dsh-skill-scope-help' && node.props['aria-label'] === 'skillScopeHint'));
+  assert.ok(page.render().some(node => node.type === 'native-tooltip-fixture' && node.props.label === 'skillScopeHint'));
   assert.ok(!page.render().some(node => node.props['aria-label'] === 'skillDirectoryHelp' || node.props.label === 'skillDirectoryHint'));
   assert.equal(page.tab('user').props['aria-selected'], true);
   assert.equal(page.projectTrigger(), undefined);
@@ -214,7 +216,7 @@ test('native skill groups collapse locally, search reveals matching groups and c
   assert.equal(group('personal').props['aria-expanded'], true);
   assert.equal(groupCount(group('personal')), 1);
   assert.ok(!render().some(node => node.props.className === 'power-dsh-skill-group-description'));
-  assert.deepEqual(render().filter(node => node.type === 'button' && /-group-/.test(node.props.id ?? '')).map(node => node.props.id), [
+  assert.deepEqual(render().filter(node => node.type === 'button' && node.props.id?.startsWith('settings-test-group-')).map(node => node.props.id), [
     'settings-test-group-personal', 'settings-test-group-preinstalled',
   ]);
   assert.ok(card('personal-skill'));
@@ -449,11 +451,12 @@ test('the skill management preference refreshes the Host mirror and reports reje
   app.unmount();
 });
 
-test('each card footer names the skill directory it was loaded from', async () => {
+test('card footers use directory chips and keep built-in package sources as plain text', async () => {
+  const builtinSources = ['runtime', 'plugin', 'bundled', 'bundled-office'];
   const app = await mount({ skillCatalog: catalogFixture({ skills: [
     skillFixture({ name: 'from-agents', source: 'user-agents', origin: '.agents', path: '/home/.agents/skills/from-agents/SKILL.md' }),
     skillFixture({ name: 'from-dsh', source: 'user-dsh', origin: '.dsh', path: '/home/.dsh/skills/from-dsh/SKILL.md' }),
-    skillFixture({ name: 'bundled-style', source: 'bundled', origin: '@deepseek-ai/dsh-skill-office' }),
+    ...builtinSources.map(source => skillFixture({ name: `${source}-style`, source, origin: '@deepseek-ai/dsh-skill-office' })),
   ] }) });
   const page = await skillsPage(app);
   const origin = name => {
@@ -469,8 +472,14 @@ test('each card footer names the skill directory it was loaded from', async () =
   };
   assert.equal(text(origin('from-agents')), '.agents');
   assert.equal(text(origin('from-dsh')), '.dsh');
-  // A package-provided skill names its package instead of inventing a directory.
-  assert.ok(text(origin('bundled-style')).includes('dsh-skill-office'));
+  for (const name of ['from-agents', 'from-dsh']) {
+    assert.ok(descendants(origin(name)).some(node => node.props.className === 'power-dsh-skill-path-label'));
+  }
+  for (const source of builtinSources) {
+    const label = origin(`${source}-style`);
+    assert.equal(text(label), '@deepseek-ai/dsh-skill-office');
+    assert.ok(!descendants(label).some(node => node.props.className === 'power-dsh-skill-path-stack'));
+  }
   app.unmount();
 });
 
@@ -532,8 +541,11 @@ test('skill detail reads the body on demand and shows description, metadata and 
   assert.deepEqual(order, ['power-dsh-skill-detail-list', 'power-dsh-skill-detail-markdown']);
   assert.deepEqual(app.skillDetailReads, [{ name: 'code-review' }]);
   assert.deepEqual(app.skillWrites, []);
-  // Closing is a view change only.
-  descendants(page.dialog()).find(node => node.props['data-native-button']).props.onClick();
+  // Closing is a view change only; the footer keeps the default close action.
+  const close = descendants(page.dialog()).find(node => node.type === 'button' && node.props['data-modal-autofocus']);
+  assert.ok(close, 'The detail dialog offers a default close button.');
+  assert.ok(close.props.children.includes('close'));
+  close.props.onClick();
   assert.equal(page.dialog(), undefined);
   assert.ok(page.row('code-review'));
   app.unmount();
@@ -618,7 +630,7 @@ test('skill detail reports a missing body, a read failure and a vanished skill',
   missing.unmount();
 });
 
-test('the discover tab lists global and each project with counts and imports one card', async () => {
+test('global discovery group lists importable skills and imports one card', async () => {
   const app = await mount({
     featureIds: ['skills'],
     externalSkillCatalog: { complete: true, entries: [
@@ -628,38 +640,74 @@ test('the discover tab lists global and each project with counts and imports one
   });
   app.set({ skillManagerEnabled: true });
   const page = await skillsPage(app);
-  const label = value => String([].concat(value ?? []).join(''));
-  await page.tab('sources').props.onClick();
-  await new Promise(resolve => setImmediate(resolve));
-  assert.deepEqual(app.externalReads, [{ cwd: '', scope: 'user' }, { cwd: '/work/a', scope: 'project' }, { cwd: '/work/b', scope: 'project' }]);
-  const groups = () => page.render().filter(node => node.type === 'section' && node.props['data-import-group']);
-  assert.deepEqual(groups().map(node => node.props['data-import-group']), ['user', 'project', 'project']);
-  assert.deepEqual(groups().map(node => node.props['data-import-cwd']), ['', '/work/a', '/work/b']);
-  assert.deepEqual(groups().map(groupCount), [2, 2, 2]);
-  assert.ok(!page.render().some(node => node.props.className === 'power-dsh-skill-group-description'));
+  await settle();
+  page.render();
+  assert.deepEqual(app.externalReads, [], 'The group must not scan before it is opened');
+  const group = () => page.discoveryGroup();
+  assert.ok(group());
+  assert.equal(descendants(group()).find(node => node.type === 'button' && node.props['aria-controls']).props['aria-expanded'], false);
+  assert.equal(groupCount(group()), undefined);
+  await page.openDiscovery();
+  assert.deepEqual(app.externalReads, [{ cwd: '', scope: 'user' }]);
+  assert.equal(groupCount(group()), 2);
   const cards = () => page.render().filter(node => node.type === 'li' && node.props['data-import']);
-  assert.equal(cards().length, 6, 'Each group renders its own discovered skills');
-  // Group headers collapse like the skill groups do.
-  const toggle = descendants(groups()[0]).find(node => node.type === 'button' && node.props['aria-expanded'] === true);
-  toggle.props.onClick();
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(descendants(groups()[0]).find(node => node.type === 'button' && node.props['aria-controls']).props['aria-expanded'], false);
-  toggle.props.onClick();
-  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(cards().length, 2);
+  assert.ok(cards().every(card => card.props['data-import-cwd'] === '' && card.props['data-discovered'] === true
+    && card.props.className === 'power-dsh-skill-card power-dsh-skill-card-discovered'));
+  // The discovery group collapses like the native skill groups do.
+  const toggle = () => descendants(group()).find(node => node.type === 'button' && node.props['aria-controls']);
+  toggle().props.onClick();
+  page.render();
+  assert.equal(toggle().props['aria-expanded'], false);
+  toggle().props.onClick();
+  page.render();
   const rowImport = descendants(cards()[0]).find(node => node.type === 'button' && node.props['data-import-action']);
   await rowImport.props.onClick();
-  await new Promise(resolve => setImmediate(resolve));
+  await settle();
   assert.deepEqual(app.externalImports, []);
   await confirmDestination(page);
   assert.equal(JSON.stringify(app.externalImports), JSON.stringify([{ cwd: '', scope: 'user', ids: ['claude-code:code-review:dir'], mode: 'copy', revision: '', targetCwd: '' }]));
-  assert.equal(cards().length, 6, 'Imported skills stay visible in their own group');
-  assert.deepEqual(groups().map(groupCount), [2, 2, 2]);
-  assert.equal(cards()[0].props['data-existing'], true);
-  assert.equal(descendants(cards()[0]).find(node => node.props['data-import-action']), undefined);
-  assert.ok(descendants(cards()[0]).some(node => node.type === 'span' && node.props.children.includes('skillAlreadyExists')));
+  await settle();
+  page.render();
+  assert.equal(cards().length, 1, 'Imported skills leave the discovery group');
   assert.ok(page.render().some(node => node.props.className === 'power-dsh-skill-import-notice'));
   assert.ok(!page.render().some(node => node.type === 'button' && node.props.children.includes('skillViewImported')));
-  assert.equal(page.tab('sources').props['aria-selected'], true);
+  assert.equal(page.tab('user').props['aria-selected'], true);
+  app.unmount();
+});
+
+test('workspace discovery cards stay in their project group and use the same importable style as global cards', async () => {
+  const app = await mount({
+    featureIds: ['skills'],
+    skillCatalog: catalogFixture({ skills: [skillFixture({ name: 'installed-skill', source: 'project-dsh', targetCwd: '/work/a' })] }),
+    externalSkillCatalog: { complete: true, entries: [
+      { id: 'claude-code:review:dir', name: 'review', description: 'Review code', source: 'Claude Code', path: '/home/.claude/skills/review', flat: false },
+    ] },
+  });
+  const page = await skillsPage(app, 'project');
+  await settle();
+  page.render();
+  assert.deepEqual(app.externalReads, [
+    { cwd: '/work/a', scope: 'project' }, { cwd: '/work/b', scope: 'project' },
+  ]);
+  const group = page.workspace('/work/a');
+  const lists = descendants(group).filter(node => node.type === 'ul' && node.props.className === 'power-dsh-skill-cards');
+  assert.equal(lists.length, 1, 'Installed and discovered cards share one card grid.');
+  assert.deepEqual(lists[0].props.children.filter(Boolean).map(node => node.props['data-skill'] ?? node.props['data-import']),
+    ['installed-skill', 'review']);
+  for (const path of ['/work/a', '/work/b']) {
+    const card = page.discovery('review', path);
+    assert.ok(card, `Workspace ${path} renders its discovered card`);
+    assert.equal(card.props['data-discovered'], true);
+    assert.equal(card.props.className, 'power-dsh-skill-card power-dsh-skill-card-discovered');
+    const header = descendants(card).find(node => node.props.className === 'power-dsh-skill-card-main');
+    const action = descendants(header).find(node => node.props['data-import-action']);
+    assert.equal(action.props['data-native-button'], true);
+    assert.equal(action.props.variant, 'outline');
+    assert.equal(action.props.size, 'sm');
+    const footer = descendants(card).find(node => node.props.className === 'power-dsh-skill-card-meta');
+    assert.deepEqual(descendants(footer).filter(node => node.type === 'button').map(node => node.props.children[0]), ['skillDetail']);
+  }
   app.unmount();
 });
 
@@ -673,8 +721,9 @@ test('a discovered skill opens the same detail dialog without importing it', asy
   });
   app.set({ skillManagerEnabled: true });
   const page = await skillsPage(app);
-  await page.tab('sources').props.onClick();
-  await new Promise(resolve => setImmediate(resolve));
+  await settle();
+  page.render();
+  await page.openDiscovery();
   const card = page.render().find(node => node.type === 'li' && node.props['data-import'] === 'code-review');
   const tooltip = descendants(card).find(node => node.type === 'native-tooltip-fixture' && node.props.label === description);
   assert.ok(tooltip);
@@ -693,43 +742,37 @@ test('a discovered skill opens the same detail dialog without importing it', asy
   assert.ok(descendants(dialog).some(node => String(node.props?.className ?? '').includes('power-dsh-skill-detail-markdown')));
   // Reading a source skill never imports it.
   assert.deepEqual(app.externalImports, []);
-  const close = descendants(dialog).find(node => node.type === 'button' && node.props['data-modal-autofocus']);
+  const footerButtons = descendants(dialog).filter(node => node.props['data-native-button']);
+  assert.deepEqual(footerButtons.map(node => node.props.children[0]), ['skillImportOne', 'close']);
+  const close = footerButtons.find(node => node.props['data-modal-autofocus']);
+  assert.ok(close, 'The detail dialog offers a default close button.');
   close.props.onClick();
   assert.equal(page.render().some(node => node.props.role === 'dialog'), false);
   app.unmount();
 });
 
-test('existing native skills have a title status, no import button and normal readable details', async () => {
+test('already present external skills are omitted from discovery in both scopes', async () => {
   const entry = externalEntryFixture({ available: true });
-  const app = await mount({
+  const global = await mount({
     featureIds: ['skills'],
     externalSkillCatalog: { complete: true, entries: [entry] },
     skillCatalog: catalogFixture({ workspaces: [] }),
   });
-  app.set({ skillManagerEnabled: true });
-  const page = await skillsPage(app);
-  await page.tab('sources').props.onClick();
-  await new Promise(resolve => setImmediate(resolve));
-  const card = page.render().find(node => node.props['data-import'] === entry.name);
-  assert.equal(card.props['data-existing'], true);
-  const heading = descendants(card).find(node => node.props.className === 'power-dsh-skill-card-main');
-  assert.ok(descendants(heading).some(node => node.type === 'span' && node.props.children.includes('skillAlreadyExists')));
-  assert.ok(!descendants(card).find(node => node.props.className === 'power-dsh-skill-card-meta').props.children.some(node => node?.props?.className === 'power-dsh-skill-existing'));
-  const add = descendants(card).find(node => node.props['data-import-action']);
-  assert.equal(add, undefined);
-  assert.ok(descendants(card).some(node => node.type === 'span' && node.props.children.includes('skillAlreadyExists')));
-  assert.deepEqual(app.externalImports, []);
-  descendants(card).find(node => node.props['data-import-detail']).props.onClick();await settle();
-  assert.ok(page.dialog());
-  assert.ok(!descendants(page.dialog()).some(node => node.type === 'button' && node.props.children.includes('skillAlreadyExists')));
-  assert.ok(!descendants(page.dialog()).some(node => node.props.children.includes('skillAlreadyExists')));
-  page.dialog().props.onClose();
-  page.tab('user').props.onClick();
-  app.setExternalSkills({ complete: true, entries: [{ ...entry, available: false }] });
-  page.tab('sources').props.onClick();await settle();
-  assert.equal(page.render().find(node => node.props['data-import'] === entry.name).props['data-existing'], false);
-  assert.equal(page.render().find(node => node.props['data-import-action'] === entry.name).props.disabled, false);
-  app.unmount();
+  const globalPage = await skillsPage(global);
+  await settle();
+  globalPage.render();
+  assert.ok(globalPage.discoveryGroup(), 'The lazy group is visible before it is opened');
+  await globalPage.openDiscovery();
+  assert.equal(globalPage.discoveryGroup(), undefined, 'An empty scan removes the group');
+  assert.equal(globalPage.render().filter(node => node.type === 'li' && node.props['data-import']).length, 0);
+
+  const workspace = await mount({ featureIds: ['skills'], externalSkillCatalog: { complete: true, entries: [entry] } });
+  const workspacePage = await skillsPage(workspace, 'project');
+  await settle();
+  workspacePage.render();
+  assert.equal(workspacePage.render().filter(node => node.type === 'li' && node.props['data-import']).length, 0);
+  global.unmount();
+  workspace.unmount();
 });
 
 test('project discovery details and imports keep the clicked project identity during pending operations', async () => {
@@ -740,11 +783,10 @@ test('project discovery details and imports keep the clicked project identity du
     externalSkillReply: () => pendingImport.promise,
     skillCatalog: catalogFixture({ workspaces: [{ path: '/work/a', title: 'Same name' }, { path: '/work/b', title: 'Same name' }] }),
   });
-  const page = await skillsPage(app);
-  page.tab('sources').props.onClick();
+  const page = await skillsPage(app, 'project');
   await settle();
-  const group = path => page.render().find(node => node.props['data-import-cwd'] === path);
-  const action = (path, attribute) => descendants(group(path)).find(node => node.props[attribute]);
+  page.render();
+  const action = (path, attribute) => descendants(page.workspace(path)).find(node => node.props[attribute]);
   await action('/work/b', 'data-import-detail').props.onClick();
   await settle();
   assert.deepEqual(app.externalDetailReads, [{ cwd: '/work/b', scope: 'project', id: entry.id }]);
@@ -756,173 +798,150 @@ test('project discovery details and imports keep the clicked project identity du
   await confirmDestination(page);
   assert.equal(page.tab('project').props.disabled, true);
   page.tab('project').props.onClick();
-  assert.equal(page.tab('sources').props['aria-selected'], true);
+  assert.equal(page.tab('project').props['aria-selected'], true);
   assert.equal(action('/work/a', 'data-import-action').props.disabled, true);
   importClick();
   assert.deepEqual(app.externalImports.map(row => ({ ...row, ids: Array.from(row.ids) })), [{ cwd: '/work/b', scope: 'project', ids: [entry.id], mode: 'copy', revision: '', targetCwd: '/work/b' }]);
-  assert.equal(groupCount(group('/work/a')), 1);
-  assert.equal(groupCount(group('/work/b')), 1);
   pendingImport.resolve({ ok: true, value: { imported: [entry.name], skipped: [] } });
   await settle();
-  assert.equal(groupCount(group('/work/a')), 1);
-  assert.equal(groupCount(group('/work/b')), 1);
+  page.render();
   assert.equal(action('/work/b', 'data-import-action'), undefined);
-  assert.ok(descendants(group('/work/b')).some(node => node.type === 'span' && node.props.children.includes('skillAlreadyExists')));
-  assert.equal(groupCount(group('')), 1);
+  assert.equal(action('/work/a', 'data-import-action').props.disabled, false);
   assert.ok(skillDetailText(action('/work/a', 'data-import-action')).includes('skillImportOne'));
   app.unmount();
 });
 
-test('discovery refresh preserves counts and cards, retries only the failed project and keeps collapse choices', async () => {
-  const oldReply = Promise.withResolvers();
-  const freshReply = Promise.withResolvers();
+test('global discovery failures stay local and retry without blocking installed skills', async () => {
+  let failed = true;
   const entry = { id: 'helper', name: 'helper', description: 'Review changes', source: 'Codex', path: '/skills/helper', flat: false };
-  let stage = 0;
-  const app = await mount({ featureIds: ['skills'], externalSkillList: (cwd, scope) => {
-    if (cwd === '/work/b' && stage < 2) return { ok: false, error: { message: 'Could not scan project' } };
-    if (cwd === '/work/a' && stage === 1) return oldReply.promise;
-    if (cwd === '/work/a' && stage === 2) return freshReply.promise;
-    return { ok: true, value: { complete: true, entries: [entry] } };
+  const app = await mount({ featureIds: ['skills'], externalSkillList: cwd => {
+    if (cwd !== '') return { ok: true, value: { complete: true, entries: [] } };
+    return failed ? { ok: false, error: { message: 'Could not scan user skills' } }
+      : { ok: true, value: { complete: true, entries: [entry] } };
   } });
   const page = await skillsPage(app);
-  const group = path => page.render().find(node => node.props['data-import-cwd'] === path);
-  const toggle = path => descendants(group(path)).find(node => node.props['aria-controls']);
-  page.tab('sources').props.onClick();
   await settle();
-  assert.equal(groupCount(group('/work/b')), undefined);
-  assert.ok(descendants(group('/work/b')).some(node => node.props.role === 'alert'));
-  assert.ok(!descendants(group('/work/b')).some(node => node.props.children.includes('skillImportEmptyGroup')));
-  assert.equal(groupCount(group('/work/a')), 1);
-  toggle('').props.onClick();
-  stage = 1;
-  page.tab('user').props.onClick();
-  page.tab('sources').props.onClick();
-  assert.equal(toggle('').props['aria-expanded'], false);
-  assert.equal(groupCount(group('/work/a')), 1);
-  assert.ok(descendants(group('/work/a')).some(node => node.props['data-import'] === entry.name));
-  assert.equal(descendants(group('/work/a')).find(node => node.props['data-import-action']).props.disabled, true);
+  page.render();
+  assert.ok(page.row('code-review'), 'Installed skills remain readable');
+  const group = () => page.discoveryGroup();
+  assert.ok(group());
+  assert.equal(descendants(group()).find(node => node.type === 'button' && node.props['aria-controls']).props['aria-expanded'], false);
+  await page.openDiscovery();
+  assert.ok(descendants(group()).some(node => node.props.role === 'alert'));
+  failed = false;
+  descendants(group()).find(node => node.props['data-native-button'] && node.props.children.includes('retry')).props.onClick();
   await settle();
-  stage = 2;
-  const reads = app.externalReads.length;
-  const failure = descendants(group('/work/b')).find(node => node.props.role === 'alert');
-  descendants(failure).find(node => node.props['data-native-button'] && node.props.children.includes('retry')).props.onClick();
-  await settle();
-  assert.deepEqual(app.externalReads.slice(reads), [{ cwd: '/work/b', scope: 'project' }]);
-  assert.equal(groupCount(group('/work/b')), 1);
-  page.tab('user').props.onClick();
-  page.tab('sources').props.onClick();
-  freshReply.resolve({ ok: true, value: { complete: true, entries: [] } });
-  await settle();
-  assert.equal(group('/work/a'), undefined);
-  oldReply.resolve({ ok: true, value: { complete: true, entries: [entry] } });
-  await settle();
-  assert.equal(group('/work/a'), undefined);
-  assert.equal(toggle('').props['aria-expanded'], false);
+  page.render();
+  assert.equal(groupCount(group()), 1);
+  assert.equal(page.discovery('helper').props['data-import-cwd'], '');
   app.unmount();
 });
 
-test('discovery search filters all source paths and descriptions, counts existing skills and restores collapse choices without scanning', async () => {
-  const review = externalEntryFixture({ available: true });
+test('workspace discovery errors stay local to the failed project and retry without a global reload', async () => {
+  let failed = true;
+  const entry = { id: 'helper', name: 'helper', description: 'Review changes', source: 'Codex', path: '/work/a/.codex/skills/helper', flat: false };
+  const app = await mount({ featureIds: ['skills'], externalSkillList: cwd => {
+    if (cwd === '/work/b') return failed ? { ok: false, error: { message: 'Could not scan project' } }
+      : { ok: true, value: { complete: true, entries: [entry] } };
+    if (cwd === '/work/a') return { ok: true, value: { complete: true, entries: [entry] } };
+    return { ok: true, value: { complete: true, entries: [] } };
+  } });
+  const page = await skillsPage(app, 'project');
+  await settle();
+  page.render();
+  assert.ok(page.discovery('helper', '/work/a'));
+  assert.ok(!page.discovery('helper', '/work/b'));
+  const failure = descendants(page.workspace('/work/b')).find(node => node.props.role === 'alert');
+  assert.ok(failure);
+  failed = false;
+  const reads = app.externalReads.length;
+  descendants(failure).find(node => node.props['data-native-button'] && node.props.children.includes('retry')).props.onClick();
+  await settle();
+  page.render();
+  assert.deepEqual(app.externalReads.slice(reads), [{ cwd: '/work/b', scope: 'project' }]);
+  assert.ok(page.discovery('helper', '/work/b'));
+  app.unmount();
+});
+
+test('discovery search filters paths and descriptions in both scopes without rescanning', async () => {
   const helper = { id: 'helper', name: 'helper', description: 'Document changes', source: 'Cursor', path: '/work/a/.cursor/skills/helper', flat: false };
+  const review = externalEntryFixture();
   const app = await mount({ featureIds: ['skills'], externalSkillList: cwd => ({ ok: true, value: {
     complete: true, entries: cwd === '' ? [review, helper] : cwd === '/work/a' ? [helper] : [],
   } }) });
   const page = await skillsPage(app);
-  page.tab('sources').props.onClick();
   await settle();
-  const group = path => page.render().find(node => node.props['data-import-cwd'] === path);
-  const toggle = path => descendants(group(path)).find(node => node.props['aria-controls']);
-  const search = value => page.search().props.onChange({ target: { value } });
-  assert.equal(page.search().props['aria-label'], 'skillSearch');
-  assert.equal(groupCount(group('')), 2);
-  toggle('').props.onClick();
-  assert.equal(toggle('').props['aria-expanded'], false);
+  page.render();
+  const group = () => page.discoveryGroup();
+  const toggle = () => descendants(group()).find(node => node.type === 'button' && node.props['aria-controls']);
+  await page.openDiscovery();
+  assert.equal(groupCount(group()), 2);
+  toggle().props.onClick();
+  page.render();
+  assert.equal(toggle().props['aria-expanded'], false);
   const reads = app.externalReads.length;
-  for (const query of [' REVIEW ', 'rEvIeW CoDe', '.CODEX', 'first source', 'CLAUDE CODE']) {
-    search(query);
-    assert.equal(toggle('').props['aria-expanded'], true);
-    assert.equal(groupCount(group('')), 1);
-    assert.equal(group('/work/a'), undefined);
-    const card = descendants(group('')).find(node => node.props['data-import'] === 'review');
-    assert.equal(card.props['data-existing'], true);
-    assert.ok(!descendants(card).some(node => node.props['data-import-action']));
+  for (const query of [' REVIEW ', 'rEvIeW CoDe', '.CLAUDE', 'first source', 'CLAUDE CODE']) {
+    page.search().props.onChange({ target: { value: query } });
+    page.render();
+    assert.equal(toggle().props['aria-expanded'], true);
+    assert.equal(groupCount(group()), 1);
+    assert.ok(page.discovery('review'));
   }
-  toggle('').props.onClick();
-  assert.equal(toggle('').props['aria-expanded'], true);
-  search('missing-skill');
-  assert.equal(page.render().filter(node => node.props['data-import-group']).length, 0);
-  assert.equal(page.render().filter(node => node.props.children.includes('skillNoMatches')).length, 1);
-  search('   ');
-  assert.equal(toggle('').props['aria-expanded'], false);
-  assert.equal(groupCount(group('')), 2);
-  search('DOCUMENT');
-  assert.equal(groupCount(group('')), 1);
-  assert.equal(groupCount(group('/work/a')), 1);
-  assert.equal(app.externalReads.length, reads);
-  descendants(group('/work/a')).find(node => node.props['data-import-action'] === 'helper').props.onClick();
-  await settle();
-  assert.equal(app.importDestinationReads.at(-1).cwd, '/work/a');
-  assert.deepEqual(app.externalImports, []);
-  app.unmount();
-});
-
-test('discovery search retains pending scans and errors when no previous cards match', async () => {
-  const reply = Promise.withResolvers();
-  const app = await mount({ featureIds: ['skills'], externalSkillList: cwd => cwd === '/work/a' ? reply.promise
-    : cwd === '/work/b' ? { ok: false, error: { message: 'Could not scan project' } }
-      : { ok: true, value: { complete: true, entries: [] } } });
-  const page = await skillsPage(app);
-  page.tab('sources').props.onClick();
   page.search().props.onChange({ target: { value: 'missing-skill' } });
+  page.render();
+  assert.equal(page.discoveryGroup(), undefined);
+  assert.equal(page.render().filter(node => node.props.children.includes('skillNoMatches')).length, 1);
+  page.search().props.onChange({ target: { value: '   ' } });
+  page.render();
+  assert.equal(toggle().props['aria-expanded'], false);
+  assert.equal(groupCount(group()), 2);
+  page.search().props.onChange({ target: { value: 'DOCUMENT' } });
+  page.render();
+  assert.equal(groupCount(group()), 1);
+  page.tab('project').props.onClick();
+  page.render();
   await settle();
-  const group = path => page.render().find(node => node.props['data-import-cwd'] === path);
-  assert.ok(descendants(group('/work/a')).some(node => node.props.className === 'power-dsh-loading'));
-  assert.ok(descendants(group('/work/b')).some(node => node.props.role === 'alert'));
-  assert.ok(!page.render().some(node => node.props.children.includes('skillNoMatches')));
-  reply.resolve({ ok: true, value: { complete: true, entries: [] } });
-  await settle();
-  assert.equal(group('/work/a'), undefined);
-  assert.ok(descendants(group('/work/b')).some(node => node.props.role === 'alert'));
+  page.render();
+  assert.ok(page.discovery('helper', '/work/a'));
+  assert.equal(page.discovery('review', '/work/a'), undefined);
+  assert.equal(app.externalReads.length, reads + 2);
   app.unmount();
 });
 
-test('discovery with no imported projects scans only global skills', async () => {
-  const reply = Promise.withResolvers();
-  const app = await mount({ featureIds: ['skills'], skillCatalog: catalogFixture({ workspaces: [] }), externalSkillList: () => reply.promise });
+test('an empty discovery result leaves no group in either scope', async () => {
+  const app = await mount({ featureIds: ['skills'], skillCatalog: catalogFixture({ workspaces: [], skills: [] }) });
   const page = await skillsPage(app);
-  page.tab('sources').props.onClick();
-  assert.equal(page.render().filter(node => node.props['data-import-group']).length, 1);
-  assert.ok(!page.render().some(node => node.props.children.includes('skillImportEmptyGroup')));
-  reply.resolve({ ok: true, value: { complete: true, entries: [] } });
   await settle();
+  page.render();
+  assert.deepEqual(app.externalReads, []);
+  assert.ok(page.discoveryGroup());
+  await page.openDiscovery();
   assert.deepEqual(app.externalReads, [{ cwd: '', scope: 'user' }]);
-  const groups = page.render().filter(node => node.props['data-import-group']);
-  assert.equal(groups.length, 0);
-  assert.equal(page.render().filter(node => node.props.children.includes('skillImportEmptyGroup')).length, 1);
+  assert.equal(page.discoveryGroup(), undefined);
+  assert.equal(page.render().filter(node => node.props.className === 'power-dsh-skill-empty').length, 1);
   app.unmount();
 });
 
-test('incomplete empty workspace and discovery catalogs retain their groups and never claim an empty page', async () => {
+test('incomplete discovery catalogs keep their feedback but never claim an empty page', async () => {
   const app = await mount({
     featureIds: ['skills'],
-    skillList: (cwd, scope) => ({ ok: true, value: catalogFixture({ cwd, scope, complete: scope === 'user', skills: [] }) }),
+    skillList: (cwd, scope) => ({ ok: true, value: catalogFixture({ cwd, scope, complete: false, skills: [] }) }),
     externalSkillCatalog: { complete: false, entries: [] },
   });
   const page = await skillsPage(app, 'project');
+  await settle();
+  page.render();
   for (const path of ['/work/a', '/work/b']) {
     assert.ok(page.workspace(path));
-    assert.equal(groupCount(page.workspace(path)), undefined);
     assert.ok(descendants(page.workspace(path)).some(node => node.props.children.includes('skillIncomplete')));
   }
   assert.ok(!page.render().some(node => node.props.children.includes('skillEmpty')));
-  page.tab('sources').props.onClick();
+  page.tab('user').props.onClick();
+  page.render();
   await settle();
-  page.search().props.onChange({ target: { value: 'missing-skill' } });
-  const groups = page.render().filter(node => node.props['data-import-group']);
-  assert.equal(groups.length, 3);
-  assert.ok(groups.every(group => descendants(group).some(node => node.props.children.includes('skillIncomplete'))));
-  assert.ok(!page.render().some(node => node.props.children.includes('skillImportEmptyGroup')));
-  assert.ok(!page.render().some(node => node.props.children.includes('skillNoMatches')));
+  page.render();
+  assert.ok(page.render().some(node => node.props.children.includes('skillIncomplete')));
+  assert.ok(!page.render().some(node => node.props.children.includes('skillEmpty')));
   app.unmount();
 });
 
@@ -943,15 +962,24 @@ test('multiple source paths share one label and confirm a destination before imp
   const app = await mount({ featureIds: ['skills'], externalSkillCatalog: { complete: true, entries: [entry] } });
   const page = await skillsPage(app);
   assert.ok(page.render().some(node => node.props.children.includes('skillsDescription')));
-  page.tab('sources').props.onClick();await settle();
-  assert.ok(page.render().some(node => node.props.children.includes('skillDiscoverDescription')));
+  await settle();
+  page.render();
+  await page.openDiscovery();
   const card = page.render().find(node => node.props['data-import'] === 'review');
   const origin = descendants(card).find(node => node.props.className === 'power-dsh-skill-card-origin');
   assert.equal(origin.props['data-source-count'], 4);
+  assert.equal(descendants(origin).filter(node => node.props.className === 'power-dsh-skill-path-layer').length, 3);
   assert.ok(descendants(origin).some(node => node.props.className === 'power-dsh-skill-path-label' && node.props.children.includes('.claude')));
   const tooltip = descendants(card).find(node => node.type === 'native-tooltip-fixture' && node.props.label.includes(entry.sources[0].path));
   assert.equal(tooltip.props.label, entry.sources.map(source => source.path).join('\n'));
-  assert.deepEqual(descendants(card).filter(node => node.type === 'button').map(node => node.props.children[0]), ['skillDetail', 'skillImportOne']);
+  assert.deepEqual(descendants(card).filter(node => node.type === 'button').map(node => node.props.children[0]), ['skillImportOne', 'skillDetail']);
+  const header = descendants(card).find(node => node.props.className === 'power-dsh-skill-card-main');
+  const action = descendants(header).find(node => node.props['data-import-action']);
+  assert.equal(action.props['data-native-button'], true);
+  assert.equal(action.props.variant, 'outline');
+  assert.equal(action.props.size, 'sm');
+  assert.equal(action.props['aria-label'], 'skillImportOne: review');
+  assert.equal(action.props['aria-haspopup'], 'dialog');
   descendants(card).find(node => node.props['data-import-detail']).props.onClick();await settle();
   assert.deepEqual(descendants(page.dialog()).filter(node => node.type === 'dt').flatMap(node => node.props.children), ['skillDetailPath', 'skillDetailDescription']);
   assert.ok(!descendants(page.dialog()).some(node => node.type === 'input' || node.type === 'native-menu-fixture'));
@@ -968,13 +996,40 @@ test('multiple source paths share one label and confirm a destination before imp
   assert.equal(app.externalImports[0].ids[0], 'variant-one');
   assert.equal(app.externalImports[0].mode, 'copy');
   assert.equal(app.externalImports[0].revision, 'a'.repeat(64));
-  assert.equal(page.tab('sources').props['aria-selected'], true);
   assert.ok(!page.render().some(node => node.props.children.includes('skillViewImported')));
-  assert.equal(page.render().find(node => node.props['data-import'] === 'review').props['data-existing'], true);
-  page.tab('user').props.onClick();await settle();
+  assert.equal(page.render().find(node => node.props['data-import'] === 'review'), undefined);
+  assert.ok(page.row('review'));
   assert.equal(page.search().props.value, '');
   assert.ok(page.row('review'));
   app.unmount();
+});
+
+test('source stacks represent every unique path without repeating the directory text', async () => {
+  for (const count of [1, 2, 4, 6]) {
+    const entry = externalEntryFixture();
+    const sources = Array.from({ length: count }, (_, index) => ({
+      agent: `Agent ${index}`, path: `/home/.agent-${index}/skills/review`,
+      realPath: '/home/.agents/skills/review', linked: true,
+    }));
+    entry.sources = [...sources, sources[0]];
+    entry.variants = [{ ...entry.variants[0], path: sources[0].path, sources: entry.sources }];
+    const app = await mount({ featureIds: ['skills'], externalSkillCatalog: { complete: true, entries: [entry] } });
+    const page = await skillsPage(app);
+    await settle();
+    await page.openDiscovery();
+    const card = page.render().find(node => node.props['data-import'] === 'review');
+    const origin = descendants(card).find(node => node.props.className === 'power-dsh-skill-card-origin');
+    assert.equal(origin.props['data-source-count'], count);
+    const labels = descendants(origin).filter(node => node.props.className === 'power-dsh-skill-path-label');
+    const layers = descendants(origin).filter(node => node.props.className === 'power-dsh-skill-path-layer');
+    assert.equal(labels.length, 1);
+    assert.deepEqual(labels[0].props.children, ['.agent-0']);
+    assert.equal(layers.length + labels.length, count);
+    assert.ok(layers.every(node => node.props['aria-hidden'] === true));
+    const tooltip = descendants(card).find(node => node.type === 'native-tooltip-fixture' && node.props.label.includes(sources[0].path));
+    assert.equal(tooltip.props.label, sources.map(source => source.path).join('\n'));
+    app.unmount();
+  }
 });
 
 test('different contents use a path field choice before confirming the same import action', async () => {
@@ -982,7 +1037,9 @@ test('different contents use a path field choice before confirming the same impo
   entry.variants.push({ ...entry.variants[0], id: 'variant-two', revision: 'b'.repeat(64), description: 'Second source', path: '/other/review', sources: [entry.sources[1]] });
   entry.comparison = 'different';
   const app = await mount({ featureIds: ['skills'], externalSkillCatalog: { complete: true, entries: [entry] } });
-  const page = await skillsPage(app);page.tab('sources').props.onClick();await settle();
+  const page = await skillsPage(app);await settle();
+  page.render();
+  await page.openDiscovery();
   page.render().find(node => node.props['data-import-action'] === 'review').props.onClick();await settle();
   assert.deepEqual(app.externalDetailReads, []);
   const add = () => descendants(page.dialog()).find(node => node.props['data-native-button'] && node.props.children.includes('skillImportOne'));
@@ -1006,7 +1063,9 @@ test('identical independent copies only require destination confirmation without
   const entry = externalEntryFixture();
   entry.variants.push({ ...entry.variants[0], id: 'other-copy', path: entry.sources[1].path, sources: [entry.sources[1]] });
   const app = await mount({ featureIds: ['skills'], externalSkillCatalog: { complete: true, entries: [entry] } });
-  const page = await skillsPage(app);page.tab('sources').props.onClick();await settle();
+  const page = await skillsPage(app);await settle();
+  page.render();
+  await page.openDiscovery();
   const card = page.render().find(node => node.props['data-import'] === 'review');
   assert.ok(!descendants(card).some(node => node.type === 'native-menu-fixture'));
   descendants(card).find(node => node.props['data-import-action']).props.onClick();await settle();
@@ -1025,7 +1084,9 @@ test('name conflicts retain details with a disabled import and never offer overw
   const app = await mount({ featureIds: ['skills'], externalSkillCatalog: { complete: true, entries: [entry] },
     skillCatalog: catalogFixture({ skills: [skillFixture({ name: 'review' })] }),
   });
-  const page = await skillsPage(app);page.tab('sources').props.onClick();await settle();
+  const page = await skillsPage(app);await settle();
+  page.render();
+  await page.openDiscovery();
   const add = page.render().find(node => node.props['data-import-action'] === 'review');
   assert.equal(add.props.disabled, true);
   assert.equal(add.props.title, 'skillNameConflict');
@@ -1072,7 +1133,9 @@ test('a pending source addition blocks closing, reselection and duplicate writes
   const app = await mount({ featureIds: ['skills'], externalSkillCatalog: { complete: true, entries: [entry] },
     externalSkillReply: () => reply.promise });
   const page = await skillsPage(app);
-  page.tab('sources').props.onClick();await settle();
+  await settle();
+  page.render();
+  await page.openDiscovery();
   page.render().find(node => node.props['data-import-action'] === 'review').props.onClick();await settle();
   const choice = () => descendants(page.dialog()).find(node => node.type === 'native-menu-fixture');
   choice().props.onSelect('variant-one');await settle();
@@ -1100,19 +1163,23 @@ test('a pending source addition blocks closing, reselection and duplicate writes
   app.unmount();
 });
 
-test('a single path has plain directory text and its details lead to destination confirmation', async () => {
+test('a single path has one directory chip and its details lead to destination confirmation', async () => {
   const entry = externalEntryFixture();
   entry.sources = [entry.sources[1]];
   entry.variants[0] = { ...entry.variants[0], path: entry.sources[0].path, sources: entry.sources };
   const app = await mount({ featureIds: ['skills'], externalSkillCatalog: { complete: true, entries: [entry] } });
   const page = await skillsPage(app);
-  page.tab('sources').props.onClick();await settle();
+  await settle();
+  page.render();
+  await page.openDiscovery();
   const card = page.render().find(node => node.props['data-import'] === 'review');
   const origin = descendants(card).find(node => node.props.className === 'power-dsh-skill-card-origin');
-  assert.equal(origin.props.children[0], '.codex');
+  assert.ok(descendants(origin).some(node => node.props.className === 'power-dsh-skill-path-label' && node.props.children.includes('.codex')));
   assert.equal(origin.props['data-source-count'], 1);
-  assert.ok(!descendants(card).some(node => node.props.className === 'power-dsh-skill-path-stack'));
-  assert.deepEqual(descendants(card).filter(node => node.type === 'button').map(node => node.props.children[0]), ['skillDetail', 'skillImportOne']);
+  const stack = descendants(origin).find(node => node.props.className === 'power-dsh-skill-path-stack');
+  assert.equal(stack.props.style['--power-dsh-source-layers'], 0);
+  assert.equal(descendants(origin).filter(node => node.props.className === 'power-dsh-skill-path-layer').length, 0);
+  assert.deepEqual(descendants(card).filter(node => node.type === 'button').map(node => node.props.children[0]), ['skillImportOne', 'skillDetail']);
   descendants(card).find(node => node.props['data-import-detail']).props.onClick();await settle();
   const nodes = descendants(page.dialog());
   assert.ok(!nodes.some(node => node.type === 'input' || node.type === 'native-menu-fixture'));
@@ -1136,7 +1203,9 @@ test('path selection isolates late detail replies and never imports before the s
   const app = await mount({ featureIds: ['skills'], externalSkillCatalog: { complete: true, entries: [entry] },
     externalDetailReply: id => id === 'variant-one' ? first.promise : second.promise });
   const page = await skillsPage(app);
-  page.tab('sources').props.onClick();await settle();
+  await settle();
+  page.render();
+  await page.openDiscovery();
   page.render().find(node => node.props['data-import-action'] === 'review').props.onClick();await settle();
   const menu = () => descendants(page.dialog()).find(node => node.type === 'native-menu-fixture');
   menu().props.onSelect('variant-one');
@@ -1155,14 +1224,15 @@ test('path selection isolates late detail replies and never imports before the s
   app.unmount();
 });
 
-test('a project import defaults to its group, allows another destination and keeps cards visible after success', async () => {
+test('a workspace discovery import defaults to its project and allows another destination', async () => {
   const entry = externalEntryFixture();
   const app = await mount({ featureIds: ['skills'], externalSkillCatalog: { complete: true, entries: [entry] } });
-  const page = await skillsPage(app);
-  page.tab('sources').props.onClick();await settle();
-  const group = cwd => page.render().find(node => node.props['data-import-cwd'] === cwd);
-  const card = cwd => descendants(group(cwd)).find(node => node.props['data-import'] === entry.name);
-  descendants(card('/work/a')).find(node => node.props['data-import-action']).props.onClick();await settle();
+  const page = await skillsPage(app, 'project');
+  await settle();
+  page.render();
+  const card = cwd => page.discovery(entry.name, cwd);
+  descendants(card('/work/a')).find(node => node.props['data-import-action']).props.onClick();
+  await settle();
   const menu = () => descendants(page.dialog()).find(node => node.type === 'native-menu-fixture');
   assert.equal(menu().props.selectedId, '/work/a');
   assert.equal(menu().props.items.length, 3);
@@ -1175,17 +1245,16 @@ test('a project import defaults to its group, allows another destination and kee
   assert.equal(app.externalImports[0].targetCwd, '/work/b');
   assert.equal(app.externalImports[0].revision, 'a'.repeat(64));
   assert.equal(page.dialog(), undefined);
-  assert.equal(page.tab('sources').props['aria-selected'], true);
-  assert.equal(card('/work/b').props['data-existing'], true);
-  assert.equal(card('/work/a').props['data-existing'], false);
-  assert.equal(groupCount(group('/work/a')), 1);
-  assert.equal(groupCount(group('/work/b')), 1);
+  assert.equal(page.tab('project').props['aria-selected'], true);
+  await settle();
+  page.render();
+  assert.equal(card('/work/b'), undefined, 'The target project no longer lists the imported skill as discovered');
+  assert.ok(card('/work/a'), 'The source project keeps its discoverable copy');
+  assert.ok(page.row('review', '/work/b'), 'The target project now lists the skill as installed');
+  assert.equal(page.row('review', '/work/b').props.className, 'power-dsh-skill-card');
+  assert.ok(descendants(page.row('review', '/work/b')).some(node => node.props.role === 'switch'));
+  assert.ok(!descendants(page.row('review', '/work/b')).some(node => node.props['data-import-action']));
   assert.deepEqual(descendants(page.render().find(node => node.props.className === 'power-dsh-skill-import-notice')).filter(node => node.type === 'button'), []);
-  descendants(card('/work/b')).find(node => node.props['data-import-detail']).props.onClick();await settle();
-  assert.ok(descendants(page.dialog()).some(node => node.type === 'native-markdown-fixture' && node.props.text.includes('Body of variant-one')));
-  assert.ok(!descendants(page.dialog()).some(node => node.type === 'button' && node.props.children.includes('skillAlreadyExists')));
-  assert.ok(!descendants(page.dialog()).some(node => node.props.children.includes('skillAlreadyExists')));
-  page.dialog().props.onClose();
   const successTimer = [...app.timers.values()].find(timer => timer.ms === 3000);
   assert.ok(successTimer);
   successTimer.fn();
@@ -1200,7 +1269,9 @@ test('destination switching rejects stale replies and confirms neither loading n
   const app = await mount({ featureIds: ['skills'], externalSkillCatalog: { complete: true, entries: [entry] },
     importDestinationReply: cwd => cwd === '' ? first.promise : other.promise });
   const page = await skillsPage(app);
-  page.tab('sources').props.onClick();await settle();
+  await settle();
+  page.render();
+  await page.openDiscovery();
   page.render().find(node => node.props['data-import-action'] === entry.name).props.onClick();await settle();
   const menu = () => descendants(page.dialog()).find(node => node.type === 'native-menu-fixture');
   const add = () => descendants(page.dialog()).find(node => node.props.className === 'power-dsh-confirm-import');
@@ -1224,10 +1295,11 @@ test('a destination read failure preserves the selection and supports retry with
   const app = await mount({ featureIds: ['skills'], externalSkillCatalog: { complete: true, entries: [entry] },
     importDestinationReply: cwd => fail ? { ok: false, error: { message: 'read rejected' } }
       : { ok: true, value: { path: `${cwd}/.dsh/skills/review`, available: false, inherited: false, complete: true } } });
-  const page = await skillsPage(app);
-  page.tab('sources').props.onClick();await settle();
-  const group = page.render().find(node => node.props['data-import-cwd'] === '/work/a');
-  descendants(group).find(node => node.props['data-import-action']).props.onClick();await settle();
+  const page = await skillsPage(app, 'project');
+  await settle();
+  page.render();
+  descendants(page.discovery(entry.name, '/work/a')).find(node => node.props['data-import-action']).props.onClick();
+  await settle();
   assert.equal(descendants(page.dialog()).find(node => node.props.className === 'power-dsh-confirm-import').props.disabled, true);
   assert.equal(descendants(page.dialog()).find(node => node.type === 'native-menu-fixture').props.selectedId, '/work/a');
   fail = false;
@@ -1244,9 +1316,12 @@ test('deletion requires the displayed path confirmation and blocks stale, closin
   const app = await mount({ featureIds: ['skills'], skillCatalog: catalogFixture({ skills: [skillFixture({ deletion })] }), skillReply: () => reply.promise });
   const page = await skillsPage(app);
   page.detail('code-review').props.onClick({ currentTarget: null });await settle();
+  assert.deepEqual(descendants(page.dialog()).filter(node => node.props['data-native-button']).map(node => node.props.children[0]), ['skillDelete', 'close']);
   const remove = () => descendants(page.dialog()).find(node => node.props.className === 'power-dsh-skill-delete');
   remove().props.onClick();
   assert.equal(page.dialog().props.title, 'skillDelete');
+  assert.deepEqual(descendants(page.dialog()).filter(node => node.props['data-native-button']).map(node => node.props.children[0]), ['cancel', 'skillConfirm']);
+  assert.ok(descendants(page.dialog()).find(node => node.props['data-native-button'] && node.props['data-modal-autofocus']).props.children.includes('cancel'));
   assert.ok(skillDetailText(page.dialog()).includes(deletion.path));
   assert.ok(skillDetailText(page.dialog()).includes('skillDeleteHint'));
   assert.deepEqual(app.skillDeletes, []);
@@ -1268,6 +1343,31 @@ test('deletion requires the displayed path confirmation and blocks stale, closin
   reply.resolve({ ok: true, value: catalogFixture({ skills: [] }) });await settle();
   assert.equal(page.dialog(), undefined);
   assert.equal(page.row('code-review'), undefined);
+  app.unmount();
+});
+
+test('delete confirmation can select multiple DSH copies of one skill', async () => {
+  const deletions = [
+    { path: '/profile/skills/code-review', linked: false, revision: 'a'.repeat(64), cwd: '', scope: 'user', workspaceTitle: '' },
+    { path: '/work/a/.dsh/skills/code-review', linked: false, revision: 'b'.repeat(64), cwd: '/work/a', scope: 'project', workspaceTitle: 'Project Alpha' },
+  ];
+  const app = await mount({ featureIds: ['skills'], skillDetailReply: () => ({ ok: true, value: { ...skillFixture(), content: 'Instructions', deletions } }) });
+  const page = await skillsPage(app);
+  page.detail('code-review').props.onClick({ currentTarget: null });await settle();
+  descendants(page.dialog()).find(node => node.props.className === 'power-dsh-skill-delete').props.onClick();
+  const dialog = () => page.dialog();
+  const checkboxes = () => descendants(dialog()).filter(node => node.type === 'input' && node.props.type === 'checkbox');
+  assert.equal(checkboxes().length, 2);
+  assert.equal(checkboxes()[0].props.checked, true, 'The current copy is selected by default');
+  assert.equal(checkboxes()[1].props.checked, false);
+  checkboxes()[1].props.onChange();
+  assert.equal(checkboxes()[1].props.checked, true);
+  descendants(dialog()).find(node => node.props.className === 'power-dsh-skill-delete' && node.type === 'button').props.onClick();
+  await settle();
+  assert.deepEqual(app.skillDeletes.map(row => ({ cwd: row.cwd, revision: row.revision })), [
+    { cwd: '', revision: 'a'.repeat(64) },
+    { cwd: '/work/a', revision: 'b'.repeat(64) },
+  ]);
   app.unmount();
 });
 

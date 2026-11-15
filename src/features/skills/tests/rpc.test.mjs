@@ -38,6 +38,12 @@ test('deletion metadata validates the confirmed path, link type and revision', (
   for (const value of [{ ...deletion, path: '' }, { ...deletion, linked: 1 }, { ...deletion, revision: '' }, null]) {
     assert.throws(() => codec.parse({ ...detail, deletion: value }), /Invalid skill deletion/);
   }
+  const option = { ...deletion, cwd: '/work/a', scope: 'project', workspaceTitle: 'Project Alpha' };
+  assert.deepEqual(codec.parse({ ...detail, deletions: [option] }).deletions, [option]);
+  for (const value of [{ ...option, scope: 'workspace' }, { ...option, cwd: 1 }, { ...option, workspaceTitle: null }]) {
+    assert.throws(() => codec.parse({ ...detail, deletions: [value] }), /Invalid skill deletion option/);
+  }
+  assert.throws(() => codec.parse({ ...detail, deletions: Array(65).fill(option) }), /Invalid skill deletions/);
 });
 
 test('discovery codecs validate variants without breaking catalogs from older hosts', () => {

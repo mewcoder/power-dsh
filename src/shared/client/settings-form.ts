@@ -1,4 +1,4 @@
-import type { ClientContext, Dispose, Listener, PreferenceKey, PreferenceValue, SavePreference, SettingsForm, SlotComponent, SlotOptions, Translate } from './types.ts';
+import type { ClientContext, Dispose, FormSnapshot, Listener, PreferenceKey, PreferenceValue, SavePreference, SettingsForm, SlotComponent, SlotOptions, SnapshotSource, Translate } from './types.ts';
 export function createSettingsForm(ctx: ClientContext, namespace: string): SettingsForm {
   const canonicalForm = ctx.configForms.get(namespace);
   // Existing managed installs keep their legacy entry ID; never migrate preferences here.
@@ -25,12 +25,12 @@ export function createPreferenceSaver(ctx: ClientContext, form: SettingsForm, t:
   };
 }
 
-export function preferenceSlot(ctx: ClientContext, form: SettingsForm, field: PreferenceKey, name: string, options: SlotOptions, component: SlotComponent) {
+export function preferenceSlot(ctx: ClientContext, form: SettingsForm, field: PreferenceKey, name: string, options: SlotOptions, component: SlotComponent, available?: () => boolean) {
   ctx.slots.inject(name, () => {
     let release: Dispose | null = null;
     const sync = () => {
       const snapshot = form.getSnapshot();
-      const enabled = snapshot.status === 'ready' && snapshot.value?.[field] === true;
+      const enabled = snapshot.status === 'ready' && snapshot.value?.[field] === true && (available?.() ?? true);
       if (enabled && !release) release = ctx.slots.register({ name, ...options }, component);
       else if (!enabled && release) { release(); release = null; }
     };
@@ -38,4 +38,10 @@ export function preferenceSlot(ctx: ClientContext, form: SettingsForm, field: Pr
     const unsubscribe = form.subscribe(sync);
     return () => { unsubscribe(); release?.(); };
   });
+}
+
+/** Management pages move to the sidebar page while wallpaper stays in settings. */
+export function standalonePageActive(source: SnapshotSource<FormSnapshot>): boolean {
+  const snapshot = source.getSnapshot();
+  return snapshot.status === 'ready' && snapshot.value?.standalonePageEnabled === true;
 }

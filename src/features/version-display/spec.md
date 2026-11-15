@@ -4,9 +4,9 @@
 
 ## 标识、入口与范围
 
-功能 id 为 `version-display`。入口：**设置 → PowerDSH → 界面 → 显示版本号**，`showVersion` 默认 `false`，通过宿主 settings 独立持久化；设置工具 `power_dsh_settings` 可读写同一偏好。
+功能 id 为 `version-display`。入口：**设置 → power-dsh → 界面 → 显示版本号**，`showVersion` 默认 `false`，通过宿主 settings 独立持久化，开关仅从设置界面操作。
 
-开启后在展开的侧栏品牌附近显示当前 DSH 宿主版本。显示值来自 Host `clientModules.graph().release.version` 或 Client 的 boot release，不使用 PowerDSH 的包版本，不硬编码更新目标。侧栏收起、偏好未就绪、功能关闭或没有可靠版本值时隐藏。
+开启后在展开的侧栏品牌附近显示当前 DSH 宿主版本。显示值来自 Host `clientModules.graph().release.version` 或 Client 的 boot release，不使用 power-dsh 的包版本，不硬编码更新目标。侧栏收起、偏好未就绪、功能关闭或没有可靠版本值时隐藏。
 
 ## 行为与数据
 

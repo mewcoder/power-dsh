@@ -1,6 +1,6 @@
 import { isRecord, isArray, hasStrings, hasBooleans, isOneOf, type Codec, type RpcDescriptor } from '../../shared/types/protocol.ts';
-import type { SkillScope, SkillWorkspace, SkillRow, SkillEntry, SkillCatalog, SkillDetail, ExternalSkillEntry, ExternalSkillCatalog, ExternalSkillDetail, SkillImportResult, SkillOccurrence, SkillVariant, SkillImportMode, SkillImportDestination, SkillDeletion } from '../../shared/types/wire.ts';
-export type { SkillScope, SkillWorkspace, SkillRow, SkillEntry, SkillCatalog, SkillDetail, ExternalSkillEntry, ExternalSkillCatalog, ExternalSkillDetail, SkillImportResult, SkillOccurrence, SkillVariant, SkillImportMode, SkillImportDestination, SkillDeletion } from '../../shared/types/wire.ts';
+import type { SkillScope, SkillWorkspace, SkillRow, SkillEntry, SkillCatalog, SkillDetail, ExternalSkillEntry, ExternalSkillCatalog, ExternalSkillDetail, SkillImportResult, SkillOccurrence, SkillVariant, SkillImportMode, SkillImportDestination, SkillDeletion, SkillDeletionOption } from '../../shared/types/wire.ts';
+export type { SkillScope, SkillWorkspace, SkillRow, SkillEntry, SkillCatalog, SkillDetail, ExternalSkillEntry, ExternalSkillCatalog, ExternalSkillDetail, SkillImportResult, SkillOccurrence, SkillVariant, SkillImportMode, SkillImportDestination, SkillDeletion, SkillDeletionOption } from '../../shared/types/wire.ts';
 import { stringCodec, booleanCodec } from '../../shared/rpc/codecs.ts';
 
 function parseSources(value: unknown): SkillOccurrence[] {
@@ -18,6 +18,13 @@ function parseDeletion(value: unknown): SkillDeletion {
   if (!isRecord(value) || !hasStrings(value, ['path', 'revision']) || typeof value.linked !== 'boolean'
     || !value.path || !/^[a-f0-9]{64}$/.test(value.revision)) throw new TypeError('Invalid skill deletion');
   return { path: value.path, revision: value.revision, linked: value.linked };
+}
+function parseDeletionOption(value: unknown): SkillDeletionOption {
+  if (!isRecord(value) || !hasStrings(value, ['path', 'revision', 'cwd', 'workspaceTitle'])
+    || !isOneOf(value.scope, ['user', 'project']) || typeof value.linked !== 'boolean'
+    || !value.path || !/^[a-f0-9]{64}$/.test(value.revision)) throw new TypeError('Invalid skill deletion option');
+  return { path: value.path, linked: value.linked, revision: value.revision,
+    cwd: value.cwd, scope: value.scope, workspaceTitle: value.workspaceTitle };
 }
 const skillCatalogCodec: Codec<SkillCatalog> = {
   mode: 'strict', typeSymbol: 'power-dsh#SkillCatalog',
@@ -44,11 +51,13 @@ const skillDetailCodec: Codec<SkillDetail | null> = {
     if (!isRecord(value) || !hasStrings(value, ['name', 'description', 'content', 'source', 'path', 'origin'])
       || !hasBooleans(value, ['enabled', 'modelInvocable', 'userInvocable'])
       || (value.linkTarget !== undefined && (typeof value.linkTarget !== 'string' || !value.linkTarget))) throw new TypeError('Invalid skill detail');
+    if (value.deletions !== undefined && (!isArray(value.deletions) || value.deletions.length > 64)) throw new TypeError('Invalid skill deletions');
     return { name: value.name, description: value.description, content: value.content, source: value.source,
       path: value.path, origin: value.origin, enabled: value.enabled,
       modelInvocable: value.modelInvocable, userInvocable: value.userInvocable,
       ...(value.linkTarget === undefined ? {} : { linkTarget: value.linkTarget }),
-      ...(value.deletion === undefined ? {} : { deletion: parseDeletion(value.deletion) }) };
+      ...(value.deletion === undefined ? {} : { deletion: parseDeletion(value.deletion) }),
+      ...(value.deletions === undefined ? {} : { deletions: value.deletions.map(parseDeletionOption) }) };
   } }),
 };
 

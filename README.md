@@ -1,31 +1,31 @@
-# PowerDSH
+# power-dsh
 
-> **优雅克制，专注实效。让你的 DSH 更顺手、更高效。**\
-> *Minimal, elegant, yet deeply powerful. Making your DSH effortless and efficient.*
+> **优雅克制，专注实效。让你的 dsh 更顺手、更高效。**\
+> *Minimal, elegant, yet deeply powerful. Making your dsh effortless and efficient.*
 
-PowerDSH 是插件显示名称，`power-dsh` 是它的包名与仓库名。
+`power-dsh` 是独立社区维护的 dsh 增强插件，显示名、包名与仓库名一致。
 
-<img src="docs/images/0.0.1/settings.webp" alt="PowerDSH 管理页" width="560">
+<img src="docs/images/0.0.1/settings.webp" alt="power-dsh 管理页" width="560">
 
 ## 功能清单
 
 | 分类 | 功能 |
 | --- | --- |
 | 通用 | 任务通知 |
-| 界面 | 自定义壁纸、快捷推理等级切换、外观快捷切换、显示版本号 |
-| 管理 | 技能管理（查看、启停、导入、删除非内置技能）、MCP 管理、全局指令、工作区管理、归档、使用统计 |
+| 界面 | 自定义壁纸、快捷推理等级切换、外观快捷切换、显示版本号、会话搜索（标题与正文） |
+| 功能 | 侧边栏独立页面、全局指令、记忆、技能管理（查看、启停、导入、删除非内置技能）、MCP 管理、工作区管理、归档、使用统计 |
 | 精简 | 停用官方登录与模型接入、停用官方搜索、停用官方反馈与遥测、停用 Todo 工具、停用 Plan 模式、停用 Goal 模式 |
 | 其他 | 界面刷新、重启应用、屏蔽双击重命名 |
 
-各项增强在 **设置 → PowerDSH** 独立开关，默认关闭；手动更新入口始终显示。
+各项增强在 **设置 → power-dsh** 独立开关，默认关闭；插件开关仅从设置界面操作，手动更新入口始终显示。「功能」首行的「侧边栏独立页面」开启后，将全局指令、记忆、技能、MCP、工作区、归档、使用统计从设置侧栏移至主侧栏的独立页面，功能开关、设置侧栏入口和独立页导航均采用此顺序。宽屏使用左侧导航、窄屏使用顶部原生分段导航，均显示图标与文字，记忆使用大脑图标；全部设置与壁纸仍从设置入口调整。
 
-「通用」最后的「插件版本」设置行显示当前 PowerDSH 版本，可手动检查更新：通过本机 Git 读取远端标签并核对正式 Release，确认后由支持公开更新接口的插件市场处理安装，成功后按需提供重启或刷新入口。任务通知用一个选项选择从不、未聚焦或始终提醒，选择框左侧的铃铛图标可发送测试通知。
+「通用」最后的「插件版本」设置行显示当前 power-dsh 版本，可手动检查更新：通过本机 Git 读取远端标签并核对正式 Release，确认后由支持公开更新接口的插件市场处理安装，成功后按需提供重启或刷新入口。任务通知用一个选项选择从不、未聚焦或始终提醒，选择框左侧的铃铛图标可发送测试通知。
 
 ## 安装
 
-PowerDSH 是独立社区维护的 DSH 桌面插件。
+power-dsh 是独立社区维护的 DSH 桌面插件。
 
-**桌面版**：在插件市场搜索 **PowerDSH** 安装；也可打开 DSH **插件**页 → **添加插件** → 输入以下来源。安装后启用，进入 **设置 → PowerDSH** 开启功能。
+**桌面版**：在插件市场搜索 **power-dsh** 安装；也可打开 DSH **插件**页 → **添加插件** → 输入以下来源。安装后启用，进入 **设置 → power-dsh** 开启功能。
 
 ```text
 github:mewcoder/power-dsh
@@ -55,4 +55,4 @@ DSH `>=0.2.0-rc.1 <0.3.0-0`（最低已测基线 `0.2.0-rc.1`），Node.js `>=22
 
 ## 链接
 
-[GitHub](https://github.com/mewcoder/power-dsh) · [问题反馈](https://github.com/mewcoder/power-dsh/issues) · [第三方资源声明](docs/third-party-notices.md)
+[GitHub](https://github.com/mewcoder/power-dsh) · [问题反馈](https://github.com/mewcoder/power-dsh/issues)

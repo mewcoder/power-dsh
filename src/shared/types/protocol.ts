@@ -1,9 +1,20 @@
 import type { SkillCatalog, SkillDetail, ExternalSkillCatalog, ExternalSkillDetail, SkillImportResult, SkillImportDestination, McpCatalog, McpServerDetail, McpProbe, PersonalizationFile, SystemSoundsCatalog, SoundPlayback, RestartStatus, RestartAccepted, ArchiveCatalog, WallpaperAsset, WallpaperCleared, UsageSnapshot, ProjectCatalog } from './wire.ts';
 import type { WindowsNotification, NotificationDelivery, NotificationCleared } from './wire.ts';
 import type { NotificationTransport, PluginRelease } from './wire.ts';
+import type { SearchContentResult } from './wire.ts';
+import type { MemoryCatalog, MemoryFileDetail, MemoryWriteResult, MemoryModels, MemoryCleanupPreview, MemoryCleanupResult } from './wire.ts';
 
 /** Named Host operations, before the transport adds its result envelope. */
 export interface PowerDshMethods {
+  memoryCleanupModels(): Promise<MemoryModels>;
+  prepareMemoryCleanup(scope: string, model: string, token: string): Promise<MemoryCleanupPreview>;
+  cancelMemoryCleanup(token: string): Promise<boolean>;
+  applyMemoryCleanup(token: string): Promise<MemoryCleanupResult>;
+  listMemoryEntries(): Promise<MemoryCatalog>;
+  readMemoryEntry(scope: string, id: string): Promise<MemoryFileDetail>;
+  deleteMemoryEntry(scope: string, id: string, revision: string): Promise<MemoryWriteResult>;
+  clearMemoryScope(scope: string, revision: string): Promise<MemoryWriteResult>;
+  openMemoryFolder(scope: string): Promise<boolean>;
   restartStatus(): Promise<RestartStatus>;
   restartApp(): Promise<RestartAccepted>;
   restartAfterUpdate(): Promise<RestartAccepted>;
@@ -20,6 +31,9 @@ export interface PowerDshMethods {
   setPlanBlocked(blocked: boolean): Promise<PolicyResult>;
   setGoalBlocked(blocked: boolean): Promise<PolicyResult>;
   setSearchBlocked(blocked: boolean): Promise<PolicyResult>;
+  setSearchPopupEnabled(enabled: boolean): Promise<PolicyResult>;
+  searchSessionContent(query: string, limit: number, previewIds: readonly string[], sessionIds: readonly string[]): Promise<SearchContentResult>;
+  readRecentSessionPreviews(sessionIds: readonly string[], versions: readonly string[]): Promise<SearchContentResult>;
   readPersonalization(): Promise<PersonalizationFile>;
   savePersonalization(text: string, revision: string): Promise<PersonalizationFile>;
   readWallpaper(): Promise<WallpaperAsset | null>;

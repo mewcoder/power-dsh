@@ -97,6 +97,7 @@ test('settings route policy changes to their explicit injected Host methods', as
   await app.settingsProps().setPlanBlocked(true);
   await app.settingsProps().setGoalBlocked(true);
   await app.settingsProps().setSearchBlocked(true);
+  await app.settingsProps().setSearchPopupEnabled(true);
   assert.deepEqual(app.rpcCalls, [
     { method: 'setTelemetryBlocked', blocked: true },
     { method: 'setAccountBlocked', blocked: false },
@@ -104,6 +105,7 @@ test('settings route policy changes to their explicit injected Host methods', as
     { method: 'setPlanBlocked', blocked: true },
     { method: 'setGoalBlocked', blocked: true },
     { method: 'setSearchBlocked', blocked: true },
+    { method: 'setSearchPopupEnabled', blocked: true },
   ]);
   app.unmount();
 });
@@ -114,8 +116,8 @@ test('settings default to General with custom wallpaper first in Interface', asy
   app.set({ notificationsEnabled: true, flowingBackgroundEnabled: true });
   const groups = {
     general: ['notificationSoundEnabled'],
-    interface: ['wallpaperEnabled', 'showThinkingEffortSwitcher', 'showThemeSwitcher', 'showVersion'],
-    enhancements: ['skillManagerEnabled', 'mcpManagerEnabled', 'personalizationEnabled', 'projectManagerEnabled', 'archiveManagerEnabled', 'usageStatsEnabled'],
+    interface: ['wallpaperEnabled', 'showThinkingEffortSwitcher', 'showThemeSwitcher', 'showVersion', 'searchPopupEnabled'],
+    enhancements: ['standalonePageEnabled', 'personalizationEnabled', 'memoryEnabled', 'skillManagerEnabled', 'mcpManagerEnabled', 'projectManagerEnabled', 'archiveManagerEnabled', 'usageStatsEnabled'],
     simplify: ['blockOfficialAccount', 'blockOfficialSearch', 'blockOfficialTelemetry', 'blockTodo', 'blockPlan', 'blockGoal'],
     other: ['showRefreshButton', 'showRestartButton', 'blockDoubleClickRename'],
   };
@@ -147,7 +149,7 @@ test('settings default to General with custom wallpaper first in Interface', asy
     fields.push(...actual);
     assert.ok(!view.some(node => node.type === 'textarea'));
   }
-  assert.equal(new Set(fields).size, 20);
+  assert.equal(new Set(fields).size, 23);
   app.unmount();
 });
 

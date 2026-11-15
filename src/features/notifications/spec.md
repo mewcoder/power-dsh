@@ -4,7 +4,7 @@
 
 ## 入口与范围
 
-在 **设置 → PowerDSH → 通用** 通过「任务通知」三档选项开启提醒，选择框左侧提供图标测试按钮。「通知声音」使用独立的 `notificationSoundEnabled`，默认 `true`，声音开关单独一行，开启后下方展开「提示音」选择与小播放图标，关闭时只保留开关行；提示音使用 `notificationSound`，默认 `'default'`。选中后先保存再自动试听，重复选择当前声音也可重听，小播放图标提供单独试听。各项由宿主设置持久化。任务通知说明固定为「任务完成、失败或需要确认时发送桌面通知」；「通知声音」只保留一句说明「开启任务通知提示音」；「提示音」行说明为「选择系统提示音」，操作错误按对应行显示。选择从不提醒后隐藏通知声音、提示音选择和试听控件，保留声音偏好；关闭声音后隐藏下拉和播放图标。不开独立设置页或侧栏常驻按钮。
+在 **设置 → power-dsh → 通用** 通过「任务通知」三档选项开启提醒，选择框左侧提供图标测试按钮。「通知声音」使用独立的 `notificationSoundEnabled`，默认 `true`，声音开关单独一行，开启后下方展开「提示音」选择与小播放图标，关闭时只保留开关行；提示音使用 `notificationSound`，默认 `'default'`。选中后先保存再自动试听，重复选择当前声音也可重听，小播放图标提供单独试听。各项由宿主设置持久化。任务通知说明固定为「任务完成、失败或需要确认时发送桌面通知」；「通知声音」只保留一句说明「开启任务通知提示音」；「提示音」行说明为「选择系统提示音」，操作错误按对应行显示。选择从不提醒后隐藏通知声音、提示音选择和试听控件，保留声音偏好；关闭声音后隐藏下拉和播放图标。不开独立设置页或侧栏常驻按钮。
 
 | 触发 | 通知 | 前台行为 |
 | --- | --- | --- |
@@ -57,4 +57,4 @@ Client 观察原生 `uiSession.sessionStatus` 的 `pendingInteraction`，以交�
 
 已核对 DSH `0.2.2-rc.1` 安装包中的会话投影、列表与控制流、原生交互状态、桌面 preload、连接 `isLoopback` 及 subprocess 的 `spawn`、取消和托管范围退出接口。原生 `turnOutline` 和 `turnBoundary` 不保存结束原因，故使用上述最小摘要；桌面公开桥未提供通用通知方法。Windows 原生通道复用已使用的 subprocess 接口，核对同版 `subprocess-local/src/spawn.ts` 的 Windows 非 detached / 隐藏窗口行为和官方 `apps/desktop/config/windows-packaging/production.env.example` 的应用标识。会话触发仍在 Client，本机 Windows 才调用 Host；其他环境继续使用浏览器 `Notification`。Inspect 本轮不可用；接口判断属于确切安装包及参考源码核对证据，不能代替实际通知验收。
 
-[摘要测试](tests/notifications.test.mjs)覆盖已知及未来结束原因、无关事件引用稳定性、输入校验和真实 Cordis 投影的注册释放。[原生声音测试](tests/system-sounds.test.mjs)覆盖 macOS 目录枚举、跨平台 POSIX 路径、目录与参数白名单、Windows 固定脚本、配置变更、重叠请求、超时和卸载取消，不代表 Windows 实机播放已验证。[Client 测试](tests/client.test.mjs)覆盖四类触发、前台抑制、去重、浏览器通知与 Windows 原生路由、默认声音试听、会话/group 隔离、远程访问及迟到响应。[Windows Toast 测试](tests/windows-toasts.test.mjs)覆盖编码命令、XML 转义、实时声音偏好、原生参数、定向清理、停用、超时与卸载；Windows runner 另解析实际 PowerShell 脚本及 XML，但不发送通知。实际系统通知权限、横幅、关闭、声音与点击行为仍需 Windows DSH 实机验收；脚本解析及进程正常退出不等于用户看到了横幅或听到声音。验证层次见[开发指南](../../../docs/development.md#验证方法与限制)，市场参考与提交见[第三方资源声明](../../../docs/third-party-notices.md#通知插件参考)。
+[摘要测试](tests/notifications.test.mjs)覆盖已知及未来结束原因、无关事件引用稳定性、输入校验和真实 Cordis 投影的注册释放。[原生声音测试](tests/system-sounds.test.mjs)覆盖 macOS 目录枚举、跨平台 POSIX 路径、目录与参数白名单、Windows 固定脚本、配置变更、重叠请求、超时和卸载取消，不代表 Windows 实机播放已验证。[Client 测试](tests/client.test.mjs)覆盖四类触发、前台抑制、去重、浏览器通知与 Windows 原生路由、默认声音试听、会话/group 隔离、远程访问及迟到响应。[Windows Toast 测试](tests/windows-toasts.test.mjs)覆盖编码命令、XML 转义、实时声音偏好、原生参数、定向清理、停用、超时与卸载；Windows runner 另解析实际 PowerShell 脚本及 XML，但不发送通知。实际系统通知权限、横幅、关闭、声音与点击行为仍需 Windows DSH 实机验收；脚本解析及进程正常退出不等于用户看到了横幅或听到声音。验证层次见[开发指南](../../../docs/development.md#验证方法与限制)，市场参考与提交见[参考研究](../../../docs/reference-research.md#通知插件参考)。

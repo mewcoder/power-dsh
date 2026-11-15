@@ -2,7 +2,7 @@
 
 模块 id：`account-blocking`；主开关 `blockOfficialAccount` 默认 `false`。模块的[定义](definition.ts)、[配置](config.ts)、[Client](client.ts)与[行为测试](tests/)在本目录维护。
 
-入口：**设置 → PowerDSH → 精简 → 停用官方登录与模型接入**，默认关闭。说明为「停用官方登录、账号界面及内置模型接入」。配置键仍为 `blockOfficialAccount`，保留已有偏好。
+入口：**设置 → power-dsh → 精简 → 停用官方登录与模型接入**，默认关闭。说明为「停用官方登录、账号界面及内置模型接入」。配置键仍为 `blockOfficialAccount`，保留已有偏好。
 
 本开关不控制搜索或网页抓取；搜索由独立的[停用官方搜索](../search-blocking/spec.md)开关控制。
 
@@ -22,7 +22,7 @@
 
 ## 操作与启停
 
-UI 与 `power_dsh_settings` 调用同一个 owner-only Host 操作。开启时停用上述匹配目标，关闭时启用这些目标，包括原先已停用的目标；不记忆或恢复之前的启用状态。共用流程见[原生精简操作](../../../docs/architecture.md#原生精简操作)。
+设置界面通过 owner-only Host 操作应用开关，不提供对话设置工具。开启时停用上述匹配目标，关闭时启用这些目标，包括原先已停用的目标；不记忆或恢复之前的启用状态。共用流程见[原生精简操作](../../../docs/architecture.md#原生精简操作)。
 
 保存精简偏好时只更新 `blockOfficialAccount`，保留通知、提示音、双击屏蔽、技能及其他功能配置，包括等待原生写锁期间保存的更新；只移除明确废止的恢复快照与全屏设置字段，不维护全功能配置白名单。行为测试见[账号策略测试](tests/account-policy.test.mjs)。
 

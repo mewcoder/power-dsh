@@ -2,8 +2,9 @@ import { styles as catalogStyles } from '../../shared/client/catalog-styles.ts';
 import { createCatalogUI } from '../../shared/client/catalog-ui.ts';
 import { errorMessage } from '../../shared/client/runtime.ts';
 import { styles as shellStyles } from '../../shared/client/shell-styles.ts';
+import { standalonePageActive } from '../../shared/client/settings-form.ts';
 import type { ClientEnvironment, ClientFeature, ClientRuntime, FeatureState, FormSnapshot, IconProps, PageSlotProps, SnapshotSource } from '../../shared/client/types.ts';
-import type { SkillCatalog, SkillDetail, SkillEntry, SkillScope, SkillWorkspace, ExternalSkillCatalog, ExternalSkillEntry, ExternalSkillDetail, SkillImportResult, SkillVariant, SkillImportMode, SkillImportDestination } from './rpc.ts';
+import type { SkillCatalog, SkillDetail, SkillEntry, SkillRow, SkillScope, SkillWorkspace, ExternalSkillCatalog, ExternalSkillEntry, ExternalSkillDetail, SkillImportResult, SkillVariant, SkillImportMode, SkillImportDestination, SkillDeletionOption } from './rpc.ts';
 import { styles as featureStyles } from './styles.ts';
 interface SkillsState extends FeatureState<SkillCatalog> { cwd: string; scope: SkillScope; workspaces: SkillWorkspace[]; saving: { name: string } | null; }
 interface DetailState {
@@ -13,7 +14,7 @@ interface DetailState {
   value: SkillDetail | null;
   error: string;
 }
-type SkillTab = SkillScope | 'sources';
+type SkillTab = SkillScope;
 interface ExternalDetailState {
   id: string;
   cwd: string;
@@ -47,7 +48,7 @@ interface ImportConfirmation {
 interface SkillsPageProps extends PageSlotProps { source: SnapshotSource<FormSnapshot>; skillsSource: SnapshotSource<SkillsState>; loadSkills(cwd?: string, scope?: SkillScope): Promise<void>; setSkillEnabled(cwd: string, name: string, enabled: boolean): Promise<SkillCatalog | null>; readSkill(cwd: string, name: string): Promise<SkillDetail | null>; deleteSkill(cwd: string, name: string, revision: string): Promise<SkillCatalog>; listWorkspaceSkills(path: string): Promise<SkillCatalog>; discoverSkills(cwd: string, scope: SkillScope): Promise<ExternalSkillCatalog>; readExternalSkill(cwd: string, id: string): Promise<ExternalSkillDetail | null>; readImportDestination(cwd: string, name: string, flat: boolean): Promise<SkillImportDestination>; importSkills(cwd: string, ids: string[], mode?: SkillImportMode, revision?: string, targetCwd?: string): Promise<SkillImportResult>; }
 
 export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironment) {
-  const { React, h, Menu, Modal, Button, Tooltip, MarkdownText, NativeIcon, observable, useSnapshot, useMounted, errorFeedback, loadingFeedback } = runtime;
+  const { React, h, Menu, MenuSurface, Modal, Button, Tooltip, MarkdownText, NativeIcon, observable, useSnapshot, useMounted, errorFeedback, loadingFeedback } = runtime;
   const { ctx, form, source, t, savePreference, preferenceSlot, namespace } = env;
   const styles = shellStyles + catalogStyles + featureStyles;
   const { SkillSearchIcon, SkillChevron } = createCatalogUI(runtime);
@@ -61,6 +62,15 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     h('path', { d: 'M20 2v4' }),
     h('path', { d: 'M22 4h-4' }),
     h('circle', { cx: 4, cy: 20, r: 2 }));
+  }
+  // Lucide CircleHelp, ISC licensed; see docs/third-party-notices.md.
+  function SkillHelpIcon({ size = 14 }: IconProps) {
+    return h('svg', { width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
+      stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
+      'aria-hidden': true, focusable: false },
+    h('circle', { cx: 12, cy: 12, r: 10 }),
+    h('path', { d: 'M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3' }),
+    h('path', { d: 'M12 17h.01' }));
   }
   function skillSource(source: string) {
     if (source === 'user' || source.startsWith('user-')) return 'skillPersonalSource';
@@ -85,10 +95,10 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const [groupsOpen, setGroupsOpen] = React.useState<Partial<Record<'preinstalled' | 'personal', boolean>>>({});
     const [detail, setDetail] = React.useState<DetailState | null>(null);
     const [deleteConfirm, setDeleteConfirm] = React.useState(false);
+    const [deleteSelection, setDeleteSelection] = React.useState<string[]>([]);
     const deleteConfirmationRef = React.useRef<DetailState | null>(null);
     const [deleteError, setDeleteError] = React.useState('');
     const [deleting, setDeleting] = React.useState(false);
-    const [importView, setImportView] = React.useState(false);
     const [importing, setImporting] = React.useState('');
     const [importNotice, setImportNotice] = React.useState('');
     const [importState, setImportState] = React.useState<ImportState>({ groups: {} });
@@ -110,9 +120,9 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const detailTrigger = React.useRef<HTMLButtonElement | null>(null);
     const id = React.useId();
     const busy = snapshot.status === 'loading' || Boolean(snapshot.saving) || Boolean(workspaceSaving) || importing !== '' || deleting;
-    // Workspace and import views are held locally: the workspace tab shows
-    // every imported workspace at once, so the catalog scope stays user.
-    const tab: SkillTab = importView ? 'sources' : projectView ? 'project' : 'user';
+    // Workspace uses its own group catalogs, so the page-level catalog stays in
+    // the user scope while the visible tab switches locally.
+    const tab: SkillTab = projectView ? 'project' : 'user';
     const writable = config.status === 'ready' && config.writable && config.value?.skillManagerEnabled === true;
     const disabled = busy || !writable || snapshot.status !== 'ready' || !catalog?.complete;
     const workspaces = snapshot.workspaces ?? [];
@@ -147,7 +157,12 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const needle = query.trim().toLocaleLowerCase();
     const rows = (catalog?.skills ?? []).filter(skill =>
       `${skill.name} ${skill.description} ${skill.origin} ${sourceLabel(displaySource(skill))}`.toLocaleLowerCase().includes(needle));
-    const TABS: readonly SkillTab[] = ['user', 'project', 'sources'];
+    const globalDiscovered = discoveryEntries('');
+    const globalDiscoveryState = importState.groups[''];
+    const globalDiscoveryPending = writable && Boolean(globalDiscoveryState)
+      && (globalDiscoveryState.status === 'loading' || globalDiscoveryState.status === 'error'
+        || Boolean(globalDiscoveryState.catalog && !globalDiscoveryState.catalog.complete));
+    const TABS: readonly SkillTab[] = ['user', 'project'];
     function selectTab(next: SkillTab) {
       if (busy || pending.current || tab === next) return;
       setError(null);
@@ -155,9 +170,16 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       closeExternalDetail();
       activeTab.current = next;
       setImportNotice('');
-      setImportView(next === 'sources');
       setProjectView(next === 'project');
-      if (next === 'sources') void loadImport();
+      // Re-enter a scope refreshes discovery for the cards already on that
+      // page; a first workspace visit is loaded by the project effect below.
+      if (next === 'user') {
+        if (importState.groups[''] && (importGroupsOpen[''] ?? false)) void loadImportGroup('');
+      } else {
+        for (const workspace of workspaces) {
+          if (importState.groups[workspace.path]) void loadImportGroup(workspace.path);
+        }
+      }
       return undefined;
     }
     function tabButton(value: SkillTab, label: string) {
@@ -248,7 +270,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
           // The footer pairs where the skill came from with the detail action, so
           // `.dsh` and `.agents` copies are told apart without opening the dialog.
           h('div', { className: 'power-dsh-skill-card-meta' },
-            renderOrigin([skill.path], skill.origin),
+            renderOrigin([skill.path], skill.origin,
+              ['runtime', 'plugin', 'bundled'].includes(skill.source) || skill.source.startsWith('bundled-')),
             h('button', {
               type: 'button', className: 'power-dsh-skill-card-detail', 'data-detail': skill.name,
               'aria-haspopup': 'dialog', 'aria-label': `${t('skillDetail')}: ${skill.name}`,
@@ -259,6 +282,21 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
               },
             }, t('skillDetail')))));
     };
+    function deletionsOf(value: SkillDetail | null, cwd: string): SkillDeletionOption[] {
+      if (value?.deletions?.length) return value.deletions;
+      return value?.deletion ? [{ ...value.deletion, cwd, scope: cwd ? 'project' : 'user', workspaceTitle: '' }] : [];
+    }
+    function openDeleteConfirm(current: DetailState) {
+      const options = deletionsOf(current.value, current.cwd);
+      if (options.length === 0) return;
+      const currentPath = current.value?.deletion?.path ?? current.value?.path;
+      const initial = options.find(option => option.cwd === current.cwd && option.path === currentPath)
+        ?? options.find(option => option.path === currentPath) ?? options[0]!;
+      setDeleteSelection([initial.revision]);
+      deleteConfirmationRef.current = current;
+      setDeleteError('');
+      setDeleteConfirm(true);
+    }
     // Opening loads the skill body once; a stale answer never replaces a newer dialog.
     async function openDetail(skill: Pick<SkillEntry, 'name'>, cwd = '') {
       if (!mounted.current || pending.current) return;
@@ -266,6 +304,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       const generation = detailGeneration.current;
       deleteConfirmationRef.current = null;
       setDeleteConfirm(false);
+      setDeleteSelection([]);
       setDeleteError('');
       setDetail({ cwd, name: skill.name, status: 'loading', value: null, error: '' });
       try {
@@ -296,7 +335,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       const index = parts.lastIndexOf('skills');
       return parts[index > 0 ? index - 1 : parts.length - 2] ?? parts[0] ?? '';
     }
-    function renderOrigin(paths: string[], origin = '') {
+    function renderOrigin(paths: string[], origin = '', plain = false) {
       const locations = [...new Set(paths.filter(Boolean))];
       const label = origin || directoryLabel(locations[0] ?? '');
       if (!label) return h('span', { className: 'power-dsh-skill-card-origin', 'aria-hidden': true });
@@ -304,7 +343,13 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       return h(Tooltip, { label: locations.join('\n') || label, side: 'top', portal: true, delayMs: 0, maxWidth: 400 },
         h('span', { className: 'power-dsh-skill-card-origin', tabIndex: 0, 'data-source-count': locations.length,
           'aria-label': stacked ? locations.join('\n') : undefined },
-          stacked ? h('span', { className: 'power-dsh-skill-path-stack' }, h('span', { className: 'power-dsh-skill-path-label' }, label)) : label));
+          plain ? label : h('span', { className: 'power-dsh-skill-path-stack',
+            style: { '--power-dsh-source-layers': Math.max(0, locations.length - 1) } as import('react').CSSProperties },
+          h('span', { className: 'power-dsh-skill-path-label' }, label),
+          locations.slice(1).map((path, index) => h('span', {
+            key: path, className: 'power-dsh-skill-path-layer', 'aria-hidden': true,
+            style: { '--power-dsh-source-index': index + 1, zIndex: -index - 1 } as import('react').CSSProperties,
+          })))));
     }
     async function openExternalDetail(entry: ExternalSkillEntry, cwd: string, selectedId = '') {
       if (!mounted.current || pending.current) return;
@@ -336,23 +381,30 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       if (!mounted.current || pending.current) return;
       detailGeneration.current++;
       deleteConfirmationRef.current = null;
+      setDeleteSelection([]);
       setDetail(null);
       detailTrigger.current?.focus?.();
     }
     async function confirmDelete(current: DetailState) {
-      const deletion = current.value?.deletion;
-      if (!mounted.current || pending.current || !writable || busy || !deleteConfirm || !deletion || deleteConfirmationRef.current !== current) return;
+      const options = deletionsOf(current.value, current.cwd);
+      const selected = options.filter(option => deleteSelection.includes(option.revision));
+      if (!mounted.current || pending.current || !writable || busy || !deleteConfirm
+        || selected.length === 0 || deleteConfirmationRef.current !== current) return;
       pending.current = true;
       setDeleting(true);
       setDeleteError('');
       try {
-        const result = await deleteSkill(current.cwd, current.name, deletion.revision);
+        const results = new Map<string, SkillCatalog>();
+        for (const option of selected) results.set(option.cwd, await deleteSkill(option.cwd, current.name, option.revision));
         if (!mounted.current) return;
         detailGeneration.current++;
         deleteConfirmationRef.current = null;
         setDetail(null);
         setDeleteConfirm(false);
-        if (current.cwd) setWorkspaceState(state => ({ ...state, [current.cwd]: { status: 'ready', catalog: result, error: '' } }));
+        setDeleteSelection([]);
+        for (const [cwd, result] of results) {
+          if (cwd) setWorkspaceState(state => ({ ...state, [cwd]: { status: 'ready', catalog: result, error: '' } }));
+        }
         await loadSkills();
         await Promise.all(Object.keys(importState.groups).map(path => loadImportGroup(path, true)));
       } catch (failure) {
@@ -363,6 +415,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
           : message.includes('skill-delete-readback-failed') || message.includes('skill-delete-preferences-failed') ? 'skillDeleteReadbackFailed' : 'skillDeleteFailed'));
         if (current.cwd) void loadWorkspace(current.cwd);
         else void loadSkills();
+        for (const option of options) if (option.cwd) void loadWorkspace(option.cwd);
       } finally {
         pending.current = false;
         if (mounted.current) setDeleting(false);
@@ -392,14 +445,6 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
           [cwd]: { status: 'error', catalog: current.groups[cwd]?.catalog ?? null, error: errorMessage(failure) || t('skillImportFailed') } } } : current);
       }
     }
-    async function loadImport() {
-      if (!writable || pending.current) return;
-      const latest = skillsSource.getSnapshot();
-      const paths = ['', ...latest.workspaces.map(workspace => workspace.path)];
-      setImportState(current => ({ groups: Object.fromEntries(paths.map(path => [path,
-        current.groups[path] ?? { status: 'idle', catalog: null, error: '' }])) }));
-      await Promise.all(paths.map(path => loadImportGroup(path)));
-    }
     function updateConfirmation(value: ImportConfirmation | null) {
       confirmationRef.current = value;
       setConfirmation(value);
@@ -423,7 +468,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     }
     function importOne(entry: ExternalSkillEntry, cwd: string, selectedId = '') {
       const group = importState.groups[cwd];
-      if (!mounted.current || activeTab.current !== 'sources' || !writable || pending.current || group?.status !== 'ready' || !group.catalog?.complete) return;
+      if (!mounted.current || activeTab.current !== (cwd ? 'project' : 'user') || !writable || pending.current
+        || group?.status !== 'ready' || !group.catalog?.complete) return;
       if (entry.available) return;
       if (entry.conflict || entry.comparison === 'unknown') { void openExternalDetail(entry, cwd); return; }
       const variant = selectedId ? variantsOf(entry).find(item => item.id === selectedId) : variantsOf(entry)[0];
@@ -434,7 +480,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       void loadDestination({ entry, variant, cwd, targetCwd: cwd, status: 'loading', destination: null, error: '' });
     }
     async function confirmImport(current: ImportConfirmation) {
-      if (!mounted.current || confirmationRef.current !== current || pending.current || !writable || activeTab.current !== 'sources'
+      if (!mounted.current || confirmationRef.current !== current || pending.current || !writable || activeTab.current !== (current.cwd ? 'project' : 'user')
         || current.status !== 'ready' || !current.destination?.complete || current.destination.available
         || current.targetCwd && !skillsSource.getSnapshot().workspaces.some(workspace => workspace.path === current.targetCwd)) return;
       const { entry, variant, cwd, targetCwd } = current;
@@ -486,77 +532,107 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     function queueWorkspaceLoads() {
       for (const workspace of workspaces) {
         if (!workspaceGeneration.current[workspace.path]) void loadWorkspace(workspace.path);
+        if (!importState.groups[workspace.path]) void loadImportGroup(workspace.path);
       }
     }
-    const renderImport = () => {
-      const current = importState;
-      const entryCard = (entry: ExternalSkillEntry, cwd: string) => {
-        const busyRow = importing === JSON.stringify([cwd, entry.id]);
-        const reason = entry.conflict ? t('skillNameConflict') : entry.available ? t('skillAlreadyExistsHint')
-          : entry.comparison === 'unknown' ? t('skillComparisonUnknown') : '';
-        return h('li', { key: entry.id, className: 'power-dsh-skill-card', 'data-import': entry.name, 'data-existing': Boolean(entry.available) },
-          h('div', { className: 'power-dsh-skill-card-content' },
-            h('div', { className: 'power-dsh-skill-card-main' },
-              h('span', { className: 'power-dsh-skill-card-title', title: entry.path }, entry.name),
-              entry.available && h('span', { className: 'power-dsh-skill-existing', title: reason }, t('skillAlreadyExists'))),
-            entry.description && h(Tooltip, { label: entry.description, side: 'top', portal: true, delayMs: 0, maxWidth: 400 },
-              h('span', { className: 'power-dsh-skill-card-description', tabIndex: 0 }, entry.description)),
-            h('div', { className: 'power-dsh-skill-card-meta' },
-              renderOrigin(pathsOf(entry)),
-              h('button', {
-                type: 'button', className: 'power-dsh-skill-card-detail', 'data-import-detail': entry.name,
-                'aria-haspopup': 'dialog', 'aria-label': `${t('skillDetail')}: ${entry.name}`,
-                onClick: () => { void openExternalDetail(entry, cwd); },
-              }, t('skillDetail')),
-              !entry.available && h('button', {
-                type: 'button', className: 'power-dsh-skill-card-detail', 'data-import-action': entry.name,
-                title: reason || (cwd ? t('skillImportProjectTarget').replace('{path}', cwd) : t('skillImportUserTarget')),
-                disabled: importing !== '' || !writable || Boolean(reason) || current.groups[cwd]?.status !== 'ready' || !current.groups[cwd]?.catalog?.complete,
-                onClick: () => { void importOne(entry, cwd); },
-              }, t(busyRow ? 'skillImporting' : 'skillImportOne')))));
+    function matchesDiscovery(entry: ExternalSkillEntry) {
+      return [entry.name, entry.description, entry.source, ...pathsOf(entry), ...variantsOf(entry).map(variant => variant.description)]
+        .join(' ').toLocaleLowerCase().includes(needle);
+    }
+    function discoveryEntries(cwd: string) {
+      return (importState.groups[cwd]?.catalog?.entries ?? []).filter(entry => !entry.available && matchesDiscovery(entry));
+    }
+    const entryCard = (entry: ExternalSkillEntry, cwd: string) => {
+      const busyRow = importing === JSON.stringify([cwd, entry.id]);
+      const reason = entry.conflict ? t('skillNameConflict') : entry.available ? t('skillAlreadyExistsHint')
+        : entry.comparison === 'unknown' ? t('skillComparisonUnknown') : '';
+      const state = importState.groups[cwd];
+      return h('li', {
+        key: entry.id,
+        className: 'power-dsh-skill-card power-dsh-skill-card-discovered',
+        'data-import': entry.name, 'data-import-cwd': cwd, 'data-existing': Boolean(entry.available),
+        'data-discovered': true,
+      },
+      h('div', { className: 'power-dsh-skill-card-content' },
+        h('div', { className: 'power-dsh-skill-card-main' },
+          h('span', { className: 'power-dsh-skill-card-title', title: entry.path }, entry.name),
+          !entry.available && h(Button, {
+            variant: 'outline', size: 'sm', className: 'power-dsh-skill-import-button', ...{ 'data-import-action': entry.name },
+            'aria-label': `${t('skillImportOne')}: ${entry.name}`, 'aria-haspopup': 'dialog', 'aria-busy': busyRow,
+            title: reason || (cwd ? t('skillImportProjectTarget').replace('{path}', cwd) : t('skillImportUserTarget')),
+            disabled: importing !== '' || !writable || Boolean(reason) || state?.status !== 'ready' || !state.catalog?.complete,
+            onClick: () => { void importOne(entry, cwd); },
+          }, t(busyRow ? 'skillImporting' : 'skillImportOne')),
+          entry.available && h('span', { className: 'power-dsh-skill-existing', title: reason }, t('skillAlreadyExists'))),
+        entry.description && h(Tooltip, { label: entry.description, side: 'top', portal: true, delayMs: 0, maxWidth: 400 },
+          h('span', { className: 'power-dsh-skill-card-description', tabIndex: 0 }, entry.description)),
+        h('div', { className: 'power-dsh-skill-card-meta' },
+          renderOrigin(pathsOf(entry)),
+          h('button', {
+            type: 'button', className: 'power-dsh-skill-card-detail', 'data-import-detail': entry.name,
+            'aria-haspopup': 'dialog', 'aria-label': `${t('skillDetail')}: ${entry.name}`,
+            onClick: () => { void openExternalDetail(entry, cwd); },
+          }, t('skillDetail')))));
+    };
+    const renderDiscoveryGroup = () => {
+      const state = importState.groups[''] ?? { status: 'idle', catalog: null, error: '' };
+      const entries = discoveryEntries('');
+      const empty = state.status === 'ready' && Boolean(state.catalog?.complete) && entries.length === 0;
+      if (state.status !== 'error' && empty) return null;
+      const titleId = `${id}-import-group-global`;
+      const open = Boolean(needle) || (importGroupsOpen[''] ?? false);
+      const toggle = () => {
+        if (needle) return;
+        const next = !(importGroupsOpen[''] ?? false);
+        setImportGroupsOpen(value => ({ ...value, '': next }));
+        if (next && (importState.groups['']?.status ?? 'idle') === 'idle') void loadImportGroup('');
       };
-      const group = (cwd: string, title: string, index: number) => {
-        const state = current.groups[cwd] ?? { status: 'idle', catalog: null, error: '' };
-        const entries = (state.catalog?.entries ?? []).filter(entry =>
-          [entry.name, entry.description, entry.source, ...pathsOf(entry), ...variantsOf(entry).map(variant => variant.description)]
-            .join(' ').toLocaleLowerCase().includes(needle));
-        if (state.status === 'ready' && state.catalog?.complete && entries.length === 0 && !state.error) return null;
-        const titleId = `${id}-import-group-${index}`;
-        const open = Boolean(needle) || (importGroupsOpen[cwd] ?? true);
-        const toggle = () => { if (!needle) setImportGroupsOpen(value => ({ ...value, [cwd]: !(value[cwd] ?? true) })); };
-        return h('section', { key: cwd, className: 'power-dsh-skill-group', 'aria-labelledby': titleId, 'data-import-group': cwd ? 'project' : 'user', 'data-import-cwd': cwd },
-          h('div', { className: 'power-dsh-skill-group-header' },
-            h('button', {
-              id: titleId, type: 'button', className: 'power-dsh-skill-group-toggle',
-              'aria-expanded': open, 'aria-controls': `${titleId}-body`, onClick: toggle,
-            }, h(SkillChevron), h('span', { className: 'power-dsh-skill-group-title', title: cwd || undefined }, title),
-            state.catalog?.complete && h('span', { className: 'power-dsh-skill-group-count' }, entries.length))),
-          open && h('div', { id: `${titleId}-body`, className: 'power-dsh-skill-group-body' },
-            state.status === 'loading' && loadingFeedback({ label: t('loading'), compact: true }),
-            state.status === 'error' && errorFeedback({ t, message: state.error, code: 'PD-SKILLS-IMPORT',
-              operation: 'discoverExternalSkills', disabled: pending.current, retry: () => { void loadImportGroup(cwd); } }),
-            state.catalog && !state.catalog.complete && h('p', { className: 'power-dsh-skill-import-empty-title' }, t('skillIncomplete')),
-            entries.length > 0
-              && h('ul', { className: 'power-dsh-skill-cards' }, entries.map(entry => entryCard(entry, cwd))),
-            state.status !== 'error' && state.error && errorFeedback({ t, message: state.error, code: 'PD-SKILLS-IMPORT',
-              operation: 'importExternalSkills' })));
-      };
-      const groups = [
-        group('', t('skillImportUserScope'), 0),
-        ...workspaces.map((workspace, index) => group(workspace.path, workspace.title, index + 1)),
-      ].filter(Boolean);
+      return h('section', { key: 'discovery', className: 'power-dsh-skill-group', 'aria-labelledby': titleId, 'data-import-group': 'user', 'data-import-cwd': '' },
+        h('div', { className: 'power-dsh-skill-group-header' },
+          h('button', {
+            id: titleId, type: 'button', className: 'power-dsh-skill-group-toggle',
+            'aria-expanded': open, 'aria-controls': `${titleId}-body`, onClick: toggle,
+          }, h(SkillChevron), h('span', { className: 'power-dsh-skill-group-title' }, t('skillImportGroup')),
+          state.catalog?.complete && h('span', { className: 'power-dsh-skill-group-count' }, entries.length))),
+        open && h('div', { id: `${titleId}-body`, className: 'power-dsh-skill-group-body' },
+          state.status === 'loading' && loadingFeedback({ label: t('loading'), compact: true }),
+          state.status === 'error' && errorFeedback({ t, message: state.error, code: 'PD-SKILLS-IMPORT',
+            operation: 'discoverExternalSkills', disabled: pending.current, retry: () => { void loadImportGroup(''); } }),
+          state.catalog && !state.catalog.complete && h('p', { className: 'power-dsh-skill-import-empty-title' }, t('skillIncomplete')),
+          entries.length > 0
+            && h('ul', { className: 'power-dsh-skill-cards' }, entries.map(entry => entryCard(entry, '')))));
+    };
+    const renderWorkspaceDiscoveryFeedback = (cwd: string, suppressIncomplete = false) => {
+      const state = importState.groups[cwd];
+      if (!state || state.status === 'idle') return null;
+      const entries = discoveryEntries(cwd);
+      const loading = state.status === 'loading' && Boolean(state.catalog);
+      if (state.status === 'error' && !state.catalog && entries.length === 0) {
+        return errorFeedback({ t, message: state.error, code: 'PD-SKILLS-IMPORT', operation: 'discoverExternalSkills',
+          disabled: pending.current, retry: () => { void loadImportGroup(cwd); } });
+      }
+      const incomplete = Boolean(state.catalog && !state.catalog.complete) && !suppressIncomplete;
+      if (!loading && !incomplete && state.status !== 'error') return null;
       return h(React.Fragment, null,
-        groups.length ? groups : h('p', { className: 'power-dsh-skill-empty' }, t(needle ? 'skillNoMatches' : 'skillImportEmptyGroup')));
+        loading && loadingFeedback({ label: t('loading'), compact: true }),
+        state.status === 'error' && errorFeedback({ t, message: state.error, code: 'PD-SKILLS-IMPORT',
+          operation: 'discoverExternalSkills', disabled: pending.current, retry: () => { void loadImportGroup(cwd); } }),
+        incomplete && h('p', { className: 'power-dsh-skill-import-empty-title' }, t('skillIncomplete')));
     };
 
     const renderWorkspaceGroup = (workspace: SkillWorkspace, index: number) => {
       const state = workspaceState[workspace.path] ?? { status: 'idle', catalog: null, error: '' } as WorkspaceGroupState;
       const titleId = `${id}-workspace-${index}`;
       const open = Boolean(needle) || (workspaceOpen[workspace.path] ?? true);
-      const hasFeedback = state.status === 'loading' || state.status === 'error' || Boolean(state.catalog && !state.catalog.complete);
+      const discovery = importState.groups[workspace.path];
+      const discovered = discoveryEntries(workspace.path);
+      const discoveryBusy = Boolean(discovery?.catalog) && discovery?.status === 'loading';
+      const discoveryFailed = discovery?.status === 'error';
+      const hasFeedback = state.status === 'loading' || state.status === 'error' || Boolean(state.catalog && !state.catalog.complete)
+        || discoveryBusy || discoveryFailed || Boolean(discovery?.catalog && !discovery.catalog.complete);
       const groupRows = (state.catalog?.skills ?? []).filter(skill =>
         `${skill.name} ${skill.description} ${skill.origin} ${sourceLabel(skillSource(skill.source))}`.toLocaleLowerCase().includes(needle));
-      if (state.status === 'ready' && state.catalog?.complete && groupRows.length === 0) return null;
+      if (state.status === 'ready' && state.catalog?.complete && groupRows.length === 0 && discovered.length === 0 && !hasFeedback) return null;
       return h('section', { key: workspace.path, className: 'power-dsh-skill-group', 'aria-labelledby': titleId, 'data-workspace': workspace.path },
         h('div', { className: 'power-dsh-skill-group-header' },
           h('button', {
@@ -567,16 +643,19 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
               const next = !(workspaceOpen[workspace.path] ?? true);
               setWorkspaceOpen(current => ({ ...current, [workspace.path]: next }));
               if (next && (workspaceState[workspace.path]?.status ?? 'idle') === 'idle') void loadWorkspace(workspace.path);
+              if (next && (importState.groups[workspace.path]?.status ?? 'idle') === 'idle') void loadImportGroup(workspace.path);
             },
           }, h(SkillChevron), h('span', { className: 'power-dsh-skill-group-title', title: workspace.path }, workspace.title),
-          state.catalog?.complete && h('span', { className: 'power-dsh-skill-group-count' }, groupRows.length))),
+          state.catalog?.complete && groupRows.length > 0 && h('span', { className: 'power-dsh-skill-group-count' }, groupRows.length))),
         (open || hasFeedback) && h('div', { id: `${titleId}-body`, className: 'power-dsh-skill-group-body' },
           state.status === 'loading' && loadingFeedback({ label: t('loading'), ...(state.catalog ? { compact: true } : {}) }),
           state.status === 'error' && errorFeedback({ t, message: state.error, code: 'PD-SKILLS-LOAD',
             operation: 'listSkills', retry: () => { void loadWorkspace(workspace.path); } }),
           state.catalog && !state.catalog.complete && h('p', { className: 'power-dsh-skill-import-empty-title' }, t('skillIncomplete')),
-          open && state.catalog && groupRows.length > 0
-            && h('ul', { className: 'power-dsh-skill-cards' }, groupRows.map(skill => renderCard(skill, workspace.path, state.catalog!.skills)))));
+          renderWorkspaceDiscoveryFeedback(workspace.path, Boolean(state.catalog && !state.catalog.complete)),
+          open && (groupRows.length > 0 || discovered.length > 0) && h('ul', { className: 'power-dsh-skill-cards' },
+            ...groupRows.map(skill => renderCard(skill, workspace.path, state.catalog?.skills)),
+            ...discovered.map(entry => entryCard(entry, workspace.path)))));
     };
     const renderWorkspaces = () => {
       if (workspaces.length === 0) return h('p', { className: 'power-dsh-skill-empty' }, t('skillNoProjects'));
@@ -676,9 +755,10 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         open: true, onClose: () => closeExternalDetail(), title: t('skillDetailTitle'), closeLabel: t('close'),
         className: 'power-dsh-skill-detail', description: current.entry.name,
         footer: h(React.Fragment, null,
-          h(Button, { variant: 'outline', 'data-modal-autofocus': true, disabled: importing !== '', onClick: () => closeExternalDetail() }, t('close')),
           !current.entry.available && h(Button, { variant: 'outline', disabled: !canAdd,
-              onClick: () => { if (canAdd) void importOne(current.entry, current.cwd, current.id); } }, t(importing ? 'skillImporting' : 'skillImportOne'))),
+            onClick: () => { if (canAdd) void importOne(current.entry, current.cwd, current.id); } }, t(importing ? 'skillImporting' : 'skillImportOne')),
+          h(Button, { variant: 'outline', 'data-modal-autofocus': true, disabled: importing !== '',
+            onClick: () => closeExternalDetail() }, t('close'))),
       },
       h('div', { className: 'power-dsh-skill-detail-body', tabIndex: 0 },
         importState.groups[current.cwd]?.error && errorFeedback({ t, message: importState.groups[current.cwd]!.error, code: 'PD-SKILLS-IMPORT', placement: 'modal', operation: 'addSkill' }),
@@ -695,28 +775,43 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const renderDetail = () => {
       const current = detail!;
       const skill = current.value;
+      const options = deletionsOf(skill, current.cwd);
       const deletion = skill?.deletion;
-      const canDelete = Boolean(deletion) && current.status === 'ready' && writable && !busy;
-      const deleteLabel = t(deletion?.linked ? 'skillRemoveLink' : 'skillDelete');
-      if (deleteConfirm && deletion) return h(Modal, {
+      const selectedOptions = options.filter(option => deleteSelection.includes(option.revision));
+      const canDelete = options.length > 0 && current.status === 'ready' && writable && !busy;
+      const allLinked = options.length > 0 && options.every(option => option.linked);
+      const deleteLabel = t(allLinked ? 'skillRemoveLink' : 'skillDelete');
+      if (deleteConfirm && options.length > 0) return h(Modal, {
         open: true, onClose: () => { if (!pending.current) { deleteConfirmationRef.current = null; setDeleteConfirm(false); } },
         title: deleteLabel, closeLabel: t('cancel'), className: 'power-dsh-skill-detail', description: current.name,
         footer: h(React.Fragment, null,
           h(Button, { variant: 'outline', 'data-modal-autofocus': true, disabled: deleting,
             onClick: () => { if (!pending.current) { deleteConfirmationRef.current = null; setDeleteConfirm(false); } } }, t('cancel')),
-          h(Button, { variant: 'outline', className: 'power-dsh-skill-delete', disabled: !canDelete || Boolean(deleteError),
-            onClick: () => { if (canDelete) void confirmDelete(current); } }, t(deleting ? 'skillDeleting' : deletion.linked ? 'skillRemoveLink' : 'skillDelete'))),
+          h(Button, { variant: 'outline', className: 'power-dsh-skill-delete', disabled: !canDelete || selectedOptions.length === 0 || Boolean(deleteError),
+            onClick: () => { if (canDelete) void confirmDelete(current); } }, t(deleting ? 'skillDeleting' : 'skillConfirm'))),
       }, h('div', { className: 'power-dsh-skill-detail-body' },
-        h('p', { className: 'power-dsh-notice' }, t(deletion.linked ? 'skillRemoveLinkHint' : 'skillDeleteHint')),
-        h('code', { className: 'power-dsh-skill-detail-code' }, deletion.path),
+        h('p', { className: 'power-dsh-notice' }, t(options.length > 1 ? 'skillDeleteMultiHint' : allLinked ? 'skillRemoveLinkHint' : 'skillDeleteHint')),
+        options.length > 1
+          ? h('div', { className: 'power-dsh-skill-delete-options' }, options.map(option => {
+            const checked = deleteSelection.includes(option.revision);
+            return h('label', { key: option.revision, className: 'power-dsh-skill-delete-option' },
+              h('input', {
+                type: 'checkbox', checked: checked, disabled: deleting,
+                onChange: () => { if (!pending.current) setDeleteSelection(current => checked ? current.filter(value => value !== option.revision) : [...current, option.revision]); },
+              }),
+              h('span', { className: 'power-dsh-skill-delete-option-content' },
+                h('span', { className: 'power-dsh-skill-delete-option-scope' }, option.scope === 'project' ? option.workspaceTitle || option.cwd : t('skillUserScope')),
+                h('code', { className: 'power-dsh-skill-detail-code' }, option.path)));
+          }))
+          : h('code', { className: 'power-dsh-skill-detail-code' }, options[0]!.path),
         deleteError && errorFeedback({ t, message: deleteError, code: 'PD-SKILLS-DELETE', placement: 'modal', operation: 'deleteSkill',
           disabled: deleting, retry: () => { void openDetail({ name: current.name }, current.cwd); } })));
       return h(Modal, {
         open: true, onClose: closeDetail, title: t('skillDetailTitle'), closeLabel: t('close'),
         className: 'power-dsh-skill-detail', description: skill?.name ?? current.name,
         footer: h(React.Fragment, null,
-          deletion && h(Button, { variant: 'outline', className: 'power-dsh-skill-delete', disabled: !canDelete,
-            onClick: () => { if (canDelete && !pending.current) { deleteConfirmationRef.current = current; setDeleteError(''); setDeleteConfirm(true); } } }, deleteLabel),
+          options.length > 0 && h(Button, { variant: 'outline', className: 'power-dsh-skill-delete', disabled: !canDelete,
+            onClick: () => { if (canDelete && !pending.current) openDeleteConfirm(current); } }, deleteLabel),
           h(Button, { variant: 'outline', 'data-modal-autofocus': true, onClick: closeDetail }, t('close'))),
       },
       current.status === 'loading' && loadingFeedback({ label: t('skillDetailLoading') }),
@@ -747,19 +842,24 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       h('style', null, styles),
       h('header', null,
         h('h2', { className: 'power-dsh-title' }, t('skillsTab')),
-        h('p', { className: 'power-dsh-description' }, t(tab === 'sources' ? 'skillDiscoverDescription' : 'skillsDescription'))),
+        h('p', { className: 'power-dsh-description' },
+          t('skillsDescription'),
+          h(Tooltip, { label: t('skillScopeHint'), side: 'top', portal: true, delayMs: 0, maxWidth: 400 },
+            h('span', { className: 'power-dsh-skill-scope-help', tabIndex: 0, 'aria-label': t('skillScopeHint') },
+              h(SkillHelpIcon))))),
       h('div', { className: 'power-dsh-skill-navigation' },
         h('div', { className: 'power-dsh-tabs', role: 'tablist', 'aria-label': t('skillScope') },
-          tabButton('user', 'skillUserScope'), tabButton('project', 'skillProjectScope'), tabButton('sources', 'skillImport'))),
+          tabButton('user', 'skillUserScope'), tabButton('project', 'skillProjectScope'))),
       h('div', { id: `${id}-skill-panel`, className: 'power-dsh-skill-panel', role: 'tabpanel', 'aria-labelledby': `${id}-scope-${tab}` },
         importNotice && h('div', { className: 'power-dsh-skill-import-notice', role: 'status' },
           importNotice),
-        (tab === 'sources' || (tab === 'project' ? workspaces.length > 0 : Boolean(catalog)))
+        (tab === 'project' ? workspaces.length > 0 : Boolean(catalog))
           && h('label', { className: 'power-dsh-skill-search-field' }, h(SkillSearchIcon), h('input', {
             type: 'search', value: query, placeholder: t('skillSearch'), 'aria-label': t('skillSearch'),
             onChange: (event: import('react').ChangeEvent<HTMLInputElement>) => {
               setQuery(event.target.value);
               if (tab === 'project' && event.target.value.trim()) queueWorkspaceLoads();
+              if (tab === 'user' && event.target.value.trim() && (importState.groups['']?.status ?? 'idle') === 'idle') void loadImportGroup('');
             },
           })),
         snapshot.status === 'loading' && loadingFeedback({ label: t('loading'), ...(catalog ? { compact: true } : {}) }),
@@ -767,11 +867,11 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
           operation: 'listSkills', placement: 'page', retry: () => loadSkills(), disabled: busy }),
         tab === 'user' && catalog && !catalog.complete && h('p', { className: 'power-dsh-description power-dsh-skill-notice', role: 'status' }, t('skillIncomplete')),
         config.status === 'ready' && !config.writable && h('p', { className: 'power-dsh-description power-dsh-skill-notice' }, t('readOnly')),
-        tab === 'sources' ? renderImport()
-          : tab === 'project' ? renderWorkspaces()
-            : catalog && [renderGroup('personal', 'skillPersonalGroup', rows.filter(skill => displaySource(skill) !== 'skillBundledSource')),
-              renderGroup('preinstalled', 'skillPreinstalledGroup', rows.filter(skill => displaySource(skill) === 'skillBundledSource'))],
-        tab === 'user' && catalog && snapshot.status === 'ready' && catalog.complete && rows.length === 0
+        tab === 'project' ? renderWorkspaces()
+          : catalog && [renderGroup('personal', 'skillPersonalGroup', rows.filter(skill => displaySource(skill) !== 'skillBundledSource')),
+            renderGroup('preinstalled', 'skillPreinstalledGroup', rows.filter(skill => displaySource(skill) === 'skillBundledSource')),
+            renderDiscoveryGroup()],
+        tab === 'user' && catalog && snapshot.status === 'ready' && catalog.complete && rows.length === 0 && globalDiscovered.length === 0 && !globalDiscoveryPending
           && h('p', { className: 'power-dsh-skill-empty' }, t(query ? 'skillNoMatches' : 'skillEmpty')),
         detail && renderDetail(),
         externalDetail && renderExternalDetail(),
@@ -907,9 +1007,17 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     }
     return null;
   };
+  const renderPage = (props: PageSlotProps) => h(SkillsPage, { ...props, source, skillsSource, loadSkills, setSkillEnabled, readSkill, deleteSkill, listWorkspaceSkills, discoverSkills, readExternalSkill, readImportDestination, importSkills });
   preferenceSlot('skillManagerEnabled', 'settings.section', {
     id: 'power-dsh-skills', order: 52, locale: namespace, label: () => t('skillsTab'),
-  }, (props: PageSlotProps) => h(SkillsPage, { ...props, source, skillsSource, loadSkills, setSkillEnabled, readSkill, deleteSkill, listWorkspaceSkills, discoverSkills, readExternalSkill, readImportDestination, importSkills }));
-  preferenceSlot('skillManagerEnabled', 'settings.section.icon', { id: 'power-dsh-skills' }, SkillsIcon);
-  return { settings: [{ field: 'skillManagerEnabled', description: 'skillManagerDescription', save: next => savePreference('skillManagerEnabled', next === true, 'skillManagerOutdated') }], api: { skillsSource, loadSkills, setSkillEnabled, readSkill, listWorkspaceSkills, discoverSkills, readExternalSkill, importSkills } } satisfies ClientFeature;
+  }, renderPage, () => !standalonePageActive(source));
+  preferenceSlot('skillManagerEnabled', 'settings.section.icon', { id: 'power-dsh-skills' }, SkillsIcon, () => !standalonePageActive(source));
+  return { settings: [
+    { field: 'skillManagerEnabled', description: 'skillManagerDescription', save: next => savePreference('skillManagerEnabled', next === true, 'skillManagerOutdated') },
+  ],
+    pages: [{
+      id: 'skills', label: 'skillsTab', icon: SkillsIcon, order: 30,
+      available: snapshot => snapshot.status === 'ready' && snapshot.value?.skillManagerEnabled === true,
+      render: renderPage,
+    }], api: { skillsSource, loadSkills, setSkillEnabled, readSkill, listWorkspaceSkills, discoverSkills, readExternalSkill, importSkills } } satisfies ClientFeature;
 }

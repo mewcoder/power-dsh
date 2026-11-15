@@ -2,7 +2,7 @@
 
 ## 入口与范围
 
-功能 id 为 `plan-blocking`，在 **设置 → PowerDSH → 精简** 的 Todo 下方提供独立「停用 Plan 模式」开关，说明「停用新对话的内置计划模式」。`blockPlan` 默认 `false`，由宿主持久保存；UI 与 `power_dsh_settings` 共用 owner-only `setPlanBlocked`，通过共享 Host 队列串行执行。
+功能 id 为 `plan-blocking`，在 **设置 → power-dsh → 精简** 的 Todo 下方提供独立「停用 Plan 模式」开关，说明「停用新对话的内置计划模式」。`blockPlan` 默认 `false`，由宿主持久保存；设置界面通过 owner-only `setPlanBlocked` 应用开关，由共享 Host 队列串行执行，不提供对话设置工具。
 
 用户确认仅需对新对话生效。只匹配 `@deepseek-ai/dsh-plan-mode`：全局条目通过原生 Plugin Manager 启停，模式中的直接与嵌套 group 条目通过原生 ConfigEditor 修改 `disabled`，保留 section、隔离声明、其他插件与元数据。开启停用，关闭启用，包括原本已停用的匹配条目，不记忆原启用状态。Web 默认停用全局 Plan、在各模式隔离提供 Plan，模式声明仍须单独处理。
 
@@ -22,6 +22,6 @@ Host 仅在 `agentPresets` 可用时提供策略执行；缺席时报错，不�
 
 ## 接口依据与验证
 
-当前工具目录没有提供 `cordis_inspect_list`，采用 DSH `0.2.2-rc.1` 桌面发行包及同版 SDK 只读核对。对照官方仓库提交 `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` 的 Plan、Agent Preset Registry、Plugin Manager、ConfigEditor 和 Web 模式声明，未复制原生实现。市场参考与许可见[第三方资源声明](../../../docs/third-party-notices.md)。不引入依赖、网络调用、进程、DOM 接入或直接 profile 文件写入。
+当前工具目录没有提供 `cordis_inspect_list`，采用 DSH `0.2.2-rc.1` 桌面发行包及同版 SDK 只读核对。对照官方仓库提交 `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` 的 Plan、Agent Preset Registry、Plugin Manager、ConfigEditor 和 Web 模式声明，未复制原生实现。市场参考与许可见[参考研究](../../../docs/reference-research.md#plan-模式精简参考)。不引入依赖、网络调用、进程、DOM 接入或直接 profile 文件写入。
 
 验收覆盖全局与嵌套模式双向启停、保留无关配置与会话状态、旧代际不受干预和新代际使用修改后声明、读回与写入失败、重复执行及卸载清理；Client 覆盖开关即时反馈、重复提交拦截、失败恢复，装配覆盖 owner 权限与独立参数。本次已通过严格类型、产物新鲜度、329 项全仓测试（本功能 18 项）、实际打包、独立生产安装及 diff 空白检查。代际测试使用真实 Cordis/Tools 作用域和受控配置夹具，原生 registry 的租约保留另由上述源码核对，不宣称完整宿主集成已验收。源码和构建产物随功能交付；实际 profile 安装、页面点击、跨版本和平台验收尚未执行，测试结果不能代替这些验收。
