@@ -242,3 +242,11 @@ macOS PowerShell `7.7.0` 下重启模块 23 项定向测试通过，无跳过，
 - 继承本轮 macOS / DSH `0.2.2-rc.3` 的本地链接记忆原生会话、关闭自动记录、跨会话召回、整理预览／应用／备份和删除验证，细节见[记忆 Spec](../src/features/memory/spec.md#验收条件与验证)。设置功能开关顺序与设置工具移除后的原生组件重载已实际确认；搜索侧栏点击、正文命中及最近摘要的已有验证边界见[版本兼容性](compatibility.md#搜索弹窗与搜索增强的新增范围与证据)。不将上述本地链接验证记为最终 `0.1.0` tarball 的原生安装升级验收，不扩展为 Windows、旧宿主完整页面或全部主题／语言验收。
 
 准备时远端最新已存在标签为 `v0.0.11`，没有 `v0.1.0`；GitHub CLI 当前凭据无效，公开 API 查询返回 403，因此尚未核验远端最新 Release、市场状态或执行任何公开写入。重新认证后需按[发布流程](releasing.md)核验远端状态，再提交、推送和发布；后续候选内容变化时以上包哈希失效。
+
+### 0.1.0 公开发布核验（2026-11-15）
+
+重新认证后，发布提交 `c85a700fb4422779eb17c977040c0eba78c0381a` 已进入 `main`，annotated 标签 `v0.1.0` 指向同一提交。[Release workflow](https://github.com/mewcoder/power-dsh/actions/runs/43724729589) 成功，Linux 上 899 项行为测试中 893 通过、6 项平台检查跳过、0 失败，实际包与独立生产安装通过。[正式 Release](https://github.com/mewcoder/power-dsh/releases/tag/v0.1.0) 已公开并成为 Latest，附件为 `power-dsh.tgz`；既有市场 PR `awesome-dsh-plugin/awesome-dsh-plugin#14457` 已合并，上游条目保留固定 Latest 下载来源，无需重复投稿。
+
+匿名下载版本地址与 Latest 地址得到同一附件：40 个文件、2,525,937 字节，SHA-256 为 `7d8c2a38d1b94042b6b0b3a0badfe4df7a0bb416c5bb24c56a087b63491d1cac`，integrity 为 `sha512-NBtaJWEpA9Yi4v1VVYCSeBNpC01ryJJJCy24KPUziJNvLq1uO26YiN+pGH+X3O0p06cGn3J233F3kmiPsrRplA==`。该包与准备阶段候选的 40 个文件内容逐字节相同；压缩包哈希不同源于本机部分文件权限为 `0600`，CI Git 检出后为 `0644`。从发布标签干净导出后重新打包，可逐字节复现公开附件，且其 integrity 与 Release workflow 独立安装检查一致；未覆盖附件或移动标签。
+
+标签对应的 Windows CI 首次出现 4 项失败，均来自搜索策略测试将预期路径写死为 POSIX 分隔符；产品实现已使用 `node:path.join`。后续测试提交 `b30ca1e77fd52f8d9b8b98719eedabc118868f59` 修正夹具，未修改包内文件；[后续 CI](https://github.com/mewcoder/power-dsh/actions/runs/43725070903) 全部通过，Windows 为 898 通过、1 跳过，Linux 为 893 通过、6 跳过，均为 899 项、0 失败，且实际包与隔离生产安装检查通过。保留标签原 CI 的失败记录，不将测试修复冒充已重新发布。最终 tarball 的原生安装升级及 Windows 完整页面场景仍未新增验收。
