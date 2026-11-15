@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { EnhancePolicy } from '../enhance-policy.ts';
 
 const MODULE = 'session-query-sqlite';
 const ENGINE = '@deepseek-ai/dsh-session-query-sqlite';
 const HOME = '/test/profile';
-const ENABLED_CONFIG = { path: `${HOME}/power-dsh/session-query-index.sqlite3`, openAt: 'first-search' };
+const ENABLED_CONFIG = { path: join(HOME, 'power-dsh', 'session-query-index.sqlite3'), openAt: 'first-search' };
 const DISABLED_CONFIG = { path: ':memory:', openAt: 'never' };
 
 function fixture({ enhanced = false, entryConfig = DISABLED_CONFIG, withEntry = true, entryDisabled = false } = {}) {
