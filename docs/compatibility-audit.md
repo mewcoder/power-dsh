@@ -267,6 +267,14 @@ macOS / DSH `0.2.2-rc.3` 已经原生管理器重载本地链接构建，核对�
 
 macOS / DSH `0.2.2-rc.3` 本地链接构建的原生设置页实际确认：`blockOfficialSearch` 与 `webSearchEnabled` 均保持开启，三个原生工具声明恢复 `search: true` 且保留 `fetch: true`，两个原生 provider 选择仍指向 power-dsh。保存的 Tavily 密钥搜索返回 5 条结果（2660ms），获取返回 156 字符（1374ms）。没有重启应用、手写 profile、修改密钥或其他功能偏好。真实模型对话调用、最终 tarball 原生升级与 Windows 页面未新增验收，完整装配路由由真实 Tools 执行器及第三方响应夹具验证。
 
+### 0.1.2 公开发布核验（2026-11-16）
+
+发布提交 `b2d85c3672a325dbd1c1bf6444f7ef4e2a1576c1` 已进入 `main`，annotated 标签 `v0.1.2` 指向同一提交。[发布前 CI](https://github.com/mewcoder/power-dsh/actions/runs/43859723050) 的 Linux 与 Windows 均通过：各 1,034 项，Linux 为 1,028 通过／6 跳过，Windows 为 1,033 通过／1 跳过，均无失败；实际包与独立生产安装均通过。[Release workflow](https://github.com/mewcoder/power-dsh/actions/runs/43860155625) 成功，[正式 Release](https://github.com/mewcoder/power-dsh/releases/tag/v0.1.2) 已公开且为 Latest。
+
+匿名下载版本地址及 Latest 地址均成功，并与干净 Git 导出的受检候选逐字节相同：42 个文件、2,580,977 字节，SHA-256 为 `4bf0d2f3275b2d1e2e4be0423c3e1f4d3bfd09d028e20068c39c7892c6f451d7`，integrity 为 `sha512-GPs6IFurmO8GvZRmUamKLFDhNeCu0tUOiFmONchmX5hhGuK/0zkr+ia4TuesHmhwUKE6muccRVItMjh4TVPF6w==`；同一候选的干净检出检查与隔离生产安装均通过。普通 GitHub 路由失败后，仅对本次命令使用经公开 DNS 核对的地址，保留 TLS 校验，未修改系统代理或 DNS；没有覆盖附件或移动标签。
+
+市场 PR `awesome-dsh-plugin/awesome-dsh-plugin#14457` 仍为已合并，上游条目保留固定 Latest 下载地址，无需重复投稿；不承诺每个客户端已刷新。不发布 npm。实际宿主验收沿用本轮本地链接构建、搜索与获取测试的记录，没有将其冒充最终 tarball 原生升级或 Windows 页面验收。
+
 ### 0.1.0 公开发布核验（2026-11-15）
 
 重新认证后，发布提交 `c85a700fb4422779eb17c977040c0eba78c0381a` 已进入 `main`，annotated 标签 `v0.1.0` 指向同一提交。[Release workflow](https://github.com/mewcoder/power-dsh/actions/runs/43724729589) 成功，Linux 上 899 项行为测试中 893 通过、6 项平台检查跳过、0 失败，实际包与独立生产安装通过。[正式 Release](https://github.com/mewcoder/power-dsh/releases/tag/v0.1.0) 已公开并成为 Latest，附件为 `power-dsh.tgz`；既有市场 PR `awesome-dsh-plugin/awesome-dsh-plugin#14457` 已合并，上游条目保留固定 Latest 下载来源，无需重复投稿。
