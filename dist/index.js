@@ -2645,7 +2645,7 @@ var PluginReleases = class {
 };
 
 // package.json
-var version = "0.1.1";
+var version = "0.1.2";
 
 // src/features/plugin-updates/host.ts
 var host_exports$17 = /* @__PURE__ */ __exportAll({
@@ -7450,6 +7450,10 @@ var SearchPolicy = class {
 	ensureActive;
 	context;
 	restrictions;
+	thirdPartyActive = false;
+	routingTouched = false;
+	routingRevision = 0;
+	tail = Promise.resolve();
 	constructor(owner, config, { ensureActive = () => {} } = {}) {
 		this.owner = owner;
 		this.config = config;
@@ -7458,12 +7462,14 @@ var SearchPolicy = class {
 		this.restrictions = /* @__PURE__ */ new Map();
 	}
 	blocked() {
-		return this.config.blockOfficialSearch.get();
+		return this.config.blockOfficialSearch.get() && !this.thirdPartyActive;
 	}
 	bind(ctx) {
 		this.context = ctx;
 		ctx.effect(() => () => {
 			this.context = null;
+			this.thirdPartyActive = false;
+			this.routingRevision++;
 			for (const { release } of this.restrictions.values()) release();
 			this.restrictions.clear();
 		});
@@ -7507,11 +7513,37 @@ var SearchPolicy = class {
 	sync() {
 		for (const agent of this.context?.agents.list() ?? []) this.syncAgent(agent);
 	}
-	async setBlocked(blocked) {
-		if (typeof blocked !== "boolean") throw new TypeError("blocked must be boolean");
-		this.ensureActive();
-		if (!this.context) throw new Error("Search blocking is unavailable. Re-enable power-dsh and try again.");
-		const enabled = !blocked;
+	run(operation) {
+		const task = this.tail.then(operation);
+		this.tail = task.catch(() => {});
+		return task;
+	}
+	setThirdPartyActive(active) {
+		const revision = ++this.routingRevision;
+		if (!active) {
+			this.thirdPartyActive = false;
+			this.sync();
+		}
+		return this.run(async () => {
+			if (!active && !this.routingTouched) return;
+			const check = () => {
+				this.ensureActive();
+				if (revision !== this.routingRevision) throw new Error("The search route changed. Please try again.");
+			};
+			check();
+			if (active && this.thirdPartyActive) return;
+			this.routingTouched = true;
+			await this.configureDeclarations(active || !this.config.blockOfficialSearch.get(), check);
+			check();
+			this.thirdPartyActive = active;
+			this.routingTouched = active;
+			this.sync();
+		});
+	}
+	async configureDeclarations(enabled, check = this.ensureActive) {
+		check();
+		const context = this.context;
+		if (!context) throw new Error("Search blocking is unavailable. Re-enable power-dsh and try again.");
 		const entries = this.owner.configEditor.entries().filter((entry) => !entry.disabled && targetRows(entry).length);
 		if (!entries.length) throw new Error("No supported built-in search tools were found in this profile.");
 		const expected = entries.map((entry) => ({
@@ -7520,10 +7552,10 @@ var SearchPolicy = class {
 			preset: entry.options.name === PRESET$3 ? entry.options.config.id : void 0
 		}));
 		for (const entry of entries) {
-			this.ensureActive();
+			check();
 			if (targetRows(entry).every((row) => (row.config?.search ?? true) === enabled)) continue;
 			await this.owner.configEditor.edit(entry, (raw) => {
-				this.ensureActive();
+				check();
 				if (entry.options.name === MODULE$3) return {
 					...raw,
 					search: enabled
@@ -7536,31 +7568,38 @@ var SearchPolicy = class {
 			});
 		}
 		const after = this.owner.configEditor.entries();
-		this.ensureActive();
+		check();
 		for (const target of expected) {
 			const entry = after.find((item) => item.options.id === target.id);
 			const rows = entry ? targetRows(entry) : [];
 			if (rows.length !== target.count || rows.some((row) => (row.config?.search ?? true) !== enabled)) throw new Error(`The search configuration did not match the requested value: ${target.id}`);
 		}
-		const compositions = await this.context.agentPresets.compositionInventory();
-		this.ensureActive();
+		const compositions = await context.agentPresets.compositionInventory();
+		check();
 		for (const target of expected.filter((row) => row.preset !== void 0)) {
 			const preset = compositions.find((row) => row.id === target.preset);
 			if (!preset || preset.broken || preset.rows.filter((row) => row.moduleName === MODULE$3).length !== target.count) throw new Error(`The search mode configuration could not be applied: ${target.preset}`);
 		}
-		await this.owner.configEditor.edit(this.owner.fiber.entry, (raw) => {
+	}
+	async setBlocked(blocked) {
+		if (typeof blocked !== "boolean") throw new TypeError("blocked must be boolean");
+		return this.run(async () => {
 			this.ensureActive();
-			return {
-				...raw,
-				blockOfficialSearch: blocked
-			};
+			await this.configureDeclarations(!blocked || this.thirdPartyActive);
+			await this.owner.configEditor.edit(this.owner.fiber.entry, (raw) => {
+				this.ensureActive();
+				return {
+					...raw,
+					blockOfficialSearch: blocked
+				};
+			});
+			this.ensureActive();
+			if (!this.context) throw new Error("Search blocking has been unloaded.");
+			this.sync();
+			if (this.config.blockOfficialSearch.get() !== blocked) throw new Error("The search setting did not match the requested value.");
+			for (const agent of this.context.agents.list()) if (this.blocked() && agent.ctx.get("tools").get(TOOL, agent)) throw new Error("Built-in search is still available. Re-enable power-dsh and try again.");
+			return { blocked };
 		});
-		this.ensureActive();
-		if (!this.context) throw new Error("Search blocking has been unloaded.");
-		this.sync();
-		if (this.blocked() !== blocked) throw new Error("The search setting did not match the requested value.");
-		for (const agent of this.context?.agents.list() ?? []) if (blocked && agent.ctx.get("tools").get(TOOL, agent)) throw new Error("Built-in search is still available. Re-enable power-dsh and try again.");
-		return { blocked };
 	}
 };
 
@@ -11643,7 +11682,7 @@ function newSlotId(provider, taken) {
 		if (!taken.has(candidate)) return candidate;
 	}
 }
-function createHost(ctx, config, { owner, ensureActive }) {
+function createHost(ctx, config, { owner, ensureActive, setThirdPartySearchActive }) {
 	let alive = true;
 	let seam = null;
 	/** Held from a child context that DECLARES `credentials`, never read off the root. */
@@ -11769,23 +11808,31 @@ function createHost(ctx, config, { owner, ensureActive }) {
 			await refreshSlots();
 			if (!alive) return;
 			if (enabled() && seam !== null) {
-				const mounted = mount();
-				if (!(mounted && await pinCapability("search"))) {
-					if (mounted) await unpinCapability("search");
-					unmount();
-					throw new Error("webSearchUnavailable");
+				const service = seam;
+				try {
+					if (!mount() || !await pinCapability("search")) throw new Error("webSearchUnavailable");
+					pinned.search = true;
+					if (!await pinCapability("fetch")) throw new Error("webSearchUnavailable");
+					pinned.fetch = true;
+					if (!alive || seam !== service) throw new Error("webSearchUnavailable");
+					await setThirdPartySearchActive?.(true);
+				} catch (error) {
+					try {
+						await setThirdPartySearchActive?.(false);
+					} finally {
+						try {
+							await unpinCapability("fetch");
+							await unpinCapability("search");
+						} finally {
+							pinned.fetch = pinned.search = false;
+							unmount();
+						}
+					}
+					throw error;
 				}
-				pinned.search = true;
-				if (!await pinCapability("fetch")) {
-					await unpinCapability("fetch");
-					await unpinCapability("search");
-					pinned.search = false;
-					unmount();
-					throw new Error("webSearchUnavailable");
-				}
-				pinned.fetch = true;
 				return;
 			}
+			await setThirdPartySearchActive?.(false);
 			if (pinned.fetch) {
 				await unpinCapability("fetch");
 				pinned.fetch = false;
@@ -11806,6 +11853,7 @@ function createHost(ctx, config, { owner, ensureActive }) {
 	*/
 	const catalog = async () => {
 		ensureActive();
+		await reconcile();
 		const store = credentials;
 		const searchSlots = searchChain();
 		const fetchSlots = fetchChain();
@@ -11920,6 +11968,7 @@ function createHost(ctx, config, { owner, ensureActive }) {
 		reconcile().catch(() => {});
 		child.effect(() => () => {
 			if (seam !== service) return;
+			setThirdPartySearchActive?.(false).catch(() => {});
 			unmount();
 			seam = null;
 			currentSearch = [];
@@ -11931,6 +11980,7 @@ function createHost(ctx, config, { owner, ensureActive }) {
 	});
 	ctx.effect(() => () => {
 		alive = false;
+		setThirdPartySearchActive?.(false).catch(() => {});
 		unmount();
 		seam = null;
 		credentials = null;
@@ -12512,7 +12562,10 @@ function apply$1(ctx, config, features = HOST_FEATURES) {
 	const service = new ModService(ctx, queue, features);
 	const options = {
 		owner: ctx,
-		ensureActive: () => queue.ensureActive()
+		ensureActive: () => queue.ensureActive(),
+		setThirdPartySearchActive: async (active) => {
+			await service.search?.setThirdPartyActive(active);
+		}
 	};
 	for (const feature of features) if (feature.createHost) ctx.inject([], (child) => {
 		const state = feature.createHost(child, config, options);

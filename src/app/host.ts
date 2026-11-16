@@ -89,7 +89,13 @@ export function apply(ctx: NativeContext, config: LivePreferences, features: rea
   const queue = new OperationQueue();
   ctx.effect(() => () => queue.close());
   const service = new ModService(ctx, queue, features);
-  const options = { owner: ctx, ensureActive: () => queue.ensureActive() };
+  const options = {
+    owner: ctx,
+    ensureActive: () => queue.ensureActive(),
+    setThirdPartySearchActive: async (active: boolean) => {
+      await service.search?.setThirdPartyActive(active);
+    },
+  };
   for (const feature of features) {
     if (feature.createHost) ctx.inject([], child => {
       const state = feature.createHost!(child, config, options);

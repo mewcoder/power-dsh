@@ -1167,6 +1167,7 @@ interface NativeContext {
 interface HostOptions {
   owner: NativeContext;
   ensureActive(): void;
+  setThirdPartySearchActive?(active: boolean): Promise<void>;
 }
 type ConfigFields = Partial<{ [K in PreferenceKey]: z<Preferences[K], Preferences[K], 'volatile-defined'>; }>;
 interface HostFeature {

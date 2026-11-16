@@ -2,11 +2,13 @@
 
 模块 id：`search-blocking`；主开关 `blockOfficialSearch` 默认 `false`。模块的[定义](definition.ts)、[配置](config.ts)、[Client](client.ts)与[行为测试](tests/)在本目录维护。
 
-入口：**设置 → power-dsh → 精简 → 停用官方搜索**，默认关闭，通过 `blockOfficialSearch` 独立持久化。说明为「关闭内置 WebSearch，保留 WebFetch」。[停用官方登录与模型接入](../account-blocking/spec.md)继续使用已有 `blockOfficialAccount`，两个开关互不联动。
+入口：**设置 → power-dsh → 精简 → 停用官方搜索**，默认关闭，通过 `blockOfficialSearch` 独立持久化。说明为「停用官方搜索，保留第三方搜索与 WebFetch」。[停用官方登录与模型接入](../account-blocking/spec.md)继续使用已有 `blockOfficialAccount`，两个开关互不联动。
 
 ## 范围与行为
 
 开启时，只在 `@deepseek-ai/dsh-tool-web` 的声明中设置 `config.search: false`，关闭时设置 `true`，不记忆原先的搜索配置。全局和各模式分别处理，嵌套组内的声明也包含在内；保留 `config.fetch`、其他配置及每个声明原有的启停标记。搜索提供方无需分别停用：内置 `web_search` 入口统一撤下，因此旧版 DeepSeek 辅助模型搜索与直接 Search API 都不再通过该入口发起请求。
+
+例外是已启用的[第三方网页搜索](../web-search/spec.md)：它复用同一个原生 `web_search`，因此只有在第三方 provider 注册并固定成功后，才将声明恢复为 `search: true` 并释放运行限制；`blockOfficialSearch` 偏好保持不变。关闭第三方功能时，先恢复运行限制和原生声明，再撤销 provider 选择，避免切回官方提供方时出现可调用窗口。启动时同样修复旧版本遗留的 `search: false`；配置或模式组合核验失败不视为启用成功。应用层显式连接两个模块，声明与运行限制仍统一由 SearchPolicy 管理，写入串行且卸载后的迟到任务不得放行搜索。
 
 保留 `web_fetch`、本机 HTTP 抓取、DeepSeek Fetch API 提供方及搜索提供方配置，不改用户已有的抓取选择；第三方 MCP 搜索与抓取工具也保留。该开关不强制把已选的 DeepSeek Fetch API 改为 HTTP，也不承诺拦截其他插件直接调用搜索服务。若其他原生插件占用同名 `web_search`，原生调用限制也会匹配它；规范命名的 `mcp__<server>__<tool>` 不受影响。
 

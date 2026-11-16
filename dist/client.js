@@ -6885,11 +6885,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	const locales$15 = {
 		"en": {
 			"blockOfficialSearch": "Disable official search",
-			"blockSearchDescription": "Disable built-in WebSearch while keeping WebFetch"
+			"blockSearchDescription": "Disable official search while keeping third-party search and WebFetch"
 		},
 		"zh": {
 			"blockOfficialSearch": "停用官方搜索",
-			"blockSearchDescription": "关闭内置 WebSearch，保留 WebFetch"
+			"blockSearchDescription": "停用官方搜索，保留第三方搜索与 WebFetch"
 		}
 	};
 
@@ -17016,7 +17016,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 							t,
 							version,
 							namespace,
-							pluginVersion: "0.1.1",
+							pluginVersion: "0.1.2",
 							savePreference,
 							preferenceSlot: preferenceSlot$1,
 							get footerBusy() {

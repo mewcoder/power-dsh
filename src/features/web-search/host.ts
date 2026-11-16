@@ -77,7 +77,7 @@ function newSlotId(provider: string, taken: ReadonlySet<string>): string {
   }
 }
 
-export function createHost(ctx: NativeContext, config: LivePreferences, { owner, ensureActive }: HostOptions) {
+export function createHost(ctx: NativeContext, config: LivePreferences, { owner, ensureActive, setThirdPartySearchActive }: HostOptions) {
   let alive = true;
   let seam: WebSeam | null = null;
   /** Held from a child context that DECLARES `credentials`, never read off the root. */
@@ -218,26 +218,31 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
       if (!alive) return;
       const wanted = enabled() && seam !== null;
       if (wanted) {
-        const mounted = mount();
-        const searchDone = mounted && await pinCapability('search');
-        if (!searchDone) {
-          if (mounted) await unpinCapability('search');
-          unmount();
-          throw new Error('webSearchUnavailable');
+        const service = seam;
+        try {
+          if (!mount() || !await pinCapability('search')) throw new Error('webSearchUnavailable');
+          pinned.search = true;
+          if (!await pinCapability('fetch')) throw new Error('webSearchUnavailable');
+          pinned.fetch = true;
+          if (!alive || seam !== service) throw new Error('webSearchUnavailable');
+          await setThirdPartySearchActive?.(true);
+        } catch (error) {
+          try {
+            await setThirdPartySearchActive?.(false);
+          } finally {
+            try {
+              await unpinCapability('fetch');
+              await unpinCapability('search');
+            } finally {
+              pinned.fetch = pinned.search = false;
+              unmount();
+            }
+          }
+          throw error;
         }
-        pinned.search = true;
-        const fetchDone = await pinCapability('fetch');
-        if (!fetchDone) {
-          // Leave nothing pinned or registered behind a failed pin.
-          await unpinCapability('fetch');
-          await unpinCapability('search');
-          pinned.search = false;
-          unmount();
-          throw new Error('webSearchUnavailable');
-        }
-        pinned.fetch = true;
         return;
       }
+      await setThirdPartySearchActive?.(false);
       if (pinned.fetch) { await unpinCapability('fetch'); pinned.fetch = false; }
       if (pinned.search) { await unpinCapability('search'); pinned.search = false; }
       unmount();
@@ -253,6 +258,7 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
    */
   const catalog = async (): Promise<WebSearchCatalog> => {
     ensureActive();
+    await reconcile();
     const store = credentials;
     const searchSlots = searchChain();
     const fetchSlots = fetchChain();
@@ -368,6 +374,7 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
     void reconcile().catch(() => {});
     child.effect(() => () => {
       if (seam !== service) return;
+      void setThirdPartySearchActive?.(false).catch(() => {});
       unmount();
       seam = null;
       currentSearch = [];
@@ -380,6 +387,7 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
   });
   ctx.effect(() => () => {
     alive = false;
+    void setThirdPartySearchActive?.(false).catch(() => {});
     unmount();
     seam = null;
     credentials = null;

@@ -99,7 +99,7 @@ test('legacy ids avoid existing instance ids in either chain', async () => {
 const slot = (id, provider = id.replace(/-\d+$/, '')) => ({ id, provider });
 
 /** A Host fixture with a web seam, a credentials store, and an editable web row. */
-function fixture({ enabled = false, searchChain = [], fetchChain = [], webConfig = { searchProvider: 'deepseek-search-api', fetchProvider: 'http' }, records = new Map(), withWeb = true, withCredentials = true } = {}) {
+function fixture({ enabled = false, searchChain = [], fetchChain = [], webConfig = { searchProvider: 'deepseek-search-api', fetchProvider: 'http' }, records = new Map(), withWeb = true, withCredentials = true, setThirdPartySearchActive } = {}) {
   const searchProviders = new Map();
   const fetchProviders = new Map();
   const webRow = { options: { id: 'web', name: WEB_MODULE, config: { ...webConfig } } };
@@ -174,7 +174,7 @@ function fixture({ enabled = false, searchChain = [], fetchChain = [], webConfig
     async deleteRecord(key) { records.delete(key); },
   };
   const queue = new OperationQueue();
-  const host = createHost(ctx, values, { owner: ctx, ensureActive: () => queue.ensureActive() });
+  const host = createHost(ctx, values, { owner: ctx, ensureActive: () => queue.ensureActive(), setThirdPartySearchActive });
   return {
     ctx, host, seam, searchProviders, fetchProviders, registered, unregistered, records, webRow,
     // Turning the switch off reaches the Host through a settings document event;
@@ -376,4 +376,37 @@ test('the fetch provider fronts the local fetcher even with an empty chain', asy
   await app.host.webSearch.addSlot('search', 'tinyfish');
   assert.deepEqual([...app.fetchProviders.keys()], ['power-dsh-fetch'], 'one fetch provider, empty chain or not');
   assert.equal(app.webRow.options.config.fetchProvider, 'power-dsh-fetch');
+});
+
+test('third-party search is allowed only after selection and is blocked before restoring official selection', async () => {
+  const calls = [];
+  let routed = false;
+  const app = fixture({ setThirdPartySearchActive: async active => {
+    calls.push(active);
+    if (active || routed) {
+      assert.equal(app.webRow.options.config.searchProvider, 'power-dsh-search');
+      assert.equal(app.searchProviders.has('power-dsh-search'), true);
+    }
+    routed = active;
+  } });
+  await app.host.webSearch.catalog();
+  app.setMasterEnabled(true);
+  await app.host.webSearch.catalog();
+  assert.ok(calls.includes(true));
+  app.setMasterEnabled(false);
+  await app.host.webSearch.catalog();
+  assert.equal(app.webRow.options.config.searchProvider, 'deepseek-search-api');
+  assert.equal(app.searchProviders.size, 0);
+});
+
+test('tool restoration failures reject reads and writes and remove provider pins and registrations', async () => {
+  const app = fixture({ enabled: true, setThirdPartySearchActive: async active => {
+    if (active) throw new Error('Native search restoration failed');
+  } });
+  await assert.rejects(app.host.webSearch.catalog(), /restoration failed/);
+  await assert.rejects(app.host.webSearch.addSlot('search', 'tavily'), /restoration failed/);
+  assert.equal(app.webRow.options.config.searchProvider, 'deepseek-search-api');
+  assert.equal(app.webRow.options.config.fetchProvider, 'http');
+  assert.equal(app.searchProviders.size, 0);
+  assert.equal(app.fetchProviders.size, 0);
 });

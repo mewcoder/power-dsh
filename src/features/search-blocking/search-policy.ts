@@ -27,6 +27,10 @@ export class SearchPolicy {
   ensureActive: Release;
   context: NativeContext | null;
   restrictions: Map<NativeAgent, { context: NativeContext; release: Release }>;
+  thirdPartyActive = false;
+  routingTouched = false;
+  routingRevision = 0;
+  tail: Promise<unknown> = Promise.resolve();
 
   constructor(owner: NativeContext, config: LivePreferences, { ensureActive = () => {} }: LifecycleOptions = {}) {
     this.owner = owner; this.config = config; this.ensureActive = ensureActive;
@@ -34,12 +38,14 @@ export class SearchPolicy {
     this.restrictions = new Map();
   }
 
-  blocked() { return this.config.blockOfficialSearch.get(); }
+  blocked() { return this.config.blockOfficialSearch.get() && !this.thirdPartyActive; }
 
   bind(ctx: NativeContext) {
     this.context = ctx;
     ctx.effect(() => () => {
       this.context = null;
+      this.thirdPartyActive = false;
+      this.routingRevision++;
       for (const { release } of this.restrictions.values()) release();
       this.restrictions.clear();
     });
@@ -80,20 +86,48 @@ export class SearchPolicy {
     for (const agent of this.context?.agents.list() ?? []) this.syncAgent(agent);
   }
 
-  async setBlocked(blocked: boolean) {
-    if (typeof blocked !== 'boolean') throw new TypeError('blocked must be boolean');
-    this.ensureActive();
-    if (!this.context) throw new Error('Search blocking is unavailable. Re-enable power-dsh and try again.');
-    const enabled = !blocked;
+  run<T>(operation: () => Promise<T>): Promise<T> {
+    const task = this.tail.then(operation);
+    this.tail = task.catch(() => {});
+    return task;
+  }
+
+  setThirdPartyActive(active: boolean): Promise<void> {
+    const revision = ++this.routingRevision;
+    if (!active) {
+      this.thirdPartyActive = false;
+      this.sync();
+    }
+    return this.run(async () => {
+      if (!active && !this.routingTouched) return;
+      const check = () => {
+        this.ensureActive();
+        if (revision !== this.routingRevision) throw new Error('The search route changed. Please try again.');
+      };
+      check();
+      if (active && this.thirdPartyActive) return;
+      this.routingTouched = true;
+      await this.configureDeclarations(active || !this.config.blockOfficialSearch.get(), check);
+      check();
+      this.thirdPartyActive = active;
+      this.routingTouched = active;
+      this.sync();
+    });
+  }
+
+  async configureDeclarations(enabled: boolean, check: Release = this.ensureActive) {
+    check();
+    const context = this.context;
+    if (!context) throw new Error('Search blocking is unavailable. Re-enable power-dsh and try again.');
     const entries = this.owner.configEditor.entries().filter(entry => !entry.disabled && targetRows(entry).length);
     if (!entries.length) throw new Error('No supported built-in search tools were found in this profile.');
     const expected = entries.map(entry => ({ id: entry.options.id, count: targetRows(entry).length,
       preset: entry.options.name === PRESET ? entry.options.config.id : undefined }));
     for (const entry of entries) {
-      this.ensureActive();
+      check();
       if (targetRows(entry).every(row => (row.config?.search ?? true) === enabled)) continue;
       await this.owner.configEditor.edit(entry, raw => {
-        this.ensureActive();
+        check();
         if (entry.options.name === MODULE) return { ...raw, search: enabled };
         if (searchRows(raw.plugins).length !== expected.find(target => target.id === entry.options.id)?.count) {
           throw new Error('The search mode configuration changed. Please try again.');
@@ -102,7 +136,7 @@ export class SearchPolicy {
       });
     }
     const after = this.owner.configEditor.entries();
-    this.ensureActive();
+    check();
     for (const target of expected) {
       const entry = after.find(item => item.options.id === target.id);
       const rows = entry ? targetRows(entry) : [];
@@ -110,27 +144,35 @@ export class SearchPolicy {
         throw new Error(`The search configuration did not match the requested value: ${target.id}`);
       }
     }
-    const compositions = await this.context.agentPresets.compositionInventory();
-    this.ensureActive();
+    const compositions = await context.agentPresets.compositionInventory();
+    check();
     for (const target of expected.filter(row => row.preset !== undefined)) {
       const preset = compositions.find(row => row.id === target.preset);
       if (!preset || preset.broken || preset.rows.filter(row => row.moduleName === MODULE).length !== target.count) {
         throw new Error(`The search mode configuration could not be applied: ${target.preset}`);
       }
     }
-    await this.owner.configEditor.edit(this.owner.fiber.entry, raw => {
+  }
+
+  async setBlocked(blocked: boolean) {
+    if (typeof blocked !== 'boolean') throw new TypeError('blocked must be boolean');
+    return this.run(async () => {
       this.ensureActive();
-      return { ...raw, blockOfficialSearch: blocked };
-    });
-    this.ensureActive();
-    if (!this.context) throw new Error('Search blocking has been unloaded.');
-    this.sync();
-    if (this.blocked() !== blocked) throw new Error('The search setting did not match the requested value.');
-    for (const agent of this.context?.agents.list() ?? []) {
-      if (blocked && agent.ctx.get('tools').get(TOOL, agent)) {
-        throw new Error('Built-in search is still available. Re-enable power-dsh and try again.');
+      await this.configureDeclarations(!blocked || this.thirdPartyActive);
+      await this.owner.configEditor.edit(this.owner.fiber.entry, raw => {
+        this.ensureActive();
+        return { ...raw, blockOfficialSearch: blocked };
+      });
+      this.ensureActive();
+      if (!this.context) throw new Error('Search blocking has been unloaded.');
+      this.sync();
+      if (this.config.blockOfficialSearch.get() !== blocked) throw new Error('The search setting did not match the requested value.');
+      for (const agent of this.context.agents.list()) {
+        if (this.blocked() && agent.ctx.get('tools').get(TOOL, agent)) {
+          throw new Error('Built-in search is still available. Re-enable power-dsh and try again.');
+        }
       }
-    }
-    return { blocked };
+      return { blocked };
+    });
   }
 }

@@ -5,7 +5,11 @@ import type { RpcDescriptor, PowerDshMethods, PowerDshMethod } from '../types/pr
 import type { NativeContext } from './native.ts';
 import type { OperationQueue } from './operation-queue.ts';
 
-export interface HostOptions { owner: NativeContext; ensureActive(): void }
+export interface HostOptions {
+  owner: NativeContext;
+  ensureActive(): void;
+  setThirdPartySearchActive?(active: boolean): Promise<void>;
+}
 export interface HostService {
   ctx: NativeContext;
   queue: OperationQueue;

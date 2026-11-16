@@ -307,3 +307,77 @@ test('search RPC accepts only boolean settings and returns the public blocked re
     assert.throws(() => output.parse({ blocked: invalid }), /Invalid policy result/);
   }
 });
+
+test('third-party routing restores disabled declarations and existing tools without changing the official-search preference', async t => {
+  const app = await fixture(t, { blocked: true });
+  app.entries[0].options.config.search = false;
+  for (const row of rows(app.entries[2].options.config.plugins)) row.config.search = false;
+  const preferences = structuredClone(app.values);
+  assert.equal((await app.invoke('web_search')).isError, true);
+  await app.policy.setThirdPartyActive(true);
+  assert.equal(app.entries[0].options.config.search, true);
+  assert.ok(rows(app.entries[2].options.config.plugins).every(row => row.config.search));
+  assert.equal((await app.invoke('web_search')).isError, false);
+  assert.deepEqual(app.values, preferences);
+  assert.equal(app.policy.restrictions.size, 0);
+  const writes = app.writes.length;
+  await app.policy.setThirdPartyActive(true);
+  assert.equal(app.writes.length, writes);
+  const stopping = app.policy.setThirdPartyActive(false);
+  assert.equal(app.policy.blocked(), true, 'The runtime guard closes before asynchronous native edits.');
+  assert.equal((await app.invoke('web_search')).isError, true);
+  await stopping;
+  assert.equal(app.entries[0].options.config.search, false);
+  assert.ok(rows(app.entries[2].options.config.plugins).every(row => !row.config.search));
+  assert.equal((await app.invoke('web_fetch')).isError, false);
+  assert.deepEqual(app.values, preferences);
+});
+
+test('toggling the official-search preference preserves an active third-party route', async t => {
+  const app = await fixture(t);
+  await app.policy.setThirdPartyActive(true);
+  for (const blocked of [true, false, true]) {
+    assert.deepEqual(await app.policy.setBlocked(blocked), { blocked });
+    assert.equal(app.values.blockOfficialSearch, blocked);
+    assert.equal(app.entries[0].options.config.search ?? true, true);
+    assert.equal((await app.invoke('web_search')).isError, false);
+  }
+  await app.policy.setBlocked(false);
+  await app.policy.setThirdPartyActive(false);
+  assert.equal(app.entries[0].options.config.search ?? true, true);
+  assert.equal((await app.invoke('web_search')).isError, false);
+});
+
+test('a failed or superseded third-party activation never releases the search guard', async t => {
+  for (const fault of ['readback', 'composition', 'unloaded', 'superseded']) {
+    const app = await fixture(t, { blocked: true });
+    app.entries[0].options.config.search = false;
+    const entered = Promise.withResolvers();
+    const release = Promise.withResolvers();
+    const edit = app.configEditor.edit;
+    app.configEditor.edit = async (entry, change) => {
+      if (entry.options.id === 'web-global') {
+        if (fault === 'readback') return;
+        if (fault === 'unloaded' || fault === 'superseded') {
+          entered.resolve();
+          await release.promise;
+        }
+      }
+      return edit(entry, change);
+    };
+    if (fault === 'composition') app.agentPresets.compositionInventory = async () => [];
+    const activating = app.policy.setThirdPartyActive(true);
+    let stopping;
+    if (fault === 'unloaded' || fault === 'superseded') {
+      await entered.promise;
+      if (fault === 'unloaded') await app.fiber.dispose();
+      else stopping = app.policy.setThirdPartyActive(false);
+      release.resolve();
+    }
+    await assert.rejects(activating, /did not match|could not be applied|unloaded|route changed/);
+    await stopping;
+    assert.equal(app.policy.thirdPartyActive, false, fault);
+    assert.equal(app.values.blockOfficialSearch, true, fault);
+    if (fault !== 'unloaded') assert.equal((await app.invoke('web_search')).isError, true, fault);
+  }
+});

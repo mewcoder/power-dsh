@@ -259,6 +259,14 @@ macOS / DSH `0.2.2-rc.3` 已经原生管理器重载本地链接构建，核对�
 
 既有市场 PR `awesome-dsh-plugin/awesome-dsh-plugin#14457` 已合并，当前上游条目保留固定 Latest 下载地址，无需重复投稿；未将此记为每个用户客户端都已刷新更新。本轮不发布 npm，没有用最终 tarball 修改用户日常 profile，带密钥后端调用及历史检索原生模型调用的验收边界沿用准备记录。
 
+### 0.1.2 搜索联动回归（2026-11-16）
+
+本轮只修复第三方搜索与停用官方搜索的冲突，沿用既有 ConfigEditor、Tools 与模式组合接口，不增加依赖或改变宿主版本范围。版本提升前当前 SDK 检查 1,034 项（1,029 通过、5 项平台跳过、0 失败），构建、实际包与隔离生产安装通过；版本提升后重新执行固定发布检查。包含旧工具代际、保存偏好保留、启停顺序、原生声明恢复、失败清理、卸载／迟到任务和实际 Host 装配的路由测试。
+
+版本提升至 `0.1.2` 后固定检查全部通过，测试仍为 1,034 项（1,029 通过、5 跳过、0 失败）。`0.2.0-rc.1` 与 `0.2.1-rc.5` 的隔离仓库检查及生产 SDK Host 装配均通过，记录为 `summary-1794828920888.json`，目录标识为 `0.2.0-rc.1-qqQ015`、`0.2.1-rc.5-zKw6SH`。这两版结果包括本轮搜索装配路由回归，不扩大为旧宿主完整页面验收。
+
+macOS / DSH `0.2.2-rc.3` 本地链接构建的原生设置页实际确认：`blockOfficialSearch` 与 `webSearchEnabled` 均保持开启，三个原生工具声明恢复 `search: true` 且保留 `fetch: true`，两个原生 provider 选择仍指向 power-dsh。保存的 Tavily 密钥搜索返回 5 条结果（2660ms），获取返回 156 字符（1374ms）。没有重启应用、手写 profile、修改密钥或其他功能偏好。真实模型对话调用、最终 tarball 原生升级与 Windows 页面未新增验收，完整装配路由由真实 Tools 执行器及第三方响应夹具验证。
+
 ### 0.1.0 公开发布核验（2026-11-15）
 
 重新认证后，发布提交 `c85a700fb4422779eb17c977040c0eba78c0381a` 已进入 `main`，annotated 标签 `v0.1.0` 指向同一提交。[Release workflow](https://github.com/mewcoder/power-dsh/actions/runs/43724729589) 成功，Linux 上 899 项行为测试中 893 通过、6 项平台检查跳过、0 失败，实际包与独立生产安装通过。[正式 Release](https://github.com/mewcoder/power-dsh/releases/tag/v0.1.0) 已公开并成为 Latest，附件为 `power-dsh.tgz`；既有市场 PR `awesome-dsh-plugin/awesome-dsh-plugin#14457` 已合并，上游条目保留固定 Latest 下载来源，无需重复投稿。
