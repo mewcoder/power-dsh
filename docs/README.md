@@ -35,11 +35,13 @@
 | [外观快捷切换](../src/features/appearance-shortcut/spec.md) | 原生主题同步、按钮定位与生命周期 |
 | [退役流动背景兼容与挂载授权](../src/features/flowing-background/spec.md) | 五个隐藏旧键的无 UI 兼容、公共结构表面适配边界及既有流动图案算法依据；现行入口归壁纸 |
 | [显示版本号](../src/features/version-display/spec.md) | 宿主版本展示、桌面更新入口与侧栏定位 |
-| [会话搜索](../src/features/search-popup/spec.md) | 一个开关开启会话搜索弹窗，自带标题与正文搜索、最近消息摘要、工作区筛选与查询词高亮，键盘选择并打开会话；首次启用全文引擎需重启 DSH |
+| [会话搜索增强](../src/features/search-popup/spec.md) | 一个开关开启会话搜索弹窗，自带标题与正文搜索、最近消息摘要、工作区筛选与查询词高亮，键盘选择并打开会话；首次启用全文引擎需重启 DSH |
 | [技能管理](../src/features/skills/spec.md) | 全局与逐项目分组、目录堆叠展示、多来源导入、仅对 DSH 生效的启停 |
 | [MCP 管理](../src/features/mcp/spec.md) | 全局服务器、原生启停、真实连接状态与只读测试连接、工具列表与脱敏详情 |
 | [全局指令](../src/features/personalization/spec.md) | 全局指令编辑、原生文件保存与入口关闭行为 |
-| [记忆](../src/features/memory/spec.md) | 全局与项目长期记忆、显式／自动记录、模型四动作工具、索引注入及查看／删除管理 |
+| [记忆](../src/features/memory/spec.md) | 全局与项目长期记忆、显式／自动记录、模型工具、索引注入、当前消息出处及查看／删除管理 |
+| [历史对话检索（实验性）](../src/features/history-search/spec.md) | 独立开关允许 AI 按需搜索当前项目历史聊天、读取原文及前后文并返回消息出处 |
+| [第三方网页搜索](../src/features/web-search/spec.md) | 「功能」分类的独立开关与「网页搜索」页，把 Tavily／Firecrawl／TinyFish 注册为原生 `web` 提供方，按顺序回退、密钥存入凭据库、可测试单个后端 |
 | [归档](../src/features/archive/spec.md) | 归档会话的可折叠分组列表（含工作区路径）、搜索、排序、工作区筛选与恢复、永久删除与自动归档 |
 | [使用统计](../src/features/usage-stats/spec.md) | 本地会话 Token 汇总、模型／工作区分布、按模型的请求质量与速度/首字延迟、53 周活动热力图与每日趋势，只读聚合与缓存边界 |
 | [工作区管理](../src/features/projects/spec.md) | 工作区名称／目录／会话数／最近活动列表，搜索、最近活动与原生顺序排序、二次确认后移除登记 |
@@ -60,6 +62,8 @@
 | [首版兼容性调查](compatibility-audit.md) | 同类插件声明、官方标签差异、隔离 SDK 与 Host 装配结果；正式支持范围以[版本兼容性](compatibility.md)为准 |
 | [Claude Code／OpenCode 记忆补充研究](memory-claude-opencode-research-2026-11-15.md) | 固定版本对比文件粒度、索引、保存与整理；研究建议不代替记忆主 Spec |
 | [Codex 开源记忆源码核验](memory-codex-source-research-2026-11-15.md) | V1／V2、会话提取与批量整合、使用记录及保留策略；源码研究不代替本功能验收 |
+| [AI 编码产品功能调研](competitive-research-2026-11-16.md) | 25 个竞品的功能共性矩阵、回滚实现差异与市场空位；文档级调研，不构成实现授权 |
+| [网页搜索与抓取后端免费额度调研](web-search-free-tier-research-2026-11-16.md) | 各搜索／抓取服务的官方免费额度、端点与认证、免密钥模式、排除清单与实测记录；选型依据，不代替主 Spec |
 | [更新日志](../CHANGELOG.md) | 已有版本记录、待发布功能、用户可感知变化与升级说明 |
 
 每项事实保留一个主要出处，其他文档链接引用。现行规范记录已采用的约定；设计提案、历史备选与未验证结论明确标注。验证记录保留方法和限制，不累积逐版本试验日记。

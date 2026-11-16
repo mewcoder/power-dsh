@@ -10,7 +10,7 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 
-async function fixture(t, { available = true, enabled = false, desktop, llm } = {}) {
+async function fixture(t, { available = true, enabled = false, desktop, llm, sessionQuery } = {}) {
   const home = await mkdtemp(join(tmpdir(), 'power-dsh-memory-host-'));
   const values = { memoryEnabled: enabled, memoryAutoCapture: true, memoryGlobalEnabled: true, memoryWorkspaceEnabled: true };
   const config = Object.fromEntries(Object.keys(values).map(key => [key, { get: () => values[key] }]));
@@ -32,6 +32,10 @@ async function fixture(t, { available = true, enabled = false, desktop, llm } = 
     sessionController: desktop,
     tools: { register: register(tools) },
     inject(dependencies, callback) {
+      if (dependencies.includes('sessionQuery')) {
+        if (sessionQuery) callback({ ...ctx, sessionQuery });
+        return;
+      }
       if (dependencies.includes('llm')) {
         if (llm) callback({ ...ctx, llm });
         return;
@@ -59,6 +63,31 @@ async function fixture(t, { available = true, enabled = false, desktop, llm } = 
   return { home, ctx, host, config, values, sections, contexts, tools, listeners, update, dispose,
     registrations: () => registrations };
 }
+
+test('management source RPC reads only the stored evidence with a matching revision and cancels after disable', async t => {
+  const event = { seq: 1, time: 1794800000000, type: 'user/message',
+    data: { source: { kind: 'user' }, content: [{ type: 'text', text: '只调宽度' }] } };
+  const sessionQuery = { async readSurface() { return { session: { id: 'source-chat', cwd: '/source-project' }, events: [event] }; } };
+  const app = await fixture(t, { enabled: true, sessionQuery });
+  const source = await app.host.memorySources.capture({ id: 'source-chat', cwd: '/source-project' }, undefined,
+    new AbortController().signal, () => {});
+  const saved = await app.host.memory.save('global', { type: 'feedback', name: 'width-only', description: '只调宽度',
+    content: '仅调整宽度。', revision: '', originSessionId: 'source-chat', source });
+  const service = { ...app.host, run: operation => Promise.resolve(operation()) };
+  const read = (revision = saved.entry.revision) => methods.readMemorySource.call(service, 'global', saved.entry.id, revision, '0');
+  assert.equal((await read()).messages[0].text, '只调宽度');
+  await assert.rejects(read('f'.repeat(64)), /memoryConflict/);
+  let entered;
+  let finish;
+  const ready = new Promise(resolve => { entered = resolve; });
+  sessionQuery.readSurface = () => { entered(); return new Promise(resolve => { finish = resolve; }); };
+  const pending = read();
+  await ready;
+  app.update({ memoryEnabled: false });
+  app.update({ memoryEnabled: true });
+  await assert.rejects(pending, /memorySourceUnavailable|memoryDisabled/);
+  finish({ session: { id: 'source-chat', cwd: '/source-project' }, events: [event] });
+});
 
 test('manual organization uses optional public services and disabling memory cancels model work', async t => {
   const catalog = { default: { provider: 'configured', model: 'model' }, groups: [{ id: 'configured', name: 'Configured', models: [{ id: 'model', name: 'Model' }] }] };

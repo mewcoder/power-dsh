@@ -1,5 +1,9 @@
 # 架构规范
 
+记忆的消息出处由功能内 `MemorySources` 经可选 `sessionQuery.readSurface` 核验并按需读取，所引消息已移出当前表面时可用公开 `readSession` 回查原始日志，标明历史状态并继续核对 hash。模型不能指定任意来源会话。`MemoryStore` 在同一原子文件中保存当前正文及 seq/time/hash 出处，更新直接替换当前内容，不生成修订快照；列表及提示词索引不携带出处。早期实验文件的历史字段仅原样保留在磁盘，整理沿用既有原件备份。管理详情通过 owner-only `readMemorySource` 读取当前引用，模型 `source` 动作另限制同项目并核对版本；缺失原文不补造。见[记忆 Spec](../src/features/memory/spec.md#消息出处)。
+
+[历史对话检索](../src/features/history-search/spec.md)拥有默认关闭的 `historySearchEnabled`，只注册一个 `power_dsh_history` 模型工具和读取策略。工具通过可选的原生 `sessionQuery.filterSessions` 按需筛选当前项目，优先读取 `readSession` 原始日志，无此能力时兼容 `readSurface`。仅投影用户／助手文本，支持消息时间及角色过滤，结果带消息序号、时间、数据范围和搜索覆盖数量；提示模型续查并检查后续纠正。关闭、服务替换和释放取消旧代际调用。不依赖记忆或搜索弹窗，不跨功能引用实现，不新增索引、持久缓存或后台扫描。
+
 ## 长期记忆
 
 [记忆模块](../src/features/memory/spec.md)通过功能内可选 `systemPrompt` 服务注册策略与动态索引，Host 在每步开始前预热缓存，provider 仅读内存。自动记录开关改变策略，日常记录使用对话模型；单一 `power_dsh_memory` 工具完成 list/read/save/forget，list 可查找相关主题，新建时精确查重。页面使用 owner-only RPC 查看、单条删除、打开存储目录及手动整理。整理复用公开 `sessionController.modelCatalog()` 与 `llm.stream()`，模型只提建议，无文件工具权限；完整预览保存在 Host 内存，确认后重新验证作用域版本，备份与恢复日志保护批量修改。生成和取消不占用共享操作队列，存储修改仍串行。`MemoryStore` 独占 `$DSH_HOME/power-dsh/memory/` 的文件写入，备份独立位于 `power-dsh/memory-backups/`；条目为事实源、索引可重建，使用跨 profile 磁盘锁、哈希版本和原子替换。打开目录复用可选 `sessionController` 的公开原生打开接口。关闭功能释放工具、提示词与页面，取消整理并保留文件；删除不回写旧会话日志。
@@ -19,7 +23,7 @@ power-dsh 按用户特性组织 Host、Client、配置、协议、文案与测�
 | [src/app/host-features.ts](../src/app/host-features.ts)、[client-features.ts](../src/app/client-features.ts) | Host 与 Client 的显式特性选择 |
 | [src/app/host.ts](../src/app/host.ts)、[client.ts](../src/app/client.ts) | 宿主接入、共享状态与贡献装配，不实现各功能业务 |
 | [src/app/config.ts](../src/app/config.ts)、[rpc.ts](../src/app/rpc.ts) | 聚合配置和严格 RPC，拒绝重复与缺项 |
-| [src/features/](../src/features/) | 二十五项特性的定义、配置、实现、文案、主 Spec 和行为测试 |
+| [src/features/](../src/features/) | 二十七项特性的定义、配置、实现、文案、主 Spec 和行为测试 |
 | [src/shared/host/](../src/shared/host/)、[client/](../src/shared/client/)、[rpc/](../src/shared/rpc/) | 队列与原生启停、设置/目录/侧栏外壳、复用 codec |
 | [tests/integration/](../tests/integration/)、[shared/](../tests/shared/)、[helpers/](../tests/helpers/) | 完整装配与组合、共享机制测试及内存夹具 |
 | [assets/](../assets/)、[cordis.patch.yml](../cordis.patch.yml)、[screenshots.json](../screenshots.json) | 元数据、图标、Bundle 与市场截图入口 |
@@ -33,7 +37,7 @@ power-dsh 按用户特性组织 Host、Client、配置、协议、文案与测�
 
 ## Host 与 Client
 
-每个特性的 `definition.ts` 是纯元数据，`config.ts` 拥有本功能 schema；有 Host 行为时由 `host.ts` 提供实例创建与具名方法。装配只组合这些声明，保留受控配置键、默认值与操作顺序。具体行为由[二十五项主 Spec](README.md#功能规格spec)维护。
+每个特性的 `definition.ts` 是纯元数据，`config.ts` 拥有本功能 schema；有 Host 行为时由 `host.ts` 提供实例创建与具名方法。装配只组合这些声明，保留受控配置键、默认值与操作顺序。具体行为由[二十七项主 Spec](README.md#功能规格spec)维护。
 
 Host 负责持久配置、文件、进程、策略与安全数据投影；Client 负责设置贡献、页面、观察与交互。普通偏好通过原生 `configForms` 保存；精简等操作由设置界面通过 owner-only RPC 调用 Host 方法，不监听布尔配置异步执行。不注册 `power_dsh_settings` 对话工具，不向模型暴露插件偏好读写；记忆模块的 `power_dsh_memory` 工具独立保留。可选服务在特性内部子 context 接入，缺少辅助服务不应阻断其他入口。
 
@@ -94,6 +98,14 @@ DSH `0.2.2-rc.1` 的原生 logger 提供内存缓冲与 exporter；插件安装�
 Host 保持一个[操作队列](../src/shared/host/operation-queue.ts)，核对原生应用结果后通过 ConfigEditor 保存偏好。写入只更新所属字段、保留其他功能的当前配置，已废止恢复字段的清理范围固定。失败明确报错，可重新应用；卸载关闭队列并阻止后续写入，不等待正在申请热重载锁的操作。
 
 配置事件只读，不在 apply、配置事件或外层 HMR 事务里嵌套写入。原生变更由 profile 持久化，卸载模块不自动启用目标，不手写 profile，不新增事务或恢复框架。目标范围、旧代际调用限制及恢复语义以[账号](../src/features/account-blocking/spec.md)、[遥测](../src/features/telemetry-blocking/spec.md)、[Todo](../src/features/todo-blocking/spec.md)、[Plan](../src/features/plan-blocking/spec.md)、[Goal](../src/features/goal-blocking/spec.md)和[搜索](../src/features/search-blocking/spec.md) Spec 为准。
+
+## 第三方网页搜索
+
+[第三方网页搜索](../src/features/web-search/spec.md)拥有 `webSearchEnabled`（默认 `false`）与 `webSearchBackends`（默认 `[]`），均经原生 `configForms` 保存。开关只控制设置页入口与原生 `web` 提供方注册；后端列表只存 id 与两个能力开关，顺序即回退顺序。API Key 不进入设置文档：Host 通过 `ctx.credentials` 的 `power-dsh/<backend>` 记录读写，页面只能读到「已配置／未配置／不可写」。
+
+Host 在功能子 context 中取得 `web` 服务，注册一个搜索提供方（`power-dsh-search`）和一个抓取提供方（`power-dsh-fetch`），每个 capability 仅注册一个，避免原生 seam 在多个可用提供方且未显式选择时抛 `WEB_PROVIDER_AMBIGUOUS`。提供方每次调用时从闭包读取当前后端槽与已解析密钥，因此改 key 或调顺序对下一次搜索立即生效，无需重注册。原生 `web` Loader 条目的 `searchProvider` / `fetchProvider` 被固定为本模块 id，只写这两个字段；关闭时只撤销仍等于本模块 id 的值并恢复该条目的组合值，不覆盖用户之后在原生页的选择。注册与固定走同一条串行队列，固定失败会撤销选择并注销提供方，不留「已注册但没被选中」的状态。
+
+后端适配与回退链分别在 [backends.ts](../src/features/web-search/backends.ts) 与 [provider.ts](../src/features/web-search/provider.ts)；凭据状态在 [state.ts](../src/features/web-search/state.ts)。后端返回的已是抽取后的正文，交给 seam 的 body 为 `{ kind: 'text' }`，不二次走原生 HTML→Markdown 转换。接口依据与验收条件以主 Spec 为准。
 
 ## 侧栏接入
 

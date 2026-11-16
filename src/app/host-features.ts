@@ -3,6 +3,9 @@ import { definition as memoryDefinition } from '../features/memory/definition.ts
 import * as memoryConfig from '../features/memory/config.ts';
 import * as memoryHost from '../features/memory/host.ts';
 import { rpc as memoryRpc } from '../features/memory/rpc.ts';
+import { definition as historySearchDefinition } from '../features/history-search/definition.ts';
+import * as historySearchConfig from '../features/history-search/config.ts';
+import * as historySearchHost from '../features/history-search/host.ts';
 import { definition as pluginUpdatesDefinition } from '../features/plugin-updates/definition.ts';
 import * as pluginUpdatesConfig from '../features/plugin-updates/config.ts';
 import * as pluginUpdatesHost from '../features/plugin-updates/host.ts';
@@ -86,9 +89,14 @@ import { definition as projectsDefinition } from '../features/projects/definitio
 import * as projectsConfig from '../features/projects/config.ts';
 import * as projectsHost from '../features/projects/host.ts';
 import { rpc as projectsRpc } from '../features/projects/rpc.ts';
+import { definition as webSearchDefinition } from '../features/web-search/definition.ts';
+import * as webSearchConfig from '../features/web-search/config.ts';
+import * as webSearchHost from '../features/web-search/host.ts';
+import { rpc as webSearchRpc } from '../features/web-search/rpc.ts';
 
 export const HOST_FEATURES = Object.freeze([
   { definition: memoryDefinition, ...memoryConfig, ...memoryHost, rpc: memoryRpc },
+  { definition: historySearchDefinition, ...historySearchConfig, ...historySearchHost },
   { definition: pluginUpdatesDefinition, ...pluginUpdatesConfig, ...pluginUpdatesHost, rpc: pluginUpdatesRpc },
   { definition: versionDefinition, ...versionConfig },
   { definition: appearanceDefinition, ...appearanceConfig },
@@ -113,6 +121,7 @@ export const HOST_FEATURES = Object.freeze([
   { definition: usageDefinition, ...usageConfig, ...usageHost, rpc: usageRpc },
   { definition: projectsDefinition, ...projectsConfig, ...projectsHost, rpc: projectsRpc },
   { definition: searchPopupDefinition, ...searchPopupConfig, ...searchPopupHost, rpc: searchPopupRpc },
+  { definition: webSearchDefinition, ...webSearchConfig, ...webSearchHost, rpc: webSearchRpc },
 ] satisfies HostFeature[]);
 
 export const hostFeatures = HOST_FEATURES;

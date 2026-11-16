@@ -1,8 +1,8 @@
 import type { Locales } from '../../shared/client/types.ts';
 export const locales = {
   "en": {
-    "searchPopupEnabled": "Session search",
-    "searchPopupDescription": "Find past sessions by title and message content",
+    "searchPopupEnabled": "Enhanced session search",
+    "searchPopupDescription": "Search session titles and content in a popup",
     "searchPopupTitle": "Search sessions",
     "searchPopupPlaceholder": "Search session titles and content…",
     "searchPopupPlaceholderTitles": "Search session titles…",
@@ -22,8 +22,8 @@ export const locales = {
     "searchPopupNoAccess": "Session search is unavailable in this host",
   },
   "zh": {
-    "searchPopupEnabled": "会话搜索",
-    "searchPopupDescription": "按标题和正文查找历史会话",
+    "searchPopupEnabled": "会话搜索增强",
+    "searchPopupDescription": "在弹窗中搜索会话标题与正文",
     "searchPopupTitle": "搜索会话",
     "searchPopupPlaceholder": "搜索会话标题和内容…",
     "searchPopupPlaceholderTitles": "搜索会话标题…",

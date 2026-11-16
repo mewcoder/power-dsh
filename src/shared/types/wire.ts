@@ -408,7 +408,20 @@ export interface MemoryEntry {
   id: string; name: string; description: string; type: MemoryType;
   created: string; updated: string; originSessionId: string; revision: string; invalid: boolean;
 }
-export interface MemoryDetail extends MemoryEntry { content: string }
+export interface MemorySource { sessionId: string; seq: number; time: number; hash: string }
+export interface MemoryDetail extends MemoryEntry {
+  content: string; source?: MemorySource | null;
+}
+export interface MemorySourceMessage {
+  seq: number; time: number; role: 'user' | 'assistant'; text: string;
+  target: boolean; offset: number; nextOffset: number | null; length: number;
+}
+export interface MemorySourceResult {
+  available: boolean;
+  historical?: boolean;
+  reason: '' | 'not-recorded' | 'unavailable' | 'not-found' | 'changed' | 'workspace';
+  source: MemorySource | null; messages: MemorySourceMessage[];
+}
 export interface MemoryFileDetail extends MemoryDetail { path: string }
 export interface MemoryScope {
   id: string; cwd: string; revision: string; complete: boolean; entries: MemoryEntry[];
@@ -439,4 +452,52 @@ export interface SearchContentResult {
    * content hit, so the row would otherwise leave its snippet line blank.
    */
   previews: SearchContentHit[];
+}
+
+/** One configured provider instance as a chain renders it. */
+export interface WebSearchSlotRow {
+  /** Instance id, unique across both chains; also the credential record id. */
+  id: string;
+  /** Vendor id: `tavily`, `firecrawl`, or `tinyfish`. */
+  provider: string;
+  /** Where the user creates this vendor's API key. */
+  keyUrl: string;
+  /** Whether a non-empty key is stored. */
+  configured: boolean;
+  /** Whether a key value is actually stored. */
+  hasKey: boolean;
+  /** Whether the credential store accepts a write. */
+  writable: boolean;
+}
+/** One capability's chain: its instances in fallback order. */
+export interface WebSearchChain {
+  /** Instance ids in this chain, in fallback order. */
+  ids: string[];
+}
+/** The whole web-search page state: two independent chains of instances. */
+export interface WebSearchCatalog {
+  enabled: boolean;
+  available: boolean;
+  /** Every instance in either chain, keyed by its id. */
+  slots: WebSearchSlotRow[];
+  search: WebSearchChain;
+  fetch: WebSearchChain;
+}
+/** One key-verification call against one backend. */
+export interface WebSearchProbeDiagnostic {
+  provider: 'tavily' | 'firecrawl' | 'tinyfish' | 'unknown';
+  stage: 'credentials' | 'request' | 'response' | 'rpc';
+  reason: 'key-missing' | 'auth' | 'forbidden' | 'quota' | 'rate-limit' | 'http' | 'network' | 'timeout' | 'invalid-response' | 'empty-response' | 'rpc' | 'unknown';
+  auth: 'keyless' | 'missing' | 'api-key' | 'unknown';
+  observedAt: string;
+  httpStatus?: number;
+  systemCode?: string;
+}
+export interface WebSearchProbe {
+  ok: boolean;
+  resultCount: number;
+  durationMs: number;
+  /** Safe one-line reason when `ok` is false. */
+  message: string;
+  diagnostic?: WebSearchProbeDiagnostic;
 }

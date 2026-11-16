@@ -1,7 +1,8 @@
 import { styles as shellStyles } from '../../shared/client/shell-styles.ts';
 import { standalonePageActive } from '../../shared/client/settings-form.ts';
 import type { ClientEnvironment, ClientFeature, ClientRuntime, FeatureState, IconProps, PageSlotProps } from '../../shared/client/types.ts';
-import { MEMORY_ERRORS, type MemoryCatalog, type MemoryFileDetail, type MemoryEntry, type MemoryScope } from './types.ts';
+import { MEMORY_ERRORS, type MemoryCatalog, type MemoryFileDetail, type MemoryEntry, type MemoryScope,
+  type MemorySource, type MemorySourceResult } from './types.ts';
 import { styles as featureStyles } from './styles.ts';
 import { createCleanupDialog } from './cleanup-client.ts';
 
@@ -112,14 +113,19 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const [error, setError] = React.useState<{ operation: string; message: string } | null>(null);
     const [confirmation, setConfirmation] = React.useState<Confirmation | null>(null);
     const [detail, setDetail] = React.useState<MemoryFileDetail | null>(null);
+    const [detailScope, setDetailScope] = React.useState('');
     const [detailOpen, setDetailOpen] = React.useState(false);
     const [cleanupScope, setCleanupScope] = React.useState<string | null>(null);
     const [detailError, setDetailError] = React.useState('');
     const [detailLoading, setDetailLoading] = React.useState(false);
     const [copied, setCopied] = React.useState(false);
+    const [sourceView, setSourceView] = React.useState<MemorySourceResult | null>(null);
+    const [sourceLoading, setSourceLoading] = React.useState(false);
+    const [sourceError, setSourceError] = React.useState('');
     const pending = React.useRef(false);
     const operationSequence = React.useRef(0);
     const detailSequence = React.useRef(0);
+    const sourceSequence = React.useRef(0);
     const mounted = useMounted();
     const controlId = React.useId();
     const canWrite = writable() && busy === null;
@@ -136,6 +142,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         consumers--;
         if (consumers === 0) unwatchConnection();
         detailSequence.current++;
+        sourceSequence.current++;
         window.removeEventListener('focus', refresh);
       };
     }, []);
@@ -148,6 +155,10 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       setConfirmation(null);
       setDetailOpen(false);
       setDetail(null);
+      sourceSequence.current++;
+      setSourceView(null);
+      setSourceLoading(false);
+      setSourceError('');
       setCleanupScope(null);
     }, [currentConnection]);
 
@@ -171,6 +182,11 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       if (!enabled()) return;
       const sequence = ++detailSequence.current;
       setDetail(null);
+      setDetailScope(scope);
+      sourceSequence.current++;
+      setSourceView(null);
+      setSourceLoading(false);
+      setSourceError('');
       setDetailError('');
       setCopied(false);
       setDetailLoading(true);
@@ -234,7 +250,47 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         }
       }
     }
-    function closeDetail() { detailSequence.current++; setDetailOpen(false); setDetail(null); setDetailError(''); }
+    async function viewSource(offset = 0) {
+      if (!detail || !live() || sourceLoading) return;
+      const currentDetail = detailSequence.current;
+      const sequence = ++sourceSequence.current;
+      setSourceLoading(true);
+      setSourceError('');
+      setSourceView(null);
+      try {
+        const result = await ctx.remote.powerDsh.readMemorySource(detailScope, detail.id, detail.revision, String(offset));
+        if (!live() || currentDetail !== detailSequence.current || sequence !== sourceSequence.current) return;
+        if (!result.ok) throw new Error(result.error.message);
+        setSourceView(result.value);
+      } catch (failure) {
+        if (live() && currentDetail === detailSequence.current && sequence === sourceSequence.current) {
+          setSourceError(message(failure, 'memorySourceUnavailable'));
+        }
+      } finally {
+        if (live() && currentDetail === detailSequence.current && sequence === sourceSequence.current) setSourceLoading(false);
+      }
+    }
+    function closeDetail() {
+      detailSequence.current++;
+      sourceSequence.current++;
+      setDetailOpen(false);
+      setDetail(null);
+      setDetailError('');
+      setSourceView(null);
+      setSourceLoading(false);
+      setSourceError('');
+    }
+    function sourceLabel(source: MemorySource) {
+      return `${source.sessionId} · ${t('memoryMessage')} ${source.seq} · ${formatMemoryDate(new Date(source.time).toISOString())}`;
+    }
+    function sourceControl(source: MemorySource | null | undefined, origin: string) {
+      return h('div', { className: 'power-dsh-memory-source' },
+        h('p', { className: 'power-dsh-memory-meta' }, source
+          ? `${t('memorySource')}: ${sourceLabel(source)}`
+          : `${origin ? `${t('memorySource')}: ${origin} · ` : ''}${t('memorySourceNotRecorded')}`),
+        source && h(Button, { variant: 'ghost', size: 'sm', disabled: sourceLoading,
+          'aria-busy': sourceLoading, onClick: () => viewSource() }, t('memoryViewSource')));
+    }
     const scopeName = (scope: MemoryScope) => scope.id === 'global' ? t('memoryGlobalEnabled')
       : scope.cwd.split(/[\\/]/).filter(Boolean).at(-1) || scope.cwd;
     const scopes = catalog?.scopes.filter(scope => scope.entries.length > 0 || !scope.complete) ?? [];
@@ -355,15 +411,31 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             text: detail.content, variant: 'body', omitHtml: true,
             labels: { code: { copyLabel: t('memoryCopyCode'), copiedLabel: t('memoryCopied') }, footnotes: t('memoryFootnotes') },
           }),
+          sourceControl(detail.source, detail.originSessionId),
           detail.originSessionId && h('div', { className: 'power-dsh-memory-source' },
-            h('p', null, `${t('memorySource')}: ${detail.originSessionId}`),
             h(Button, { variant: 'ghost', size: 'sm', onClick: async () => {
               const sequence = detailSequence.current;
               try {
-                await navigator.clipboard.writeText(detail.originSessionId);
+                await navigator.clipboard.writeText(detail.source?.sessionId ?? detail.originSessionId);
                 if (live() && sequence === detailSequence.current) setCopied(true);
               } catch { if (live() && sequence === detailSequence.current) setDetailError(t('memoryCopyFailed')); }
-            } }, t(copied ? 'memoryCopied' : 'memoryCopySource')))))));
+            } }, t(copied ? 'memoryCopied' : 'memoryCopySource'))),
+          sourceLoading && loadingFeedback({ label: t('loading') }),
+          sourceError && errorFeedback({ t, message: sourceError, code: 'PD-MEMORY-SOURCE',
+            operation: 'readMemorySource', placement: 'modal' }),
+          sourceView && h('section', { className: 'power-dsh-memory-original', 'aria-label': t('memoryOriginal') },
+            h('h3', null, t('memoryOriginal')),
+            sourceView.historical && h('p', { className: 'power-dsh-notice' }, t('memorySourceHistorical')),
+            !sourceView.available ? h('p', { className: 'power-dsh-notice' }, t({
+              'not-recorded': 'memorySourceNotRecorded', unavailable: 'memorySourceUnavailable',
+              'not-found': 'memorySourceMissing', changed: 'memorySourceChanged', workspace: 'memorySourceWorkspace', '': 'memorySourceUnavailable',
+            }[sourceView.reason])) : h(React.Fragment, null,
+              ...sourceView.messages.map(part => h('div', { key: part.seq, className: 'power-dsh-memory-message' },
+                h('p', { className: 'power-dsh-memory-meta' }, `${t(part.role === 'user' ? 'memorySourceUser' : 'memorySourceAssistant')} · ${t('memoryMessage')} ${part.seq} · ${formatMemoryDate(new Date(part.time).toISOString())}`),
+                h(MarkdownText, { text: part.text, variant: 'body', omitHtml: true,
+                  labels: { code: { copyLabel: t('memoryCopyCode'), copiedLabel: t('memoryCopied') }, footnotes: t('memoryFootnotes') } }),
+                part.target && part.nextOffset !== null && h(Button, { variant: 'ghost', size: 'sm',
+                  disabled: sourceLoading, onClick: () => viewSource(part.nextOffset!) }, t('memoryReadMore'))))))))));
   }
 
   const renderPage = (props: PageSlotProps) => h(MemoryPage, props);

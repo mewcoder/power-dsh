@@ -3,6 +3,9 @@ import { createClientFeature as memory } from '../features/memory/client.ts';
 import { definition as memoryDefinition } from '../features/memory/definition.ts';
 import { locales as memoryLocales } from '../features/memory/locales.ts';
 import { rpc as memoryRpc } from '../features/memory/rpc.ts';
+import { definition as historySearchDefinition } from '../features/history-search/definition.ts';
+import { createClientFeature as historySearch } from '../features/history-search/client.ts';
+import { locales as historySearchLocales } from '../features/history-search/locales.ts';
 import { createClientFeature as pluginUpdates } from '../features/plugin-updates/client.ts';
 import { definition as pluginUpdatesDefinition } from '../features/plugin-updates/definition.ts';
 import { locales as pluginUpdatesLocales } from '../features/plugin-updates/locales.ts';
@@ -93,9 +96,14 @@ import { createClientFeature as searchPopup } from '../features/search-popup/cli
 import { definition as searchPopupDefinition } from '../features/search-popup/definition.ts';
 import { locales as searchPopupLocales } from '../features/search-popup/locales.ts';
 import { rpc as searchPopupRpc } from '../features/search-popup/rpc.ts';
+import { createClientFeature as webSearch } from '../features/web-search/client.ts';
+import { definition as webSearchDefinition } from '../features/web-search/definition.ts';
+import { locales as webSearchLocales } from '../features/web-search/locales.ts';
+import { rpc as webSearchRpc } from '../features/web-search/rpc.ts';
 
 export const clientFeatures: ClientFeatureSelection[] = [
   { definition: memoryDefinition, create: memory, locales: memoryLocales, rpc: memoryRpc },
+  { definition: historySearchDefinition, create: historySearch, locales: historySearchLocales, rpc: [] },
   { definition: pluginUpdatesDefinition, create: pluginUpdates, locales: pluginUpdatesLocales, rpc: pluginUpdatesRpc },
   { definition: versionDisplayDefinition, create: versionDisplay, locales: versionDisplayLocales, rpc: [] },
   { definition: appearanceShortcutDefinition, create: appearanceShortcut, locales: appearanceShortcutLocales, rpc: [] },
@@ -120,4 +128,5 @@ export const clientFeatures: ClientFeatureSelection[] = [
   { definition: usageStatsDefinition, create: usageStats, locales: usageStatsLocales, rpc: usageStatsRpc },
   { definition: projectsDefinition, create: projects, locales: projectsLocales, rpc: projectsRpc },
   { definition: searchPopupDefinition, create: searchPopup, locales: searchPopupLocales, rpc: searchPopupRpc },
+  { definition: webSearchDefinition, create: webSearch, locales: webSearchLocales, rpc: webSearchRpc },
 ];

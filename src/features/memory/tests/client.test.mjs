@@ -20,6 +20,59 @@ const cleanupButton = (view, name = 'Global memory') => namedButton(view, `Organ
 const deleteScopeButton = (view, name = 'Global memory') => namedButton(view, `Delete memories in “${name}”`);
 const cleanupNode = view => descendants(view).find(node => node.type?.name === 'MemoryCleanupDialog');
 
+test('memory detail shows only the current source and reads only after an explicit click', async t => {
+  const source = { sessionId: 'source-chat', seq: 14, time: Date.parse('2026-11-16T00:00:00Z'), hash: 'f'.repeat(64) };
+  const detail = { ...row, path: '/test/memory/short-answers.md', content: 'Keep settings editor height only.', source,
+    history: [{ name: row.name, type: row.type, description: 'Earlier wording', content: 'Keep editor height.',
+      updated: row.updated, originSessionId: 'older-chat', source: { ...source, sessionId: 'older-chat', seq: 8 } }] };
+  const { app, render } = await fixture(t, async (method, args) => {
+    if (method === 'readMemoryEntry') return { ok: true, value: detail };
+    if (method === 'readMemorySource') {
+      assert.deepEqual(args, ['global', row.id, row.revision, '0']);
+      return { ok: true, value: { available: true, reason: '', source, historical: true,
+        messages: [{ seq: 14, time: source.time, role: 'user', target: true, text: '这个高度不用调，只针对设置页编辑器。',
+          offset: 0, nextOffset: null, length: 21 }] } };
+    }
+    return { ok: true, value: catalog([row]) };
+  });
+  scopeButton(render()).props.onClick();
+  await buttons(render()).find(node => node.props.className === 'power-dsh-memory-open').props.onClick();
+  assert.match(JSON.stringify(render()), /source-chat/);
+  assert.equal(descendants(render()).some(node => node.type === 'details'), false);
+  assert.doesNotMatch(JSON.stringify(render()), /Previous version|Revision history|Keep editor height|older-chat/);
+  assert.equal(app.memoryCalls.some(call => call.method === 'readMemorySource'), false);
+  await buttons(render()).find(node => text(node) === 'View original').props.onClick();
+  assert.match(JSON.stringify(render()), /这个高度不用调，只针对设置页编辑器/);
+  assert.match(JSON.stringify(render()), /outside the current context/);
+  assert.equal(app.memoryCalls.filter(call => call.method === 'readMemorySource').length, 1);
+});
+
+test('missing originals show an honest reason and a closed detail discards a late source response', async t => {
+  const source = { sessionId: 'original', seq: 1, time: 1794800000000, hash: 'f'.repeat(64) };
+  let finish;
+  let delayed = false;
+  const { app, render } = await fixture(t, async method => {
+    if (method === 'readMemoryEntry') return { ok: true, value: { ...row, path: '/test/memory/short-answers.md', content: 'Current.', source } };
+    if (method === 'readMemorySource') {
+      if (delayed) return new Promise(resolve => { finish = resolve; });
+      return { ok: true, value: { available: false, reason: 'not-found', source, messages: [] } };
+    }
+    return { ok: true, value: catalog([row]) };
+  });
+  scopeButton(render()).props.onClick();
+  await buttons(render()).find(node => node.props.className === 'power-dsh-memory-open').props.onClick();
+  await button(render(), 'View original').props.onClick();
+  assert.match(JSON.stringify(render()), /missing or no longer available after compaction/);
+  delayed = true;
+  const pending = button(render(), 'View original').props.onClick();
+  modal(render()).props.onClose();
+  finish({ ok: true, value: { available: true, reason: '', source, messages: [{ seq: 1, time: source.time,
+    role: 'user', target: true, text: 'late private text', offset: 0, nextOffset: null, length: 17 }] } });
+  await pending;
+  assert.doesNotMatch(JSON.stringify(render()), /late private text|Original conversation/);
+  assert.equal(modal(render()), undefined);
+});
+
 async function fixture(t, reply, options = {}) {
   const app = await mount({ featureIds: ['memory'], ...options });
   t.after(() => app.unmount());

@@ -805,7 +805,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
             fileVersion++;
             return { ok: true, value: fileValue() };
           }
-          if (['listMemoryEntries', 'readMemoryEntry', 'deleteMemoryEntry', 'clearMemoryScope', 'openMemoryFolder',
+          if (['listMemoryEntries', 'readMemoryEntry', 'readMemorySource', 'deleteMemoryEntry', 'clearMemoryScope', 'openMemoryFolder',
             'memoryCleanupModels', 'prepareMemoryCleanup', 'cancelMemoryCleanup', 'applyMemoryCleanup'].includes(descriptor.method)) {
             memoryCalls.push({ method: descriptor.method, args: rpcArgs });
             return memoryReply(descriptor.method, rpcArgs);

@@ -9,6 +9,11 @@ interface DisabledSkillPreference {
   projectRoot: string;
   origin: string;
 }
+/** One configured provider instance: its own id plus the vendor it talks to. */
+interface WebSearchSlotPreference {
+  id: string;
+  provider: string;
+}
 interface Preferences {
   showVersion: boolean;
   showThemeSwitcher: boolean;
@@ -23,6 +28,7 @@ interface Preferences {
   memoryAutoCapture: boolean;
   memoryGlobalEnabled: boolean;
   memoryWorkspaceEnabled: boolean;
+  historySearchEnabled: boolean;
   skillManagerEnabled: boolean;
   disabledSkills: DisabledSkillPreference[];
   mcpManagerEnabled: boolean;
@@ -51,13 +57,18 @@ interface Preferences {
   usageStatsEnabled: boolean;
   projectManagerEnabled: boolean;
   searchPopupEnabled: boolean;
+  webSearchEnabled: boolean;
+  /** Search provider instances in fallback order. */
+  webSearchChain: (WebSearchSlotPreference | string)[];
+  /** Fetch provider instances in fallback order, independent of the search chain. */
+  webFetchChain: (WebSearchSlotPreference | string)[];
 }
 type PreferenceKey = keyof Preferences;
 interface LiveValue<T> {
   get(): T;
 }
 type LivePreferences = { [K in PreferenceKey]: LiveValue<Preferences[K]>; };
-type FeatureId = 'version-display' | 'appearance-shortcut' | 'refresh-button' | 'restart-button' | 'notifications' | 'personalization' | 'skills' | 'mcp' | 'account-blocking' | 'search-blocking' | 'telemetry-blocking' | 'todo-blocking' | 'plan-blocking' | 'goal-blocking' | 'double-click-rename' | 'thinking-effort' | 'flowing-background' | 'archive' | 'usage-stats' | 'projects' | 'wallpaper' | 'plugin-updates' | 'standalone-page' | 'search-popup' | 'memory';
+type FeatureId = 'version-display' | 'appearance-shortcut' | 'refresh-button' | 'restart-button' | 'notifications' | 'personalization' | 'skills' | 'mcp' | 'account-blocking' | 'search-blocking' | 'telemetry-blocking' | 'todo-blocking' | 'plan-blocking' | 'goal-blocking' | 'double-click-rename' | 'thinking-effort' | 'flowing-background' | 'archive' | 'usage-stats' | 'projects' | 'wallpaper' | 'plugin-updates' | 'standalone-page' | 'search-popup' | 'memory' | 'history-search' | 'web-search';
 type FeatureCategory = 'general' | 'interface' | 'enhance' | 'simplify' | 'other';
 interface FeatureDefinition {
   readonly id: FeatureId;
@@ -487,8 +498,32 @@ interface MemoryEntry {
   revision: string;
   invalid: boolean;
 }
+interface MemorySource {
+  sessionId: string;
+  seq: number;
+  time: number;
+  hash: string;
+}
 interface MemoryDetail extends MemoryEntry {
   content: string;
+  source?: MemorySource | null;
+}
+interface MemorySourceMessage {
+  seq: number;
+  time: number;
+  role: 'user' | 'assistant';
+  text: string;
+  target: boolean;
+  offset: number;
+  nextOffset: number | null;
+  length: number;
+}
+interface MemorySourceResult {
+  available: boolean;
+  historical?: boolean;
+  reason: '' | 'not-recorded' | 'unavailable' | 'not-found' | 'changed' | 'workspace';
+  source: MemorySource | null;
+  messages: MemorySourceMessage[];
 }
 interface MemoryFileDetail extends MemoryDetail {
   path: string;
@@ -551,6 +586,53 @@ interface SearchContentResult {
    */
   previews: SearchContentHit[];
 }
+/** One configured provider instance as a chain renders it. */
+interface WebSearchSlotRow {
+  /** Instance id, unique across both chains; also the credential record id. */
+  id: string;
+  /** Vendor id: `tavily`, `firecrawl`, or `tinyfish`. */
+  provider: string;
+  /** Where the user creates this vendor's API key. */
+  keyUrl: string;
+  /** Whether a non-empty key is stored. */
+  configured: boolean;
+  /** Whether a key value is actually stored. */
+  hasKey: boolean;
+  /** Whether the credential store accepts a write. */
+  writable: boolean;
+}
+/** One capability's chain: its instances in fallback order. */
+interface WebSearchChain {
+  /** Instance ids in this chain, in fallback order. */
+  ids: string[];
+}
+/** The whole web-search page state: two independent chains of instances. */
+interface WebSearchCatalog {
+  enabled: boolean;
+  available: boolean;
+  /** Every instance in either chain, keyed by its id. */
+  slots: WebSearchSlotRow[];
+  search: WebSearchChain;
+  fetch: WebSearchChain;
+}
+/** One key-verification call against one backend. */
+interface WebSearchProbeDiagnostic {
+  provider: 'tavily' | 'firecrawl' | 'tinyfish' | 'unknown';
+  stage: 'credentials' | 'request' | 'response' | 'rpc';
+  reason: 'key-missing' | 'auth' | 'forbidden' | 'quota' | 'rate-limit' | 'http' | 'network' | 'timeout' | 'invalid-response' | 'empty-response' | 'rpc' | 'unknown';
+  auth: 'keyless' | 'missing' | 'api-key' | 'unknown';
+  observedAt: string;
+  httpStatus?: number;
+  systemCode?: string;
+}
+interface WebSearchProbe {
+  ok: boolean;
+  resultCount: number;
+  durationMs: number;
+  /** Safe one-line reason when `ok` is false. */
+  message: string;
+  diagnostic?: WebSearchProbeDiagnostic;
+}
 /** Named Host operations, before the transport adds its result envelope. */
 interface PowerDshMethods {
   memoryCleanupModels(): Promise<MemoryModels>;
@@ -559,6 +641,7 @@ interface PowerDshMethods {
   applyMemoryCleanup(token: string): Promise<MemoryCleanupResult>;
   listMemoryEntries(): Promise<MemoryCatalog>;
   readMemoryEntry(scope: string, id: string): Promise<MemoryFileDetail>;
+  readMemorySource(scope: string, id: string, revision: string, offset: string): Promise<MemorySourceResult>;
   deleteMemoryEntry(scope: string, id: string, revision: string): Promise<MemoryWriteResult>;
   clearMemoryScope(scope: string, revision: string): Promise<MemoryWriteResult>;
   openMemoryFolder(scope: string): Promise<boolean>;
@@ -600,6 +683,13 @@ interface PowerDshMethods {
   readMcpServer(id: string): Promise<McpServerDetail | null>;
   setMcpServerEnabled(id: string, enabled: boolean): Promise<McpCatalog>;
   probeMcpServer(id: string): Promise<McpProbe>;
+  readWebSearch(): Promise<WebSearchCatalog>;
+  addWebSearchSlot(capability: string, provider: string): Promise<WebSearchCatalog>;
+  removeWebSearchSlot(capability: string, id: string): Promise<WebSearchCatalog>;
+  reorderWebSearchChain(capability: string, ids: readonly string[]): Promise<WebSearchCatalog>;
+  saveWebSearchKey(id: string, value: string): Promise<WebSearchCatalog>;
+  probeWebSearchSearch(id: string): Promise<WebSearchProbe>;
+  probeWebSearchFetch(id: string): Promise<WebSearchProbe>;
   listArchivedSessions(): Promise<ArchiveCatalog>;
   restoreArchivedSession(sessionId: string): Promise<ArchiveCatalog>;
   deleteArchivedSession(sessionId: string): Promise<ArchiveCatalog>;

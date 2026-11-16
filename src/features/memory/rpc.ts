@@ -1,8 +1,9 @@
 import { isRecord, isArray, isOneOf, hasStrings, type Codec, type RpcDescriptor } from '../../shared/types/protocol.ts';
 import { booleanCodec, stringCodec } from '../../shared/rpc/codecs.ts';
 import { MEMORY_TYPES, type MemoryCatalog, type MemoryFileDetail, type MemoryEntry, type MemoryWriteResult,
-  type MemoryModels, type MemoryCleanupPreview, type MemoryCleanupResult, type MemoryDetail } from './types.ts';
+  type MemoryModels, type MemoryCleanupPreview, type MemoryCleanupResult, type MemoryDetail, type MemorySourceResult } from './types.ts';
 import { parseModel, parseCleanupPlan } from './cleanup-plan.ts';
+import { parseMemorySource } from './provenance.ts';
 
 export function parseMemoryEntry(value: unknown): MemoryEntry {
   if (!isRecord(value) || !hasStrings(value, ['id', 'name', 'description', 'created', 'updated', 'originSessionId', 'revision'])
@@ -38,7 +39,8 @@ const detailCodec: Codec<MemoryFileDetail> = {
     const entry = parseMemoryEntry(value);
     if (!isRecord(value) || typeof value.content !== 'string' || value.content.length > 1200
       || typeof value.path !== 'string' || !value.path) throw new TypeError('memoryInvalid');
-    return { ...entry, content: value.content, path: value.path };
+    return { ...entry, content: value.content, path: value.path,
+      source: parseMemorySource(value.source) };
   } }),
 };
 
@@ -61,6 +63,30 @@ function descriptor<M extends string, Result>(method: M, fields: string[], resul
 
 export const LIST_MEMORY_ENTRIES_RPC = descriptor('listMemoryEntries', [], memoryCatalogCodec);
 export const READ_MEMORY_ENTRY_RPC = descriptor('readMemoryEntry', ['scope', 'id'], detailCodec);
+export const READ_MEMORY_SOURCE_RPC = descriptor('readMemorySource', ['scope', 'id', 'revision', 'offset'], {
+  mode: 'strict', typeSymbol: 'power-dsh#MemorySourceResult',
+  create: () => ({ parse(value: unknown): MemorySourceResult {
+    if (!isRecord(value) || typeof value.available !== 'boolean'
+      || value.historical !== undefined && typeof value.historical !== 'boolean'
+      || !isOneOf(value.reason, ['', 'not-recorded', 'unavailable', 'not-found', 'changed', 'workspace'] as const)
+      || value.available !== (value.reason === '') || !isArray(value.messages) || value.messages.length > 5) throw new TypeError('memoryInvalid');
+    const source = parseMemorySource(value.source);
+    if (value.available && !source || !value.available && value.messages.length !== 0) throw new TypeError('memoryInvalid');
+    const messages = value.messages.map(row => {
+      if (!isRecord(row) || !Number.isSafeInteger(row.seq) || Number(row.seq) < 0 || typeof row.time !== 'number' || !Number.isFinite(new Date(row.time).getTime())
+        || !isOneOf(row.role, ['user', 'assistant'] as const) || typeof row.target !== 'boolean'
+        || typeof row.text !== 'string' || row.text.length > (row.target ? 8_000 : 1_000)
+        || !Number.isSafeInteger(row.offset) || Number(row.offset) < 0 || !Number.isSafeInteger(row.length) || Number(row.length) < 0
+        || row.nextOffset !== null && (!Number.isSafeInteger(row.nextOffset) || Number(row.nextOffset) <= Number(row.offset)
+          || Number(row.nextOffset) >= Number(row.length))
+        || Number(row.offset) + row.text.length !== (row.nextOffset ?? row.length)) throw new TypeError('memoryInvalid');
+      return { seq: Number(row.seq), time: row.time, role: row.role, target: row.target, text: row.text,
+        offset: Number(row.offset), length: Number(row.length), nextOffset: row.nextOffset === null ? null : Number(row.nextOffset) };
+    });
+    if (value.available && messages.filter(row => row.target && row.role === 'user' && row.seq === source?.seq).length !== 1) throw new TypeError('memoryInvalid');
+    return { available: value.available, reason: value.reason, source, messages, historical: value.historical === true };
+  } }),
+});
 export const DELETE_MEMORY_ENTRY_RPC = descriptor('deleteMemoryEntry', ['scope', 'id', 'revision'], writeCodec);
 export const CLEAR_MEMORY_SCOPE_RPC = descriptor('clearMemoryScope', ['scope', 'revision'], writeCodec);
 export const OPEN_MEMORY_FOLDER_RPC = descriptor('openMemoryFolder', ['scope'], booleanCodec);
@@ -82,7 +108,7 @@ export const PREPARE_MEMORY_CLEANUP_RPC = descriptor('prepareMemoryCleanup', ['s
     const detail = (input: unknown) => {
       const entry = parseMemoryEntry(input);
       if (!isRecord(input) || entry.invalid || typeof input.content !== 'string' || !input.content.trim() || input.content.length > 1200) throw new TypeError('memoryInvalid');
-      entries.push({ ...entry, content: input.content });
+      entries.push({ ...entry, content: input.content, source: parseMemorySource(input.source) });
       return entry;
     };
     const raw = value.changes.map(change => {
@@ -102,5 +128,5 @@ export const APPLY_MEMORY_CLEANUP_RPC = descriptor('applyMemoryCleanup', ['token
     return { indexUpdated: value.indexUpdated, backup: value.backup };
   } }),
 });
-export const rpc = [LIST_MEMORY_ENTRIES_RPC, READ_MEMORY_ENTRY_RPC, DELETE_MEMORY_ENTRY_RPC, CLEAR_MEMORY_SCOPE_RPC, OPEN_MEMORY_FOLDER_RPC,
+export const rpc = [LIST_MEMORY_ENTRIES_RPC, READ_MEMORY_ENTRY_RPC, READ_MEMORY_SOURCE_RPC, DELETE_MEMORY_ENTRY_RPC, CLEAR_MEMORY_SCOPE_RPC, OPEN_MEMORY_FOLDER_RPC,
   MEMORY_CLEANUP_MODELS_RPC, PREPARE_MEMORY_CLEANUP_RPC, CANCEL_MEMORY_CLEANUP_RPC, APPLY_MEMORY_CLEANUP_RPC];

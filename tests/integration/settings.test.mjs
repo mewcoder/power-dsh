@@ -117,7 +117,7 @@ test('settings default to General with custom wallpaper first in Interface', asy
   const groups = {
     general: ['notificationSoundEnabled'],
     interface: ['wallpaperEnabled', 'showThinkingEffortSwitcher', 'showThemeSwitcher', 'showVersion', 'searchPopupEnabled'],
-    enhancements: ['standalonePageEnabled', 'personalizationEnabled', 'memoryEnabled', 'skillManagerEnabled', 'mcpManagerEnabled', 'projectManagerEnabled', 'archiveManagerEnabled', 'usageStatsEnabled'],
+    enhancements: ['standalonePageEnabled', 'personalizationEnabled', 'memoryEnabled', 'skillManagerEnabled', 'mcpManagerEnabled', 'webSearchEnabled', 'projectManagerEnabled', 'archiveManagerEnabled', 'usageStatsEnabled', 'historySearchEnabled'],
     simplify: ['blockOfficialAccount', 'blockOfficialSearch', 'blockOfficialTelemetry', 'blockTodo', 'blockPlan', 'blockGoal'],
     other: ['showRefreshButton', 'showRestartButton', 'blockDoubleClickRename'],
   };
@@ -149,7 +149,7 @@ test('settings default to General with custom wallpaper first in Interface', asy
     fields.push(...actual);
     assert.ok(!view.some(node => node.type === 'textarea'));
   }
-  assert.equal(new Set(fields).size, 23);
+  assert.equal(new Set(fields).size, Object.values(groups).flat().length);
   app.unmount();
 });
 

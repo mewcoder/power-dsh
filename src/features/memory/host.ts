@@ -7,11 +7,13 @@ import { createMemoryTool } from './memory-tool.ts';
 import { memoryPolicy, renderMemoryContext, type MemoryPrompt } from './injection.ts';
 import { memoryError } from './types.ts';
 import { MemoryCleanup, type MemoryLlm } from './cleanup.ts';
+import { MemorySources, type MemorySourceQuery } from './sources.ts';
 
 export function createHost(ctx: NativeContext, config: LivePreferences, { owner, ensureActive }: HostOptions) {
   let alive = true;
   let prompt: MemoryPrompt | null = null;
   let registered = false;
+  let generation = 0;
   let failure = '';
   let releases: Release[] = [];
   let desktop: NativeSessionController | null = null;
@@ -26,13 +28,16 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
     if (!alive || !config.memoryEnabled?.get()) throw new Error('memoryDisabled');
   };
   const memory = new MemoryStore(owner.profileContext.home, ensureEnabled);
+  const sources = new MemorySources();
   const cleanup = new MemoryCleanup(memory, ensureEnabled, () => {
     const catalog = desktop && Reflect.get(desktop, 'modelCatalog');
     return llm && typeof catalog === 'function' ? { llm, catalog: () => catalog.call(desktop) as Promise<unknown> } : null;
   });
   const stop = () => {
+    generation++;
     cleanup.cancelAll();
     cancelFolders();
+    sources.cancel();
     for (const release of releases.splice(0).reverse()) release();
     registered = false;
     failure = '';
@@ -41,6 +46,7 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
     if (!alive || !config.memoryEnabled?.get() || !prompt) { stop(); return; }
     if (registered) return;
     const current = prompt;
+    const currentGeneration = generation;
     try {
       releases.push(current.section({ name: 'power-dsh:memory-policy', order: 700, interpolate: false,
         text: () => config.memoryEnabled?.get() ? memoryPolicy(config.memoryAutoCapture?.get() !== false) : '' }));
@@ -52,7 +58,7 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
             ? config.memoryGlobalEnabled?.get() !== false : config.memoryWorkspaceEnabled?.get() !== false);
           return renderMemoryContext(scopes);
         } }));
-      releases.push(ctx.tools.register(createMemoryTool(memory, config, () => registered)));
+      releases.push(ctx.tools.register(createMemoryTool(memory, config, () => registered && generation === currentGeneration, sources)));
       releases.push(ctx.on('agent/pre-step', async ({ agent }, next) => {
         if (!alive || !config.memoryEnabled?.get()) return next();
         try {
@@ -73,6 +79,11 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
     desktop = child.sessionController ?? null;
     child.effect(() => () => { desktop = null; cancelFolders(); cleanup.cancelAll(); });
   });
+  ctx.inject(['sessionQuery'], child => {
+    const service: unknown = child.sessionQuery;
+    if (!service || typeof service !== 'object' || typeof Reflect.get(service, 'readSurface') !== 'function') return;
+    child.effect(() => sources.bind(service as MemorySourceQuery));
+  });
   ctx.inject(['llm'], child => {
     const service: unknown = Reflect.get(child, 'llm');
     if (!service || typeof service !== 'object' || typeof Reflect.get(service, 'stream') !== 'function') return;
@@ -91,9 +102,11 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
   ctx.on('settings/document-updated', namespace => {
     if (namespace === owner.fiber.entry?.options.id) sync();
   });
-  ctx.effect(() => () => { alive = false; stop(); memory.close(); });
+  ctx.effect(() => () => { alive = false; stop(); sources.close(); memory.close(); });
   return {
     memory,
+    memorySources: sources,
+    memoryGeneration: () => generation,
     memoryCleanup: cleanup,
     async memoryCatalog() {
       ensureEnabled();
@@ -124,6 +137,25 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
 }
 
 export const methods = {
+  async readMemorySource(scope: string, id: string, revision: string, offset: string) {
+    return this.run(async () => {
+      const generation = this.memoryGeneration();
+      const guard = () => {
+        this.memoryEnsureEnabled();
+        if (this.memoryGeneration() !== generation) throw new Error('memorySourceUnavailable');
+      };
+      guard();
+      if (!/^[0-9]{1,10}$/.test(offset)) throw new Error('memoryInvalid');
+      const detail = await this.memory.read(scope, id);
+      guard();
+      if (detail.revision !== revision) throw new Error('memoryConflict');
+      const result = await this.memorySources.read(detail.source, Number(offset), new AbortController().signal, guard);
+      guard();
+      if ((await this.memory.read(scope, id)).revision !== revision) throw new Error('memoryConflict');
+      guard();
+      return result;
+    });
+  },
   memoryCleanupModels() { return this.run(() => ({ pending: this.memoryCleanup.models() })).then(result => result.pending); },
   prepareMemoryCleanup(scope: string, model: string, token: string) {
     return this.run(() => ({ pending: this.memoryCleanup.prepare(scope, model, token) })).then(result => result.pending);

@@ -8,8 +8,9 @@ import { MemoryStore } from '../memory-store.ts';
 import { createMemoryTool } from '../memory-tool.ts';
 import { memoryPolicy, renderMemoryContext } from '../injection.ts';
 import { MemoryCleanup } from '../cleanup.ts';
+import { MemorySources } from '../sources.ts';
 
-async function* completion(options, input) {
+export async function* completion(options, input) {
   const response = await fetch(`${options.baseURL.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${options.apiKey}` },
@@ -58,7 +59,8 @@ function parseArguments(tool, text) {
   for (const [name, value] of Object.entries(args)) {
     const field = tool.parameters.properties[name];
     assert.ok(field, 'Unknown memory parameter');
-    assert.equal(typeof value, field.type);
+    assert.equal(typeof value, field.type === 'integer' ? 'number' : field.type);
+    if (field.type === 'integer') assert.ok(Number.isSafeInteger(value));
     if (field.enum) assert.ok(field.enum.includes(value), 'Invalid memory enum');
   }
   for (const name of tool.parameters.required ?? []) assert.ok(Object.hasOwn(args, name), 'Missing memory parameter');
@@ -75,7 +77,13 @@ export async function runMemoryLive(options) {
   const flags = { memoryEnabled: true, memoryAutoCapture: true, memoryGlobalEnabled: true, memoryWorkspaceEnabled: true };
   const config = Object.fromEntries(Object.keys(flags).map(key => [key, { get: () => flags[key] }]));
   let store = new MemoryStore(home);
-  let tool = createMemoryTool(store, config, () => true);
+  const sources = new MemorySources();
+  const sessions = new Map();
+  sources.bind({ async readSurface(id) {
+    assert.ok(sessions.has(id));
+    return structuredClone(sessions.get(id));
+  } });
+  let tool = createMemoryTool(store, config, () => true, sources);
   let cleanup;
   const report = { model: options.model, reasoningEffort: options.reasoningEffort ?? '',
     started: new Date().toISOString(), boundary: 'Real configured model with source memory tool/store/policy and cleanup; direct protocol adapter, not native DSH/UI',
@@ -98,10 +106,11 @@ export async function runMemoryLive(options) {
             ? error.message : 'Model or test operation failed',
         location: String(error?.stack ?? '').split('\n').slice(1).filter(line => line.includes('/src/features/memory/')).slice(0, 3)
           .map(line => line.replace(/.*\/src\/features\/memory\//, 'memory/')) });
-      throw error;
     }
   }
   async function chat(text, session = randomUUID()) {
+    sessions.set(session, { session: { id: session, cwd: project }, events: [{ seq: 1, time: Date.now(), type: 'user/message',
+      data: { source: { kind: 'user' }, content: [{ type: 'text', text }] } }] });
     const signal = AbortSignal.timeout(120_000);
     const messages = [{ role: 'user', content: text }];
     for (let step = 0; step < 12; step++) {
@@ -177,7 +186,7 @@ export async function runMemoryLive(options) {
       assert.notEqual(entries[0].revision, before.revision);
       assert.match(entries[0].content, /中文/);
       assert.match(entries[0].content, /结论/);
-      assert.match(entries[0].content, /不限|不(?:再)?(?:限定|限制)|取消.*(?:上限|限制)|无.*(?:上限|限制)/);
+      assert.match(entries[0].content, /不限|不(?:再)?(?:限定|限制)|不作限制|取消.*(?:上限|限制)|无.*(?:上限|限制)/);
       return entries;
     });
     await runCase('automatic capture off skips incidental information and permits explicit remember', async () => {
@@ -188,7 +197,7 @@ export async function runMemoryLive(options) {
       const reply = await chat('顺便聊一句，我平时把代码缩进设为两个空格。');
       assert.deepEqual(await allDetails(), before);
       assert.deepEqual(await allDetails(workspace.id), projectBefore);
-      assert.doesNotMatch(reply, /(?:已经?|成功)(?:记住|记下|保存|记录)|记下了|以后.*(?:记住|沿用|照做)/);
+      assert.doesNotMatch(reply, /(?:^|[。！\n])\s*(?:(?:已经?|成功)(?:记住|记下|保存|记录)|记下了|以后[^。！\n]*(?:沿用|照做))/);
       await chat('请记住：我喜欢用两个空格缩进代码。');
       const entries = await allDetails();
       assert.ok(entries.some(entry => /缩进/.test(entry.content) && /两个|2|两/.test(entry.content)));
@@ -206,7 +215,7 @@ export async function runMemoryLive(options) {
     await runCase('new store instance and fresh chat recall saved preferences', async () => {
       store.close();
       store = new MemoryStore(home);
-      tool = createMemoryTool(store, config, () => true);
+      tool = createMemoryTool(store, config, () => true, sources);
       const reply = await chat('我之前保存了哪些回答风格偏好？请先读取有关记忆再回答，不要猜测。');
       assert.match(reply, /中文/);
       assert.match(reply, /结论/);
@@ -215,6 +224,8 @@ export async function runMemoryLive(options) {
     await runCase('exact content under another filename reuses the existing file', async () => {
       const before = await allDetails();
       const entry = before[0];
+      sessions.set('exact-duplicate', { session: { id: 'exact-duplicate', cwd: project }, events: [{ seq: 1,
+        time: Date.now(), type: 'user/message', data: { source: { kind: 'user' }, content: [{ type: 'text', text: entry.content }] } }] });
       const result = await tool.execute({ action: 'save', scope: 'global', type: entry.type,
         name: 'test-identical-copy', description: entry.description, content: entry.content, revision: '' },
       { signal: AbortSignal.timeout(10_000), agent: { session: { header: { id: 'exact-duplicate', cwd: project } } } });
@@ -223,6 +234,75 @@ export async function runMemoryLive(options) {
       assert.equal(result.data.entry.id, entry.id);
       assert.equal((await allDetails()).length, before.length);
       return { id: entry.id, reused: true };
+    });
+    await runCase('explicit Windows fact stays brief without inferred operating rules', async () => {
+      const workspace = await store.workspace(project);
+      const before = [...await allDetails(), ...await allDetails(workspace.id)];
+      await chat('请记住当前环境是win。');
+      const entries = [...await allDetails(), ...await allDetails(workspace.id)];
+      const added = entries.filter(entry => !before.some(previous => previous.id === entry.id));
+      assert.equal(added.length, 1);
+      for (const previous of before) assert.deepEqual(entries.find(entry => entry.id === previous.id), previous);
+      const entry = added[0];
+      assert.match(entry.content, /win(?:dows)?/i);
+      assert.match(entry.content, /当前|本机|此.*环境|current/i);
+      const claims = `${entry.description}\n${entry.content}`.split(/[\n。；]/u)
+        .filter(line => !/未确认|未说明|未指定|尚不清楚|未知|不确定|待确认|不要.*推断/.test(line)).join('\n');
+      assert.doesNotMatch(claims, /powershell|cmd\b|wsl|bash|CRLF|反斜杠/i, 'Windows alone does not establish a shell, line ending or path convention');
+      assert.doesNotMatch(claims, /(?:偏好|默认|必须|只能|始终)[^。\n]{0,16}(?:powershell|cmd\b|wsl|bash|shell)|(?:禁止|不得|不要使用)[^。\n]{0,12}(?:linux|mac|bash)|(?:所有|全部)项目/i);
+      return added;
+    });
+    await runCase('README language preference does not spread to documentation or UI', async () => {
+      const before = await allDetails();
+      await chat('请记住我的偏好：README默认中文。');
+      const entries = await allDetails();
+      const added = entries.filter(entry => !before.some(previous => previous.id === entry.id));
+      assert.equal(added.length, 1);
+      const entry = added[0];
+      assert.match(entry.content, /README/i);
+      assert.match(entry.content, /中文/);
+      assert.doesNotMatch(`${entry.description}\n${entry.content}`, /所有.*文档|全部.*文档|一切|界面|UI|注释|沟通|回答|交流|英文|英语/i);
+      return added;
+    });
+    await runCase('current Linux environment overrides saved Windows fact without inventing new preferences', async () => {
+      const workspace = await store.workspace(project);
+      const before = await allDetails(workspace.id);
+      const globalBefore = await allDetails();
+      const reply = await chat('本次已经换到Linux环境，这只是这次会话的信息，不要修改长期记忆。你现在应按哪个系统处理？');
+      assert.match(reply, /Linux/i);
+      assert.doesNotMatch(reply, /(?:必须|只能|仍(?:然)?|继续)(?:使用|按|以|遵循)[^。\n]{0,12}(?:Windows|PowerShell)/i);
+      assert.deepEqual(await allDetails(workspace.id), before);
+      assert.deepEqual(await allDetails(), globalBefore);
+      return { reply };
+    });
+    await runCase('richer environment context retains explicit shell instructions and the CI exception', async () => {
+      const workspace = await store.workspace(project);
+      const globalBefore = await allDetails();
+      await chat('补充并记住当前项目环境：本地开发用Windows，终端是PowerShell 7；因为路径经常有空格，命令里的路径要加引号。但CI仍然用Linux。这些只针对当前项目。');
+      const entries = await allDetails(workspace.id);
+      const content = entries.map(entry => entry.content).join('\n');
+      assert.match(content, /Windows/i);
+      assert.match(content, /PowerShell\s*7/i);
+      assert.match(content, /空格/);
+      assert.match(content, /引号/);
+      assert.match(content, /CI[^。\n]{0,35}Linux|Linux[^。\n]{0,35}CI/i);
+      assert.doesNotMatch(content, /CRLF|反斜杠/, 'Explicit shell and quoting guidance does not establish other platform conventions');
+      assert.deepEqual(await allDetails(), globalBefore);
+      return entries;
+    });
+    await runCase('project decision keeps its stated reason date and experimental exception', async () => {
+      const workspace = await store.workspace(project);
+      const globalBefore = await allDetails();
+      await chat('请记住这个项目的协议决策：为了兼容旧客户端，正式发布暂不升级协议，限制到2026-11-20；实验分支可以先试新协议。');
+      const entries = await allDetails(workspace.id);
+      const content = entries.map(entry => entry.content).join('\n');
+      assert.match(content, /兼容.*旧客户端/);
+      assert.match(content, /正式发布/);
+      assert.match(content, /2026[-年/]11[-月/]20/);
+      assert.match(content, /实验分支/);
+      assert.match(content, /(?:实验分支[^。\n]{0,30}(?:可以|可先|允许|试|升级))/);
+      assert.deepEqual(await allDetails(), globalBefore);
+      return entries;
     });
     const cleanupHome = join(root, 'cleanup');
     await mkdir(cleanupHome);
@@ -292,11 +372,12 @@ export async function runMemoryLive(options) {
       }
       return { beforeCount: before.length, afterCount: after.length, suggestedChanges: preview.changes.length };
     });
-    report.passed = true;
+    report.passed = report.cases.every(row => row.passed);
   } catch {
     report.passed = false;
   } finally {
     cleanup?.cancelAll();
+    sources.close();
     store.close();
     report.finished = new Date().toISOString();
     const output = options.reportPath ?? join(tmpdir(), `power-dsh-memory-live-${randomUUID()}.json`);

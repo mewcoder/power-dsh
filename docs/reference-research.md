@@ -1,5 +1,15 @@
 # 参考研究
 
+## 实验性历史对话检索
+
+2026-11-16 按轻量实效方向补齐原文与纠正查询。本环境再次搜索 `cordis_inspect_list` 无可用工具，只读核对本机 DSH `0.2.2-rc.3` 安装包 `dsh-session-query/src/index.ts` 的公开 `readSession(id)`：它经原生会话回放校验后返回原始事件与同次观察的 header。历史检索优先使用它，缺席才使用 `readSurface`；记忆来源仅在当前表面找不到所引消息时按需回查原始日志，仍核对身份、项目及 seq/time/hash，明确旧原文可能被替换。无需新数据库、全文索引或后台任务，消息时间与角色过滤在现有读取后完成。
+
+2026-11-16 记忆出处与修订扩展沿用下述 `0.2.2-rc.3` 公开 `readSurface(id)` 的原子 session header/current surface 观察，只捕获当前调用会话的用户文本来源，保留 seq/time/hash，按需读回并核对哈希。官方固定源码 `fcc0ad46` 的 `packages/core/session/src/index.ts` 标明 `eventAt/snapshotEvents` 已弃用，故本扩展不调用这些同步接口；工具调用身份使用公开 `ToolRunContext.agent.session.header`。本环境 Inspect 仍不可调用，来源读取为可选能力；缺席不伪造消息定位，旧文件无证据不补造，实际 UI 与模型链路须另行验收。
+
+同日原生验收发现，`user/message` 还承载宿主上下文，不能仅凭事件类型认定为用户原话。只读核对本机 `0.2.2-rc.3` 安装包内 `dsh-llm/src/message.ts` 的 `MessageSourceMap.user` 与 `dsh-client-ui-chat/src/client/conversation-nodes/message.ts` 的原生分流，确认以 `data.source.kind === 'user'` 识别人工输入。记忆出处捕获、原文邻文和实验性历史检索均据此排除注入及未知来源，缺少标识时不猜测；未复制内部 UI 实现。
+
+2026-11-15 核对本地 `amd47802574/dsh-session-fulltext-search`（MIT，提交 `93d4c0c`，工作区干净）的 README，了解默认关闭的 FTS 与中文分词限制；本功能不复制其代码、不接管其引擎配置。当前工具中没有可调用的 `cordis_inspect_list`，转而只读核对本机 DSH `0.2.2-rc.3` 安装包中 `@deepseek-ai/dsh-session-query/lib/index.js` 的 `filterSessions(filters, signal)` 与 `readSurface(id)`，并对照官方固定源码 `fcc0ad46` 的 `packages/session-query/session-query/src/index.ts`、`types.ts`、`filters.ts` 及 `packages/experimental/tool-session-query/src/workspace-access.ts`。借鉴公开的 cwd 授权及观察后二次检查方式，没有复制其工具或引入依赖；本功能仅投影当前表面的用户／助手文本，采用有界按需字面匹配，与其他项目、原始工具结果和被替换事件隔离。接口核对不等于旧版本、原生模型调用或 GUI 验收，行为以[主 Spec](../src/features/history-search/spec.md)为准。
+
 本文保留开发时的来源与接口核对记录，不随安装包发布。随包版权与许可见[第三方许可](third-party-notices.md)。
 
 ## 独立功能页分段导航
@@ -310,3 +320,23 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 2026-11-15 索引同步修复：当前没有可调用的 `cordis_inspect_list`，只读核对本机 `0.2.2-rc.3` 安装包的 `dsh-session-query-sqlite/lib/index.js` 与 `dsh-session-query/lib/index.js`。公开 `searchSessions` 在查询前执行内部同步，持久生成号仅随该同步更新，不能靠轮询数据库主动刷新；活跃会话使用连接私有临时表，另一个 SQLite 连接不能读取。故本插件通过公开查询触发同步，再只读持久缓存，并以公开 `listSessions`、`readSurface` 取得活跃会话当前消息作为覆盖。未调用私有方法、未修改宿主实现，也未将源码存在性视为真实 profile 验收或端到端性能证据。
 
 同日真实 Host 性能测试确认每次同步、枚举和 `readSurface` 是主要开销，后续改为按需增量：已有 SQLite 只作为冷启动种子，用 `sessionPersistence.list` 的 revision 校验；正常热查询不再调用全局同步或目录枚举。`dsh-session` 公开 `session/event`、`session/created`、`session/disposed`、`Session.seq` 与 `Session.surface.contentGeneration/nodes` 支持消息追加与复杂替换失效；`observeSession` 的不可变切片与公开 `buildSessionEventSearchDocuments` 支持规范正文提取且避免重复深复制。观察租约始终释放，不调用已废弃的 `snapshotEvents`/`eventAt`，不读取私有临时表。宿主公开 API 缺失时退回原有公开读取；性能数据与范围见主 Spec，真实服务基准不等于页面计时。
+
+## 第三方网页搜索参考（2026-11-16）
+
+页面优化对照本地保留的 `@deepseek-ai/dsh-client-ui-settings-models@0.2.2-rc.1` 发行包及官方 `ModelsSection.module.css`、`EditorFooter.tsx`，复用模型页 720px 限宽、卡片、32px 字段与操作区规格。另核对公共 `Menu` 的 `className` 和 inline-flex 根包装，为自有添加菜单显式设为整行宽度。改编样式的 MIT 声明已保留在[第三方许可](third-party-notices.md)。本轮未提供 `cordis_inspect_list` 工具，接口以确切发行包为依据；不运行时导入内部组件，不覆盖宿主样式。
+
+同时在运行中的 DSH `0.2.2-rc.3` 只读对照模型列表与编辑面板，核对名称／标签／状态点顺序、编辑标题、灰色内嵌区及右侧取消／保存布局；未提交模型配置。网页页的空搜索列表、本机获取行和整行添加入口已在深色主题实际展示，提供方编辑、窄屏与浅色主题仍需另验。
+
+同日设置不可用排查：原生插件详情明确显示旧 `webSearchChain` 的字符串成员被新对象 schema 拒绝，Host 组件因此异常，Client 随后报告 `PD-SETTINGS-LOAD`。兼容 schema 同时接受字符串与实例对象，旧密钥读取和首次写入转换只使用已核对的凭据及 `configEditor` 接口。通过原生插件开关重载本地链接后，组件恢复运行，设置及原 Tavily 条目恢复；未手写 profile 或移除已有配置。
+
+[第三方网页搜索](../src/features/web-search/spec.md)开发时核对了以下社区实现，仅用于理解接入方式，未复制代码：
+
+- [`wlj521/dsh-ui-tweaks`](https://github.com/wlj521/dsh-ui-tweaks) `src/search.ts`：向 `ctx.web.registerSearchProvider` 注册单一 provider，引擎 id 与插件名同名以避免冲突，密钥经 `ctx.credentials.resolve` 解析、回落到进程环境。
+- [`MochiNek0/dsh-web-search-free`](https://github.com/MochiNek0/dsh-web-search-free)：多引擎按序 fallback 的完整实现；每家 provider 自己映射字段，空结果**抛错而不是返回空数组**，否则会截断后续回退链——本模块沿用了这条约定。
+- [`240xu/dsh-websearch`](https://github.com/240xu/dsh-websearch)：并发分发到多个引擎后按 URL 去重合并，与本模块的顺序回退是两种取舍。
+
+接口依据仍来自本机安装包：`@deepseek-ai/dsh-web` 的 `registerSearchProvider` / `registerFetchProvider`、`WebSearchResult`、`WebFetchBody`（闭合联合，provider 自行解码 kind），以及 `@deepseek-ai/dsh-credentials` 的 `modifyRecord` / `describeRecord`。原生「插件 → 网页搜索」页通过 `web/listProviders` 列出注册项，因此第三方 provider 会出现在该页下拉中。
+
+免费额度与端点的核对结果见[免费额度调研](web-search-free-tier-research-2026-11-16.md)。
+
+同日测试失败排查：只读核对本机 `0.2.2-rc.3` 发行包中的 `dsh-http-proxy/src/install.ts`、`policy.ts` 与 `dsh/src/profile-boot.ts`，确认启动器依据启动环境快照安装 undici 全局代理 dispatcher，插件的 `fetch` 遵守该策略。DSH 内 Firecrawl 免密钥搜索在约 5 秒后返回 `ECONNRESET`，无 HTTP 状态；同机同参数（公开查询 `DeepSeek`、5 条结果）直连成功，Node 启用环境代理后复现同样连接重置。Tavily 同机请求另有 HTTP 429，不能把两家失败混为额度或密钥问题。当前仅完善安全诊断与超时，不改宿主 dispatcher、系统代理或用户网络配置，不据此声称 DSH 请求成功。

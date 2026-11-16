@@ -3,10 +3,11 @@ import { lstat, mkdir, open, readdir, realpath, rename, unlink } from 'node:fs/p
 import { createHash, randomUUID } from 'node:crypto';
 import { isAbsolute, join, resolve } from 'node:path';
 import { OperationQueue } from '../../shared/host/operation-queue.ts';
-import { MEMORY_TYPES, type MemoryCatalog, type MemoryDetail, type MemoryEntry, type MemoryScope, type MemoryType, type MemoryCleanupPreview } from './types.ts';
+import { MEMORY_TYPES, type MemoryCatalog, type MemoryDetail, type MemoryEntry, type MemoryScope, type MemoryType, type MemoryCleanupPreview, type MemorySource } from './types.ts';
 import { isRecord } from '../../shared/types/protocol.ts';
+import { parseMemorySource } from './provenance.ts';
 
-const MAX_FILE_BYTES = 16_384;
+const MAX_FILE_BYTES = 262_144;
 const MAX_ENTRIES = 500;
 const MAX_SCOPES = 64;
 const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -28,7 +29,7 @@ function entryParts(id: string): [MemoryType, string] {
 }
 
 function summary(entry: MemoryDetail): MemoryEntry {
-  const { content: _content, ...row } = entry;
+  const { content: _content, source: _source, ...row } = entry;
   return row;
 }
 
@@ -64,25 +65,36 @@ export function parseMemoryFile(text: string, name: string): MemoryDetail {
   const [type] = entryParts(`${fields.type}/${name}`);
   const id = `${type}/${name}`;
   const content = match[2]!;
-  if (fields.schemaVersion !== 1 || fields.name !== name || fields.type !== type
+  if (fields.schemaVersion !== 1 && fields.schemaVersion !== 2 || fields.name !== name || fields.type !== type
     || typeof fields.description !== 'string' || !fields.description.trim()
     || fields.description.length > 160 || /[\r\n\u0000-\u001f\u007f]/.test(fields.description)
     || typeof fields.created !== 'string'
     || typeof fields.updated !== 'string' || typeof fields.originSessionId !== 'string'
     || fields.originSessionId.length > 200 || !Number.isFinite(Date.parse(fields.created))
     || !Number.isFinite(Date.parse(fields.updated)) || !content.trim() || content.length > 1200) throw new Error('memoryInvalid');
+  const source = fields.schemaVersion === 2 ? parseMemorySource(fields.source) : null;
   return { id, name, type, description: fields.description, created: fields.created,
-    updated: fields.updated, originSessionId: fields.originSessionId, content, revision: digest(text), invalid: false };
+    updated: fields.updated, originSessionId: fields.originSessionId, content, source, revision: digest(text), invalid: false };
 }
 
-function serialize(entry: MemoryDetail) {
-  const fields = { schemaVersion: 1, name: entry.name, description: entry.description, type: entry.type,
-    created: entry.created, updated: entry.updated, originSessionId: entry.originSessionId };
-  return `---\n${Object.entries(fields).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n')}\n---\n${entry.content}`;
+function serialize(entry: MemoryDetail, previous = '') {
+  const fields = { schemaVersion: 2, name: entry.name, description: entry.description, type: entry.type,
+    created: entry.created, updated: entry.updated, originSessionId: entry.originSessionId,
+    source: parseMemorySource(entry.source) };
+  const legacyHistory = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(previous)?.[1]
+    ?.split(/\r?\n/).find(line => line.startsWith('history: '));
+  const header = Object.entries(fields).map(([key, value]) => `${key}: ${JSON.stringify(value)}`);
+  if (legacyHistory) header.push(legacyHistory);
+  const text = `---\n${header.join('\n')}\n---\n${entry.content}`;
+  if (Buffer.byteLength(text) > MAX_FILE_BYTES) throw new Error('memoryLimit');
+  return text;
 }
 
 interface ScopeData { scope: MemoryScope; details: MemoryDetail[] }
-interface SaveMemory { type: MemoryType; name: string; description: string; content: string; revision: string; originSessionId: string }
+interface SaveMemory {
+  type: MemoryType; name: string; description: string; content: string; revision: string;
+  originSessionId: string; source?: MemorySource | null;
+}
 
 export class MemoryStore {
   readonly path: string;
@@ -338,7 +350,7 @@ export class MemoryStore {
     return this.locked(async () => {
       const entry = (await this.load(scope)).details.find(row => row.id === id);
       if (!entry) throw new Error('memoryNotFound');
-      return { ...entry };
+      return structuredClone(entry);
     });
   }
 
@@ -354,9 +366,9 @@ export class MemoryStore {
       if (previous && previous.id !== id || (previous?.revision ?? '') !== input.revision) throw new Error('memoryConflict');
       if (!data.scope.complete) throw new Error('memoryLimit');
       const duplicate = !previous ? data.details.find(row => !row.invalid && normalized(row.content) === normalized(input.content)) : null;
-      if (duplicate) return { entry: summary(duplicate), indexUpdated: await this.rebuild(data), reused: true };
+      if (duplicate) return { entry: summary(duplicate), indexUpdated: await this.rebuild(data), reused: true, sourceRecorded: Boolean(duplicate.source) };
       if (previous && !previous.invalid && previous.content === input.content && previous.description === input.description) {
-        return { entry: summary(previous), indexUpdated: await this.rebuild(data), reused: true };
+        return { entry: summary(previous), indexUpdated: await this.rebuild(data), reused: true, sourceRecorded: Boolean(previous.source) };
       }
       if (!data.scope.complete || !previous && data.details.length >= MAX_ENTRIES) throw new Error('memoryLimit');
       if (scope !== 'global') {
@@ -375,13 +387,17 @@ export class MemoryStore {
       const now = new Date().toISOString();
       const entry: MemoryDetail = { id, name: input.name, type: input.type, description: input.description,
         content: input.content, created: previous?.created || now, updated: now,
-        originSessionId: input.originSessionId.slice(0, 200), revision: '', invalid: false };
-      const text = serialize(entry);
+        originSessionId: previous ? previous.originSessionId : input.originSessionId.slice(0, 200),
+        source: parseMemorySource(input.source),
+        revision: '', invalid: false };
+      const original = previous ? await this.readFile(directory, `${input.name}.md`) : '';
+      if (previous && digest(original) !== previous.revision) throw new Error('memoryConflict');
+      const text = serialize(entry, original);
       parseMemoryFile(text, input.name);
       await this.atomic(directory, `${input.name}.md`, text, guard);
       entry.revision = digest(text);
       const updated = this.cache(scope, cwd, [...data.details.filter(row => row.id !== id), entry], data.scope.complete);
-      return { entry: summary(entry), indexUpdated: await this.rebuild(updated), reused: false };
+      return { entry: summary(entry), indexUpdated: await this.rebuild(updated), reused: false, sourceRecorded: Boolean(entry.source) };
     });
   }
 
@@ -432,8 +448,8 @@ export class MemoryStore {
     return this.locked(async () => {
       const data = await this.load(scope);
       if (!data.scope.complete || data.details.some(entry => entry.invalid)) throw new Error('memoryIncomplete');
-      if (JSON.stringify(data.details).length > 80_000) throw new Error('memoryCleanupLimit');
-      return { scope: { ...data.scope }, details: data.details.map(entry => ({ ...entry })) };
+      if (JSON.stringify(data.details.map(entry => ({ id: entry.id, description: entry.description, content: entry.content }))).length > 80_000) throw new Error('memoryCleanupLimit');
+      return { scope: { ...data.scope }, details: structuredClone(data.details) };
     });
   }
 
@@ -490,7 +506,7 @@ export class MemoryStore {
           const original = await this.readFile(directory, `${entry.name}.md`);
           if (digest(original) !== entry.revision) throw new Error('memoryConflict');
           const text = entry.id === change.before.id ? serialize({ ...current, description: change.description,
-            content: change.content, updated: new Date().toISOString() }) : '';
+            content: change.content, updated: new Date().toISOString(), source: null }, original) : '';
           if (text) parseMemoryFile(text, entry.name);
           targets.push({ name: entry.name, before: digest(original), after: text ? digest(text) : '', text, original });
           if (targets.length > 50) throw new Error('memoryCleanupLimit');

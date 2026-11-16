@@ -65,6 +65,17 @@ test('tool scope isolation and live switches reject calls, including previously 
   assert.equal((await tool.execute({ action: 'list', scope: 'global' }, execution)).error, 'memoryDisabled');
 });
 
+test('omitted revision creates a new memory but never overwrites an existing entry', async t => {
+  const { store, tool, execution } = await fixture(t);
+  const args = { action: 'save', scope: 'global', type: 'user', name: 'indent', description: '缩进偏好', content: '使用两个空格缩进。' };
+  const saved = await tool.execute(args, execution);
+  assert.equal(saved.ok, true);
+  const before = await store.read('global', saved.data.entry.id);
+  const conflict = await tool.execute({ ...args, content: '改为四个空格。' }, execution);
+  assert.equal(conflict.error, 'memoryConflict');
+  assert.deepEqual(await store.read('global', before.id), before);
+});
+
 test('tool cancellation and unexpected errors never disclose raw diagnostics', async t => {
   const { tool, execution, store } = await fixture(t);
   store.list = async () => { throw new Error('/private/machine/path?token=topsecret'); };
@@ -121,7 +132,7 @@ test('strict RPC projection excludes unrecognized data and rejects malformed ent
   assert.throws(() => parse({ ...value, scopes: [scope('global', [{ ...entry(0), invalid: 'true' }])] }), /memoryInvalid/);
   const parseDetail = READ_MEMORY_ENTRY_RPC.result.create().parse;
   const detail = { ...entry(0), content: 'Saved preference', path: '/local/memory/item-0.md' };
-  assert.deepEqual(parseDetail({ ...detail, secret: 'do not serialize' }), detail);
+  assert.deepEqual(parseDetail({ ...detail, secret: 'do not serialize' }), { ...detail, source: null });
   assert.throws(() => parseDetail({ ...detail, path: undefined }), /memoryInvalid/);
   assert.throws(() => parseDetail({ ...detail, path: '' }), /memoryInvalid/);
 });

@@ -2,7 +2,8 @@ import type { SkillCatalog, SkillDetail, ExternalSkillCatalog, ExternalSkillDeta
 import type { WindowsNotification, NotificationDelivery, NotificationCleared } from './wire.ts';
 import type { NotificationTransport, PluginRelease } from './wire.ts';
 import type { SearchContentResult } from './wire.ts';
-import type { MemoryCatalog, MemoryFileDetail, MemoryWriteResult, MemoryModels, MemoryCleanupPreview, MemoryCleanupResult } from './wire.ts';
+import type { MemoryCatalog, MemoryFileDetail, MemoryWriteResult, MemoryModels, MemoryCleanupPreview, MemoryCleanupResult, MemorySourceResult } from './wire.ts';
+import type { WebSearchCatalog, WebSearchProbe } from './wire.ts';
 
 /** Named Host operations, before the transport adds its result envelope. */
 export interface PowerDshMethods {
@@ -12,6 +13,7 @@ export interface PowerDshMethods {
   applyMemoryCleanup(token: string): Promise<MemoryCleanupResult>;
   listMemoryEntries(): Promise<MemoryCatalog>;
   readMemoryEntry(scope: string, id: string): Promise<MemoryFileDetail>;
+  readMemorySource(scope: string, id: string, revision: string, offset: string): Promise<MemorySourceResult>;
   deleteMemoryEntry(scope: string, id: string, revision: string): Promise<MemoryWriteResult>;
   clearMemoryScope(scope: string, revision: string): Promise<MemoryWriteResult>;
   openMemoryFolder(scope: string): Promise<boolean>;
@@ -53,6 +55,13 @@ export interface PowerDshMethods {
   readMcpServer(id: string): Promise<McpServerDetail | null>;
   setMcpServerEnabled(id: string, enabled: boolean): Promise<McpCatalog>;
   probeMcpServer(id: string): Promise<McpProbe>;
+  readWebSearch(): Promise<WebSearchCatalog>;
+  addWebSearchSlot(capability: string, provider: string): Promise<WebSearchCatalog>;
+  removeWebSearchSlot(capability: string, id: string): Promise<WebSearchCatalog>;
+  reorderWebSearchChain(capability: string, ids: readonly string[]): Promise<WebSearchCatalog>;
+  saveWebSearchKey(id: string, value: string): Promise<WebSearchCatalog>;
+  probeWebSearchSearch(id: string): Promise<WebSearchProbe>;
+  probeWebSearchFetch(id: string): Promise<WebSearchProbe>;
   listArchivedSessions(): Promise<ArchiveCatalog>;
   restoreArchivedSession(sessionId: string): Promise<ArchiveCatalog>;
   deleteArchivedSession(sessionId: string): Promise<ArchiveCatalog>;

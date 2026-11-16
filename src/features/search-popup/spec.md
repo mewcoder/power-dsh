@@ -1,8 +1,8 @@
-# 会话搜索
+# 会话搜索增强
 
-模块 id：`search-popup`；唯一开关 `searchPopupEnabled` 默认 `false`，开启后自带标题与正文搜索。模块的[定义](definition.ts)、[配置](config.ts)、[Client](client.ts)、[Host](host.ts)、[策略](enhance-policy.ts)、[样式](styles.ts)、[文案](locales.ts)与[行为测试](tests/)在本目录维护。
+模块 id：`search-popup`；唯一开关 `searchPopupEnabled` 默认 `false`，设置页显示为「会话搜索增强」，开启后自带标题与正文搜索。模块的[定义](definition.ts)、[配置](config.ts)、[Client](client.ts)、[Host](host.ts)、[策略](enhance-policy.ts)、[样式](styles.ts)、[文案](locales.ts)与[行为测试](tests/)在本目录维护。
 
-入口：**设置 → power-dsh → 界面 → 会话搜索**，通过宿主 `configForms` 持久化；设置行经 Host 的 `setSearchPopupEnabled` 策略写入，不能只改偏好，不提供对话设置工具。说明固定为「按标题和正文查找历史会话」，英文为「Find past sessions by title and message content」；重启要求仅在运行中全文引擎尚未启用时通过搜索框占位符提示，不在设置行常驻显示。不再提供独立搜索增强开关或 RPC；旧 `searchEnhanceEnabled` 不再控制行为，保存唯一开关时移除旧字段。已有弹窗开启但旧增强关闭的安装无需再次开启：第一次非空内容请求按需补齐引擎配置，运行中的旧引擎仍禁用时显示重启提示；不在启动或最近会话预览时改写引擎。内部配置键与 RPC 名称保持不变。
+入口：**设置 → power-dsh → 界面 → 会话搜索增强**，通过宿主 `configForms` 持久化；设置行经 Host 的 `setSearchPopupEnabled` 策略写入，不能只改偏好，不提供对话设置工具。说明固定为「在弹窗中搜索会话标题与正文」，英文为「Search session titles and content in a popup」；重启要求仅在运行中全文引擎尚未启用时通过搜索框占位符提示，不在设置行常驻显示。不再提供独立搜索增强开关或 RPC；旧 `searchEnhanceEnabled` 不再控制行为，保存唯一开关时移除旧字段。已有弹窗开启但旧增强关闭的安装无需再次开启：第一次非空内容请求按需补齐引擎配置，运行中的旧引擎仍禁用时显示重启提示；不在启动或最近会话预览时改写引擎。内部配置键与 RPC 名称保持不变。
 
 ## 范围与行为
 

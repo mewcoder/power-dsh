@@ -106,3 +106,15 @@ GitHub REST latest 接口本次被匿名限流，版本以 GitHub Releases lates
 - OpenCode 开发分支：`services/site/src/docs/content/instructions.mdx`、`compaction.mdx`，`packages/core/src/session/compaction.ts`、`instruction-discovery.ts`。
 - dot-opencode/memory：`README.md`、`src/report.rs`、`src/dream.rs`、`skills/agent-memory/dream/prompt.md`。
 - opencode-supermemory：`README.md`、`src/services/client.ts`、`memory-tool.ts`、`recall-results.ts` 与 `src/v2/`。
+
+## 提示词校准（2026-11-16）
+
+针对「记住当前环境是 Windows 却扩写成长篇规则」重新阅读实际模板，区分提炼信息与推测用户要求，而不是继续累加禁止词：
+
+- [Qwen Code `prompt.ts`](https://github.com/QwenLM/qwen-code/blob/6f754be6548903e545e6ff0ed43a34927fe3bfb9/packages/core/src/memory/prompt.ts)：`TYPES_SECTION_INDIVIDUAL` 的反馈与项目记忆强调原因和适用方式，示例会把已知背景归纳成以后可用的信息；原因描述明确指向用户给出的理由。项目日期可归一化，正文按主题组织。这说明不能为了避免发散而一律禁止原因、应用说明或日期。
+- [Codex 阶段一模板](https://github.com/openai/codex/blob/81b995a6c9a4c978f399775cfa5ce50702368749/codex-rs/memories/write/templates/memories/stage_one_system.md)：强调有用的可复用学习、证据分级及允许不记录；用户消息是偏好的主要证据，工具核验是项目事实的主要证据，助手总结不能替代用户表达。
+- [Codex V2 整合模板](https://github.com/openai/codex/blob/81b995a6c9a4c978f399775cfa5ce50702368749/codex-rs/memories/write/templates/memories/consolidation_v2.md)：警惕过宽或僵硬的历史规则，保留证据支持的范围、确定程度和后续纠正；单任务请求留在任务内，用户偏好应是明确默认值或跨任务支持的工作方式。
+
+PowerDSH 据此改为简短的证据与范围原则：允许自然归纳、改写、合并重复，保留有依据的理由、条件和例外；长度随内容，不固定一句话，也不强制每条补「Why／How」。不把环境事实提升为普遍偏好、不把助手建议写成用户已采纳的规则。不确定解释优先省略，确有价值才保留其不确定性。执行任务时可根据已知事实判断操作方式，但不把通用常识和未核验细节填充进记忆；用户指导或实际核验得到的特定经验可以保留。Windows 与 README 例子留在验收，避免将特定事故清单塞进常驻提示词；补充真实模型场景验证显式 Shell 操作、CI 例外、项目原因及日期不会被过度精简丢掉。
+
+本次使用本地固定提交的开源提示词作为机制依据，自行编写短策略，没有复制完整提示词、引入新模型步骤或修改现有存储。Claude Code 仅继承上文官方文档的证据边界，不宣称读到了其完整内部提示词。

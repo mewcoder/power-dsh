@@ -9,6 +9,12 @@ export interface DisabledSkillPreference {
   origin: string;
 }
 
+/** One configured provider instance: its own id plus the vendor it talks to. */
+export interface WebSearchSlotPreference {
+  id: string;
+  provider: string;
+}
+
 export interface Preferences {
   showVersion: boolean;
   showThemeSwitcher: boolean;
@@ -23,6 +29,7 @@ export interface Preferences {
   memoryAutoCapture: boolean;
   memoryGlobalEnabled: boolean;
   memoryWorkspaceEnabled: boolean;
+  historySearchEnabled: boolean;
   skillManagerEnabled: boolean;
   disabledSkills: DisabledSkillPreference[];
   mcpManagerEnabled: boolean;
@@ -51,6 +58,11 @@ export interface Preferences {
   usageStatsEnabled: boolean;
   projectManagerEnabled: boolean;
   searchPopupEnabled: boolean;
+  webSearchEnabled: boolean;
+  /** Search provider instances in fallback order. */
+  webSearchChain: (WebSearchSlotPreference | string)[];
+  /** Fetch provider instances in fallback order, independent of the search chain. */
+  webFetchChain: (WebSearchSlotPreference | string)[];
 }
 export type PreferenceKey = keyof Preferences;
 export type PowerDshPreferences = Preferences;

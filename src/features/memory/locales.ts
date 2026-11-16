@@ -2,6 +2,15 @@ import type { Locales } from '../../shared/client/types.ts';
 
 export const locales = {
   en: {
+    memoryViewSource: 'View original', memoryOriginal: 'Original conversation',
+    memoryMessage: 'Message', memorySourceUser: 'User', memorySourceAssistant: 'Assistant',
+    memoryReadMore: 'Continue reading', memorySourceNotRecorded: 'No exact message source was recorded',
+    memorySourceMissing: 'The original message is missing or no longer available after compaction',
+    memorySourceChanged: 'The original message changed and could not be verified',
+    memorySourceHistorical: 'This original message is outside the current context and may have been compacted or replaced. Check later corrections before relying on it.',
+    memorySourceWorkspace: 'Return to the source project to verify this message',
+    memorySourceUnavailable: 'The original conversation is unavailable. Try again after reconnecting.',
+    memorySourceNotFound: 'The quoted user message was not found. Check the quote before saving.',
     memoryEnabled: 'Memory', memoryDescription: 'Automatically remember preferences and project facts across chats',
     memoryTab: 'Memory', memoryPageDescription: 'Manage global and project memories',
     memoryConfirm: 'Confirm', memoryCopyCode: 'Copy code', memoryFootnotes: 'Footnotes',
@@ -50,6 +59,15 @@ export const locales = {
     memoryClearPartial: 'Clearing stopped after deleting some entries. Reopen the memory page to see what remains.',
   },
   zh: {
+    memoryViewSource: '查看原文', memoryOriginal: '原始对话',
+    memoryMessage: '消息', memorySourceUser: '用户', memorySourceAssistant: '助手',
+    memoryReadMore: '继续读取原文', memorySourceNotRecorded: '未记录具体消息',
+    memorySourceMissing: '原始消息已不存在，或在压缩后无法读取',
+    memorySourceChanged: '原始消息已变化，无法核验出处',
+    memorySourceHistorical: '这条原文已不在当前上下文，可能经过压缩或替换，请核对后续纠正再使用。',
+    memorySourceWorkspace: '请回到来源项目核验这条消息',
+    memorySourceUnavailable: '暂时无法读取原始对话，请在连接恢复后重试。',
+    memorySourceNotFound: '没有找到引用的用户原话，请核对原话后再保存。',
     memoryEnabled: '记忆', memoryDescription: '自动记住你的偏好和项目要点',
     memoryTab: '记忆', memoryPageDescription: '管理全局与项目记忆',
     memoryConfirm: '确定', memoryCopyCode: '复制代码', memoryFootnotes: '脚注',

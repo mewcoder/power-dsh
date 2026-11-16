@@ -160,7 +160,7 @@ npm run check
 
 ### 启用与功能行为
 
-启用后进入 **设置 → power-dsh**，按需开启功能。入口、默认值和操作行为以[二十五项主 Spec](README.md#功能规格spec)为准，分类与键盘交互见 [UI 规范](ui.md#分类-tab)。
+启用后进入 **设置 → power-dsh**，按需开启功能。入口、默认值和操作行为以[功能主 Spec](README.md#功能规格spec)为准，分类与键盘交互见 [UI 规范](ui.md#分类-tab)。
 
 安装和验收时注意：
 

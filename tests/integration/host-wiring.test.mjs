@@ -183,6 +183,7 @@ test('all feature configuration defaults survive composition without a settings 
     blockTodo: false, blockPlan: false, blockGoal: false, blockDoubleClickRename: false, personalizationEnabled: false,
     skillManagerEnabled: false, mcpManagerEnabled: false, disabledSkills: [],
     memoryEnabled: false, memoryAutoCapture: true, memoryGlobalEnabled: true, memoryWorkspaceEnabled: true,
+    historySearchEnabled: false,
     showThinkingEffortSwitcher: false,
     thinkingEffortGlyph: 'arc',
     standalonePageEnabled: false,
@@ -201,6 +202,9 @@ test('all feature configuration defaults survive composition without a settings 
     projectManagerEnabled: false,
     usageStatsEnabled: false,
     searchPopupEnabled: false,
+    webSearchEnabled: false,
+    webSearchChain: [],
+    webFetchChain: [],
   };
   assert.deepEqual(Object.keys(Config.dict).sort(), Object.keys(expected).sort());
   for (const [key, value] of Object.entries(expected)) assert.deepEqual(Config.dict[key].meta.default, value, key);
