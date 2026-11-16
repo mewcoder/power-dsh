@@ -251,6 +251,14 @@ macOS PowerShell `7.7.0` 下重启模块 23 项定向测试通过，无跳过，
 
 macOS / DSH `0.2.2-rc.3` 已经原生管理器重载本地链接构建，核对设置可读、配置状态圆点、密钥获取文字链接、测试入口及精简编辑区；添加自动展开、空密钥不发请求和失败保留草稿由行为测试覆盖。记忆出处的原生会话与页面验收继承主 Spec 记录。尚未完成带 API Key 的真实第三方搜索／获取成功验收，实验性历史检索尚无原生 DSH 模型直接调用的独立证据；这两项限制已在发版前向用户说明，用户仍明确要求发布 `0.1.1`。不扩展为上述场景、Windows 或最终 tarball 升级已验收的声明。
 
+### 0.1.1 公开发布核验（2026-11-16）
+
+发布标签 `v0.1.1` 指向 `3945f13d3093d64c9017291b010043be1b4b536e`，该提交已进入 `main`。[发布前 CI](https://github.com/mewcoder/power-dsh/actions/runs/43840814533) 在 Linux 和 Windows 均通过：各 1,028 项，Linux 为 1,022 通过／6 跳过，Windows 为 1,027 通过／1 跳过，均无失败；两端实际包与独立生产安装均通过。首次 CI 因文档索引引用的研究材料未纳入提交而失败，补齐后通过干净检出及上述 CI；包内文件未因此改变。
+
+[Release workflow](https://github.com/mewcoder/power-dsh/actions/runs/43841220859) 成功，[正式 Release](https://github.com/mewcoder/power-dsh/releases/tag/v0.1.1) 已公开并成为 Latest，附件固定为 `power-dsh.tgz`。匿名下载版本地址及 Latest 地址均成功，与干净 Git 导出的受检候选逐字节相同：42 个文件、2,579,784 字节，SHA-256 为 `f95043455976da73128345bb357fc78f331fafcd4f88085e4de0fd104a0a4779`，integrity 为 `sha512-VM21le1QHAu5mcqeoMAg67rLj4vSb1RAvaUYyhedYNr4J0t0ejbkNLlHum9EX19oz/KYbrWah3PJ8o811EG5iA==`。同一候选的隔离生产安装通过；没有修改已发布附件或移动标签。
+
+既有市场 PR `awesome-dsh-plugin/awesome-dsh-plugin#14457` 已合并，当前上游条目保留固定 Latest 下载地址，无需重复投稿；未将此记为每个用户客户端都已刷新更新。本轮不发布 npm，没有用最终 tarball 修改用户日常 profile，带密钥后端调用及历史检索原生模型调用的验收边界沿用准备记录。
+
 ### 0.1.0 公开发布核验（2026-11-15）
 
 重新认证后，发布提交 `c85a700fb4422779eb17c977040c0eba78c0381a` 已进入 `main`，annotated 标签 `v0.1.0` 指向同一提交。[Release workflow](https://github.com/mewcoder/power-dsh/actions/runs/43724729589) 成功，Linux 上 899 项行为测试中 893 通过、6 项平台检查跳过、0 失败，实际包与独立生产安装通过。[正式 Release](https://github.com/mewcoder/power-dsh/releases/tag/v0.1.0) 已公开并成为 Latest，附件为 `power-dsh.tgz`；既有市场 PR `awesome-dsh-plugin/awesome-dsh-plugin#14457` 已合并，上游条目保留固定 Latest 下载来源，无需重复投稿。
