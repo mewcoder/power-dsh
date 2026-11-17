@@ -289,6 +289,14 @@ macOS / DSH `0.2.2-rc.3` 的本地链接构建经原生组件开关重载后，�
 
 macOS / DSH `0.2.2-rc.3` 已通过本地链接构建和原生界面刷新确认六个设置分类、功能与管理开关归属、侧边栏独立页面开关位置，以及 Tavily 真实搜索和额度展示、结果同行与自动消失；本机抓取的键盘排序和重新进入页面后的顺序持久化通过。真实鼠标拖拽未完成验收。Exa、Firecrawl 与 TinyFish 没有配置真实账户密钥，其接口行为由官方文档与夹具验证。没有将本地链接构建冒充最终 tarball 原生升级或 Windows 页面验收。
 
+### 0.1.3 公开发布核验（2026-11-17）
+
+发布提交 `4641ed1ef482026b0503f0b8cfddca19f3ac1172` 已进入 `main`，annotated 标签 `v0.1.3` 指向同一提交。[发布前 CI](https://github.com/mewcoder/power-dsh/actions/runs/43996772698) 与[标签 CI](https://github.com/mewcoder/power-dsh/actions/runs/43997101082) 的 Linux、Windows 均通过；发布前两端各 1,063 项测试，Linux 为 1,057 通过／6 跳过，Windows 为 1,062 通过／1 跳过，均无失败，实际包与隔离生产安装通过。[Release workflow](https://github.com/mewcoder/power-dsh/actions/runs/43997100694) 成功，[正式 Release](https://github.com/mewcoder/power-dsh/releases/tag/v0.1.3) 已公开且为 Latest。
+
+匿名下载版本地址及 Latest 地址均成功，并与干净 Git 导出、独立生产安装通过的受检候选逐字节相同：42 个文件、2,589,260 字节，SHA-256 为 `e657780a2e2c87877d62b6874b3d577ba9716d7c4ce6307567cbae841a7a58d2`，integrity 为 `sha512-gYcMbiExB34gnROyGxNeSgv3JCqFyvzBIFHfsJei+Q8KDElDxEhNg1BG5QCCxSBxI7aSp9DGbG6y/dTT9X8ezA==`。公开包清单版本为 `0.1.3`，保留 `private: true`，不发布 npm；没有覆盖附件或移动标签。
+
+市场 PR `awesome-dsh-plugin/awesome-dsh-plugin#14457` 已合并，上游条目仍使用固定 Latest 下载地址，无需重复投稿；不承诺每个客户端已刷新。实际宿主验收与未验证项沿用上方准备回归，没有新增最终 tarball 原生升级、Windows 完整页面、真实鼠标拖拽或 Exa／Firecrawl／TinyFish 账户调用验收。
+
 ### 0.1.0 公开发布核验（2026-11-15）
 
 重新认证后，发布提交 `c85a700fb4422779eb17c977040c0eba78c0381a` 已进入 `main`，annotated 标签 `v0.1.0` 指向同一提交。[Release workflow](https://github.com/mewcoder/power-dsh/actions/runs/43724729589) 成功，Linux 上 899 项行为测试中 893 通过、6 项平台检查跳过、0 失败，实际包与独立生产安装通过。[正式 Release](https://github.com/mewcoder/power-dsh/releases/tag/v0.1.0) 已公开并成为 Latest，附件为 `power-dsh.tgz`；既有市场 PR `awesome-dsh-plugin/awesome-dsh-plugin#14457` 已合并，上游条目保留固定 Latest 下载来源，无需重复投稿。
