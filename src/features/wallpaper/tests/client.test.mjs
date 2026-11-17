@@ -83,7 +83,7 @@ test('Interface starts with the custom wallpaper switch and enabling registers t
   const tabs = () => main().filter(node => node.props.role === 'tab');
   assert.equal(tabs()[0].props.id, 'settings-test-tab-general');
   assert.equal(tabs()[0].props['aria-selected'], true);
-  assert.equal(tabs().length, 5);
+  assert.equal(tabs().length, 6);
   assert.equal(tabs().some(node => node.props.id === 'settings-test-tab-wallpaper'), false);
   assert.equal(main().some(node => node.props.id === 'settings-test-wallpaperEnabled'), false);
   app.selectSettingsTab('interface');

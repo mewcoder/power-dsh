@@ -2,7 +2,7 @@ import type { WebSearchProbe, WebSearchProbeDiagnostic } from '../../shared/type
 import type { DiagnosticContext } from '../../shared/types/diagnostics.ts';
 import type { Translate } from '../../shared/client/types.ts';
 
-const providers = ['tavily', 'firecrawl', 'tinyfish', 'unknown'] as const;
+const providers = ['tavily', 'firecrawl', 'tinyfish', 'exa', 'unknown'] as const;
 const stages = ['credentials', 'request', 'response', 'rpc'] as const;
 const reasons = ['key-missing', 'auth', 'forbidden', 'quota', 'rate-limit', 'http', 'network', 'timeout', 'invalid-response', 'empty-response', 'rpc', 'unknown'] as const;
 const modes = ['keyless', 'missing', 'api-key', 'unknown'] as const;

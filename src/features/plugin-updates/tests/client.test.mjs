@@ -13,7 +13,7 @@ test('plugin version is the last General setting row, always shown in General an
   const panel = descendants(app.renderSettings()).find(node => node.props.role === 'tabpanel');
   assert.equal(panel.props.children.at(-1).props['aria-label'], 'pluginUpdateVersion');
   const staleCheck = descendants(row()).find(node => node.type === 'button' && node.props.children.includes('pluginUpdateCheck')).props.onClick;
-  for (const tab of ['interface', 'enhancements', 'simplify', 'other']) {
+  for (const tab of ['interface', 'enhancements', 'management', 'simplify', 'other']) {
     app.selectSettingsTab(tab);
     assert.equal(row(), undefined);
     assert.equal(descendants(app.renderSettings()).filter(node => node.type === 'footer').length, 0);

@@ -328,6 +328,7 @@
 				"general",
 				"interface",
 				"enhancements",
+				"management",
 				"simplify",
 				"other"
 			].map((id) => ({ id }));
@@ -1866,7 +1867,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 // src/features/memory/definition.ts
 	const definition$26 = Object.freeze({
 		id: "memory",
-		category: "enhance",
+		category: "management",
 		order: 8,
 		keys: Object.freeze([
 			"memoryEnabled",
@@ -3609,7 +3610,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 // src/features/standalone-page/definition.ts
 	const definition$23 = Object.freeze({
 		id: "standalone-page",
-		category: "enhance",
+		category: "interface",
 		order: 6.5,
 		keys: Object.freeze(["standalonePageEnabled"]),
 		spec: "src/features/standalone-page/spec.md"
@@ -3621,13 +3622,13 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			standalonePageEnabled: "Sidebar page",
 			standalonePageDescription: "Move feature pages from the settings sidebar to a standalone page in the main sidebar",
 			standaloneEmpty: "No feature pages enabled",
-			standaloneEmptyHint: "Enable a feature in Settings → power-dsh → Features"
+			standaloneEmptyHint: "Enable a feature in Settings → power-dsh → Management"
 		},
 		zh: {
 			standalonePageEnabled: "侧边栏独立页面",
 			standalonePageDescription: "将功能页从设置侧栏移至主侧栏的独立页面",
 			standaloneEmpty: "尚未开启功能页",
-			standaloneEmptyHint: "在设置 → power-dsh → 功能中开启所需功能"
+			standaloneEmptyHint: "在设置 → power-dsh → 管理中开启所需功能"
 		}
 	};
 
@@ -4983,7 +4984,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 // src/features/mcp/definition.ts
 	const definition$19 = Object.freeze({
 		id: "mcp",
-		category: "enhance",
+		category: "management",
 		order: 9.5,
 		keys: Object.freeze(["mcpManagerEnabled"]),
 		spec: "src/features/mcp/spec.md"
@@ -6482,7 +6483,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 // src/features/personalization/definition.ts
 	const definition$17 = Object.freeze({
 		id: "personalization",
-		category: "enhance",
+		category: "management",
 		order: 7,
 		keys: Object.freeze(["personalizationEnabled"]),
 		spec: "src/features/personalization/spec.md"
@@ -8472,7 +8473,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 // src/features/skills/definition.ts
 	const definition$13 = Object.freeze({
 		id: "skills",
-		category: "enhance",
+		category: "management",
 		order: 9,
 		keys: Object.freeze(["skillManagerEnabled", "disabledSkills"]),
 		spec: "src/features/skills/spec.md"
@@ -12361,7 +12362,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 // src/features/archive/definition.ts
 	const definition$4 = Object.freeze({
 		id: "archive",
-		category: "enhance",
+		category: "management",
 		order: 10.5,
 		keys: Object.freeze([
 			"archiveManagerEnabled",
@@ -13734,7 +13735,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 // src/features/usage-stats/definition.ts
 	const definition$3 = Object.freeze({
 		id: "usage-stats",
-		category: "enhance",
+		category: "management",
 		order: 12,
 		keys: Object.freeze(["usageStatsEnabled"]),
 		spec: "src/features/usage-stats/spec.md"
@@ -14565,7 +14566,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 // src/features/projects/definition.ts
 	const definition$2 = Object.freeze({
 		id: "projects",
-		category: "enhance",
+		category: "management",
 		order: 10,
 		keys: Object.freeze(["projectManagerEnabled"]),
 		spec: "src/features/projects/spec.md"
@@ -15601,6 +15602,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 .power-dsh-web-rows { display:flex; flex-direction:column; gap:8px; margin:12px 0 0; padding:0; list-style:none; }
 .power-dsh-web-row { display:flex; flex-direction:column; gap:12px; padding:12px 14px; border:.5px solid var(--dsw-alias-settings-card-stroke); border-radius:var(--dsw-radius-xl); background:var(--dsw-alias-settings-card-fill); }
 .power-dsh-web-row-head { display:flex; align-items:center; gap:10px; min-height:28px; }
+.power-dsh-web-probe-result { min-width:0; }
 .power-dsh-web-row-identity { display:inline-flex; align-items:center; gap:6px; min-width:0; }
 .power-dsh-web-dot { box-sizing:border-box; display:inline-block; flex:none; width:8px; height:8px; border-radius:50%; corner-shape:round; background:var(--dsw-alias-border-l3); }
 .power-dsh-web-dot[data-state="configured"] { background:var(--dsw-alias-state-success-primary); }
@@ -15608,6 +15610,12 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 .power-dsh-web-name { min-width:0; overflow:hidden; color:var(--dsw-alias-label-primary); font-size:14px; font-weight:500; line-height:22px; text-overflow:ellipsis; white-space:nowrap; }
 .power-dsh-web-tag { flex:none; padding:1px 6px; border:.5px solid var(--dsw-alias-border-l3); border-radius:var(--dsw-radius-xs); color:var(--dsw-alias-label-secondary); font-size:11px; line-height:16px; }
 .power-dsh-web-row-actions { display:inline-flex; flex:none; align-items:center; gap:4px; margin-left:auto; }
+.power-dsh-web-quota { display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; }
+.power-dsh-web-quota .power-dsh-web-hint { margin:0; }
+.power-dsh-web-quota-refresh { margin-left:auto; padding:0; border:0; background:transparent; color:var(--dsw-alias-label-secondary); font:inherit; font-size:12px; line-height:18px; cursor:pointer; }
+.power-dsh-web-quota-refresh:hover:not(:disabled) { text-decoration:underline; }
+.power-dsh-web-quota-refresh:disabled { opacity:.4; cursor:default; }
+.power-dsh-web-quota-refresh:focus-visible { outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
 
 /* The Models page's button family: 36px base, 28px inside a row's action group. */
 .power-dsh-web-primary,.power-dsh-web-secondary,.power-dsh-web-danger { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; gap:4px; height:36px; padding:0 14px; border:none; border-radius:var(--dsw-radius-md); font:inherit; font-size:14px; line-height:22px; cursor:pointer; }
@@ -15669,6 +15677,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		"tavily",
 		"firecrawl",
 		"tinyfish",
+		"exa",
 		"unknown"
 	];
 	const stages = [
@@ -15794,6 +15803,12 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		};
 	}
 
+// src/features/web-search/chain.ts
+	const LOCAL_FETCH = Object.freeze({
+		id: "power-dsh-local-fetch",
+		provider: "local"
+	});
+
 // src/features/web-search/client.ts
 /**
 	* Client half: the settings row that turns the feature on, and the page that
@@ -15807,7 +15822,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 	const NAMES = {
 		tavily: "Tavily",
 		firecrawl: "Firecrawl",
-		tinyfish: "TinyFish"
+		tinyfish: "TinyFish",
+		exa: "Exa"
 	};
 	/** Vendors the add menu offers, in display order. */
 	const VENDORS = Object.keys(NAMES);
@@ -15842,11 +15858,17 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		let pending = false;
 		let generation = 0;
 		let probe = null;
+		let probeTimer;
+		const stopProbeTimer = () => {
+			window.clearTimeout(probeTimer);
+			probeTimer = void 0;
+		};
 		const catalogSource = observable(() => catalog);
 		const probeSource = observable(() => probe);
 		ctx.effect(() => () => {
 			active = false;
 			generation++;
+			stopProbeTimer();
 		});
 		/**
 		* Map a Host failure onto page copy. A key this page knows becomes its
@@ -15921,6 +15943,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		const saveKey = (id, value) => write(() => ctx.remote.powerDsh.saveWebSearchKey(id, value), "webSearchKeyFailed");
 		const probeBackend = async (capability, id) => {
 			if (!active || probe?.status === "running") return;
+			stopProbeTimer();
 			probe = {
 				capability,
 				id,
@@ -15954,9 +15977,30 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 					value: failedRpc(failure)
 				};
 			}
+			const completed = probe;
+			probeTimer = window.setTimeout(() => {
+				if (!active || probe !== completed) return;
+				probeTimer = void 0;
+				probe = null;
+				probeSource.notify();
+			}, 5e3);
 			probeSource.notify();
 		};
-		function WebSearchPage({ t, source, catalogSource: catalogView, loadCatalog, addSlot, removeSlot, reorderChain, saveKey, probeBackend }) {
+		const readQuota = async (id) => {
+			const startedAt = Date.now();
+			try {
+				const result = await ctx.remote.powerDsh.readWebSearchQuota(id);
+				if (result.ok) return result.value;
+				throw new Error("Quota RPC failed");
+			} catch (failure) {
+				return {
+					status: "error",
+					durationMs: Date.now() - startedAt,
+					diagnostic: probeDiagnostic(failure, catalog.value?.slots.find((slot) => slot.id === id)?.provider ?? "unknown", "unknown", "rpc")
+				};
+			}
+		};
+		function WebSearchPage({ t, source, catalogSource: catalogView, loadCatalog, addSlot, removeSlot, reorderChain, saveKey, probeBackend, readQuota }) {
 			const config = useSnapshot(source);
 			const snapshot = useSnapshot(catalogView);
 			const probeState = useSnapshot(probeSource);
@@ -15966,6 +16010,9 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			const [editing, setEditing] = React.useState(null);
 			const [rowError, setRowError] = React.useState(null);
 			const [busy, setBusy] = React.useState(false);
+			const [quotas, setQuotas] = React.useState({});
+			const quotaEpoch = React.useRef(0);
+			const quotaPending = React.useRef(/* @__PURE__ */ new Set());
 			const [dragging, setDragging] = React.useState(null);
 			const [over, setOver] = React.useState(null);
 			const mounted = useMounted();
@@ -15982,6 +16029,56 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				window.addEventListener("focus", refresh);
 				return () => window.removeEventListener("focus", refresh);
 			}, []);
+			const loadQuota = async (slotId, epoch = quotaEpoch.current) => {
+				if (quotaPending.current.has(slotId)) return;
+				quotaPending.current.add(slotId);
+				setQuotas((current) => ({
+					...current,
+					[slotId]: {
+						...current[slotId],
+						loading: true,
+						value: current[slotId]?.value ?? null
+					}
+				}));
+				let result;
+				try {
+					result = await readQuota(slotId);
+				} catch (failure) {
+					result = {
+						status: "error",
+						durationMs: 0,
+						diagnostic: probeDiagnostic(failure, value?.slots.find((slot) => slot.id === slotId)?.provider ?? "unknown", "unknown", "rpc")
+					};
+				}
+				if (!mounted.current || epoch !== quotaEpoch.current) return;
+				quotaPending.current.delete(slotId);
+				setQuotas((current) => ({
+					...current,
+					[slotId]: {
+						loading: false,
+						value: result,
+						previous: result.status === "ready" ? result : current[slotId]?.previous
+					}
+				}));
+			};
+			React.useEffect(() => {
+				const epoch = ++quotaEpoch.current;
+				quotaPending.current.clear();
+				const configured = new Set(enabled ? value?.slots.filter((row) => row.hasKey).map((row) => row.id) : []);
+				setQuotas((current) => Object.fromEntries(Object.entries(current).filter(([slotId]) => configured.has(slotId))));
+				if (enabled && value?.available) {
+					for (const row of value.slots) if (row.hasKey) loadQuota(row.id, epoch);
+				}
+				return () => {
+					quotaEpoch.current++;
+					quotaPending.current.clear();
+				};
+			}, [value, enabled]);
+			const quotaText = (quota) => {
+				const data = quota.data;
+				if (data.kind === "balance") return t("webSearchQuotaBalance").replace("{balance}", data.balance);
+				return `${t(data.scope === "key" ? "webSearchQuotaKey" : "webSearchQuotaAccount")} · ${data.used === void 0 ? t("webSearchQuotaRemaining").replace("{remaining}", String(data.remaining)) : data.limit === null ? t("webSearchQuotaUnlimited").replace("{used}", String(data.used)) : t("webSearchQuotaUsed").replace("{used}", String(data.used)).replace("{limit}", String(data.limit))}${data.paygoRemaining === void 0 ? "" : ` · ${t("webSearchQuotaPaygo").replace("{remaining}", String(data.paygoRemaining))}`}`;
+			};
 			const run = async (operation, rowId) => {
 				if (busy) return;
 				setBusy(true);
@@ -16022,34 +16119,25 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			* vendor — they are separate instances with separate keys.
 			*/
 			const chainSection = (capability, headingId) => {
-				const chain = capability === "search" ? value?.search.ids ?? [] : value?.fetch.ids ?? [];
-				const disabled = !writable || !value?.available || snapshot.status === "error" || busy;
-				const members = chain.filter((slotId) => byId.has(slotId));
 				const search = capability === "search";
-				const rowOf = (slotId, index) => {
-					const row = byId.get(slotId);
-					if (!row) return null;
-					const control = `${id}-${capability}-${slotId}`;
-					const position = search ? index + 1 : index + 2;
-					const draft = drafts[slotId] ?? "";
-					const currentProbe = probeState?.capability === capability && probeState.id === slotId ? probeState : null;
-					const running = currentProbe?.status === "running";
-					const result = currentProbe?.status === "ready" ? currentProbe.value : null;
-					const name = NAMES[row.provider] ?? row.provider;
-					const probeLabel = `${t(search ? "webSearchProbeSearch" : "webSearchProbeFetch")}: ${name} #${String(position)}`;
-					const dot = row.hasKey ? "configured" : "missing";
-					const open = editing === slotId;
+				const fetchIds = value?.fetch.ids ?? [];
+				const chain = search ? value?.search.ids ?? [] : fetchIds.includes(LOCAL_FETCH.id) ? fetchIds : [LOCAL_FETCH.id, ...fetchIds];
+				const disabled = !writable || !value?.available || snapshot.status === "error" || busy;
+				const members = chain.filter((slotId) => byId.has(slotId) || !search && slotId === LOCAL_FETCH.id);
+				const sortableRow = (slotId, index, open, ...children) => {
 					const isDragging = dragging !== null && dragging.capability === capability && dragging.id === slotId;
 					const dropHalf = over !== null && dragging !== null && dragging.capability === capability && over.id === slotId && dragging.id !== slotId ? over.half : null;
 					return h("li", {
 						key: slotId,
 						className: "power-dsh-web-row",
 						"data-slot": slotId,
-						"data-provider": row.provider,
+						"data-provider": byId.get(slotId)?.provider,
+						"data-local": slotId === LOCAL_FETCH.id || void 0,
 						"data-capability": capability,
 						"data-dragging": isDragging || void 0,
 						"data-drop": dropHalf ?? void 0,
 						"aria-describedby": `${id}-${capability}-reorder-hint`,
+						"aria-labelledby": `${id}-${capability}-${slotId}-name`,
 						draggable: !disabled && !open,
 						tabIndex: disabled ? void 0 : 0,
 						onKeyDown: (event) => {
@@ -16075,7 +16163,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 							setOver(null);
 						},
 						onDragOver: (event) => {
-							if (!dragging || dragging.capability !== capability || dragging.id === slotId) return;
+							if (disabled || !dragging || dragging.capability !== capability || dragging.id === slotId) return;
 							event.preventDefault();
 							event.dataTransfer.dropEffect = "move";
 							const rect = event.currentTarget.getBoundingClientRect();
@@ -16089,7 +16177,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 							setOver((current) => current?.id === slotId ? null : current);
 						},
 						onDrop: (event) => {
-							if (!dragging || dragging.capability !== capability || dragging.id === slotId) return;
+							if (disabled || !dragging || dragging.capability !== capability || dragging.id === slotId) return;
 							event.preventDefault();
 							const half = dropHalf ?? "after";
 							const source = dragging.id;
@@ -16104,7 +16192,39 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 							setDragging(null);
 							setOver(null);
 						}
-					}, h("div", { className: "power-dsh-web-row-head" }, h("div", { className: "power-dsh-web-row-identity" }, h("span", {
+					}, ...children);
+				};
+				const rowOf = (slotId, index) => {
+					const control = `${id}-${capability}-${slotId}`;
+					const position = index + 1;
+					if (!search && slotId === LOCAL_FETCH.id) return sortableRow(slotId, index, false, h("div", { className: "power-dsh-web-row-head" }, h("div", { className: "power-dsh-web-row-identity" }, h("span", {
+						id: `${control}-name`,
+						className: "power-dsh-web-name"
+					}, t("webSearchLocalName")), h("span", { className: "power-dsh-web-tag" }, `#${String(position)}`), h("span", {
+						className: "power-dsh-web-dot",
+						"data-state": "configured",
+						"aria-hidden": true
+					}))), rowError?.id === slotId && errorFeedback({
+						t,
+						id: `${control}-error`,
+						message: rowError.message,
+						code: "PD-WEBSEARCH-SAVE",
+						operation: "reorderWebSearchChain"
+					}));
+					const row = byId.get(slotId);
+					if (!row) return null;
+					const draft = drafts[slotId] ?? "";
+					const currentProbe = probeState?.capability === capability && probeState.id === slotId ? probeState : null;
+					const running = currentProbe?.status === "running";
+					const result = currentProbe?.status === "ready" ? currentProbe.value : null;
+					const quota = quotas[slotId];
+					const quotaValue = quota?.value?.status === "ready" ? quota.value : quota?.previous;
+					const quotaError = quota?.value?.status === "error" ? quota.value : null;
+					const name = NAMES[row.provider] ?? row.provider;
+					const probeLabel = `${t(search ? "webSearchProbeSearch" : "webSearchProbeFetch")}: ${name} #${String(position)}`;
+					const dot = row.hasKey ? "configured" : "missing";
+					const open = editing === slotId;
+					return sortableRow(slotId, index, open, h("div", { className: "power-dsh-web-row-head" }, h("div", { className: "power-dsh-web-row-identity" }, h("span", {
 						id: `${control}-name`,
 						className: "power-dsh-web-name"
 					}, name), h("span", { className: "power-dsh-web-tag" }, `#${String(position)}`), h("span", {
@@ -16113,7 +16233,24 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 						role: "img",
 						"aria-label": t(row.hasKey ? "webSearchKeyConfigured" : "webSearchKeyMissing"),
 						title: t(row.hasKey ? "webSearchKeyConfigured" : "webSearchKeyMissing")
-					})), h("div", { className: "power-dsh-web-row-actions" }, h(Tooltip, {
+					})), result && (result.ok ? h("span", {
+						id: `${control}-probe-result`,
+						className: "power-dsh-web-hint power-dsh-web-probe-result",
+						"data-ok": true,
+						role: "status"
+					}, t(search ? "webSearchProbeOk" : "webSearchProbeFetchOk").replace("{count}", String(result.resultCount)).replace("{ms}", String(result.durationMs))) : h("div", {
+						className: "power-dsh-web-probe-result",
+						onClickCapture: stopProbeTimer
+					}, errorFeedback({
+						t,
+						id: `${control}-probe-result`,
+						style: { margin: 0 },
+						message: probeFailureMessage(result, t),
+						context: probeDiagnosticContext(result, capability, t),
+						observedAt: result.diagnostic?.observedAt,
+						code: "PD-WEBSEARCH-PROBE",
+						operation: search ? "probeWebSearchSearch" : "probeWebSearchFetch"
+					}))), h("div", { className: "power-dsh-web-row-actions" }, h(Tooltip, {
 						label: probeLabel,
 						portal: true,
 						side: "top",
@@ -16158,20 +16295,46 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 						onClick: () => {
 							run(() => removeSlot(capability, slotId), slotId);
 						}
-					}, t("webSearchRemove")))), result && (result.ok ? h("p", {
-						id: `${control}-probe-result`,
+					}, t("webSearchRemove")))), row.hasKey && enabled && value?.available && quota?.value?.status !== "unsupported" && h("div", {
+						className: "power-dsh-web-quota",
+						"aria-busy": quota?.loading || void 0
+					}, h("span", {
+						role: "status",
 						className: "power-dsh-web-hint",
-						"data-ok": true,
-						role: "status"
-					}, t(search ? "webSearchProbeOk" : "webSearchProbeFetchOk").replace("{count}", String(result.resultCount)).replace("{ms}", String(result.durationMs))) : errorFeedback({
+						"data-stale": quotaError && quotaValue ? true : void 0
+					}, quotaValue ? `${quotaText(quotaValue)}${quotaError ? ` · ${t("webSearchQuotaStale")}` : ""}` : t(quota?.loading ? "webSearchQuotaLoading" : quotaError ? "webSearchQuotaUnknown" : "webSearchQuotaUnavailable")), h("button", {
+						type: "button",
+						className: "power-dsh-web-quota-refresh",
+						disabled: quota?.loading || disabled,
+						title: t("webSearchQuotaCacheHint"),
+						"aria-label": `${t("webSearchQuotaRefresh")}: ${name} #${String(position)}`,
+						onClick: () => {
+							loadQuota(slotId);
+						}
+					}, t("webSearchQuotaRefresh"))), quotaError && row.hasKey && enabled && errorFeedback({
 						t,
-						id: `${control}-probe-result`,
-						message: probeFailureMessage(result, t),
-						context: probeDiagnosticContext(result, capability, t),
-						observedAt: result.diagnostic?.observedAt,
-						code: "PD-WEBSEARCH-PROBE",
-						operation: search ? "probeWebSearchSearch" : "probeWebSearchFetch"
-					})), rowError?.id === slotId && !open && errorFeedback({
+						id: `${control}-quota-error`,
+						message: t("webSearchQuotaFailed"),
+						code: "PD-WEBSEARCH-QUOTA",
+						operation: "readWebSearchQuota",
+						observedAt: quotaError.diagnostic.observedAt,
+						context: {
+							stage: `web-search.quota.${quotaError.diagnostic.stage}`,
+							check: row.provider,
+							result: `${quotaError.diagnostic.reason}; ${t(`webSearchProbeReason_${quotaError.diagnostic.reason}`)}`,
+							actual: [
+								quotaError.diagnostic.httpStatus === void 0 ? "" : `HTTP ${String(quotaError.diagnostic.httpStatus)}`,
+								quotaError.diagnostic.systemCode,
+								`${String(quotaError.durationMs)} ms`
+							].filter(Boolean).join("; "),
+							state: quotaError.diagnostic.auth,
+							recovery: t(quotaError.diagnostic.reason === "rpc" ? "webSearchProbeRecoveryReload" : [
+								"auth",
+								"key-missing",
+								"forbidden"
+							].includes(quotaError.diagnostic.reason) ? "webSearchProbeRecoveryKey" : quotaError.diagnostic.reason === "rate-limit" ? "webSearchQuotaCacheHint" : "webSearchProbeRecoveryNetwork")
+						}
+					}), rowError?.id === slotId && !open && errorFeedback({
 						t,
 						id: `${control}-error`,
 						message: rowError.message,
@@ -16241,7 +16404,9 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 										...current,
 										[slotId]: ""
 									}));
+									setQuotas((current) => Object.fromEntries(Object.entries(current).filter(([currentId]) => currentId !== slotId)));
 									setEditing(null);
+									if (next.trim() !== "") loadQuota(slotId);
 								}
 							}, slotId).finally(() => {
 								if (mounted.current) setSavingKey(null);
@@ -16259,18 +16424,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				}, search ? t("webSearchChainSearch") : t("webSearchChainFetch")), h("p", {
 					id: `${id}-${capability}-reorder-hint`,
 					className: "power-dsh-web-sr"
-				}, t("webSearchReorderHint")), (!search || members.length > 0) && h("ul", { className: "power-dsh-web-rows" }, !search && h("li", {
-					className: "power-dsh-web-row",
-					"data-local": true,
-					"aria-labelledby": `${id}-local-name`
-				}, h("div", { className: "power-dsh-web-row-head" }, h("div", { className: "power-dsh-web-row-identity" }, h("span", {
-					id: `${id}-local-name`,
-					className: "power-dsh-web-name"
-				}, t("webSearchLocalName")), h("span", { className: "power-dsh-web-tag" }, t("webSearchLocalTag")), h("span", {
-					className: "power-dsh-web-dot",
-					"data-state": "configured",
-					"aria-hidden": true
-				})))), ...members.map((slotId, index) => rowOf(slotId, index))), rowError?.id === capability && errorFeedback({
+				}, t("webSearchReorderHint")), (!search || members.length > 0) && h("ul", { className: "power-dsh-web-rows" }, ...members.map((slotId, index) => rowOf(slotId, index))), rowError?.id === capability && errorFeedback({
 					t,
 					message: rowError.message,
 					code: "PD-WEBSEARCH-SAVE",
@@ -16343,7 +16497,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			removeSlot,
 			reorderChain,
 			saveKey,
-			probeBackend
+			probeBackend,
+			readQuota
 		});
 		preferenceSlot("webSearchEnabled", "settings.section", {
 			id: "power-dsh-web-search",
@@ -16368,7 +16523,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				removeSlot,
 				reorderChain,
 				saveKey,
-				probeBackend
+				probeBackend,
+				readQuota
 			}
 		};
 	}
@@ -16396,6 +16552,20 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 	const locales$1 = {
 		"en": {
 			"webSearchEnabled": "Third-party web search",
+			"webSearchQuotaRefresh": "Refresh",
+			"webSearchQuotaCacheHint": "Quota reads are cached for two minutes; try again after the cache expires",
+			"webSearchQuotaLoading": "Reading quota…",
+			"webSearchQuotaFailed": "Could not read the quota",
+			"webSearchQuotaUnknown": "Quota unknown",
+			"webSearchQuotaUnavailable": "Quota unavailable",
+			"webSearchQuotaStale": "Last read",
+			"webSearchQuotaKey": "Key",
+			"webSearchQuotaAccount": "Account",
+			"webSearchQuotaUsed": "Used {used} / {limit} credits",
+			"webSearchQuotaRemaining": "{remaining} credits left",
+			"webSearchQuotaUnlimited": "Used {used} credits · No limit",
+			"webSearchQuotaPaygo": "{remaining} pay-as-you-go credits left",
+			"webSearchQuotaBalance": "Balance USD {balance}",
 			"webSearchDescription": "Answer web search and web fetch through free third-party providers",
 			"webSearchTab": "Web search and fetch",
 			"webSearchPageDescription": "Configure search and fetch services, and drag to set their priority",
@@ -16454,6 +16624,20 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		},
 		"zh": {
 			"webSearchEnabled": "第三方网页搜索",
+			"webSearchQuotaRefresh": "刷新",
+			"webSearchQuotaCacheHint": "额度查询缓存两分钟，缓存到期后可重新获取",
+			"webSearchQuotaLoading": "正在读取额度…",
+			"webSearchQuotaFailed": "额度读取失败",
+			"webSearchQuotaUnknown": "额度未知",
+			"webSearchQuotaUnavailable": "暂无额度信息",
+			"webSearchQuotaStale": "上次读取",
+			"webSearchQuotaKey": "密钥",
+			"webSearchQuotaAccount": "账户",
+			"webSearchQuotaUsed": "已用 {used} / {limit} 积分",
+			"webSearchQuotaRemaining": "剩余 {remaining} 积分",
+			"webSearchQuotaUnlimited": "已用 {used} 积分 · 无上限",
+			"webSearchQuotaPaygo": "按量剩余 {remaining} 积分",
+			"webSearchQuotaBalance": "余额 USD {balance}",
 			"webSearchDescription": "通过免费的第三方提供方接管网页搜索与获取",
 			"webSearchTab": "网页搜索与获取",
 			"webSearchPageDescription": "配置搜索与获取服务，拖动调整优先顺序",
@@ -16537,7 +16721,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		} })
 	};
 	const chainCodec = (value, known) => {
-		if (!isRecord(value) || !isArray(value.ids) || value.ids.length > 32) throw new TypeError("Invalid web search chain");
+		if (!isRecord(value) || !isArray(value.ids) || value.ids.length > known.size) throw new TypeError("Invalid web search chain");
 		const ids = value.ids.map((id) => {
 			if (typeof id !== "string" || !known.has(id)) throw new TypeError("Invalid web search chain");
 			return id;
@@ -16552,13 +16736,13 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			if (!isRecord(value) || typeof value.enabled !== "boolean" || typeof value.available !== "boolean" || !isArray(value.slots) || value.slots.length > 32) throw new TypeError("Invalid web search catalog");
 			const slots = value.slots.map((row) => slotCodec.create().parse(row));
 			const known = new Set(slots.map((row) => row.id));
-			if (known.size !== slots.length) throw new TypeError("Invalid web search catalog");
+			if (known.size !== slots.length || known.has(LOCAL_FETCH.id)) throw new TypeError("Invalid web search catalog");
 			return {
 				enabled: value.enabled,
 				available: value.available,
 				slots,
 				search: { ids: chainCodec(value.search, known) },
-				fetch: { ids: chainCodec(value.fetch, known) }
+				fetch: { ids: chainCodec(value.fetch, /* @__PURE__ */ new Set([...known, LOCAL_FETCH.id])) }
 			};
 		} })
 	};
@@ -16573,6 +16757,47 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 				durationMs: value.durationMs,
 				message: value.message,
 				...value.diagnostic === void 0 ? {} : { diagnostic: parseProbeDiagnostic(value.diagnostic) }
+			};
+		} })
+	};
+	function parseCredit(value) {
+		if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > Number.MAX_SAFE_INTEGER) throw new TypeError("Invalid web search quota");
+		return value;
+	}
+	const webSearchQuotaCodec = {
+		mode: "strict",
+		typeSymbol: "power-dsh#WebSearchQuota",
+		create: () => ({ parse(value) {
+			if (!isRecord(value)) throw new TypeError("Invalid web search quota");
+			if (value.status === "missing" || value.status === "unsupported") return { status: value.status };
+			if (value.status === "error") return {
+				status: "error",
+				durationMs: parseCredit(value.durationMs),
+				diagnostic: parseProbeDiagnostic(value.diagnostic)
+			};
+			if (value.status !== "ready" || typeof value.observedAt !== "string" || value.observedAt.length > 40 || !Number.isFinite(Date.parse(value.observedAt)) || !isRecord(value.data)) throw new TypeError("Invalid web search quota");
+			const raw = value.data;
+			let data;
+			if (raw.kind === "balance" && raw.currency === "USD" && typeof raw.balance === "string" && /^-?(?:0|[1-9]\d{0,11})(?:\.\d{1,6})?$/.test(raw.balance)) data = {
+				kind: "balance",
+				currency: "USD",
+				balance: raw.balance
+			};
+			else if (raw.kind === "credits" && (raw.scope === "key" || raw.scope === "account")) {
+				data = {
+					kind: "credits",
+					scope: raw.scope,
+					limit: raw.limit === null ? null : parseCredit(raw.limit),
+					remaining: raw.remaining === null ? null : parseCredit(raw.remaining),
+					...raw.used === void 0 ? {} : { used: parseCredit(raw.used) },
+					...raw.paygoRemaining === void 0 ? {} : { paygoRemaining: parseCredit(raw.paygoRemaining) }
+				};
+				if (data.remaining === null && (data.limit !== null || data.used === void 0)) throw new TypeError("Invalid web search quota");
+			} else throw new TypeError("Invalid web search quota");
+			return {
+				status: "ready",
+				observedAt: value.observedAt,
+				data
 			};
 		} })
 	};
@@ -16593,6 +16818,10 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		};
 	}
 	const READ_WEB_SEARCH_RPC = descriptor("readWebSearch", [], webSearchCatalogCodec);
+	const READ_WEB_SEARCH_QUOTA_RPC = descriptor("readWebSearchQuota", [{
+		name: "id",
+		codec: stringCodec
+	}], webSearchQuotaCodec);
 	const ADD_WEB_SEARCH_SLOT_RPC = descriptor("addWebSearchSlot", [{
 		name: "capability",
 		codec: stringCodec
@@ -16636,7 +16865,8 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		REORDER_WEB_SEARCH_CHAIN_RPC,
 		SAVE_WEB_SEARCH_KEY_RPC,
 		PROBE_WEB_SEARCH_SEARCH_RPC,
-		PROBE_WEB_SEARCH_FETCH_RPC
+		PROBE_WEB_SEARCH_FETCH_RPC,
+		READ_WEB_SEARCH_QUOTA_RPC
 	];
 
 // src/app/client-features.ts
@@ -16812,6 +17042,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			"generalTab": "General",
 			"interfaceTab": "Interface",
 			"enhancementsTab": "Features",
+			"managementTab": "Management",
 			"simplifyTab": "Simplify",
 			"otherTab": "Other",
 			"skillPreinstalledGroup": "Built-in",
@@ -16840,6 +17071,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 			"generalTab": "通用",
 			"interfaceTab": "界面",
 			"enhancementsTab": "功能",
+			"managementTab": "管理",
 			"simplifyTab": "精简",
 			"otherTab": "其他",
 			"skillPreinstalledGroup": "内置",
@@ -16908,6 +17140,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		SAVE_WEB_SEARCH_KEY_RPC,
 		PROBE_WEB_SEARCH_SEARCH_RPC,
 		PROBE_WEB_SEARCH_FETCH_RPC,
+		READ_WEB_SEARCH_QUOTA_RPC,
 		NOTIFICATION_TRANSPORT_RPC,
 		RESTART_STATUS_RPC,
 		RESTART_APP_RPC,
@@ -17016,7 +17249,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 							t,
 							version,
 							namespace,
-							pluginVersion: "0.1.2",
+							pluginVersion: "0.1.3",
 							savePreference,
 							preferenceSlot: preferenceSlot$1,
 							get footerBusy() {

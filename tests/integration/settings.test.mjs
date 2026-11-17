@@ -114,10 +114,12 @@ test('settings default to General with custom wallpaper first in Interface', asy
   const app = await mount({ desktop: true });
   // The notification sound row follows its parent notification switch.
   app.set({ notificationsEnabled: true, flowingBackgroundEnabled: true });
+  const savedPreferences = structuredClone(app.settingsProps().source.getSnapshot().value);
   const groups = {
     general: ['notificationSoundEnabled'],
-    interface: ['wallpaperEnabled', 'showThinkingEffortSwitcher', 'showThemeSwitcher', 'showVersion', 'searchPopupEnabled'],
-    enhancements: ['standalonePageEnabled', 'personalizationEnabled', 'memoryEnabled', 'skillManagerEnabled', 'mcpManagerEnabled', 'webSearchEnabled', 'projectManagerEnabled', 'archiveManagerEnabled', 'usageStatsEnabled', 'historySearchEnabled'],
+    interface: ['wallpaperEnabled', 'showThinkingEffortSwitcher', 'showThemeSwitcher', 'showVersion', 'standalonePageEnabled', 'searchPopupEnabled'],
+    enhancements: ['webSearchEnabled', 'historySearchEnabled'],
+    management: ['personalizationEnabled', 'memoryEnabled', 'skillManagerEnabled', 'mcpManagerEnabled', 'projectManagerEnabled', 'archiveManagerEnabled', 'usageStatsEnabled'],
     simplify: ['blockOfficialAccount', 'blockOfficialSearch', 'blockOfficialTelemetry', 'blockTodo', 'blockPlan', 'blockGoal'],
     other: ['showRefreshButton', 'showRestartButton', 'blockDoubleClickRename'],
   };
@@ -130,7 +132,7 @@ test('settings default to General with custom wallpaper first in Interface', asy
     app.selectSettingsTab(id);
     const view = descendants(app.renderSettings());
     const tabs = view.filter(node => node.props.role === 'tab');
-    assert.deepEqual(tabs.map(tab => tab.props.children[0]), ['generalTab', 'interfaceTab', 'enhancementsTab', 'simplifyTab', 'otherTab']);
+    assert.deepEqual(tabs.map(tab => tab.props.children[0]), ['generalTab', 'interfaceTab', 'enhancementsTab', 'managementTab', 'simplifyTab', 'otherTab']);
     assert.equal(tabs.filter(tab => tab.props['aria-selected']).length, 1);
     assert.equal(tabs.filter(tab => tab.props.tabIndex === 0).length, 1);
     for (const tab of tabs) {
@@ -150,6 +152,7 @@ test('settings default to General with custom wallpaper first in Interface', asy
     assert.ok(!view.some(node => node.type === 'textarea'));
   }
   assert.equal(new Set(fields).size, Object.values(groups).flat().length);
+  assert.deepEqual(structuredClone(app.settingsProps().source.getSnapshot().value), savedPreferences);
   app.unmount();
 });
 
@@ -158,9 +161,9 @@ test('settings tabs support wrapping arrow keys, Home and End with selection and
   const tabs = () => descendants(app.renderSettings()).filter(node => node.props.role === 'tab');
   for (const [key, expected] of [
     ['ArrowLeft', 'other'], ['ArrowRight', 'general'], ['ArrowRight', 'interface'],
-    ['ArrowRight', 'enhancements'], ['ArrowRight', 'simplify'], ['ArrowRight', 'other'],
+    ['ArrowRight', 'enhancements'], ['ArrowRight', 'management'], ['ArrowRight', 'simplify'], ['ArrowRight', 'other'],
     ['ArrowRight', 'general'], ['End', 'other'], ['ArrowLeft', 'simplify'],
-    ['ArrowLeft', 'enhancements'], ['ArrowLeft', 'interface'], ['ArrowLeft', 'general'],
+    ['ArrowLeft', 'management'], ['ArrowLeft', 'enhancements'], ['ArrowLeft', 'interface'], ['ArrowLeft', 'general'],
     ['Home', 'general'],
   ]) {
     let prevented = false;
@@ -179,7 +182,7 @@ test('settings tabs support wrapping arrow keys, Home and End with selection and
 test('a pending save marks only its own row busy and keeps the page operable', async () => {
   for (const [id, field, mechanism] of [
     ['interface', 'showVersion', 'form'], ['general', 'notificationSoundEnabled', 'form'],
-    ['enhancements', 'skillManagerEnabled', 'form'], ['simplify', 'blockTodo', 'rpc'],
+    ['management', 'skillManagerEnabled', 'form'], ['simplify', 'blockTodo', 'rpc'],
   ]) {
     const reply = Promise.withResolvers();
     const app = await mount(mechanism === 'form' ? { formReply: () => reply.promise } : { rpcReply: reply.promise });

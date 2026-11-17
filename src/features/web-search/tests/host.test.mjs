@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { createHost } from '../host.ts';
 import { OperationQueue } from '../../../shared/host/operation-queue.ts';
 import { webSearchCatalogCodec } from '../rpc.ts';
+import { LOCAL_FETCH } from '../chain.ts';
 
 const WEB_MODULE = '@deepseek-ai/dsh-web';
 
@@ -44,7 +45,7 @@ test('legacy chains load without writes and keep the original key across indepen
     records: new Map([['power-dsh/tavily', { kind: 'api-key', key: 'original' }]]) });
   const catalog = webSearchCatalogCodec.create().parse(await app.host.webSearch.catalog());
   assert.equal(catalog.slots.length, 2);
-  assert.notEqual(catalog.search.ids[0], catalog.fetch.ids[0]);
+  assert.notEqual(catalog.search.ids[0], catalog.fetch.ids[1]);
   assert.ok(catalog.slots.every(row => row.hasKey));
   assert.deepEqual(app.ctx.fiber.entry.options.config.webSearchChain, ['tavily']);
   assert.equal(app.records.size, 1);
@@ -62,7 +63,7 @@ test('editing a legacy chain copies its keys before converting only that chain',
   await app.host.webSearch.saveKey(id, 'replacement');
   assert.equal(app.records.get('power-dsh/tavily').key, 'original');
   assert.equal(app.records.get(`power-dsh/${id}`).key, 'replacement');
-  assert.equal((await app.host.webSearch.catalog()).slots.find(row => row.id === before.fetch.ids[0]).hasKey, true);
+  assert.equal((await app.host.webSearch.catalog()).slots.find(row => row.id === before.fetch.ids[1]).hasKey, true);
 });
 
 test('clearing a legacy key never restores it from the original shared record', async () => {
@@ -71,7 +72,7 @@ test('clearing a legacy key never restores it from the original shared record', 
   const before = await app.host.webSearch.catalog();
   const after = await app.host.webSearch.saveKey(before.search.ids[0], '');
   assert.equal(after.slots.find(row => row.id === before.search.ids[0]).hasKey, false);
-  assert.equal(after.slots.find(row => row.id === before.fetch.ids[0]).hasKey, true);
+  assert.equal(after.slots.find(row => row.id === before.fetch.ids[1]).hasKey, true);
   assert.equal(app.records.get('power-dsh/tinyfish').key, 'original');
 });
 
@@ -92,14 +93,14 @@ test('legacy ids avoid existing instance ids in either chain', async () => {
     fetchChain: [slot('legacy-search-tavily', 'firecrawl')] });
   const catalog = webSearchCatalogCodec.create().parse(await app.host.webSearch.catalog());
   assert.equal(catalog.search.ids.length, 1);
-  assert.notEqual(catalog.search.ids[0], catalog.fetch.ids[0]);
+  assert.notEqual(catalog.search.ids[0], catalog.fetch.ids[1]);
 });
 
 /** One configured instance; the provider defaults to the id's vendor prefix. */
 const slot = (id, provider = id.replace(/-\d+$/, '')) => ({ id, provider });
 
 /** A Host fixture with a web seam, a credentials store, and an editable web row. */
-function fixture({ enabled = false, searchChain = [], fetchChain = [], webConfig = { searchProvider: 'deepseek-search-api', fetchProvider: 'http' }, records = new Map(), withWeb = true, withCredentials = true, setThirdPartySearchActive } = {}) {
+function fixture({ enabled = false, searchChain = [], fetchChain = [], webConfig = { searchProvider: 'deepseek-search-api', fetchProvider: 'http' }, records = new Map(), withWeb = true, withCredentials = true, localFetcher, setThirdPartySearchActive } = {}) {
   const searchProviders = new Map();
   const fetchProviders = new Map();
   const webRow = { options: { id: 'web', name: WEB_MODULE, config: { ...webConfig } } };
@@ -142,6 +143,9 @@ function fixture({ enabled = false, searchChain = [], fetchChain = [], webConfig
       const child = { ...ctx };
       if (withWeb && deps.includes('web')) child.web = seam;
       if (withCredentials && deps.includes('credentials')) child.credentials = credentials;
+      if (deps.includes('loader') && localFetcher) child.loader = { import: async () => ({ HttpFetchProvider: class {
+        fetch(request, signal) { return localFetcher.fetch(request, signal); }
+      } }) };
       if (deps.includes('web') && !withWeb || deps.includes('credentials') && !withCredentials) return () => {};
       callback(child);
       return () => {};
@@ -197,7 +201,7 @@ test('the catalog lists every configured instance and never exposes a key value'
     records: new Map([['power-dsh/tinyfish-1', { kind: 'api-key', key: 'tf-secret' }]]) });
   const catalog = await app.host.webSearch.catalog();
   assert.deepEqual(catalog.search.ids, ['tinyfish-1']);
-  assert.deepEqual(catalog.fetch.ids, []);
+  assert.deepEqual(catalog.fetch.ids, [LOCAL_FETCH.id]);
   const row = catalog.slots.find(candidate => candidate.id === 'tinyfish-1');
   assert.equal(row.provider, 'tinyfish');
   assert.equal(row.hasKey, true);
@@ -225,6 +229,43 @@ test('the same vendor can be added twice with different keys and they stay indep
   assert.equal(app.records.get('power-dsh/tavily-2').key, 'second-key');
 });
 
+test('Exa instances use independent search and fetch keys through the registered native providers', async context => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, key: init.headers['x-api-key'] });
+    return { ok: true, json: async () => url.endsWith('/search')
+      ? { results: [{ url: 'https://example.test', title: 'Exa result', highlights: ['summary'] }] }
+      : { results: [{ text: 'Exa page' }], statuses: [{ status: 'success' }] } };
+  };
+  const app = fixture({ enabled: true, searchChain: [slot('tavily-1')], fetchChain: [slot('firecrawl-1', 'firecrawl')] });
+  await app.host.webSearch.addSlot('search', 'exa');
+  await app.host.webSearch.addSlot('fetch', 'exa');
+  await app.host.webSearch.saveKey('exa-1', 'search-test-key');
+  await app.host.webSearch.saveKey('exa-2', 'fetch-test-key');
+  await app.host.webSearch.reorder('fetch', ['exa-2', LOCAL_FETCH.id, 'firecrawl-1']);
+  const catalog = webSearchCatalogCodec.create().parse(await app.host.webSearch.catalog());
+  assert.deepEqual(catalog.search.ids, ['tavily-1', 'exa-1']);
+  assert.deepEqual(catalog.fetch.ids, ['exa-2', LOCAL_FETCH.id, 'firecrawl-1']);
+  assert.equal(catalog.slots.find(row => row.id === 'exa-1').keyUrl, 'https://dashboard.exa.ai/api-keys');
+  assert.doesNotMatch(JSON.stringify(catalog), /search-test-key|fetch-test-key/);
+  assert.equal((await app.searchProviders.get('power-dsh-search').search({ query: 'q' })).sources[0].title, 'Exa result');
+  assert.equal((await app.fetchProviders.get('power-dsh-fetch').fetch({ url: 'https://example.test' })).body.content, 'Exa page');
+  assert.equal((await app.host.webSearch.probeSearch('exa-1')).ok, true);
+  assert.equal((await app.host.webSearch.probeFetch('exa-2')).ok, true);
+  assert.deepEqual(await app.host.webSearch.quota('exa-1'), { status: 'unsupported' });
+  assert.deepEqual(calls, [
+    { url: 'https://api.exa.ai/search', key: 'search-test-key' },
+    { url: 'https://api.exa.ai/contents', key: 'fetch-test-key' },
+    { url: 'https://api.exa.ai/search', key: 'search-test-key' },
+    { url: 'https://api.exa.ai/contents', key: 'fetch-test-key' },
+  ]);
+  await app.host.webSearch.removeSlot('search', 'exa-1');
+  assert.equal(app.records.has('power-dsh/exa-1'), false);
+  assert.equal(app.records.get('power-dsh/exa-2').key, 'fetch-test-key');
+});
+
 test('a new instance id never collides with an id already used in either chain', async () => {
   const app = fixture({ enabled: true, searchChain: [slot('tavily-1')], fetchChain: [slot('tavily-2')] });
   const catalog = await app.host.webSearch.addSlot('search', 'tavily');
@@ -237,12 +278,12 @@ test('search and fetch chains are independent', async () => {
   await app.host.webSearch.addSlot('fetch', 'firecrawl');
   let catalog = await app.host.webSearch.catalog();
   assert.deepEqual(catalog.search.ids, ['tavily-1']);
-  assert.deepEqual(catalog.fetch.ids, ['firecrawl-1']);
+  assert.deepEqual(catalog.fetch.ids, [LOCAL_FETCH.id, 'firecrawl-1']);
 
   // Removing from one chain leaves the other alone.
   catalog = await app.host.webSearch.removeSlot('search', 'tavily-1');
   assert.deepEqual(catalog.search.ids, []);
-  assert.deepEqual(catalog.fetch.ids, ['firecrawl-1']);
+  assert.deepEqual(catalog.fetch.ids, [LOCAL_FETCH.id, 'firecrawl-1']);
 });
 
 test('the search provider only ever sees the search chain', async () => {
@@ -255,7 +296,7 @@ test('the search provider only ever sees the search chain', async () => {
   assert.equal(search.available(), true);
   assert.equal(fetch.available(), true);
   // Reordering the fetch chain must not reorder the search chain.
-  await app.host.webSearch.reorder('fetch', ['firecrawl-1']);
+  await app.host.webSearch.reorder('fetch', [LOCAL_FETCH.id, 'firecrawl-1']);
   assert.deepEqual((await app.host.webSearch.catalog()).search.ids, ['tavily-1', 'tinyfish-1']);
 });
 
@@ -280,10 +321,80 @@ test('a drag reports the whole order and it is written in one go', async () => {
 test('reordering one chain leaves the other untouched', async () => {
   const app = fixture({ enabled: true, searchChain: [slot('tavily-1'), slot('tinyfish-1', 'tinyfish')],
     fetchChain: [slot('tavily-2'), slot('tinyfish-2', 'tinyfish')] });
-  await app.host.webSearch.reorder('fetch', ['tinyfish-2', 'tavily-2']);
+  await app.host.webSearch.reorder('fetch', ['tinyfish-2', LOCAL_FETCH.id, 'tavily-2']);
   const catalog = await app.host.webSearch.catalog();
   assert.deepEqual(catalog.search.ids, ['tavily-1', 'tinyfish-1']);
-  assert.deepEqual(catalog.fetch.ids, ['tinyfish-2', 'tavily-2']);
+  assert.deepEqual(catalog.fetch.ids, ['tinyfish-2', LOCAL_FETCH.id, 'tavily-2']);
+});
+
+test('legacy fetch sorting persists the local position and preserves migrated credentials', async () => {
+  const app = fixture({ enabled: true, searchChain: ['tavily'], fetchChain: ['tavily', 'firecrawl'],
+    records: new Map([['power-dsh/tavily', { kind: 'api-key', key: 'original' }]]) });
+  const before = await app.host.webSearch.catalog();
+  assert.equal(before.fetch.ids[0], LOCAL_FETCH.id);
+  assert.deepEqual(app.ctx.fiber.entry.options.config.webFetchChain, ['tavily', 'firecrawl']);
+  const remoteIds = before.fetch.ids.slice(1);
+  await app.host.webSearch.reorder('fetch', [remoteIds[0], LOCAL_FETCH.id, remoteIds[1]]);
+  assert.deepEqual(app.ctx.fiber.entry.options.config.webFetchChain, [
+    slot(remoteIds[0], 'tavily'), LOCAL_FETCH, slot(remoteIds[1], 'firecrawl'),
+  ]);
+  assert.equal(app.records.get(`power-dsh/${remoteIds[0]}`).key, 'original');
+  await app.host.webSearch.addSlot('fetch', 'tinyfish');
+  await app.host.webSearch.removeSlot('fetch', remoteIds[1]);
+  const after = webSearchCatalogCodec.create().parse(await app.host.webSearch.catalog());
+  assert.deepEqual(after.fetch.ids, [remoteIds[0], LOCAL_FETCH.id, 'tinyfish-1']);
+  assert.deepEqual(app.ctx.fiber.entry.options.config.webSearchChain, ['tavily']);
+  assert.ok(!after.slots.some(row => row.id === LOCAL_FETCH.id));
+  assert.ok(!app.records.has(`power-dsh/${LOCAL_FETCH.id}`));
+});
+
+test('fetch ordering cannot remove or duplicate local, and local has no credential actions', async () => {
+  const app = fixture({ enabled: true, fetchChain: [slot('tavily-1'), LOCAL_FETCH, LOCAL_FETCH] });
+  const before = JSON.stringify(app.ctx.fiber.entry.options.config);
+  assert.deepEqual((await app.host.webSearch.catalog()).fetch.ids, ['tavily-1', LOCAL_FETCH.id]);
+  for (const ids of [['tavily-1'], ['tavily-1', LOCAL_FETCH.id, LOCAL_FETCH.id], [LOCAL_FETCH.id, LOCAL_FETCH.id]]) {
+    await assert.rejects(app.host.webSearch.reorder('fetch', ids), /webSearchOrderChanged/);
+  }
+  await assert.rejects(app.host.webSearch.reorder('search', [LOCAL_FETCH.id]), /webSearchOrderChanged/);
+  await assert.rejects(app.host.webSearch.addSlot('fetch', 'local'), /webSearchUnknownBackend/);
+  await assert.rejects(app.host.webSearch.removeSlot('fetch', LOCAL_FETCH.id), /webSearchUnknownBackend/);
+  await assert.rejects(app.host.webSearch.saveKey(LOCAL_FETCH.id, 'key'), /webSearchUnknownBackend/);
+  await assert.rejects(app.host.webSearch.quota(LOCAL_FETCH.id), /webSearchUnknownBackend/);
+  assert.equal(JSON.stringify(app.ctx.fiber.entry.options.config), before);
+});
+
+test('the catalog codec admits the local step only in fetch and rejects duplicates', async () => {
+  const app = fixture({ enabled: true });
+  const catalog = await app.host.webSearch.catalog();
+  assert.deepEqual(webSearchCatalogCodec.create().parse(catalog).fetch.ids, [LOCAL_FETCH.id]);
+  assert.throws(() => webSearchCatalogCodec.create().parse({ ...catalog, search: { ids: [LOCAL_FETCH.id] } }));
+  assert.throws(() => webSearchCatalogCodec.create().parse({ ...catalog, fetch: { ids: [LOCAL_FETCH.id, LOCAL_FETCH.id] } }));
+});
+
+test('saved local ordering reaches the registered fetch provider and survives Host recreation', async context => {
+  const calls = [];
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async () => { calls.push('remote'); return { ok: false, status: 429 }; };
+  const localFetcher = { async fetch(request) {
+    calls.push('local');
+    return { url: request.url, statusCode: 200, body: { kind: 'html', content: '<p>local</p>' }, truncated: false };
+  } };
+  const records = new Map([['power-dsh/tavily-1', { kind: 'api-key', key: 'test-key' }]]);
+  const app = fixture({ enabled: true, fetchChain: [slot('tavily-1')], records, localFetcher });
+  await app.host.webSearch.catalog();
+  const provider = app.fetchProviders.get('power-dsh-fetch');
+  await provider.fetch({ url: 'https://example.test' });
+  assert.deepEqual(calls, ['local']);
+  await app.host.webSearch.reorder('fetch', ['tavily-1', LOCAL_FETCH.id]);
+  calls.length = 0;
+  await provider.fetch({ url: 'https://example.test' });
+  assert.deepEqual(calls, ['remote', 'local']);
+  const reloaded = fixture({ enabled: true, fetchChain: app.ctx.fiber.entry.options.config.webFetchChain, records, localFetcher });
+  assert.deepEqual((await reloaded.host.webSearch.catalog()).fetch.ids, ['tavily-1', LOCAL_FETCH.id]);
+  calls.length = 0;
+  await reloaded.fetchProviders.get('power-dsh-fetch').fetch({ url: 'https://example.test' });
+  assert.deepEqual(calls, ['remote', 'local']);
 });
 
 test('an unchanged order is not written at all', async () => {
@@ -323,7 +434,7 @@ test('all probes reject missing keys without making a request', async context =>
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
   globalThis.fetch = () => { assert.fail('missing credentials must not reach the network'); };
-  for (const provider of ['tavily', 'firecrawl', 'tinyfish']) {
+  for (const provider of ['tavily', 'firecrawl', 'tinyfish', 'exa']) {
     const id = `${provider}-1`;
     const app = fixture({ enabled: true, searchChain: [slot(id, provider)], fetchChain: [slot(`${provider}-2`, provider)] });
     for (const result of [await app.host.webSearch.probeSearch(id), await app.host.webSearch.probeFetch(`${provider}-2`)]) {
@@ -409,4 +520,30 @@ test('tool restoration failures reject reads and writes and remove provider pins
   assert.equal(app.webRow.options.config.fetchProvider, 'http');
   assert.equal(app.searchProviders.size, 0);
   assert.equal(app.fetchProviders.size, 0);
+});
+
+test('quota reads share a key across chains and invalidate after replacement or deletion', async context => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const requests = [];
+  globalThis.fetch = async (_url, options) => {
+    requests.push(options.headers.Authorization);
+    return new Response(JSON.stringify({ key: { usage: 1, limit: 100 }, account: {} }));
+  };
+  const app = fixture({ enabled: true, searchChain: [slot('tavily-1')], fetchChain: [slot('tavily-2')],
+    records: new Map([['power-dsh/tavily-1', { kind: 'api-key', key: 'shared' }],
+      ['power-dsh/tavily-2', { kind: 'api-key', key: 'shared' }]]) });
+  assert.equal((await app.host.webSearch.quota('tavily-1')).status, 'ready');
+  assert.equal((await app.host.webSearch.quota('tavily-2')).status, 'ready');
+  assert.deepEqual(requests, ['Bearer shared']);
+  await app.host.webSearch.saveKey('tavily-1', 'new-key');
+  assert.equal((await app.host.webSearch.quota('tavily-1')).status, 'ready');
+  assert.deepEqual(requests, ['Bearer shared', 'Bearer new-key']);
+  await app.host.webSearch.saveKey('tavily-1', '');
+  assert.deepEqual(await app.host.webSearch.quota('tavily-1'), { status: 'missing' });
+  assert.equal(requests.length, 2);
+  await app.host.webSearch.removeSlot('search', 'tavily-1');
+  await assert.rejects(app.host.webSearch.quota('tavily-1'), /UnknownBackend/);
+  app.setMasterEnabled(false);
+  await assert.rejects(app.host.webSearch.quota('tavily-2'), /Unavailable/);
 });

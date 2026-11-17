@@ -17,6 +17,7 @@ export const styles = `
 .power-dsh-web-rows { display:flex; flex-direction:column; gap:8px; margin:12px 0 0; padding:0; list-style:none; }
 .power-dsh-web-row { display:flex; flex-direction:column; gap:12px; padding:12px 14px; border:.5px solid var(--dsw-alias-settings-card-stroke); border-radius:var(--dsw-radius-xl); background:var(--dsw-alias-settings-card-fill); }
 .power-dsh-web-row-head { display:flex; align-items:center; gap:10px; min-height:28px; }
+.power-dsh-web-probe-result { min-width:0; }
 .power-dsh-web-row-identity { display:inline-flex; align-items:center; gap:6px; min-width:0; }
 .power-dsh-web-dot { box-sizing:border-box; display:inline-block; flex:none; width:8px; height:8px; border-radius:50%; corner-shape:round; background:var(--dsw-alias-border-l3); }
 .power-dsh-web-dot[data-state="configured"] { background:var(--dsw-alias-state-success-primary); }
@@ -24,6 +25,12 @@ export const styles = `
 .power-dsh-web-name { min-width:0; overflow:hidden; color:var(--dsw-alias-label-primary); font-size:14px; font-weight:500; line-height:22px; text-overflow:ellipsis; white-space:nowrap; }
 .power-dsh-web-tag { flex:none; padding:1px 6px; border:.5px solid var(--dsw-alias-border-l3); border-radius:var(--dsw-radius-xs); color:var(--dsw-alias-label-secondary); font-size:11px; line-height:16px; }
 .power-dsh-web-row-actions { display:inline-flex; flex:none; align-items:center; gap:4px; margin-left:auto; }
+.power-dsh-web-quota { display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; }
+.power-dsh-web-quota .power-dsh-web-hint { margin:0; }
+.power-dsh-web-quota-refresh { margin-left:auto; padding:0; border:0; background:transparent; color:var(--dsw-alias-label-secondary); font:inherit; font-size:12px; line-height:18px; cursor:pointer; }
+.power-dsh-web-quota-refresh:hover:not(:disabled) { text-decoration:underline; }
+.power-dsh-web-quota-refresh:disabled { opacity:.4; cursor:default; }
+.power-dsh-web-quota-refresh:focus-visible { outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; }
 
 /* The Models page's button family: 36px base, 28px inside a row's action group. */
 .power-dsh-web-primary,.power-dsh-web-secondary,.power-dsh-web-danger { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; gap:4px; height:36px; padding:0 14px; border:none; border-radius:var(--dsw-radius-md); font:inherit; font-size:14px; line-height:22px; cursor:pointer; }

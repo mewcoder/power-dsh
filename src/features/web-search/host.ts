@@ -14,10 +14,12 @@ import type { NativeContext, NativeEntry, Release } from '../../shared/host/nati
 import type { LivePreferences } from '../../shared/types/preferences.ts';
 import type { HostOptions, HostService } from '../../shared/host/feature.ts';
 import { BACKENDS, backendOf } from './backends.ts';
-import { AggregateFetchProvider, AggregateSearchProvider, FETCH_PROVIDER_ID, SEARCH_PROVIDER_ID, type BackendSlot, type Capability, type LocalFetcher } from './provider.ts';
+import { AggregateFetchProvider, AggregateSearchProvider, FETCH_PROVIDER_ID, SEARCH_PROVIDER_ID, type BackendSlot, type FetchSlot, type Capability, type LocalFetcher } from './provider.ts';
+import { LOCAL_FETCH } from './chain.ts';
 import { credentialsOf, readSlotRows, resolveKey, writeKey, type Credentials, type SlotPreference } from './state.ts';
-import type { WebSearchCatalog, WebSearchProbe } from './types.ts';
+import type { WebSearchCatalog, WebSearchProbe, WebSearchQuota } from './types.ts';
 import { probeDiagnostic } from './probe-diagnostics.ts';
+import { QuotaReader } from './quota.ts';
 
 /** The native `web` seam this feature registers into. */
 interface WebSeam {
@@ -43,10 +45,10 @@ const WEB_MODULE = '@deepseek-ai/dsh-web';
  * Two entries may share a vendor — they are distinct instances with their own keys.
  */
 function chainOf(value: unknown, capability: Capability, reserved: ReadonlySet<string>): SlotPreference[] {
-  if (!Array.isArray(value)) return [];
+  if (!Array.isArray(value)) return capability === 'fetch' ? [{ ...LOCAL_FETCH }] : [];
   const seen = new Set<string>();
   const legacyProviders = new Set<string>();
-  return value.flatMap(row => {
+  const chain: SlotPreference[] = value.flatMap(row => {
     if (typeof row === 'string') {
       if (!backendOf(row) || legacyProviders.has(row)) return [];
       legacyProviders.add(row);
@@ -58,10 +60,15 @@ function chainOf(value: unknown, capability: Capability, reserved: ReadonlySet<s
     if (typeof row !== 'object' || row === null) return [];
     const { id, provider } = row as { id?: unknown; provider?: unknown };
     if (typeof id !== 'string' || typeof provider !== 'string') return [];
-    if (backendOf(provider) === undefined || id === '' || seen.has(id)) return [];
+    if (id === '' || seen.has(id)) return [];
+    if (id === LOCAL_FETCH.id) {
+      if (capability !== 'fetch' || provider !== LOCAL_FETCH.provider) return [];
+    } else if (backendOf(provider) === undefined) return [];
     seen.add(id);
     return [{ id, provider }];
   });
+  if (capability === 'fetch' && !seen.has(LOCAL_FETCH.id)) chain.unshift({ ...LOCAL_FETCH });
+  return chain;
 }
 
 /** Every instance id the two chains currently hold. */
@@ -92,11 +99,12 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
   // every call, so a key or order change reaches the next request without
   // re-registering anything.
   let currentSearch: BackendSlot[] = [];
-  let currentFetch: BackendSlot[] = [];
+  let currentFetch: FetchSlot[] = [];
   /** The machine's own fetcher, resolved from the native package when present. */
   let localFetcher: LocalFetcher | null = null;
   const search = new AggregateSearchProvider(() => currentSearch);
   const fetchProvider = new AggregateFetchProvider(() => currentFetch, () => localFetcher);
+  const quotas = new QuotaReader();
 
   const enabled = () => config.webSearchEnabled?.get() === true;
   const reservedIds = () => new Set([...(config.webSearchChain?.get() ?? []), ...(config.webFetchChain?.get() ?? [])]
@@ -105,9 +113,13 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
   const fetchChain = () => chainOf(config.webFetchChain?.get(), 'fetch', reservedIds());
 
   /** Resolve one chain into slots, reading each instance's own key. */
-  const slotsOf = async (chain: readonly SlotPreference[]): Promise<BackendSlot[]> => {
-    const slots: BackendSlot[] = [];
+  const slotsOf = async (chain: readonly SlotPreference[]): Promise<FetchSlot[]> => {
+    const slots: FetchSlot[] = [];
     for (const slot of chain) {
+      if (slot.id === LOCAL_FETCH.id) {
+        slots.push(LOCAL_FETCH.id);
+        continue;
+      }
       const backend = backendOf(slot.provider);
       if (!backend) continue;
       slots.push({ id: slot.id, backend, apiKey: await resolveKey(credentials ?? undefined, slot.legacyCredentialId ?? slot.id) });
@@ -117,7 +129,7 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
 
   const refreshSlots = async (): Promise<void> => {
     const [nextSearch, nextFetch] = await Promise.all([slotsOf(searchChain()), slotsOf(fetchChain())]);
-    currentSearch = nextSearch;
+    currentSearch = nextSearch.filter(slot => typeof slot !== 'string');
     currentFetch = nextFetch;
   };
 
@@ -133,12 +145,8 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
   /**
    * Point one capability's selection at this feature's provider.
    *
-   * Search is always pinned while the feature is on: the aggregate provider is
-   * the only thing that can serve the user's third-party chain. Fetch is pinned
-   * only when the user actually put something in the fetch chain — otherwise the
-   * native local `http` provider keeps serving fetches, which is free and reaches
-   * intranet and loopback addresses. Pinning fetch unconditionally used to take
-   * that away from anyone who merely turned the feature on.
+   * Both capabilities stay pinned while enabled; the aggregate fetch provider
+   * preserves local fetching even when no third-party instances are configured.
    */
   const pinCapability = async (capability: Capability): Promise<boolean> => {
     const entry = webEntry();
@@ -207,9 +215,6 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
    * Reconcile the live state with the stored preference: refresh keys, then
    * mount/unmount and pin/unpin each capability in an order that never leaves the
    * seam pointing at an unregistered provider.
-   *
-   * Fetch is intentionally left alone when its chain is empty: the native local
-   * `http` provider keeps serving it, free and with intranet access.
    */
   const reconcile = (): Promise<void> => {
     const task = tail.then(async () => {
@@ -262,7 +267,7 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
     const store = credentials;
     const searchSlots = searchChain();
     const fetchSlots = fetchChain();
-    const all = [...searchSlots, ...fetchSlots];
+    const all = [...searchSlots, ...fetchSlots].filter(slot => slot.id !== LOCAL_FETCH.id);
     const rows = await readSlotRows(store ?? undefined, all);
     return {
       enabled: enabled(),
@@ -336,8 +341,8 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
   });
 
   /**
-   * Resolve the native local fetcher so the fetch chain can try the machine
-   * first. Its public class is loaded through the loader rather than reimplemented:
+   * Resolve the native local fetcher for its configured position in the chain.
+   * Its public class is loaded through the loader rather than reimplemented:
    * URL validation, same-origin redirects, size and charset limits are all
    * behaviour this feature must not fork. Absence is not an error — the chain
    * simply starts at the first third-party backend.
@@ -383,10 +388,14 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
   });
 
   ctx.on('settings/document-updated', namespace => {
-    if (namespace === owner.fiber.entry?.options.id) void reconcile().catch(() => {});
+    if (namespace === owner.fiber.entry?.options.id) {
+      if (!enabled()) quotas.clear();
+      void reconcile().catch(() => {});
+    }
   });
   ctx.effect(() => () => {
     alive = false;
+    quotas.dispose();
     void setThirdPartySearchActive?.(false).catch(() => {});
     unmount();
     seam = null;
@@ -398,6 +407,18 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
   return {
     webSearch: {
       catalog,
+      async quota(id: string): Promise<WebSearchQuota> {
+        ensureActive();
+        if (!alive || !enabled() || !seam) throw new Error('webSearchUnavailable');
+        const slot = [...searchChain(), ...fetchChain()].find(candidate => candidate.id === id);
+        if (!slot || slot.id === LOCAL_FETCH.id) throw new Error('webSearchUnknownBackend');
+        const apiKey = await resolveKey(credentials ?? undefined, slot.legacyCredentialId ?? slot.id);
+        ensureActive();
+        const value = await quotas.read(slot.provider, apiKey);
+        ensureActive();
+        if (!alive) throw new Error('webSearchUnavailable');
+        return value;
+      },
       /**
        * Add one provider instance to the end of ONE chain. Each call creates a
        * new instance with its own credential record, so adding the same vendor
@@ -414,8 +435,9 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
       /** Remove one instance from ONE chain and drop its credential record. */
       async removeSlot(capability: string, id: string) {
         const { slots, capability: kind } = chainFor(capability);
-        if (!slots.some(slot => slot.id === id)) throw new Error('webSearchUnknownBackend');
+        if (id === LOCAL_FETCH.id || !slots.some(slot => slot.id === id)) throw new Error('webSearchUnknownBackend');
         await persistChain(kind, slots.filter(slot => slot.id !== id));
+        quotas.clear();
         // The instance is gone from the page, so its key has no owner left.
         ensureActive();
         if (credentials) {
@@ -447,7 +469,7 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
         const searchSlots = searchChain();
         const fetchSlots = fetchChain();
         const slot = [...searchSlots, ...fetchSlots].find(candidate => candidate.id === id);
-        if (!slot) throw new Error('webSearchUnknownBackend');
+        if (!slot || slot.id === LOCAL_FETCH.id) throw new Error('webSearchUnknownBackend');
         if (typeof value !== 'string' || value.length > 4096) throw new TypeError('invalid key');
         ensureActive();
         if (slot.legacyCredentialId !== undefined) {
@@ -455,6 +477,7 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
           await persistChain(kind, kind === 'search' ? searchSlots : fetchSlots);
         }
         await writeKey(credentials ?? undefined, id, value.trim());
+        quotas.clear();
         ensureActive();
         await reconcile();
         return catalog();
@@ -512,6 +535,13 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
 }
 
 export const methods = {
+  readWebSearchQuota(id: string): Promise<WebSearchQuota> {
+    if (this.ctx.invocation && this.ctx.invocation.peer.principal.kind !== 'owner') {
+      throw new Error('Only the profile owner can read web search quotas.');
+    }
+    this.queue.ensureActive();
+    return this.webSearch.quota(id);
+  },
   readWebSearch(): Promise<WebSearchCatalog> {
     return this.run(() => this.webSearch.catalog());
   },

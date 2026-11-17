@@ -3,7 +3,7 @@ import type { WindowsNotification, NotificationDelivery, NotificationCleared } f
 import type { NotificationTransport, PluginRelease } from './wire.ts';
 import type { SearchContentResult } from './wire.ts';
 import type { MemoryCatalog, MemoryFileDetail, MemoryWriteResult, MemoryModels, MemoryCleanupPreview, MemoryCleanupResult, MemorySourceResult } from './wire.ts';
-import type { WebSearchCatalog, WebSearchProbe } from './wire.ts';
+import type { WebSearchCatalog, WebSearchProbe, WebSearchQuota } from './wire.ts';
 
 /** Named Host operations, before the transport adds its result envelope. */
 export interface PowerDshMethods {
@@ -56,6 +56,7 @@ export interface PowerDshMethods {
   setMcpServerEnabled(id: string, enabled: boolean): Promise<McpCatalog>;
   probeMcpServer(id: string): Promise<McpProbe>;
   readWebSearch(): Promise<WebSearchCatalog>;
+  readWebSearchQuota(id: string): Promise<WebSearchQuota>;
   addWebSearchSlot(capability: string, provider: string): Promise<WebSearchCatalog>;
   removeWebSearchSlot(capability: string, id: string): Promise<WebSearchCatalog>;
   reorderWebSearchChain(capability: string, ids: readonly string[]): Promise<WebSearchCatalog>;

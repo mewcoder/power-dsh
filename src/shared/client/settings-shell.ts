@@ -9,7 +9,7 @@ export function createSettingsPage(runtime: ClientRuntime) {
   function SettingsPage({ t, source, form, version, features, close }: SettingsPageProps) {
     const snapshot = useSnapshot(source);
     const [activeTab, setActiveTab] = React.useState('general');
-    const tabs = ['general', 'interface', 'enhancements', 'simplify', 'other'].map(id => ({ id }));
+    const tabs = ['general', 'interface', 'enhancements', 'management', 'simplify', 'other'].map(id => ({ id }));
     const tabRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
     const [saving, setSaving] = React.useState<SavingSetting | null>(null);
     const [error, setError] = React.useState<SettingError | null>(null);

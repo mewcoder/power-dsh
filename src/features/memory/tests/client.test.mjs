@@ -147,7 +147,7 @@ test('the accessible main switch controls automatic, global and project preferen
   const app = await mount({ featureIds: ['memory'] });
   t.after(() => app.unmount());
   assert.equal(app.entries.has('settings.section:power-dsh-memory'), false);
-  const settings = app.selectSettingsTab('enhancements');
+  const settings = app.selectSettingsTab('management');
   const control = descendants(settings).find(node => node.props.role === 'switch');
   assert.ok(control);
   await control.props.onClick();

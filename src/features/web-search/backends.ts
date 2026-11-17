@@ -10,6 +10,8 @@
  * @module power-dsh/web-search/backends
  */
 
+import { isRecord } from '../../shared/types/protocol.ts';
+
 /** A source shape mirroring the host seam's `WebSearchSource`, without importing it. */
 export interface BackendSource {
   url: string;
@@ -294,8 +296,62 @@ const tinyfish: WebBackend = {
   },
 };
 
+const exa: WebBackend = {
+  id: 'exa',
+  credentialId: 'exa',
+  keyUrl: 'https://dashboard.exa.ai/api-keys',
+  async search({ query, maxResults }, apiKey, signal) {
+    requireKey(apiKey);
+    const numResults = clampCount(maxResults, 100);
+    const response = await fetch('https://api.exa.ai/search', {
+      method: 'POST', redirect: 'error', cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+      body: JSON.stringify({
+        query, type: 'auto', contents: { highlights: { maxCharacters: SNIPPET_MAX } },
+        ...(numResults === undefined ? {} : { numResults }),
+      }),
+      signal,
+    });
+    assertOk(response, 'Exa search');
+    const data: unknown = await response.json();
+    if (!isRecord(data)) throw new SyntaxError('Invalid Exa search response');
+    const sources = (Array.isArray(data.results) ? data.results : []).flatMap(row => {
+      if (!isRecord(row) || typeof row.url !== 'string' || row.url === '') return [];
+      const source: BackendSource = { url: row.url };
+      if (typeof row.title === 'string' && row.title !== '') source.title = row.title;
+      const highlights = Array.isArray(row.highlights) ? row.highlights.filter(value => typeof value === 'string').join('\n') : '';
+      const snippet = toSnippet(highlights) ?? toSnippet(row.text);
+      if (snippet !== undefined) source.snippet = snippet;
+      const publishedAt = toPublishedAt(row.publishedDate);
+      if (publishedAt !== undefined) source.publishedAt = publishedAt;
+      return [source];
+    });
+    if (sources.length === 0) throw new BackendError('Exa search returned no results');
+    return { sources };
+  },
+  async fetch(url, apiKey, signal) {
+    requireKey(apiKey);
+    const maxCharacters = 100_000;
+    const response = await fetch('https://api.exa.ai/contents', {
+      method: 'POST', redirect: 'error', cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+      body: JSON.stringify({ urls: [url], text: { maxCharacters: maxCharacters + 1 } }),
+      signal,
+    });
+    assertOk(response, 'Exa contents');
+    const data: unknown = await response.json();
+    if (!isRecord(data)) throw new SyntaxError('Invalid Exa contents response');
+    const failed = Array.isArray(data.statuses) && data.statuses.some(status => isRecord(status) && status.status === 'error');
+    const row: unknown = Array.isArray(data.results) ? data.results[0] : undefined;
+    if (failed || !isRecord(row) || typeof row.text !== 'string' || row.text.trim() === '') {
+      throw new BackendError('Exa contents returned no content');
+    }
+    return { content: row.text.slice(0, maxCharacters), truncated: row.text.length > maxCharacters };
+  },
+};
+
 /** Every backend this feature serves, in the order the picker lists them. */
-export const BACKENDS: readonly WebBackend[] = Object.freeze([tavily, firecrawl, tinyfish]);
+export const BACKENDS: readonly WebBackend[] = Object.freeze([tavily, firecrawl, tinyfish, exa]);
 
 /** Look up one backend by its stable id. */
 export function backendOf(id: string): WebBackend | undefined {

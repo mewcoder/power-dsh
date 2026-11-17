@@ -9,7 +9,7 @@ import z from '@deepseek-ai/schemastery';
 export const slotSchema = z.object({
   /** Instance id, unique across both chains; also the credential record id. */
   id: z.string().required(),
-  /** Vendor id: `tavily`, `firecrawl`, or `tinyfish`. */
+  /** Vendor id: `tavily`, `firecrawl`, `tinyfish`, or `exa`. */
   provider: z.string().required(),
 });
 

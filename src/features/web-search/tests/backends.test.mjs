@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { BACKENDS, backendOf } from '../backends.ts';
+import { AggregateSearchProvider } from '../provider.ts';
+import { parseProbeDiagnostic, probeDiagnostic } from '../probe-diagnostics.ts';
 
 const recorded = [];
 const realFetch = globalThis.fetch;
@@ -23,7 +25,7 @@ function capture(reply) {
 function restore() { globalThis.fetch = realFetch; }
 
 test('every listed backend is one of the free-tier vendors and carries an id', () => {
-  assert.deepEqual(BACKENDS.map(backend => backend.id), ['tavily', 'firecrawl', 'tinyfish']);
+  assert.deepEqual(BACKENDS.map(backend => backend.id), ['tavily', 'firecrawl', 'tinyfish', 'exa']);
   for (const backend of BACKENDS) {
     assert.ok(backend.credentialId.length > 0);
     assert.equal(typeof backend.search, 'function');
@@ -108,6 +110,88 @@ test('TinyFish sends X-API-Key on both its subdomains and maps each field set', 
   assert.equal(fetched.content, '# Doc');
 });
 
+test('Exa search authenticates with its saved key and requests bounded highlights', async context => {
+  context.after(restore);
+  const signal = new AbortController().signal;
+  capture({ body: { results: [null, { title: 'missing URL' }, { url: 'https://exa.test', title: 'Exa',
+    highlights: ['x'.repeat(1000), 42, 'more'], publishedDate: '2026-11-17', text: 'unrequested full body' }] } });
+  const result = await backendOf('exa').search({ query: 'q', maxResults: 1000 }, 'exa-test-key', signal);
+  const call = recorded[0];
+  assert.equal(call.url, 'https://api.exa.ai/search');
+  assert.equal(call.init.headers['x-api-key'], 'exa-test-key');
+  assert.equal(call.init.signal, signal);
+  assert.equal(call.init.redirect, 'error');
+  assert.equal(call.init.cache, 'no-store');
+  assert.deepEqual(JSON.parse(call.init.body), { query: 'q', type: 'auto', numResults: 100,
+    contents: { highlights: { maxCharacters: 800 } } });
+  assert.equal(result.sources.length, 1);
+  assert.equal(result.sources[0].publishedAt, '2026-11-17');
+  assert.ok(result.sources[0].snippet.length <= 801);
+  assert.doesNotMatch(JSON.stringify(result), /unrequested full body|exa-test-key/);
+  capture({ body: { results: [{ url: 'https://exa.test', text: 'fallback text' }] } });
+  assert.equal((await backendOf('exa').search({ query: 'q' }, 'key', signal)).sources[0].snippet, 'fallback text');
+  assert.equal(JSON.parse(recorded[0].init.body).numResults, undefined);
+});
+
+test('Exa contents preserves readable text and flags the local delivery bound', async context => {
+  context.after(restore);
+  const signal = new AbortController().signal;
+  capture({ body: { results: [{ url: 'https://exa.test', text: '# Exa' }], statuses: [{ status: 'success' }] } });
+  const result = await backendOf('exa').fetch('https://exa.test', 'key', signal);
+  assert.deepEqual(result, { content: '# Exa', truncated: false });
+  assert.equal(recorded[0].url, 'https://api.exa.ai/contents');
+  assert.equal(recorded[0].init.headers['x-api-key'], 'key');
+  assert.equal(recorded[0].init.signal, signal);
+  assert.equal(recorded[0].init.redirect, 'error');
+  assert.deepEqual(JSON.parse(recorded[0].init.body), { urls: ['https://exa.test'], text: { maxCharacters: 100001 } });
+  capture({ body: { results: [{ text: 'x'.repeat(100001) }] } });
+  const long = await backendOf('exa').fetch('https://exa.test', 'key', signal);
+  assert.equal(long.content.length, 100000);
+  assert.equal(long.truncated, true);
+});
+
+test('Exa rejects malformed, empty and per-URL failures without exposing upstream error payloads', async context => {
+  context.after(restore);
+  const signal = new AbortController().signal;
+  for (const body of [null, {}, { results: [] }, { results: [null, { url: '' }] }]) {
+    capture({ body });
+    await assert.rejects(backendOf('exa').search({ query: 'q' }, 'key', signal));
+  }
+  for (const body of [null, {}, { results: [] }, { results: [{ text: ' ' }] },
+    { results: [{ text: 'stale' }], statuses: [{ status: 'error', error: { message: 'private-payload' } }] }]) {
+    capture({ body });
+    await assert.rejects(backendOf('exa').fetch('https://exa.test', 'key', signal), error => {
+      assert.doesNotMatch(error.message, /private-payload/);
+      return true;
+    });
+  }
+  for (const status of [401, 402, 429]) {
+    capture({ ok: false, status, body: { error: 'private-payload' } });
+    await assert.rejects(backendOf('exa').search({ query: 'q' }, 'key', signal), error => {
+      assert.equal(error.status, status);
+      assert.equal(parseProbeDiagnostic(probeDiagnostic(error, 'exa', 'api-key')).provider, 'exa');
+      assert.doesNotMatch(error.message, /private-payload/);
+      return true;
+    });
+  }
+});
+
+test('Exa failures continue through the existing search chain', async context => {
+  context.after(restore);
+  let fallbackCalls = 0;
+  const provider = new AggregateSearchProvider(() => [
+    { id: 'exa-1', backend: backendOf('exa'), apiKey: 'key' },
+    { id: 'fallback', apiKey: 'key', backend: { id: 'fallback', search: async () => {
+      fallbackCalls++; return { sources: [{ url: 'https://fallback.test' }] };
+    } } },
+  ]);
+  for (const reply of [{ ok: false, status: 429 }, { body: { results: [] } }]) {
+    capture(reply);
+    assert.equal((await provider.search({ query: 'q' })).sources[0].url, 'https://fallback.test');
+  }
+  assert.equal(fallbackCalls, 2);
+});
+
 test('every backend rejects empty keys before sending any search or fetch request', async context => {
   context.after(restore);
   capture({ body: {} });
@@ -128,4 +212,5 @@ test('every backend publishes an https key page so a key can be obtained without
   }
   assert.equal(backendOf('tavily').keyUrl, 'https://app.tavily.com/home');
   assert.equal(backendOf('tinyfish').keyUrl, 'https://agent.tinyfish.ai/api-keys');
+  assert.equal(backendOf('exa').keyUrl, 'https://dashboard.exa.ai/api-keys');
 });

@@ -64,7 +64,7 @@ test('personalization saves explicitly, cancels edits and preserves saved text w
   assert.equal(writes.length, 0);
   assert.deepEqual(app.fileWrites, [{ text: '中文保存 {{literal}}', revision: '1'.padStart(64, '0') }]);
   assert.equal(page.action('save').props.disabled, true);
-  app.selectSettingsTab('enhancements');
+  app.selectSettingsTab('management');
   const toggle = () => descendants(app.renderSettings()).find(node => node.props.id === 'settings-test-personalizationEnabled');
   await toggle().props.onClick();
   assert.deepEqual(writes.at(-1), { field: 'personalizationEnabled', value: false });
@@ -123,7 +123,7 @@ test('personalization detects remote changes and length limits, and respects rea
   assert.equal(locked.editor().props.disabled, true);
   assert.equal(locked.action('save').props.disabled, true);
   assert.ok(!locked.render().some(node => node.props.role === 'switch'));
-  readOnly.selectSettingsTab('enhancements');
+  readOnly.selectSettingsTab('management');
   assert.equal(descendants(readOnly.renderSettings()).find(node => node.props.id === 'settings-test-personalizationEnabled').props.disabled, true);
   readOnly.unmount();
 });
@@ -167,7 +167,7 @@ test('personalization refreshes Host settings and leaves a rejected switch off w
     formLoad: async () => upgraded ? { personalizationEnabled: false, globalPrompt: '' } : undefined,
   });
   app.set({ personalizationEnabled: undefined, globalPrompt: undefined });
-  app.selectSettingsTab('enhancements');
+  app.selectSettingsTab('management');
   const toggle = () => descendants(app.renderSettings()).find(node => node.props.id === 'settings-test-personalizationEnabled');
   await toggle().props.onClick();
   assert.equal(writes.length, 0);

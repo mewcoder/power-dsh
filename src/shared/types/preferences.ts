@@ -61,7 +61,7 @@ export interface Preferences {
   webSearchEnabled: boolean;
   /** Search provider instances in fallback order. */
   webSearchChain: (WebSearchSlotPreference | string)[];
-  /** Fetch provider instances in fallback order, independent of the search chain. */
+  /** Fetch steps in fallback order, including the optional persisted local step. */
   webFetchChain: (WebSearchSlotPreference | string)[];
 }
 export type PreferenceKey = keyof Preferences;

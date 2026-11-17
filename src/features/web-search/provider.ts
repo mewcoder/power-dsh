@@ -12,6 +12,7 @@
  */
 
 import { BackendError, type BackendFetchResult, type BackendSearchResult, type WebBackend } from './backends.ts';
+import { LOCAL_FETCH } from './chain.ts';
 
 /** Provider ids written into the host's `web.searchProvider` / `web.fetchProvider`. */
 export const SEARCH_PROVIDER_ID = 'power-dsh-search';
@@ -25,6 +26,8 @@ export interface BackendSlot {
   /** Resolved key; empty means skip this instance. */
   apiKey: string;
 }
+
+export type FetchSlot = BackendSlot | typeof LOCAL_FETCH.id;
 
 /** A capability, each with its own chain. */
 export type Capability = 'search' | 'fetch';
@@ -106,7 +109,7 @@ export class AggregateSearchProvider {
   }
 }
 
-/** The native local fetcher this chain tries first, duck-typed from its public class. */
+/** The native local fetcher, duck-typed from its public class. */
 export interface LocalFetcher {
   fetch(request: { url: string }, signal?: AbortSignal): Promise<{
     url: string;
@@ -116,55 +119,47 @@ export interface LocalFetcher {
   }>;
 }
 
-/**
- * The aggregate fetch provider: the machine's own fetcher first, then the
- * third-party chain.
- *
- * Local first is deliberate. The native fetcher costs nothing, never leaves the
- * machine's own credentials behind, and reaches intranet and loopback addresses
- * no hosted API can. A third-party fetch costs free-tier credits and can refuse
- * a proxy egress, so it is the fallback rather than the default — the chain only
- * runs when the local attempt actually fails (JavaScript-only pages, PDFs, or a
- * destination the local policy blocks).
- */
+/** The aggregate fetch provider walks local and third-party steps in saved order. */
 export class AggregateFetchProvider {
   readonly id = FETCH_PROVIDER_ID;
   readonly title = 'power-dsh';
-  readonly description = { en: 'Fetches from this machine first, then through the free web backends enabled in power-dsh', zh: '先由本机抓取，失败后通过 power-dsh 中已启用的免费网页后端抓取' };
+  readonly description = { en: 'Fetches through local and third-party steps in the order configured in power-dsh', zh: '按 power-dsh 中配置的顺序通过本机与第三方后端抓取' };
 
-  private readonly slots: () => readonly BackendSlot[];
+  private readonly slots: () => readonly FetchSlot[];
   private readonly local: () => LocalFetcher | null;
 
-  constructor(slots: () => readonly BackendSlot[], local: () => LocalFetcher | null = () => null) {
+  constructor(slots: () => readonly FetchSlot[], local: () => LocalFetcher | null = () => null) {
     this.slots = slots;
     this.local = local;
   }
 
   /** The local fetcher alone makes this provider usable, even with no chain. */
   available(): boolean {
-    return this.local() !== null || this.slots().some(slot => usable(slot));
+    return this.local() !== null || this.slots().some(slot => typeof slot !== 'string' && usable(slot));
   }
 
   async fetch(request: { url: string }, signal?: AbortSignal): Promise<{ url: string; statusCode: number; body: { kind: 'html' | 'text'; content: string }; truncated: boolean }> {
     const controller = signal ?? new AbortController().signal;
-    const local = this.local();
-    if (local) {
+    const slots = this.slots();
+    const ordered: readonly FetchSlot[] = slots.includes(LOCAL_FETCH.id) ? slots : [LOCAL_FETCH.id, ...slots];
+    const failures: { backend: string; message: string }[] = [];
+    for (const slot of ordered) {
+      if (controller.aborted) throw new BackendError('web fetch aborted');
       try {
-        // The native result already has the seam's shape, so it passes through
-        // unchanged — including its own `html` body for the host to convert.
-        return await local.fetch(request, controller);
-      } catch {
+        if (slot === LOCAL_FETCH.id) {
+          const local = this.local();
+          if (local) return await local.fetch(request, controller);
+          continue;
+        }
+        if (!usable(slot)) continue;
+        const body: BackendFetchResult = await slot.backend.fetch(request.url, slot.apiKey, controller);
+        return { url: request.url, statusCode: 200, body: { kind: 'text', content: body.content }, truncated: body.truncated };
+      } catch (error) {
         if (controller.aborted) throw new BackendError('web fetch aborted');
-        // A local failure is the expected cue to try the chain; the reason is
-        // not reported because the chain's own failures are what the user sees.
+        failures.push({ backend: typeof slot === 'string' ? slot : slot.id,
+          message: error instanceof Error ? error.message : String(error) });
       }
     }
-    const result = await walk(this.slots(),
-      slot => slot.backend.fetch(request.url, slot.apiKey, controller), controller);
-    if (!result.ok) throw new BackendError(`web fetch failed (${describeFailures(result.failures)})`);
-    const body: BackendFetchResult = result.value;
-    // Every backend here returns already-extracted text, so the seam receives a
-    // `text` body and the host's own HTML→markdown conversion never runs.
-    return { url: request.url, statusCode: 200, body: { kind: 'text', content: body.content }, truncated: body.truncated };
+    throw new BackendError(`web fetch failed (${describeFailures(failures)})`);
   }
 }

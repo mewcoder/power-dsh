@@ -79,10 +79,10 @@ test('standalone pages suppress duplicate settings entries while wallpaper and a
     assert.ok(app.entries.has('settings.section.icon:power-dsh-wallpaper'));
     assert.ok(!app.entries.has('settings.section:power-dsh-usage'));
     assert.ok(!app.entries.has('settings.section.icon:power-dsh-usage'));
-    const featureView = descendants(app.selectSettingsTab('enhancements'));
+    const featureView = descendants(app.selectSettingsTab('management'));
     assert.deepEqual(featureView.filter(node => node.props.role === 'switch').map(node => node.props.id),
-      ['settings-test-standalonePageEnabled', 'settings-test-usageStatsEnabled']);
-    assert.ok(!descendants(app.selectSettingsTab('interface')).some(node => node.props.id === 'settings-test-standalonePageEnabled'));
+      ['settings-test-usageStatsEnabled']);
+    assert.ok(descendants(app.selectSettingsTab('interface')).some(node => node.props.id === 'settings-test-standalonePageEnabled'));
     assert.ok(descendants(app.renderSettings()).some(node => node.props.id === 'settings-test-wallpaperEnabled'));
     app.set({ standalonePageEnabled: false });
     assert.ok(app.entries.has('settings.section:power-dsh-usage'));
@@ -282,7 +282,7 @@ test('the settings switch keeps the shared save and return-to-conversation behav
   try {
     app.set({ standalonePageEnabled: true });
     app.selectPanel('power-dsh');
-    const control = descendants(app.selectSettingsTab('enhancements')).find(node => node.props.role === 'switch');
+    const control = descendants(app.selectSettingsTab('interface')).find(node => node.props.role === 'switch');
     await control.props.onClick();
     assert.equal(app.activePanelId(), null);
     assert.equal(app.entries.has('main:power-dsh'), false);
@@ -296,7 +296,7 @@ test('a rejected standalone switch save preserves the panel and reports the erro
   try {
     app.set({ standalonePageEnabled: true });
     app.selectPanel('power-dsh');
-    app.selectSettingsTab('enhancements');
+    app.selectSettingsTab('interface');
     const render = () => descendants(app.renderSettings());
     await render().find(node => node.props.role === 'switch').props.onClick();
     assert.equal(render().find(node => node.props.role === 'switch').props['aria-checked'], true);

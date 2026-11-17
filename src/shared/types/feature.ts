@@ -4,7 +4,7 @@ export type FeatureId = 'version-display' | 'appearance-shortcut' | 'refresh-but
   | 'notifications' | 'personalization' | 'skills' | 'mcp' | 'account-blocking' | 'search-blocking'
   | 'telemetry-blocking' | 'todo-blocking' | 'plan-blocking' | 'goal-blocking' | 'double-click-rename' | 'thinking-effort' | 'flowing-background'
   | 'archive' | 'usage-stats' | 'projects' | 'wallpaper' | 'plugin-updates' | 'standalone-page' | 'search-popup' | 'memory' | 'history-search' | 'web-search';
-export type FeatureCategory = 'general' | 'interface' | 'enhance' | 'simplify' | 'other';
+export type FeatureCategory = 'general' | 'interface' | 'enhance' | 'management' | 'simplify' | 'other';
 export interface FeatureDefinition {
   readonly id: FeatureId;
   readonly category: FeatureCategory;

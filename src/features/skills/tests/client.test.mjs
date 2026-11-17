@@ -439,7 +439,7 @@ test('the skill management preference refreshes the Host mirror and reports reje
     formLoad: async () => upgraded ? { skillManagerEnabled: false } : undefined,
   });
   app.set({ skillManagerEnabled: undefined });
-  app.selectSettingsTab('enhancements');
+  app.selectSettingsTab('management');
   const toggle = () => descendants(app.renderSettings()).find(node => node.props.id === 'settings-test-skillManagerEnabled');
   await toggle().props.onClick();
   assert.deepEqual(writes, []);

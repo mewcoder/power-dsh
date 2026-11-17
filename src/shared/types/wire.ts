@@ -458,7 +458,7 @@ export interface SearchContentResult {
 export interface WebSearchSlotRow {
   /** Instance id, unique across both chains; also the credential record id. */
   id: string;
-  /** Vendor id: `tavily`, `firecrawl`, or `tinyfish`. */
+  /** Vendor id: `tavily`, `firecrawl`, `tinyfish`, or `exa`. */
   provider: string;
   /** Where the user creates this vendor's API key. */
   keyUrl: string;
@@ -471,7 +471,7 @@ export interface WebSearchSlotRow {
 }
 /** One capability's chain: its instances in fallback order. */
 export interface WebSearchChain {
-  /** Instance ids in this chain, in fallback order. */
+  /** Instance ids in fallback order, including `power-dsh-local-fetch` for fetch. */
   ids: string[];
 }
 /** The whole web-search page state: two independent chains of instances. */
@@ -485,7 +485,7 @@ export interface WebSearchCatalog {
 }
 /** One key-verification call against one backend. */
 export interface WebSearchProbeDiagnostic {
-  provider: 'tavily' | 'firecrawl' | 'tinyfish' | 'unknown';
+  provider: 'tavily' | 'firecrawl' | 'tinyfish' | 'exa' | 'unknown';
   stage: 'credentials' | 'request' | 'response' | 'rpc';
   reason: 'key-missing' | 'auth' | 'forbidden' | 'quota' | 'rate-limit' | 'http' | 'network' | 'timeout' | 'invalid-response' | 'empty-response' | 'rpc' | 'unknown';
   auth: 'keyless' | 'missing' | 'api-key' | 'unknown';
@@ -501,3 +501,10 @@ export interface WebSearchProbe {
   message: string;
   diagnostic?: WebSearchProbeDiagnostic;
 }
+export type WebSearchQuotaData =
+  | { kind: 'credits'; scope: 'key' | 'account'; used?: number; limit: number | null; remaining: number | null; paygoRemaining?: number }
+  | { kind: 'balance'; currency: 'USD'; balance: string };
+export type WebSearchQuota =
+  | { status: 'ready'; observedAt: string; data: WebSearchQuotaData }
+  | { status: 'error'; durationMs: number; diagnostic: WebSearchProbeDiagnostic }
+  | { status: 'missing' | 'unsupported' };

@@ -653,7 +653,7 @@ test('the MCP preference refreshes the Host mirror and shows rejection without e
     formLoad: async () => upgraded ? { mcpManagerEnabled: false } : undefined,
   });
   app.set({ mcpManagerEnabled: undefined });
-  app.selectSettingsTab('enhancements');
+  app.selectSettingsTab('management');
   const toggle = () => descendants(app.renderSettings()).find(node => node.props.id === 'settings-test-mcpManagerEnabled');
   await toggle().props.onClick();
   assert.deepEqual(writes, []);

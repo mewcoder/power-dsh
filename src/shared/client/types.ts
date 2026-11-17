@@ -113,7 +113,7 @@ export interface SettingFailure {
 }
 export interface SettingContribution {
   failure?: SettingFailure;
-  field: PreferenceKey; description?: string; category?: 'general' | 'interface' | 'enhancements' | 'simplify' | 'other'; hidden?: boolean; hideError?: boolean; error?: string;
+  field: PreferenceKey; description?: string; category?: 'general' | 'interface' | 'enhancements' | 'management' | 'simplify' | 'other'; hidden?: boolean; hideError?: boolean; error?: string;
   save?(next: PreferenceValue, context: { mounted: ReactTypes.MutableRefObject<boolean> }): Promise<void>;
   canSave?(next: PreferenceValue): boolean; render?(): ReactTypes.ReactNode;
 }

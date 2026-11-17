@@ -69,13 +69,13 @@ test('each Client feature can be omitted without removing another feature settin
     const app = await mount({ desktop: true, featureIds: featureIds.filter(id => id !== omitted.definition.id) });
     const initialTabs = descendants(app.renderSettings()).filter(node => node.props.role === 'tab');
     assert.deepEqual(initialTabs.map(tab => tab.props.id),
-      ['general', 'interface', 'enhancements', 'simplify', 'other'].map(id => `settings-test-tab-${id}`));
+      ['general', 'interface', 'enhancements', 'management', 'simplify', 'other'].map(id => `settings-test-tab-${id}`));
     assert.equal(initialTabs.find(tab => tab.props['aria-selected']).props.id, 'settings-test-tab-general');
     assert.equal(app.entries.has('settings.section:power-dsh-wallpaper'), false);
     assert.equal(app.entries.has('settings.section.icon:power-dsh-wallpaper'), false);
     app.set(enabledPreferences);
     const controls = [];
-    for (const tab of ['general', 'interface', 'enhancements', 'simplify', 'other']) {
+    for (const tab of ['general', 'interface', 'enhancements', 'management', 'simplify', 'other']) {
       controls.push(...descendants(app.selectSettingsTab(tab)).filter(node => node.props.role === 'switch').map(node => node.props.id.replace('settings-test-', '')));
     }
     for (const feature of clientFeatures) for (const key of settings.get(feature.definition.id)) {
@@ -117,7 +117,7 @@ test('an empty Client selection renders the settings shell with no feature contr
   const app = await mount({ desktop: true, featureIds: [] });
   assert.equal(app.rpcDescriptors.length, 0);
   app.set(enabledPreferences);
-  for (const tab of ['general', 'interface', 'enhancements', 'simplify', 'other']) {
+  for (const tab of ['general', 'interface', 'enhancements', 'management', 'simplify', 'other']) {
     assert.equal(descendants(app.selectSettingsTab(tab)).filter(node => node.props.role === 'switch').length, 0);
   }
   assert.equal(descendants(app.renderFooter()).filter(node => node.props['aria-label'] === 'moreActions').length, 0);

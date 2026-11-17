@@ -60,7 +60,7 @@ interface Preferences {
   webSearchEnabled: boolean;
   /** Search provider instances in fallback order. */
   webSearchChain: (WebSearchSlotPreference | string)[];
-  /** Fetch provider instances in fallback order, independent of the search chain. */
+  /** Fetch steps in fallback order, including the optional persisted local step. */
   webFetchChain: (WebSearchSlotPreference | string)[];
 }
 type PreferenceKey = keyof Preferences;
@@ -69,7 +69,7 @@ interface LiveValue<T> {
 }
 type LivePreferences = { [K in PreferenceKey]: LiveValue<Preferences[K]>; };
 type FeatureId = 'version-display' | 'appearance-shortcut' | 'refresh-button' | 'restart-button' | 'notifications' | 'personalization' | 'skills' | 'mcp' | 'account-blocking' | 'search-blocking' | 'telemetry-blocking' | 'todo-blocking' | 'plan-blocking' | 'goal-blocking' | 'double-click-rename' | 'thinking-effort' | 'flowing-background' | 'archive' | 'usage-stats' | 'projects' | 'wallpaper' | 'plugin-updates' | 'standalone-page' | 'search-popup' | 'memory' | 'history-search' | 'web-search';
-type FeatureCategory = 'general' | 'interface' | 'enhance' | 'simplify' | 'other';
+type FeatureCategory = 'general' | 'interface' | 'enhance' | 'management' | 'simplify' | 'other';
 interface FeatureDefinition {
   readonly id: FeatureId;
   readonly category: FeatureCategory;
@@ -590,7 +590,7 @@ interface SearchContentResult {
 interface WebSearchSlotRow {
   /** Instance id, unique across both chains; also the credential record id. */
   id: string;
-  /** Vendor id: `tavily`, `firecrawl`, or `tinyfish`. */
+  /** Vendor id: `tavily`, `firecrawl`, `tinyfish`, or `exa`. */
   provider: string;
   /** Where the user creates this vendor's API key. */
   keyUrl: string;
@@ -603,7 +603,7 @@ interface WebSearchSlotRow {
 }
 /** One capability's chain: its instances in fallback order. */
 interface WebSearchChain {
-  /** Instance ids in this chain, in fallback order. */
+  /** Instance ids in fallback order, including `power-dsh-local-fetch` for fetch. */
   ids: string[];
 }
 /** The whole web-search page state: two independent chains of instances. */
@@ -617,7 +617,7 @@ interface WebSearchCatalog {
 }
 /** One key-verification call against one backend. */
 interface WebSearchProbeDiagnostic {
-  provider: 'tavily' | 'firecrawl' | 'tinyfish' | 'unknown';
+  provider: 'tavily' | 'firecrawl' | 'tinyfish' | 'exa' | 'unknown';
   stage: 'credentials' | 'request' | 'response' | 'rpc';
   reason: 'key-missing' | 'auth' | 'forbidden' | 'quota' | 'rate-limit' | 'http' | 'network' | 'timeout' | 'invalid-response' | 'empty-response' | 'rpc' | 'unknown';
   auth: 'keyless' | 'missing' | 'api-key' | 'unknown';
@@ -633,6 +633,29 @@ interface WebSearchProbe {
   message: string;
   diagnostic?: WebSearchProbeDiagnostic;
 }
+type WebSearchQuotaData = {
+  kind: 'credits';
+  scope: 'key' | 'account';
+  used?: number;
+  limit: number | null;
+  remaining: number | null;
+  paygoRemaining?: number;
+} | {
+  kind: 'balance';
+  currency: 'USD';
+  balance: string;
+};
+type WebSearchQuota = {
+  status: 'ready';
+  observedAt: string;
+  data: WebSearchQuotaData;
+} | {
+  status: 'error';
+  durationMs: number;
+  diagnostic: WebSearchProbeDiagnostic;
+} | {
+  status: 'missing' | 'unsupported';
+};
 /** Named Host operations, before the transport adds its result envelope. */
 interface PowerDshMethods {
   memoryCleanupModels(): Promise<MemoryModels>;
@@ -684,6 +707,7 @@ interface PowerDshMethods {
   setMcpServerEnabled(id: string, enabled: boolean): Promise<McpCatalog>;
   probeMcpServer(id: string): Promise<McpProbe>;
   readWebSearch(): Promise<WebSearchCatalog>;
+  readWebSearchQuota(id: string): Promise<WebSearchQuota>;
   addWebSearchSlot(capability: string, provider: string): Promise<WebSearchCatalog>;
   removeWebSearchSlot(capability: string, id: string): Promise<WebSearchCatalog>;
   reorderWebSearchChain(capability: string, ids: readonly string[]): Promise<WebSearchCatalog>;

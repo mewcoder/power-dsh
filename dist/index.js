@@ -63,7 +63,7 @@ var OperationQueue = class {
 // src/features/memory/definition.ts
 const definition$26 = Object.freeze({
 	id: "memory",
-	category: "enhance",
+	category: "management",
 	order: 8,
 	keys: Object.freeze([
 		"memoryEnabled",
@@ -2645,7 +2645,7 @@ var PluginReleases = class {
 };
 
 // package.json
-var version = "0.1.2";
+var version = "0.1.3";
 
 // src/features/plugin-updates/host.ts
 var host_exports$17 = /* @__PURE__ */ __exportAll({
@@ -3917,7 +3917,7 @@ const methods$15 = {
 // src/features/personalization/definition.ts
 const definition$18 = Object.freeze({
 	id: "personalization",
-	category: "enhance",
+	category: "management",
 	order: 7,
 	keys: Object.freeze(["personalizationEnabled"]),
 	spec: "src/features/personalization/spec.md"
@@ -4046,7 +4046,7 @@ const rpc$14 = [READ_PERSONALIZATION_RPC, SAVE_PERSONALIZATION_RPC];
 // src/features/skills/definition.ts
 const definition$17 = Object.freeze({
 	id: "skills",
-	category: "enhance",
+	category: "management",
 	order: 9,
 	keys: Object.freeze(["skillManagerEnabled", "disabledSkills"]),
 	spec: "src/features/skills/spec.md"
@@ -6049,7 +6049,7 @@ const rpc$13 = [
 // src/features/mcp/definition.ts
 const definition$16 = Object.freeze({
 	id: "mcp",
-	category: "enhance",
+	category: "management",
 	order: 9.5,
 	keys: Object.freeze(["mcpManagerEnabled"]),
 	spec: "src/features/mcp/spec.md"
@@ -8315,7 +8315,7 @@ const rpc$5 = [
 // src/features/standalone-page/definition.ts
 const definition$5 = Object.freeze({
 	id: "standalone-page",
-	category: "enhance",
+	category: "interface",
 	order: 6.5,
 	keys: Object.freeze(["standalonePageEnabled"]),
 	spec: "src/features/standalone-page/spec.md"
@@ -9155,7 +9155,7 @@ const rpc$4 = [
 // src/features/archive/definition.ts
 const definition$3 = Object.freeze({
 	id: "archive",
-	category: "enhance",
+	category: "management",
 	order: 10.5,
 	keys: Object.freeze([
 		"archiveManagerEnabled",
@@ -9819,7 +9819,7 @@ const rpc$3 = [
 // src/features/usage-stats/definition.ts
 const definition$2 = Object.freeze({
 	id: "usage-stats",
-	category: "enhance",
+	category: "management",
 	order: 12,
 	keys: Object.freeze(["usageStatsEnabled"]),
 	spec: "src/features/usage-stats/spec.md"
@@ -10838,7 +10838,7 @@ const rpc$2 = [READ_USAGE_STATS_RPC];
 // src/features/projects/definition.ts
 const definition$1 = Object.freeze({
 	id: "projects",
-	category: "enhance",
+	category: "management",
 	order: 10,
 	keys: Object.freeze(["projectManagerEnabled"]),
 	spec: "src/features/projects/spec.md"
@@ -11027,7 +11027,7 @@ var config_exports = /* @__PURE__ */ __exportAll({
 const slotSchema = z.object({
 	/** Instance id, unique across both chains; also the credential record id. */
 	id: z.string().required(),
-	/** Vendor id: `tavily`, `firecrawl`, or `tinyfish`. */
+	/** Vendor id: `tavily`, `firecrawl`, `tinyfish`, or `exa`. */
 	provider: z.string().required()
 });
 /**
@@ -11045,6 +11045,17 @@ const configFields = {
 };
 
 // src/features/web-search/backends.ts
+/**
+* One third-party web backend: what the picker shows, which capabilities it
+* serves, and how one search or fetch reaches it. Everything that differs per
+* vendor lives here; the fallback chain in `provider.ts` only sequences them.
+*
+* Every backend listed here has a documented free tier. A vendor without one
+* does not belong in this file: the feature exists so a user can search without
+* paying, not so the plugin can broker paid APIs.
+*
+* @module power-dsh/web-search/backends
+*/
 /**
 * A backend failure carrying the HTTP status when there was one. The chain
 * benches a key on 401/403/429 and retries the next backend on anything else.
@@ -11272,16 +11283,91 @@ const tinyfish = {
 		throw new BackendError(`TinyFish fetch returned no content${typeof reason === "string" ? `: ${reason}` : ""}`);
 	}
 };
+const exa = {
+	id: "exa",
+	credentialId: "exa",
+	keyUrl: "https://dashboard.exa.ai/api-keys",
+	async search({ query, maxResults }, apiKey, signal) {
+		requireKey(apiKey);
+		const numResults = clampCount(maxResults, 100);
+		const response = await fetch("https://api.exa.ai/search", {
+			method: "POST",
+			redirect: "error",
+			cache: "no-store",
+			headers: {
+				"Content-Type": "application/json",
+				"x-api-key": apiKey
+			},
+			body: JSON.stringify({
+				query,
+				type: "auto",
+				contents: { highlights: { maxCharacters: SNIPPET_MAX } },
+				...numResults === void 0 ? {} : { numResults }
+			}),
+			signal
+		});
+		assertOk(response, "Exa search");
+		const data = await response.json();
+		if (!isRecord$2(data)) throw new SyntaxError("Invalid Exa search response");
+		const sources = (Array.isArray(data.results) ? data.results : []).flatMap((row) => {
+			if (!isRecord$2(row) || typeof row.url !== "string" || row.url === "") return [];
+			const source = { url: row.url };
+			if (typeof row.title === "string" && row.title !== "") source.title = row.title;
+			const snippet = toSnippet(Array.isArray(row.highlights) ? row.highlights.filter((value) => typeof value === "string").join("\n") : "") ?? toSnippet(row.text);
+			if (snippet !== void 0) source.snippet = snippet;
+			const publishedAt = toPublishedAt(row.publishedDate);
+			if (publishedAt !== void 0) source.publishedAt = publishedAt;
+			return [source];
+		});
+		if (sources.length === 0) throw new BackendError("Exa search returned no results");
+		return { sources };
+	},
+	async fetch(url, apiKey, signal) {
+		requireKey(apiKey);
+		const maxCharacters = 1e5;
+		const response = await fetch("https://api.exa.ai/contents", {
+			method: "POST",
+			redirect: "error",
+			cache: "no-store",
+			headers: {
+				"Content-Type": "application/json",
+				"x-api-key": apiKey
+			},
+			body: JSON.stringify({
+				urls: [url],
+				text: { maxCharacters: 100001 }
+			}),
+			signal
+		});
+		assertOk(response, "Exa contents");
+		const data = await response.json();
+		if (!isRecord$2(data)) throw new SyntaxError("Invalid Exa contents response");
+		const failed = Array.isArray(data.statuses) && data.statuses.some((status) => isRecord$2(status) && status.status === "error");
+		const row = Array.isArray(data.results) ? data.results[0] : void 0;
+		if (failed || !isRecord$2(row) || typeof row.text !== "string" || row.text.trim() === "") throw new BackendError("Exa contents returned no content");
+		return {
+			content: row.text.slice(0, maxCharacters),
+			truncated: row.text.length > maxCharacters
+		};
+	}
+};
 /** Every backend this feature serves, in the order the picker lists them. */
 const BACKENDS = Object.freeze([
 	tavily,
 	firecrawl,
-	tinyfish
+	tinyfish,
+	exa
 ]);
 /** Look up one backend by its stable id. */
 function backendOf(id) {
 	return BACKENDS.find((backend) => backend.id === id);
 }
+
+// src/features/web-search/chain.ts
+const LOCAL_FETCH = Object.freeze({
+	id: "power-dsh-local-fetch",
+	provider: "local"
+});
 
 // src/features/web-search/provider.ts
 /**
@@ -11376,23 +11462,13 @@ var AggregateSearchProvider = class {
 		};
 	}
 };
-/**
-* The aggregate fetch provider: the machine's own fetcher first, then the
-* third-party chain.
-*
-* Local first is deliberate. The native fetcher costs nothing, never leaves the
-* machine's own credentials behind, and reaches intranet and loopback addresses
-* no hosted API can. A third-party fetch costs free-tier credits and can refuse
-* a proxy egress, so it is the fallback rather than the default — the chain only
-* runs when the local attempt actually fails (JavaScript-only pages, PDFs, or a
-* destination the local policy blocks).
-*/
+/** The aggregate fetch provider walks local and third-party steps in saved order. */
 var AggregateFetchProvider = class {
 	id = FETCH_PROVIDER_ID;
 	title = "power-dsh";
 	description = {
-		en: "Fetches from this machine first, then through the free web backends enabled in power-dsh",
-		zh: "先由本机抓取，失败后通过 power-dsh 中已启用的免费网页后端抓取"
+		en: "Fetches through local and third-party steps in the order configured in power-dsh",
+		zh: "按 power-dsh 中配置的顺序通过本机与第三方后端抓取"
 	};
 	slots;
 	local;
@@ -11402,28 +11478,41 @@ var AggregateFetchProvider = class {
 	}
 	/** The local fetcher alone makes this provider usable, even with no chain. */
 	available() {
-		return this.local() !== null || this.slots().some((slot) => usable(slot));
+		return this.local() !== null || this.slots().some((slot) => typeof slot !== "string" && usable(slot));
 	}
 	async fetch(request, signal) {
 		const controller = signal ?? new AbortController().signal;
-		const local = this.local();
-		if (local) try {
-			return await local.fetch(request, controller);
-		} catch {
+		const slots = this.slots();
+		const ordered = slots.includes(LOCAL_FETCH.id) ? slots : [LOCAL_FETCH.id, ...slots];
+		const failures = [];
+		for (const slot of ordered) {
 			if (controller.aborted) throw new BackendError("web fetch aborted");
+			try {
+				if (slot === LOCAL_FETCH.id) {
+					const local = this.local();
+					if (local) return await local.fetch(request, controller);
+					continue;
+				}
+				if (!usable(slot)) continue;
+				const body = await slot.backend.fetch(request.url, slot.apiKey, controller);
+				return {
+					url: request.url,
+					statusCode: 200,
+					body: {
+						kind: "text",
+						content: body.content
+					},
+					truncated: body.truncated
+				};
+			} catch (error) {
+				if (controller.aborted) throw new BackendError("web fetch aborted");
+				failures.push({
+					backend: typeof slot === "string" ? slot : slot.id,
+					message: error instanceof Error ? error.message : String(error)
+				});
+			}
 		}
-		const result = await walk(this.slots(), (slot) => slot.backend.fetch(request.url, slot.apiKey, controller), controller);
-		if (!result.ok) throw new BackendError(`web fetch failed (${describeFailures(result.failures)})`);
-		const body = result.value;
-		return {
-			url: request.url,
-			statusCode: 200,
-			body: {
-				kind: "text",
-				content: body.content
-			},
-			truncated: body.truncated
-		};
+		throw new BackendError(`web fetch failed (${describeFailures(failures)})`);
 	}
 };
 
@@ -11527,6 +11616,7 @@ const providers = [
 	"tavily",
 	"firecrawl",
 	"tinyfish",
+	"exa",
 	"unknown"
 ];
 const stages = [
@@ -11624,6 +11714,163 @@ function probeDiagnostic(error, provider, auth, stage = "request") {
 	};
 }
 
+// src/features/web-search/quota.ts
+const KEEP_MS = 12e4;
+const MAX_BYTES = 65536;
+const endpoints = {
+	tavily: "https://api.tavily.com/usage",
+	firecrawl: "https://api.firecrawl.dev/v2/team/credit-usage",
+	tinyfish: "https://agent.tinyfish.ai/v1/wallet"
+};
+function credits(value) {
+	if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > Number.MAX_SAFE_INTEGER) throw new SyntaxError("Invalid credit amount");
+	return value;
+}
+function nullableCredits(value) {
+	return value === null ? null : credits(value);
+}
+function parseTavilyUsage(value) {
+	if (!isRecord$2(value) || !isRecord$2(value.key) || !isRecord$2(value.account)) throw new SyntaxError("Invalid usage response");
+	const keyLimit = nullableCredits(value.key.limit);
+	const limit = keyLimit ?? nullableCredits(value.account.plan_limit);
+	const scope = keyLimit === null && limit !== null ? "account" : "key";
+	const used = credits(keyLimit !== null || limit === null ? value.key.usage : value.account.plan_usage);
+	const paygoRemaining = value.account.paygo_limit === void 0 || value.account.paygo_usage === void 0 || value.account.paygo_limit === null || value.account.paygo_usage === null ? void 0 : Math.max(0, credits(value.account.paygo_limit) - credits(value.account.paygo_usage));
+	return {
+		kind: "credits",
+		scope,
+		used,
+		limit,
+		remaining: limit === null ? null : Math.max(0, limit - used),
+		...paygoRemaining === void 0 ? {} : { paygoRemaining }
+	};
+}
+function parseFirecrawlUsage(value) {
+	if (!isRecord$2(value) || value.success !== true || !isRecord$2(value.data)) throw new SyntaxError("Invalid usage response");
+	return {
+		kind: "credits",
+		scope: "account",
+		remaining: credits(value.data.remainingCredits),
+		limit: credits(value.data.planCredits)
+	};
+}
+function parseTinyfishBalance(value) {
+	if (!isRecord$2(value) || value.currency !== "USD" || typeof value.available_balance !== "string" || !/^-?(?:0|[1-9]\d{0,11})(?:\.\d{1,6})?$/.test(value.available_balance)) throw new SyntaxError("Invalid wallet response");
+	return {
+		kind: "balance",
+		currency: "USD",
+		balance: value.available_balance
+	};
+}
+async function readJson(response) {
+	const reader = response.body?.getReader();
+	if (!reader) throw new SyntaxError("Empty quota response");
+	const chunks = [];
+	let length = 0;
+	try {
+		while (true) {
+			const chunk = await reader.read();
+			if (chunk.done) break;
+			length += chunk.value.byteLength;
+			if (length > MAX_BYTES) throw new SyntaxError("Quota response is too large");
+			chunks.push(chunk.value);
+		}
+		const buffer = new Uint8Array(length);
+		let offset = 0;
+		for (const chunk of chunks) {
+			buffer.set(chunk, offset);
+			offset += chunk.byteLength;
+		}
+		return JSON.parse(new TextDecoder().decode(buffer));
+	} finally {
+		await reader.cancel().catch(() => {});
+		reader.releaseLock();
+	}
+}
+var QuotaReader = class {
+	cache = /* @__PURE__ */ new Map();
+	pending = /* @__PURE__ */ new Map();
+	controller = new AbortController();
+	revision = 0;
+	closed = false;
+	now;
+	fetcher;
+	constructor({ now = Date.now, fetcher = fetch } = {}) {
+		this.now = now;
+		this.fetcher = fetcher;
+	}
+	clear() {
+		this.revision++;
+		this.controller.abort();
+		this.controller = new AbortController();
+		this.cache.clear();
+		this.pending.clear();
+	}
+	dispose() {
+		this.closed = true;
+		this.clear();
+	}
+	async read(provider, key) {
+		if (this.closed) throw new Error("webSearchUnavailable");
+		if (!endpoints[provider]) return { status: "unsupported" };
+		if (key.trim() === "") return { status: "missing" };
+		const cacheKey = `${provider}:${createHash("sha256").update(key).digest("hex")}`;
+		const cached = this.cache.get(cacheKey);
+		if (cached && cached.expiresAt > this.now()) return cached.value;
+		const pending = this.pending.get(cacheKey);
+		if (pending) return pending;
+		const revision = this.revision;
+		const startedAt = this.now();
+		const signal = AbortSignal.any([this.controller.signal, AbortSignal.timeout(15e3)]);
+		const task = (async () => {
+			let result;
+			try {
+				const response = await this.fetcher(endpoints[provider], {
+					method: "GET",
+					redirect: "error",
+					cache: "no-store",
+					signal,
+					headers: {
+						Accept: "application/json",
+						...provider === "tinyfish" ? { "X-API-Key": key } : { Authorization: `Bearer ${key}` }
+					}
+				});
+				if (!response.ok) {
+					await response.body?.cancel().catch(() => {});
+					throw new BackendError("Quota request failed", response.status);
+				}
+				const raw = await readJson(response);
+				const data = provider === "tavily" ? parseTavilyUsage(raw) : provider === "firecrawl" ? parseFirecrawlUsage(raw) : parseTinyfishBalance(raw);
+				result = {
+					status: "ready",
+					observedAt: new Date(this.now()).toISOString(),
+					data
+				};
+			} catch (error) {
+				result = {
+					status: "error",
+					durationMs: Math.max(0, this.now() - startedAt),
+					diagnostic: probeDiagnostic(error, provider, "api-key")
+				};
+			}
+			if (revision === this.revision && !this.closed) {
+				if (this.cache.size >= 64) this.cache.delete(this.cache.keys().next().value);
+				this.cache.set(cacheKey, {
+					expiresAt: this.now() + KEEP_MS,
+					value: result
+				});
+			}
+			return result;
+		})();
+		this.pending.set(cacheKey, task);
+		try {
+			return await task;
+		} finally {
+			if (this.pending.get(cacheKey) === task) this.pending.delete(cacheKey);
+		}
+	}
+};
+
 // src/features/web-search/host.ts
 var host_exports = /* @__PURE__ */ __exportAll({
 	createHost: () => createHost,
@@ -11644,10 +11891,10 @@ const WEB_MODULE = "@deepseek-ai/dsh-web";
 * Two entries may share a vendor — they are distinct instances with their own keys.
 */
 function chainOf(value, capability, reserved) {
-	if (!Array.isArray(value)) return [];
+	if (!Array.isArray(value)) return capability === "fetch" ? [{ ...LOCAL_FETCH }] : [];
 	const seen = /* @__PURE__ */ new Set();
 	const legacyProviders = /* @__PURE__ */ new Set();
-	return value.flatMap((row) => {
+	const chain = value.flatMap((row) => {
 		if (typeof row === "string") {
 			if (!backendOf(row) || legacyProviders.has(row)) return [];
 			legacyProviders.add(row);
@@ -11663,13 +11910,18 @@ function chainOf(value, capability, reserved) {
 		if (typeof row !== "object" || row === null) return [];
 		const { id, provider } = row;
 		if (typeof id !== "string" || typeof provider !== "string") return [];
-		if (backendOf(provider) === void 0 || id === "" || seen.has(id)) return [];
+		if (id === "" || seen.has(id)) return [];
+		if (id === LOCAL_FETCH.id) {
+			if (capability !== "fetch" || provider !== LOCAL_FETCH.provider) return [];
+		} else if (backendOf(provider) === void 0) return [];
 		seen.add(id);
 		return [{
 			id,
 			provider
 		}];
 	});
+	if (capability === "fetch" && !seen.has(LOCAL_FETCH.id)) chain.unshift({ ...LOCAL_FETCH });
+	return chain;
 }
 /** Every instance id the two chains currently hold. */
 function instanceIds(search, fetch) {
@@ -11701,6 +11953,7 @@ function createHost(ctx, config, { owner, ensureActive, setThirdPartySearchActiv
 	let localFetcher = null;
 	const search = new AggregateSearchProvider(() => currentSearch);
 	const fetchProvider = new AggregateFetchProvider(() => currentFetch, () => localFetcher);
+	const quotas = new QuotaReader();
 	const enabled = () => config.webSearchEnabled?.get() === true;
 	const reservedIds = () => new Set([...config.webSearchChain?.get() ?? [], ...config.webFetchChain?.get() ?? []].flatMap((row) => typeof row === "object" && row !== null ? [row.id] : []));
 	const searchChain = () => chainOf(config.webSearchChain?.get(), "search", reservedIds());
@@ -11709,6 +11962,10 @@ function createHost(ctx, config, { owner, ensureActive, setThirdPartySearchActiv
 	const slotsOf = async (chain) => {
 		const slots = [];
 		for (const slot of chain) {
+			if (slot.id === LOCAL_FETCH.id) {
+				slots.push(LOCAL_FETCH.id);
+				continue;
+			}
 			const backend = backendOf(slot.provider);
 			if (!backend) continue;
 			slots.push({
@@ -11721,7 +11978,7 @@ function createHost(ctx, config, { owner, ensureActive, setThirdPartySearchActiv
 	};
 	const refreshSlots = async () => {
 		const [nextSearch, nextFetch] = await Promise.all([slotsOf(searchChain()), slotsOf(fetchChain())]);
-		currentSearch = nextSearch;
+		currentSearch = nextSearch.filter((slot) => typeof slot !== "string");
 		currentFetch = nextFetch;
 	};
 	/** The `web` entry this feature pins provider selection on, when editable. */
@@ -11735,12 +11992,8 @@ function createHost(ctx, config, { owner, ensureActive, setThirdPartySearchActiv
 	/**
 	* Point one capability's selection at this feature's provider.
 	*
-	* Search is always pinned while the feature is on: the aggregate provider is
-	* the only thing that can serve the user's third-party chain. Fetch is pinned
-	* only when the user actually put something in the fetch chain — otherwise the
-	* native local `http` provider keeps serving fetches, which is free and reaches
-	* intranet and loopback addresses. Pinning fetch unconditionally used to take
-	* that away from anyone who merely turned the feature on.
+	* Both capabilities stay pinned while enabled; the aggregate fetch provider
+	* preserves local fetching even when no third-party instances are configured.
 	*/
 	const pinCapability = async (capability) => {
 		const entry = webEntry();
@@ -11798,9 +12051,6 @@ function createHost(ctx, config, { owner, ensureActive, setThirdPartySearchActiv
 	* Reconcile the live state with the stored preference: refresh keys, then
 	* mount/unmount and pin/unpin each capability in an order that never leaves the
 	* seam pointing at an unregistered provider.
-	*
-	* Fetch is intentionally left alone when its chain is empty: the native local
-	* `http` provider keeps serving it, free and with intranet access.
 	*/
 	const reconcile = () => {
 		const task = tail.then(async () => {
@@ -11857,7 +12107,7 @@ function createHost(ctx, config, { owner, ensureActive, setThirdPartySearchActiv
 		const store = credentials;
 		const searchSlots = searchChain();
 		const fetchSlots = fetchChain();
-		const all = [...searchSlots, ...fetchSlots];
+		const all = [...searchSlots, ...fetchSlots].filter((slot) => slot.id !== LOCAL_FETCH.id);
 		const rows = await readSlotRows(store ?? void 0, all);
 		return {
 			enabled: enabled(),
@@ -11931,8 +12181,8 @@ function createHost(ctx, config, { owner, ensureActive, setThirdPartySearchActiv
 		});
 	});
 	/**
-	* Resolve the native local fetcher so the fetch chain can try the machine
-	* first. Its public class is loaded through the loader rather than reimplemented:
+	* Resolve the native local fetcher for its configured position in the chain.
+	* Its public class is loaded through the loader rather than reimplemented:
 	* URL validation, same-origin redirects, size and charset limits are all
 	* behaviour this feature must not fork. Absence is not an error — the chain
 	* simply starts at the first third-party backend.
@@ -11976,10 +12226,14 @@ function createHost(ctx, config, { owner, ensureActive, setThirdPartySearchActiv
 		});
 	});
 	ctx.on("settings/document-updated", (namespace) => {
-		if (namespace === owner.fiber.entry?.options.id) reconcile().catch(() => {});
+		if (namespace === owner.fiber.entry?.options.id) {
+			if (!enabled()) quotas.clear();
+			reconcile().catch(() => {});
+		}
 	});
 	ctx.effect(() => () => {
 		alive = false;
+		quotas.dispose();
 		setThirdPartySearchActive?.(false).catch(() => {});
 		unmount();
 		seam = null;
@@ -11989,6 +12243,18 @@ function createHost(ctx, config, { owner, ensureActive, setThirdPartySearchActiv
 	});
 	return { webSearch: {
 		catalog,
+		async quota(id) {
+			ensureActive();
+			if (!alive || !enabled() || !seam) throw new Error("webSearchUnavailable");
+			const slot = [...searchChain(), ...fetchChain()].find((candidate) => candidate.id === id);
+			if (!slot || slot.id === LOCAL_FETCH.id) throw new Error("webSearchUnknownBackend");
+			const apiKey = await resolveKey(credentials ?? void 0, slot.legacyCredentialId ?? slot.id);
+			ensureActive();
+			const value = await quotas.read(slot.provider, apiKey);
+			ensureActive();
+			if (!alive) throw new Error("webSearchUnavailable");
+			return value;
+		},
 		/**
 		* Add one provider instance to the end of ONE chain. Each call creates a
 		* new instance with its own credential record, so adding the same vendor
@@ -12007,8 +12273,9 @@ function createHost(ctx, config, { owner, ensureActive, setThirdPartySearchActiv
 		/** Remove one instance from ONE chain and drop its credential record. */
 		async removeSlot(capability, id) {
 			const { slots, capability: kind } = chainFor(capability);
-			if (!slots.some((slot) => slot.id === id)) throw new Error("webSearchUnknownBackend");
+			if (id === LOCAL_FETCH.id || !slots.some((slot) => slot.id === id)) throw new Error("webSearchUnknownBackend");
 			await persistChain(kind, slots.filter((slot) => slot.id !== id));
+			quotas.clear();
 			ensureActive();
 			if (credentials) try {
 				await credentials.deleteRecord(`power-dsh/${id}`);
@@ -12039,7 +12306,7 @@ function createHost(ctx, config, { owner, ensureActive, setThirdPartySearchActiv
 			const searchSlots = searchChain();
 			const fetchSlots = fetchChain();
 			const slot = [...searchSlots, ...fetchSlots].find((candidate) => candidate.id === id);
-			if (!slot) throw new Error("webSearchUnknownBackend");
+			if (!slot || slot.id === LOCAL_FETCH.id) throw new Error("webSearchUnknownBackend");
 			if (typeof value !== "string" || value.length > 4096) throw new TypeError("invalid key");
 			ensureActive();
 			if (slot.legacyCredentialId !== void 0) {
@@ -12047,6 +12314,7 @@ function createHost(ctx, config, { owner, ensureActive, setThirdPartySearchActiv
 				await persistChain(kind, kind === "search" ? searchSlots : fetchSlots);
 			}
 			await writeKey(credentials ?? void 0, id, value.trim());
+			quotas.clear();
 			ensureActive();
 			await reconcile();
 			return catalog();
@@ -12129,6 +12397,11 @@ function createHost(ctx, config, { owner, ensureActive, setThirdPartySearchActiv
 	} };
 }
 const methods = {
+	readWebSearchQuota(id) {
+		if (this.ctx.invocation && this.ctx.invocation.peer.principal.kind !== "owner") throw new Error("Only the profile owner can read web search quotas.");
+		this.queue.ensureActive();
+		return this.webSearch.quota(id);
+	},
 	readWebSearch() {
 		return this.run(() => this.webSearch.catalog());
 	},
@@ -12177,7 +12450,7 @@ const slotCodec = {
 	} })
 };
 const chainCodec = (value, known) => {
-	if (!isRecord$2(value) || !isArray(value.ids) || value.ids.length > 32) throw new TypeError("Invalid web search chain");
+	if (!isRecord$2(value) || !isArray(value.ids) || value.ids.length > known.size) throw new TypeError("Invalid web search chain");
 	const ids = value.ids.map((id) => {
 		if (typeof id !== "string" || !known.has(id)) throw new TypeError("Invalid web search chain");
 		return id;
@@ -12192,13 +12465,13 @@ const webSearchCatalogCodec = {
 		if (!isRecord$2(value) || typeof value.enabled !== "boolean" || typeof value.available !== "boolean" || !isArray(value.slots) || value.slots.length > 32) throw new TypeError("Invalid web search catalog");
 		const slots = value.slots.map((row) => slotCodec.create().parse(row));
 		const known = new Set(slots.map((row) => row.id));
-		if (known.size !== slots.length) throw new TypeError("Invalid web search catalog");
+		if (known.size !== slots.length || known.has(LOCAL_FETCH.id)) throw new TypeError("Invalid web search catalog");
 		return {
 			enabled: value.enabled,
 			available: value.available,
 			slots,
 			search: { ids: chainCodec(value.search, known) },
-			fetch: { ids: chainCodec(value.fetch, known) }
+			fetch: { ids: chainCodec(value.fetch, /* @__PURE__ */ new Set([...known, LOCAL_FETCH.id])) }
 		};
 	} })
 };
@@ -12213,6 +12486,47 @@ const probeCodec = {
 			durationMs: value.durationMs,
 			message: value.message,
 			...value.diagnostic === void 0 ? {} : { diagnostic: parseProbeDiagnostic(value.diagnostic) }
+		};
+	} })
+};
+function parseCredit(value) {
+	if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > Number.MAX_SAFE_INTEGER) throw new TypeError("Invalid web search quota");
+	return value;
+}
+const webSearchQuotaCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#WebSearchQuota",
+	create: () => ({ parse(value) {
+		if (!isRecord$2(value)) throw new TypeError("Invalid web search quota");
+		if (value.status === "missing" || value.status === "unsupported") return { status: value.status };
+		if (value.status === "error") return {
+			status: "error",
+			durationMs: parseCredit(value.durationMs),
+			diagnostic: parseProbeDiagnostic(value.diagnostic)
+		};
+		if (value.status !== "ready" || typeof value.observedAt !== "string" || value.observedAt.length > 40 || !Number.isFinite(Date.parse(value.observedAt)) || !isRecord$2(value.data)) throw new TypeError("Invalid web search quota");
+		const raw = value.data;
+		let data;
+		if (raw.kind === "balance" && raw.currency === "USD" && typeof raw.balance === "string" && /^-?(?:0|[1-9]\d{0,11})(?:\.\d{1,6})?$/.test(raw.balance)) data = {
+			kind: "balance",
+			currency: "USD",
+			balance: raw.balance
+		};
+		else if (raw.kind === "credits" && (raw.scope === "key" || raw.scope === "account")) {
+			data = {
+				kind: "credits",
+				scope: raw.scope,
+				limit: raw.limit === null ? null : parseCredit(raw.limit),
+				remaining: raw.remaining === null ? null : parseCredit(raw.remaining),
+				...raw.used === void 0 ? {} : { used: parseCredit(raw.used) },
+				...raw.paygoRemaining === void 0 ? {} : { paygoRemaining: parseCredit(raw.paygoRemaining) }
+			};
+			if (data.remaining === null && (data.limit !== null || data.used === void 0)) throw new TypeError("Invalid web search quota");
+		} else throw new TypeError("Invalid web search quota");
+		return {
+			status: "ready",
+			observedAt: value.observedAt,
+			data
 		};
 	} })
 };
@@ -12233,6 +12547,10 @@ function descriptor(method, parameters, result) {
 	};
 }
 const READ_WEB_SEARCH_RPC = descriptor("readWebSearch", [], webSearchCatalogCodec);
+const READ_WEB_SEARCH_QUOTA_RPC = descriptor("readWebSearchQuota", [{
+	name: "id",
+	codec: stringCodec
+}], webSearchQuotaCodec);
 const ADD_WEB_SEARCH_SLOT_RPC = descriptor("addWebSearchSlot", [{
 	name: "capability",
 	codec: stringCodec
@@ -12276,7 +12594,8 @@ const rpc = [
 	REORDER_WEB_SEARCH_CHAIN_RPC,
 	SAVE_WEB_SEARCH_KEY_RPC,
 	PROBE_WEB_SEARCH_SEARCH_RPC,
-	PROBE_WEB_SEARCH_FETCH_RPC
+	PROBE_WEB_SEARCH_FETCH_RPC,
+	READ_WEB_SEARCH_QUOTA_RPC
 ];
 
 // src/app/host-features.ts
@@ -12453,6 +12772,7 @@ const MOD_RPC = composeRpc([
 	SAVE_WEB_SEARCH_KEY_RPC,
 	PROBE_WEB_SEARCH_SEARCH_RPC,
 	PROBE_WEB_SEARCH_FETCH_RPC,
+	READ_WEB_SEARCH_QUOTA_RPC,
 	NOTIFICATION_TRANSPORT_RPC,
 	RESTART_STATUS_RPC,
 	RESTART_APP_RPC,

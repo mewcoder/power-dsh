@@ -5,7 +5,7 @@ import { Config } from '../../../app/config.ts';
 
 test('the full Host schema accepts legacy and instance chains, including its serialized client schema', () => {
   const preferences = { webSearchChain: ['tavily', { id: 'tinyfish-1', provider: 'tinyfish' }],
-    webFetchChain: ['tavily', 'firecrawl'] };
+    webFetchChain: ['tavily', { id: 'power-dsh-local-fetch', provider: 'local' }, 'firecrawl'] };
   for (const schema of [Config, new z(Config.toJSON())]) {
     const config = schema(structuredClone(preferences));
     assert.deepEqual(config.webSearchChain.get(), preferences.webSearchChain);

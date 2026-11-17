@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { AggregateFetchProvider, AggregateSearchProvider, FETCH_PROVIDER_ID, SEARCH_PROVIDER_ID, describeFailures, usable } from '../provider.ts';
 import { BackendError } from '../backends.ts';
+import { LOCAL_FETCH } from '../chain.ts';
 
 function backend(id, { search, fetch } = {}) {
   return {
@@ -169,4 +170,66 @@ test('an aborted local fetch does not fall through to the chain', async () => {
   const provider = new AggregateFetchProvider(() => [{ id: (remote).id, backend: remote, apiKey: 'k' }], () => local);
   await assert.rejects(provider.fetch({ url: 'https://example.test' }, controller.signal));
   assert.deepEqual(calls, [], 'an aborted request must not start another attempt');
+});
+
+test('fetch follows live ordering with local at the beginning, middle or end', async () => {
+  const calls = [];
+  const local = { async fetch(request) {
+    calls.push('local');
+    return { url: request.url, statusCode: 200, body: { kind: 'html', content: '<p>local</p>' }, truncated: false };
+  } };
+  const first = { id: 'first', apiKey: 'key', backend: backend('first', { fetch: async () => {
+    calls.push('first'); throw new BackendError('quota', 429);
+  } }) };
+  const second = { id: 'second', apiKey: 'key', backend: backend('second', { fetch: async () => {
+    calls.push('second'); throw new BackendError('offline');
+  } }) };
+  let slots = [LOCAL_FETCH.id, first, second];
+  const provider = new AggregateFetchProvider(() => slots, () => local);
+  for (const [order, expected] of [
+    [[LOCAL_FETCH.id, first, second], ['local']],
+    [[first, LOCAL_FETCH.id, second], ['first', 'local']],
+    [[first, second, LOCAL_FETCH.id], ['first', 'second', 'local']],
+  ]) {
+    slots = order;
+    calls.length = 0;
+    assert.equal((await provider.fetch({ url: 'https://example.test' })).body.kind, 'html');
+    assert.deepEqual(calls, expected);
+  }
+});
+
+test('a successful remote before local stops the chain, and absent local is skipped in place', async () => {
+  const calls = [];
+  const broken = { id: 'broken', apiKey: 'key', backend: backend('broken', { fetch: async () => {
+    calls.push('broken'); throw new BackendError('offline');
+  } }) };
+  const good = { id: 'good', apiKey: 'key', backend: backend('good', { fetch: async () => {
+    calls.push('good'); return { content: 'remote', truncated: false };
+  } }) };
+  const local = { async fetch() { calls.push('local'); throw new Error('offline'); } };
+  const provider = new AggregateFetchProvider(() => [good, LOCAL_FETCH.id, broken], () => local);
+  assert.equal((await provider.fetch({ url: 'https://example.test' })).body.content, 'remote');
+  assert.deepEqual(calls, ['good']);
+  calls.length = 0;
+  await new AggregateFetchProvider(() => [broken, LOCAL_FETCH.id, good]).fetch({ url: 'https://example.test' });
+  assert.deepEqual(calls, ['broken', 'good']);
+  calls.length = 0;
+  await new AggregateFetchProvider(() => [broken, LOCAL_FETCH.id, good], () => local).fetch({ url: 'https://example.test' });
+  assert.deepEqual(calls, ['broken', 'local', 'good']);
+});
+
+test('cancellation before local prevents any later attempt', async () => {
+  const controller = new AbortController();
+  const calls = [];
+  const remote = { id: 'remote', apiKey: 'key', backend: backend('remote', { fetch: async () => {
+    calls.push('remote'); controller.abort(); throw new Error('aborted');
+  } }) };
+  const local = { async fetch() { calls.push('local'); throw new Error('unexpected'); } };
+  const provider = new AggregateFetchProvider(() => [remote, LOCAL_FETCH.id], () => local);
+  await assert.rejects(provider.fetch({ url: 'https://example.test' }, controller.signal), /aborted/);
+  assert.deepEqual(calls, ['remote']);
+  controller.abort();
+  await assert.rejects(new AggregateFetchProvider(() => [LOCAL_FETCH.id], () => local)
+    .fetch({ url: 'https://example.test' }, controller.signal), /aborted/);
+  assert.deepEqual(calls, ['remote']);
 });

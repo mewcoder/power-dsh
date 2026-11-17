@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mount, descendants } from '../../../../tests/helpers/client-fixture.mjs';
+import { LOCAL_FETCH } from '../chain.ts';
 
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const slot = (id, provider = 'tavily') => ({ id, provider, keyUrl: 'https://example.com/keys',
@@ -9,8 +10,8 @@ const text = node => [node?.props?.children].flat(Infinity).filter(value => type
 const button = (view, label) => descendants(view).find(node => node.type === 'button' && text(node) === label);
 const input = view => descendants(view).find(node => node.type === 'input');
 
-async function fixture(context, overrides = {}) {
-  const app = await mount({ featureIds: ['web-search'], rpcError: 'Test request failed' });
+async function fixture(context, overrides = {}, mountOptions = {}) {
+  const app = await mount({ featureIds: ['web-search'], rpcError: 'Test request failed', ...mountOptions });
   context.after(() => app.unmount());
   app.set({ webSearchEnabled: true });
   const wrapped = app.entries.get('settings.section:power-dsh-web-search').component({
@@ -21,9 +22,10 @@ async function fixture(context, overrides = {}) {
   Object.assign(wrapped.props, {
     catalogSource: { getSnapshot: () => snapshot, subscribe: () => () => {} },
     loadCatalog: async () => {}, addSlot: async () => {}, removeSlot: async () => {},
-    saveKey: async () => {}, reorderChain: async () => {}, ...overrides,
+    saveKey: async () => {}, reorderChain: async () => {},
+    readQuota: async () => ({ status: 'unsupported' }), ...overrides,
   });
-  return { render: () => app.renderComponent(wrapped),
+  return { app, render: () => app.renderComponent(wrapped),
     setSnapshot: next => { snapshot = next; } };
 }
 
@@ -71,6 +73,83 @@ test('web search retains the catalog but blocks writes when refresh fails', asyn
   assert.ok(descendants(render()).some(node => node.props['data-slot'] === 'search-1'));
 });
 
+test('configured instances read and display actual quota units while refresh failures keep the last value and editors usable', async context => {
+  const calls = [];
+  let failing = false;
+  const { render } = await fixture(context, { readQuota: async id => {
+    calls.push(id);
+    return failing ? { status: 'error', durationMs: 2, diagnostic: { provider: 'tavily', stage: 'response',
+      reason: 'rate-limit', auth: 'api-key', httpStatus: 429, observedAt: new Date().toISOString() } }
+      : { status: 'ready', observedAt: new Date().toISOString(), data: id === 'search-1'
+        ? { kind: 'credits', scope: 'account', used: 80, limit: 1000, remaining: 920, paygoRemaining: 26 }
+        : { kind: 'balance', currency: 'USD', balance: '-0.012345' } };
+  } });
+  render();
+  await flush();
+  const textContent = descendants(render()).map(text).join(' ');
+  assert.match(textContent, /Account · Used 80 \/ 1000 credits · 26 pay-as-you-go credits left/);
+  assert.match(textContent, /Balance USD -0\.012345/);
+  assert.deepEqual(calls, ['search-1', 'fetch-1']);
+  failing = true;
+  const refresh = () => descendants(render()).find(node => node.props['aria-label'] === 'Refresh: Tavily #1');
+  refresh().props.onClick();
+  assert.equal(refresh().props.disabled, true);
+  await flush();
+  assert.match(descendants(render()).map(text).join(' '), /Used 80 \/ 1000 credits.*Last read/);
+  assert.ok(descendants(render()).some(node => node.props['data-error-code'] === 'PD-WEBSEARCH-QUOTA'));
+  assert.equal(button(render(), 'Edit').props.disabled, false);
+});
+
+test('missing keys never read quotas and late reads cannot overwrite a changed credential state', async context => {
+  const pending = [];
+  const { render, setSnapshot } = await fixture(context, { readQuota: id => new Promise(resolve => { pending.push({ id, resolve }); }) });
+  render();
+  assert.equal(pending.length, 2);
+  setSnapshot({ status: 'ready', error: '', value: { enabled: true, available: true,
+    slots: [{ ...slot('search-1'), configured: false, hasKey: false }], search: { ids: ['search-1'] }, fetch: { ids: [] } } });
+  render();
+  for (const request of pending) request.resolve({ status: 'ready', observedAt: new Date().toISOString(),
+    data: { kind: 'credits', scope: 'key', used: 999, limit: 1000, remaining: 1 } });
+  await flush();
+  assert.equal(pending.length, 2);
+  assert.doesNotMatch(descendants(render()).filter(node => node.type !== 'style').map(text).join(' '), /999|credits|Refresh/);
+});
+
+test('both add menus offer Exa, its editor uses the official key link, and unsupported quotas have no refresh row', async context => {
+  const { render, setSnapshot } = await fixture(context);
+  const menus = descendants(render()).filter(node => node.type === 'native-menu-fixture');
+  assert.equal(menus.length, 2);
+  assert.ok(menus.every(menu => menu.props.items.some(item => item.id === 'exa' && item.label === 'Exa')));
+  setSnapshot({ status: 'ready', error: '', value: { enabled: true, available: true,
+    slots: [{ ...slot('exa-1', 'exa'), keyUrl: 'https://dashboard.exa.ai/api-keys' }],
+    search: { ids: ['exa-1'] }, fetch: { ids: [] } } });
+  render();
+  await flush();
+  button(render(), 'Edit').props.onClick();
+  const keyLink = descendants(render()).find(node => node.type === 'a' && text(node) === 'Get a key');
+  assert.equal(keyLink.props.href, 'https://dashboard.exa.ai/api-keys');
+  assert.equal(keyLink.props.rel, 'noopener noreferrer');
+  assert.ok(descendants(render()).some(node => node.props['aria-label'] === 'Test search: Exa #1'));
+  assert.equal(descendants(render()).some(node => node.props.className === 'power-dsh-web-quota'), false);
+  assert.equal(descendants(render()).some(node => node.props['aria-label'] === 'Refresh: Exa #1'), false);
+});
+
+test('a successful key replacement requests its new quota after clearing the old value', async context => {
+  let replaced = false;
+  const { render } = await fixture(context, { saveKey: async () => { replaced = true; }, readQuota: async () => ({
+    status: 'ready', observedAt: new Date().toISOString(),
+    data: { kind: 'credits', scope: 'key', used: replaced ? 12 : 7, limit: 100, remaining: replaced ? 88 : 93 },
+  }) });
+  render();
+  await flush();
+  button(render(), 'Edit').props.onClick();
+  input(render()).props.onChange({ target: { value: 'new-key' } });
+  button(render(), 'Save').props.onClick();
+  await flush();
+  const searchRow = descendants(render()).find(node => node.props['data-slot'] === 'search-1');
+  assert.match(descendants(searchRow).map(text).join(' '), /Used 12 \/ 100 credits/);
+});
+
 test('web fetch editor announces its actual position and clears a successful draft', async context => {
   const writes = [];
   const { render } = await fixture(context, { saveKey: async (...args) => { writes.push(args); } });
@@ -111,6 +190,44 @@ test('row test icons show busy state and preserve failure feedback with the edit
   assert.equal(input(render()), undefined);
   assert.ok(descendants(render()).some(node => node.props['data-error-code'] === 'PD-WEBSEARCH-PROBE'));
   assert.match(probe().props['aria-describedby'], /probe-result$/);
+});
+
+for (const ok of [true, false]) {
+  test(`a completed ${ok ? 'successful' : 'failed'} probe disappears after five seconds and older timers cannot clear a newer result`, async context => {
+    const { app, render } = await fixture(context, {}, {
+      rpcReply: { ok: true, value: { ok, resultCount: ok ? 5 : 0, durationMs: 20, message: ok ? '' : 'Test failed' } },
+    });
+    const probe = () => descendants(render()).find(node => node.props['aria-label'] === 'Test search: Tavily #1');
+    probe().props.onClick();
+    assert.equal([...app.timers.values()].filter(timer => timer.ms === 5000).length, 0);
+    await flush();
+    assert.match(probe().props['aria-describedby'], /probe-result$/);
+    const older = [...app.timers.values()].find(timer => timer.ms === 5000);
+    probe().props.onClick();
+    await flush();
+    older.fn();
+    assert.match(probe().props['aria-describedby'], /probe-result$/);
+    const current = [...app.timers.values()].find(timer => timer.ms === 5000);
+    current.fn();
+    assert.equal(probe().props['aria-describedby'], undefined);
+    assert.equal(descendants(render()).some(node => node.props['data-error-code'] === 'PD-WEBSEARCH-PROBE'), false);
+  });
+}
+
+test('interacting with failed probe details stops dismissal and unload clears the next timer', async context => {
+  const { app, render } = await fixture(context);
+  const probe = () => descendants(render()).find(node => node.props['aria-label'] === 'Test search: Tavily #1');
+  probe().props.onClick();
+  await flush();
+  const feedback = descendants(render()).find(node => node.props.className === 'power-dsh-web-probe-result');
+  feedback.props.onClickCapture();
+  assert.equal([...app.timers.values()].filter(timer => timer.ms === 5000).length, 0);
+  assert.match(probe().props['aria-describedby'], /probe-result$/);
+  probe().props.onClick();
+  await flush();
+  assert.equal([...app.timers.values()].filter(timer => timer.ms === 5000).length, 1);
+  app.unmount();
+  assert.equal([...app.timers.values()].filter(timer => timer.ms === 5000).length, 0);
 });
 
 test('unconfigured rows expose their status through the dot and disable probing', async context => {
@@ -158,3 +275,54 @@ for (const capability of ['search', 'fetch']) {
     assert.ok(descendants(row).some(node => node.type === 'a' && text(node) === 'Get a key'));
   });
 }
+
+test('local fetch is sortable without credential actions and reports failed saves on its row', async context => {
+  const writes = [];
+  const { render, setSnapshot } = await fixture(context, { reorderChain: async (...args) => {
+    writes.push(args); throw new Error('Could not save order');
+  } });
+  const local = () => descendants(render()).find(node => node.props['data-local']);
+  assert.equal(local().props.draggable, true);
+  assert.equal(descendants(local()).some(node => node.type === 'button' || node.type === 'input'), false);
+  assert.match(descendants(local()).map(text).join(' '), /#1/);
+  local().props.onKeyDown({ altKey: true, key: 'ArrowDown', preventDefault() {} });
+  await flush();
+  assert.deepEqual(structuredClone(writes), [['fetch', ['fetch-1', LOCAL_FETCH.id]]]);
+  assert.ok(descendants(local()).some(node => node.props['data-error-code'] === 'PD-WEBSEARCH-SAVE'));
+  setSnapshot({ status: 'ready', error: '', value: { enabled: true, available: true,
+    slots: [slot('fetch-1')], search: { ids: [] }, fetch: { ids: ['fetch-1', LOCAL_FETCH.id] } } });
+  const rows = descendants(render()).filter(node => node.type === 'li' && node.props['data-capability'] === 'fetch');
+  assert.deepEqual(rows.map(node => node.props['data-slot']), ['fetch-1', LOCAL_FETCH.id]);
+  assert.match(descendants(local()).map(text).join(' '), /#2/);
+  assert.ok(descendants(render()).some(node => node.props['aria-label'] === 'Test fetch: Tavily #1'));
+});
+
+test('dragging local below a remote persists the complete fetch order only', async context => {
+  const writes = [];
+  const { render } = await fixture(context, { reorderChain: async (...args) => { writes.push(args); } });
+  const local = () => descendants(render()).find(node => node.props['data-local']);
+  const remote = () => descendants(render()).find(node => node.props['data-slot'] === 'fetch-1');
+  const dataTransfer = { effectAllowed: '', dropEffect: '', setData() {} };
+  local().props.onDragStart({ dataTransfer, preventDefault() {} });
+  remote().props.onDragOver({ dataTransfer, clientY: 25, preventDefault() {},
+    currentTarget: { getBoundingClientRect: () => ({ top: 0, height: 30 }) } });
+  assert.equal(remote().props['data-drop'], 'after');
+  remote().props.onDrop({ preventDefault() {} });
+  await flush();
+  assert.deepEqual(structuredClone(writes), [['fetch', ['fetch-1', LOCAL_FETCH.id]]]);
+});
+
+test('unavailable settings block local keyboard and drag ordering', async context => {
+  const writes = [];
+  const { render, setSnapshot } = await fixture(context, { reorderChain: async (...args) => { writes.push(args); } });
+  setSnapshot({ status: 'error', error: 'Could not load', value: { enabled: true, available: true,
+    slots: [slot('fetch-1')], search: { ids: [] }, fetch: { ids: [LOCAL_FETCH.id, 'fetch-1'] } } });
+  const local = descendants(render()).find(node => node.props['data-local']);
+  assert.equal(local.props.draggable, false);
+  local.props.onKeyDown({ altKey: true, key: 'ArrowDown', preventDefault() {} });
+  let prevented = false;
+  local.props.onDragStart({ preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  await flush();
+  assert.deepEqual(writes, []);
+});

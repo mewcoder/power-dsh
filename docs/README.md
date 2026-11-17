@@ -21,13 +21,13 @@
 
 ## 功能规格（Spec）
 
-每项用户功能的唯一主 Spec 与实现、文案和行为测试位于同一特性目录。维护要求见[功能 Spec 规范](feature-spec.md)，模块归属与索引由仓库检查核对。下表汇总各功能；界面顺序为「通用」「界面」「功能」「精简」「其他」，默认通用，分类范围与关联设置见[分类 Tab](ui.md#分类-tab)。
+每项用户功能的唯一主 Spec 与实现、文案和行为测试位于同一特性目录。维护要求见[功能 Spec 规范](feature-spec.md)，模块归属与索引由仓库检查核对。下表汇总各功能；界面顺序为「通用」「界面」「功能」「管理」「精简」「其他」，默认通用，分类范围与关联设置见[分类 Tab](ui.md#分类-tab)。
 
 | 功能 | 主要职责 |
 | --- | --- |
 | [插件更新](../src/features/plugin-updates/spec.md) | 通用设置的插件版本行、手动检查、正式目标校验、确认后交给市场更新与进度读回 |
 | [壁纸](../src/features/wallpaper/spec.md) | 界面首行「开启自定义壁纸」、原生设置左侧壁纸入口（全局指令上方）、四项缩略图选择、自定义图片卡片底部操作、共享可见度／模糊、拖动预览与提交、Host 存储校验及旧背景兼容 |
-| [侧边栏独立页面](../src/features/standalone-page/spec.md) | 「功能」首行的独立页面开关、七个功能页、带图标的导航与响应式布局 |
+| [侧边栏独立页面](../src/features/standalone-page/spec.md) | 「界面」中的独立页面开关、七个管理页、带图标的导航与响应式布局 |
 | [任务通知](../src/features/notifications/spec.md) | 事件触发、权限、前台抑制与系统提示音 |
 | [界面刷新](../src/features/refresh-button/spec.md) | 原生页面重载、状态边界与按钮显隐 |
 | [重启应用](../src/features/restart-button/spec.md) | macOS／Windows 桌面的设置入口、确认、当前实例退出与同路径重开，以及平台和验收限制 |
@@ -41,7 +41,7 @@
 | [全局指令](../src/features/personalization/spec.md) | 全局指令编辑、原生文件保存与入口关闭行为 |
 | [记忆](../src/features/memory/spec.md) | 全局与项目长期记忆、显式／自动记录、模型工具、索引注入、当前消息出处及查看／删除管理 |
 | [历史对话检索（实验性）](../src/features/history-search/spec.md) | 独立开关允许 AI 按需搜索当前项目历史聊天、读取原文及前后文并返回消息出处 |
-| [第三方网页搜索](../src/features/web-search/spec.md) | 「功能」分类的独立开关与「网页搜索」页，把 Tavily／Firecrawl／TinyFish 注册为原生 `web` 提供方，按顺序回退、密钥存入凭据库、可测试单个后端 |
+| [第三方网页搜索](../src/features/web-search/spec.md) | 「功能」分类的独立开关与「网页搜索与获取」页，把 Tavily／Firecrawl／TinyFish／Exa 注册为原生 `web` 提供方，按顺序回退、密钥存入凭据库、可测试单个后端 |
 | [归档](../src/features/archive/spec.md) | 归档会话的可折叠分组列表（含工作区路径）、搜索、排序、工作区筛选与恢复、永久删除与自动归档 |
 | [使用统计](../src/features/usage-stats/spec.md) | 本地会话 Token 汇总、模型／工作区分布、按模型的请求质量与速度/首字延迟、53 周活动热力图与每日趋势，只读聚合与缓存边界 |
 | [工作区管理](../src/features/projects/spec.md) | 工作区名称／目录／会话数／最近活动列表，搜索、最近活动与原生顺序排序、二次确认后移除登记 |

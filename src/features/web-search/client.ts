@@ -10,9 +10,11 @@
 import { errorMessage } from '../../shared/client/runtime.ts';
 import { styles as shellStyles } from '../../shared/client/shell-styles.ts';
 import type { ClientEnvironment, ClientFeature, ClientRuntime, FeatureState, FormSnapshot, IconProps, PageSlotProps, SnapshotSource } from '../../shared/client/types.ts';
-import type { WebSearchCatalog, WebSearchProbe } from './rpc.ts';
+import type { WebSearchCatalog, WebSearchProbe, WebSearchQuota } from './rpc.ts';
 import { styles as featureStyles } from './styles.ts';
 import { probeDiagnostic, probeDiagnosticContext, probeFailureMessage } from './probe-diagnostics.ts';
+import { LOCAL_FETCH } from './chain.ts';
+import type { ReactNode } from 'react';
 
 /** One capability's probe of one backend; `capability` keeps the two buttons apart. */
 interface ProbeState {
@@ -33,6 +35,7 @@ interface WebSearchPageProps extends PageSlotProps {
   reorderChain(capability: Capability, ids: readonly string[]): Promise<void>;
   saveKey(id: string, value: string): Promise<void>;
   probeBackend(capability: Capability, id: string): Promise<void>;
+  readQuota(id: string): Promise<WebSearchQuota>;
 }
 
 /** Vendor display names; a vendor the build no longer ships renders its id. */
@@ -40,6 +43,7 @@ const NAMES: Record<string, string> = {
   tavily: 'Tavily',
   firecrawl: 'Firecrawl',
   tinyfish: 'TinyFish',
+  exa: 'Exa',
 };
 
 /** Vendors the add menu offers, in display order. */
@@ -66,9 +70,14 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   let pending = false;
   let generation = 0;
   let probe: ProbeState | null = null;
+  let probeTimer: number | undefined;
+  const stopProbeTimer = () => {
+    window.clearTimeout(probeTimer);
+    probeTimer = undefined;
+  };
   const catalogSource = observable(() => catalog);
   const probeSource = observable(() => probe);
-  ctx.effect(() => () => { active = false; generation++; });
+  ctx.effect(() => () => { active = false; generation++; stopProbeTimer(); });
 
   /**
    * Map a Host failure onto page copy. A key this page knows becomes its
@@ -131,6 +140,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
 
   const probeBackend = async (capability: Capability, id: string) => {
     if (!active || probe?.status === 'running') return;
+    stopProbeTimer();
     probe = { capability, id, status: 'running', value: null };
     probeSource.notify();
     const startedAt = Date.now();
@@ -148,10 +158,29 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       if (!active) return;
       probe = { capability, id, status: 'ready', value: failedRpc(failure) };
     }
+    const completed = probe;
+    probeTimer = window.setTimeout(() => {
+      if (!active || probe !== completed) return;
+      probeTimer = undefined;
+      probe = null;
+      probeSource.notify();
+    }, 5000);
     probeSource.notify();
   };
 
-  function WebSearchPage({ t, source, catalogSource: catalogView, loadCatalog, addSlot, removeSlot, reorderChain, saveKey, probeBackend }: WebSearchPageProps) {
+  const readQuota = async (id: string): Promise<WebSearchQuota> => {
+    const startedAt = Date.now();
+    try {
+      const result = await ctx.remote.powerDsh.readWebSearchQuota(id);
+      if (result.ok) return result.value;
+      throw new Error('Quota RPC failed');
+    } catch (failure) {
+      return { status: 'error', durationMs: Date.now() - startedAt,
+        diagnostic: probeDiagnostic(failure, catalog.value?.slots.find(slot => slot.id === id)?.provider ?? 'unknown', 'unknown', 'rpc') };
+    }
+  };
+
+  function WebSearchPage({ t, source, catalogSource: catalogView, loadCatalog, addSlot, removeSlot, reorderChain, saveKey, probeBackend, readQuota }: WebSearchPageProps) {
     const config = useSnapshot(source);
     const snapshot = useSnapshot(catalogView);
     const probeState = useSnapshot(probeSource);
@@ -161,6 +190,9 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const [editing, setEditing] = React.useState<string | null>(null);
     const [rowError, setRowError] = React.useState<{ id: string; message: string } | null>(null);
     const [busy, setBusy] = React.useState(false);
+    const [quotas, setQuotas] = React.useState<Record<string, { loading: boolean; value: WebSearchQuota | null; previous?: WebSearchQuota & { status: 'ready' } }>>({});
+    const quotaEpoch = React.useRef(0);
+    const quotaPending = React.useRef(new Set<string>());
     // The row being dragged, and the row whose edge it is currently over. Only
     // one chain drags at a time, so one pair of fields covers both sections.
     const [dragging, setDragging] = React.useState<{ capability: Capability; id: string } | null>(null);
@@ -178,6 +210,46 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       window.addEventListener('focus', refresh);
       return () => window.removeEventListener('focus', refresh);
     }, []);
+
+    const loadQuota = async (slotId: string, epoch = quotaEpoch.current) => {
+      if (quotaPending.current.has(slotId)) return;
+      quotaPending.current.add(slotId);
+      setQuotas(current => ({ ...current, [slotId]: { ...current[slotId], loading: true, value: current[slotId]?.value ?? null } }));
+      let result: WebSearchQuota;
+      try { result = await readQuota(slotId); }
+      catch (failure) {
+        result = { status: 'error', durationMs: 0,
+          diagnostic: probeDiagnostic(failure, value?.slots.find(slot => slot.id === slotId)?.provider ?? 'unknown', 'unknown', 'rpc') };
+      }
+      if (!mounted.current || epoch !== quotaEpoch.current) return;
+      quotaPending.current.delete(slotId);
+      setQuotas(current => ({ ...current, [slotId]: { loading: false, value: result,
+        previous: result.status === 'ready' ? result : current[slotId]?.previous } }));
+    };
+
+    React.useEffect(() => {
+      const epoch = ++quotaEpoch.current;
+      quotaPending.current.clear();
+      const configured = new Set(enabled ? value?.slots.filter(row => row.hasKey).map(row => row.id) : []);
+      setQuotas(current => Object.fromEntries(Object.entries(current).filter(([slotId]) => configured.has(slotId))));
+      if (enabled && value?.available) {
+        for (const row of value.slots) if (row.hasKey) void loadQuota(row.id, epoch);
+      }
+      return () => { quotaEpoch.current++; quotaPending.current.clear(); };
+    }, [value, enabled]);
+
+    const quotaText = (quota: WebSearchQuota & { status: 'ready' }) => {
+      const data = quota.data;
+      if (data.kind === 'balance') return t('webSearchQuotaBalance').replace('{balance}', data.balance);
+      const scope = t(data.scope === 'key' ? 'webSearchQuotaKey' : 'webSearchQuotaAccount');
+      const amount = data.used === undefined
+        ? t('webSearchQuotaRemaining').replace('{remaining}', String(data.remaining))
+        : data.limit === null ? t('webSearchQuotaUnlimited').replace('{used}', String(data.used))
+          : t('webSearchQuotaUsed').replace('{used}', String(data.used)).replace('{limit}', String(data.limit));
+      const paygo = data.paygoRemaining === undefined ? ''
+        : ` · ${t('webSearchQuotaPaygo').replace('{remaining}', String(data.paygoRemaining))}`;
+      return `${scope} · ${amount}${paygo}`;
+    };
 
     const run = async (operation: () => Promise<void>, rowId?: string) => {
       if (busy) return;
@@ -216,36 +288,25 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
      * vendor — they are separate instances with separate keys.
      */
     const chainSection = (capability: Capability, headingId: string) => {
-      const chain = capability === 'search' ? value?.search.ids ?? [] : value?.fetch.ids ?? [];
-      const disabled = !writable || !value?.available || snapshot.status === 'error' || busy;
-      const members = chain.filter(slotId => byId.has(slotId));
       const search = capability === 'search';
+      const fetchIds = value?.fetch.ids ?? [];
+      const chain = search ? value?.search.ids ?? []
+        : fetchIds.includes(LOCAL_FETCH.id) ? fetchIds : [LOCAL_FETCH.id, ...fetchIds];
+      const disabled = !writable || !value?.available || snapshot.status === 'error' || busy;
+      const members = chain.filter(slotId => byId.has(slotId) || !search && slotId === LOCAL_FETCH.id);
 
-      const rowOf = (slotId: string, index: number) => {
-        const row = byId.get(slotId);
-        if (!row) return null;
-        const control = `${id}-${capability}-${slotId}`;
-        const position = search ? index + 1 : index + 2;
-        const draft = drafts[slotId] ?? '';
-        const currentProbe = probeState?.capability === capability && probeState.id === slotId ? probeState : null;
-        const running = currentProbe?.status === 'running';
-        const result = currentProbe?.status === 'ready' ? currentProbe.value : null;
-        const name = NAMES[row.provider] ?? row.provider;
-        const probeLabel = `${t(search ? 'webSearchProbeSearch' : 'webSearchProbeFetch')}: ${name} #${String(position)}`;
-        // The dot states the one fact a glance needs: can this instance run now?
-        const dot = row.hasKey ? 'configured' : 'missing';
-        const open = editing === slotId;
+      const sortableRow = (slotId: string, index: number, open: boolean, ...children: ReactNode[]) => {
         const isDragging = dragging !== null && dragging.capability === capability && dragging.id === slotId;
         const dropHalf = over !== null && dragging !== null && dragging.capability === capability
           && over.id === slotId && dragging.id !== slotId ? over.half : null;
         return h('li', {
-          key: slotId, className: 'power-dsh-web-row', 'data-slot': slotId, 'data-provider': row.provider,
+          key: slotId, className: 'power-dsh-web-row', 'data-slot': slotId, 'data-provider': byId.get(slotId)?.provider,
+          'data-local': slotId === LOCAL_FETCH.id || undefined,
           'data-capability': capability,
           'data-dragging': isDragging || undefined,
           'data-drop': dropHalf ?? undefined,
           'aria-describedby': `${id}-${capability}-reorder-hint`,
-          // Drag is the reorder gesture. A drag is pointer-only, so the row is
-          // also focusable and Alt+Arrow reorders it — no visible buttons.
+          'aria-labelledby': `${id}-${capability}-${slotId}-name`,
           draggable: !disabled && !open,
           tabIndex: disabled ? undefined : 0,
           onKeyDown: event => {
@@ -266,7 +327,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             setOver(null);
           },
           onDragOver: event => {
-            if (!dragging || dragging.capability !== capability || dragging.id === slotId) return;
+            if (disabled || !dragging || dragging.capability !== capability || dragging.id === slotId) return;
             event.preventDefault();
             event.dataTransfer.dropEffect = 'move';
             const rect = event.currentTarget.getBoundingClientRect();
@@ -279,7 +340,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             setOver(current => current?.id === slotId ? null : current);
           },
           onDrop: event => {
-            if (!dragging || dragging.capability !== capability || dragging.id === slotId) return;
+            if (disabled || !dragging || dragging.capability !== capability || dragging.id === slotId) return;
             event.preventDefault();
             const half = dropHalf ?? 'after';
             const source = dragging.id;
@@ -291,7 +352,36 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             void run(() => reorderChain(capability, next), slotId);
           },
           onDragEnd: () => { setDragging(null); setOver(null); },
-        },
+        }, ...children);
+      };
+
+      const rowOf = (slotId: string, index: number) => {
+        const control = `${id}-${capability}-${slotId}`;
+        const position = index + 1;
+        if (!search && slotId === LOCAL_FETCH.id) {
+          return sortableRow(slotId, index, false,
+            h('div', { className: 'power-dsh-web-row-head' },
+              h('div', { className: 'power-dsh-web-row-identity' },
+                h('span', { id: `${control}-name`, className: 'power-dsh-web-name' }, t('webSearchLocalName')),
+                h('span', { className: 'power-dsh-web-tag' }, `#${String(position)}`),
+                h('span', { className: 'power-dsh-web-dot', 'data-state': 'configured', 'aria-hidden': true }))),
+            rowError?.id === slotId && errorFeedback({ t, id: `${control}-error`, message: rowError.message,
+              code: 'PD-WEBSEARCH-SAVE', operation: 'reorderWebSearchChain' }));
+        }
+        const row = byId.get(slotId);
+        if (!row) return null;
+        const draft = drafts[slotId] ?? '';
+        const currentProbe = probeState?.capability === capability && probeState.id === slotId ? probeState : null;
+        const running = currentProbe?.status === 'running';
+        const result = currentProbe?.status === 'ready' ? currentProbe.value : null;
+        const quota = quotas[slotId];
+        const quotaValue = quota?.value?.status === 'ready' ? quota.value : quota?.previous;
+        const quotaError = quota?.value?.status === 'error' ? quota.value : null;
+        const name = NAMES[row.provider] ?? row.provider;
+        const probeLabel = `${t(search ? 'webSearchProbeSearch' : 'webSearchProbeFetch')}: ${name} #${String(position)}`;
+        const dot = row.hasKey ? 'configured' : 'missing';
+        const open = editing === slotId;
+        return sortableRow(slotId, index, open,
           h('div', { className: 'power-dsh-web-row-head' },
             h('div', { className: 'power-dsh-web-row-identity' },
               h('span', { id: `${control}-name`, className: 'power-dsh-web-name' }, name),
@@ -299,6 +389,15 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
               h('span', { className: 'power-dsh-web-dot', 'data-state': dot, role: 'img',
                 'aria-label': t(row.hasKey ? 'webSearchKeyConfigured' : 'webSearchKeyMissing'),
                 title: t(row.hasKey ? 'webSearchKeyConfigured' : 'webSearchKeyMissing') })),
+            result && (result.ok
+              ? h('span', { id: `${control}-probe-result`, className: 'power-dsh-web-hint power-dsh-web-probe-result', 'data-ok': true, role: 'status' },
+                t(search ? 'webSearchProbeOk' : 'webSearchProbeFetchOk')
+                  .replace('{count}', String(result.resultCount)).replace('{ms}', String(result.durationMs)))
+              : h('div', { className: 'power-dsh-web-probe-result', onClickCapture: stopProbeTimer },
+                errorFeedback({ t, id: `${control}-probe-result`, style: { margin: 0 },
+                  message: probeFailureMessage(result, t),
+                  context: probeDiagnosticContext(result, capability, t), observedAt: result.diagnostic?.observedAt,
+                  code: 'PD-WEBSEARCH-PROBE', operation: search ? 'probeWebSearchSearch' : 'probeWebSearchFetch' }))),
             h('div', { className: 'power-dsh-web-row-actions' },
               h(Tooltip, { label: probeLabel, portal: true, side: 'top', delayMs: 0 }, h('button', {
                 type: 'button', className: 'power-dsh-web-probe',
@@ -320,13 +419,24 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
                 'aria-label': `${t('webSearchRemove')}: ${name} #${String(position)}`,
                 onClick: () => { void run(() => removeSlot(capability, slotId), slotId); },
               }, t('webSearchRemove')))),
-          result && (result.ok
-            ? h('p', { id: `${control}-probe-result`, className: 'power-dsh-web-hint', 'data-ok': true, role: 'status' },
-              t(search ? 'webSearchProbeOk' : 'webSearchProbeFetchOk')
-                .replace('{count}', String(result.resultCount)).replace('{ms}', String(result.durationMs)))
-            : errorFeedback({ t, id: `${control}-probe-result`, message: probeFailureMessage(result, t),
-              context: probeDiagnosticContext(result, capability, t), observedAt: result.diagnostic?.observedAt,
-              code: 'PD-WEBSEARCH-PROBE', operation: search ? 'probeWebSearchSearch' : 'probeWebSearchFetch' })),
+          row.hasKey && enabled && value?.available && quota?.value?.status !== 'unsupported'
+            && h('div', { className: 'power-dsh-web-quota', 'aria-busy': quota?.loading || undefined },
+            h('span', { role: 'status', className: 'power-dsh-web-hint', 'data-stale': quotaError && quotaValue ? true : undefined },
+              quotaValue ? `${quotaText(quotaValue)}${quotaError ? ` · ${t('webSearchQuotaStale')}` : ''}`
+                : t(quota?.loading ? 'webSearchQuotaLoading' : quotaError ? 'webSearchQuotaUnknown' : 'webSearchQuotaUnavailable')),
+            h('button', { type: 'button', className: 'power-dsh-web-quota-refresh', disabled: quota?.loading || disabled,
+              title: t('webSearchQuotaCacheHint'), 'aria-label': `${t('webSearchQuotaRefresh')}: ${name} #${String(position)}`,
+              onClick: () => { void loadQuota(slotId); } }, t('webSearchQuotaRefresh'))),
+          quotaError && row.hasKey && enabled && errorFeedback({ t, id: `${control}-quota-error`,
+            message: t('webSearchQuotaFailed'), code: 'PD-WEBSEARCH-QUOTA', operation: 'readWebSearchQuota',
+            observedAt: quotaError.diagnostic.observedAt,
+            context: { stage: `web-search.quota.${quotaError.diagnostic.stage}`, check: row.provider,
+              result: `${quotaError.diagnostic.reason}; ${t(`webSearchProbeReason_${quotaError.diagnostic.reason}`)}`,
+              actual: [quotaError.diagnostic.httpStatus === undefined ? '' : `HTTP ${String(quotaError.diagnostic.httpStatus)}`,
+                quotaError.diagnostic.systemCode, `${String(quotaError.durationMs)} ms`].filter(Boolean).join('; '), state: quotaError.diagnostic.auth,
+              recovery: t(quotaError.diagnostic.reason === 'rpc' ? 'webSearchProbeRecoveryReload'
+                : ['auth', 'key-missing', 'forbidden'].includes(quotaError.diagnostic.reason) ? 'webSearchProbeRecoveryKey'
+                  : quotaError.diagnostic.reason === 'rate-limit' ? 'webSearchQuotaCacheHint' : 'webSearchProbeRecoveryNetwork') } }),
           rowError?.id === slotId && !open && errorFeedback({ t, id: `${control}-error`, message: rowError.message,
             code: 'PD-WEBSEARCH-SAVE', operation: 'webSearch' }),
           open && h('div', { id: `${control}-editor`, className: 'power-dsh-web-editor' },
@@ -367,7 +477,12 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
                   setSavingKey(slotId);
                   void run(async () => {
                     await saveKey(slotId, next);
-                    if (mounted.current) { setDrafts(current => ({ ...current, [slotId]: '' })); setEditing(null); }
+                    if (mounted.current) {
+                      setDrafts(current => ({ ...current, [slotId]: '' }));
+                      setQuotas(current => Object.fromEntries(Object.entries(current).filter(([currentId]) => currentId !== slotId)));
+                      setEditing(null);
+                      if (next.trim() !== '') void loadQuota(slotId);
+                    }
                   }, slotId).finally(() => { if (mounted.current) setSavingKey(null); });
                 },
               }, t(draft === '' && row.hasKey ? 'webSearchKeyClear' : 'save'))))));
@@ -378,15 +493,6 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
           search ? t('webSearchChainSearch') : t('webSearchChainFetch')),
         h('p', { id: `${id}-${capability}-reorder-hint`, className: 'power-dsh-web-sr' }, t('webSearchReorderHint')),
         (!search || members.length > 0) && h('ul', { className: 'power-dsh-web-rows' },
-          // The fetch section always leads with the machine itself. It is the
-          // first step of every fetch and cannot be removed or reordered, so the
-          // user sees the real order instead of having to infer it from copy.
-          !search && h('li', { className: 'power-dsh-web-row', 'data-local': true, 'aria-labelledby': `${id}-local-name` },
-            h('div', { className: 'power-dsh-web-row-head' },
-              h('div', { className: 'power-dsh-web-row-identity' },
-                h('span', { id: `${id}-local-name`, className: 'power-dsh-web-name' }, t('webSearchLocalName')),
-                h('span', { className: 'power-dsh-web-tag' }, t('webSearchLocalTag')),
-                h('span', { className: 'power-dsh-web-dot', 'data-state': 'configured', 'aria-hidden': true })))),
           ...members.map((slotId, index) => rowOf(slotId, index))),
         rowError?.id === capability && errorFeedback({ t, message: rowError.message,
           code: 'PD-WEBSEARCH-SAVE', operation: 'addWebSearchSlot' }),
@@ -438,7 +544,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
 
   const renderPage = (props: PageSlotProps) => h(WebSearchPage, {
     ...props, source, catalogSource, loadCatalog,
-    addSlot, removeSlot, reorderChain, saveKey, probeBackend,
+    addSlot, removeSlot, reorderChain, saveKey, probeBackend, readQuota,
   });
 
   // The settings sidebar is this feature's only seat: it contributes no
@@ -456,6 +562,6 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         await loadCatalog();
       },
     }],
-    api: { catalogSource, loadCatalog, addSlot, removeSlot, reorderChain, saveKey, probeBackend },
+    api: { catalogSource, loadCatalog, addSlot, removeSlot, reorderChain, saveKey, probeBackend, readQuota },
   } satisfies ClientFeature;
 }
