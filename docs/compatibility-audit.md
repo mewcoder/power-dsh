@@ -305,6 +305,14 @@ macOS / DSH `0.2.2-rc.3` 已通过本地链接构建和原生界面刷新确认�
 
 最低基线 0.2.0-rc.1 的隔离 SDK 快照通过 1078 项测试（1073 通过、5 跳过、0 失败）与最终产物在旧 SDK 上的 7 项 Host 装配检查，日志标识 `0.2.0-rc.1-yOffrc`；随后额外的两项渲染器清理／减少动效单测在当前 SDK 通过。此旧 SDK 回归证明默认关闭不阻断既有装配，不推定旧版支持新增任务/装饰扩展点。最终 tarball 的日常桌面升级、Windows 页面和旧宿主的新功能仍未验收。
 
+### 0.1.4 公开发布核验（2026-11-18）
+
+发布提交 `e3f4c48c121a9c214c3175c397f31678e70c36c9` 已推送 main，annotated 标签 `v0.1.4` 指向同一提交。[Windows／Linux CI](https://github.com/mewcoder/power-dsh/actions/runs/44255186722) 与 [Release workflow](https://github.com/mewcoder/power-dsh/actions/runs/44255523553) 均成功；本机最终检查共 1080 项（1075 通过、5 跳过、0 失败），构建新鲜度、实际包与独立生产安装通过。[正式 Release](https://github.com/mewcoder/power-dsh/releases/tag/v0.1.4) 已公开并设为 Latest，附件名 `power-dsh.tgz`。
+
+干净 Git 导出的候选已通过独立生产安装：44 个文件、2,794,165 字节；SHA-256 为 `1307c3b9d810e742ad86ff2465876b05ca4672ee8b1b8ee0a33a538f5ac2e822`，integrity 为 `sha512-Q4Cthtoqc6iXkF1Z0PyIr/43AFC2Eq1jBb5MlWQbNm7c6t+bqKJhVuRHdhj7D0uTlfKMcn2QeIKXP00GMhKzgg==`。匿名下载版本地址与 Latest 地址均成功，与此候选逐字节一致，包清单为 `power-dsh@0.1.4` 且保留 `private: true`；不发布 npm，不覆盖附件、不移动标签。
+
+市场已收录条目仍使用固定 Latest 附件来源，无需重复投稿；不承诺客户端已刷新。新增功能的隔离真实页面验收见上方准备记录，未安装升级用户的日常桌面插件，也未新增最终压缩包的桌面原生升级或 Windows 页面验收。
+
 ### 0.1.0 公开发布核验（2026-11-15）
 
 重新认证后，发布提交 `c85a700fb4422779eb17c977040c0eba78c0381a` 已进入 `main`，annotated 标签 `v0.1.0` 指向同一提交。[Release workflow](https://github.com/mewcoder/power-dsh/actions/runs/43724729589) 成功，Linux 上 899 项行为测试中 893 通过、6 项平台检查跳过、0 失败，实际包与独立生产安装通过。[正式 Release](https://github.com/mewcoder/power-dsh/releases/tag/v0.1.0) 已公开并成为 Latest，附件为 `power-dsh.tgz`；既有市场 PR `awesome-dsh-plugin/awesome-dsh-plugin#14457` 已合并，上游条目保留固定 Latest 下载来源，无需重复投稿。
