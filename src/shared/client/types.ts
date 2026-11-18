@@ -64,8 +64,9 @@ export interface SlotProps extends PageSlotProps { wide: boolean; }
 /** Session-scoped composer slots additionally carry the owning session id. */
 export interface ComposerSlotProps extends PageSlotProps { sessionId?: string }
 export type SlotComponent = ReactTypes.ComponentType<PageSlotProps> | ReactTypes.ComponentType<SlotProps>
-  | ReactTypes.ComponentType<IconProps> | ReactTypes.ComponentType<ComposerSlotProps>;
-export interface SlotOptions { name?: string; id?: string; key?: string; order?: number; locale?: string; label?: () => string; }
+  | ReactTypes.ComponentType<IconProps> | ReactTypes.ComponentType<ComposerSlotProps>
+  | ReactTypes.ComponentType<{ hero?: boolean; children?: ReactTypes.ReactNode }>;
+export interface SlotOptions { name?: string; id?: string; key?: string; order?: number; priority?: number; locale?: string; label?: () => string; }
 export interface LayoutService {
   panelInfo: SnapshotSource<{ activePanelId?: string | null }>;
   selectPanel(panelId: string | null): void;

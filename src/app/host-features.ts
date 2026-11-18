@@ -1,4 +1,10 @@
 import type { HostFeature } from '../shared/host/feature.ts';
+import { definition as taskModelsDefinition } from '../features/task-models/definition.ts';
+import * as taskModelsConfig from '../features/task-models/config.ts';
+import * as taskModelsHost from '../features/task-models/host.ts';
+import { rpc as taskModelsRpc } from '../features/task-models/rpc.ts';
+import { definition as homeWhaleDefinition } from '../features/home-whale/definition.ts';
+import * as homeWhaleConfig from '../features/home-whale/config.ts';
 import { definition as memoryDefinition } from '../features/memory/definition.ts';
 import * as memoryConfig from '../features/memory/config.ts';
 import * as memoryHost from '../features/memory/host.ts';
@@ -95,6 +101,8 @@ import * as webSearchHost from '../features/web-search/host.ts';
 import { rpc as webSearchRpc } from '../features/web-search/rpc.ts';
 
 export const HOST_FEATURES = Object.freeze([
+  { definition: taskModelsDefinition, ...taskModelsConfig, ...taskModelsHost, rpc: taskModelsRpc },
+  { definition: homeWhaleDefinition, ...homeWhaleConfig },
   { definition: memoryDefinition, ...memoryConfig, ...memoryHost, rpc: memoryRpc },
   { definition: historySearchDefinition, ...historySearchConfig, ...historySearchHost },
   { definition: pluginUpdatesDefinition, ...pluginUpdatesConfig, ...pluginUpdatesHost, rpc: pluginUpdatesRpc },

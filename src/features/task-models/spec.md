@@ -1,0 +1,21 @@
+# 自动化模型选择
+
+## 标识、入口与范围
+
+功能 id `task-models`；设置 → power-dsh → 功能中的「自动化模型选择」默认关闭，开启后出现原生设置侧栏「自动化模型」页。先在原生自动化任务页创建任务，再在此按任务选择已配置模型与思考深度；不替换原生任务页，不修改 DSH 源码、安装包、调度数据或全局默认模型。
+
+## 配置与行为
+
+`taskModelsEnabled` 默认 false；隐藏配置 `taskModelBindings` 默认 `{}`，以 JSON 字符串保存任务 id 对应的 provider/model/可选 reasoningEffort，均持久化于插件自己的原生配置。写入由 owner-only RPC 串行处理，按配置原文校验冲突，保存失败保留原选择并可重试。模型来自原生 modelCatalog，切换模型清除旧思考深度；默认模型移除绑定，默认思考深度省略 effort。
+
+仅为「每次新建会话」与尚未执行的「新建后复用」任务设置模型。已有会话任务保持自身模型；新建后复用首次选定后，后续继续沿用该会话模型，页面说明其已绑定会话，不单凭残留配置声称已应用。关闭或卸载停止向新会话应用选择，保留绑定和任务，也不撤销已写入会话的模型。
+
+## 生命周期、权限与兼容
+
+Inspect 工具当前不可用。接口依据为官方 DSH 0.2.2-rc.1 提交 fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159：schedule.catalog、schedule/resolve-agent waterfall、agent/inbox/inserted、agent/pre-step、agent.model.select、sessionController.modelCatalog、llm.resolveCallConfig。schedule/resolve-agent 仅调用 next 后准备本次目标的选择；仅信任 source.kind=schedule 且符合原生固定 framing 的单条提醒，在 inbox 插入、driver 启动前选择模型。普通消息、批量已有会话提醒和无绑定任务不干预。模型不可用时阻止该会话的模型请求，显示可恢复错误，不偷偷改用默认模型；原生投递可能已记为完成，修正后需在原生任务页再次执行。
+
+服务缺席时页面报告不可用，不伪造空目录；不扫描会话内容、不增加计时调度或网络请求。事件、目标缓存和错误状态随子 context 释放。已激活的请求保持原生生命周期。
+
+## 验收条件与验证
+
+覆盖默认关闭、配置持久化和冲突、原生提醒识别、首次请求的模型/effort、全局默认不变、已有会话不受影响、不可用模型拒绝、关闭和卸载。静态检查、隔离集成与真实界面分别记录；历史兼容矩阵不自动覆盖这些新 API。

@@ -1,4 +1,11 @@
 import type { ClientFeatureSelection } from '../shared/client/types.ts';
+import { definition as taskModelsDefinition } from '../features/task-models/definition.ts';
+import { createClientFeature as taskModels } from '../features/task-models/client.ts';
+import { locales as taskModelsLocales } from '../features/task-models/locales.ts';
+import { rpc as taskModelsRpc } from '../features/task-models/rpc.ts';
+import { definition as homeWhaleDefinition } from '../features/home-whale/definition.ts';
+import { createClientFeature as homeWhale } from '../features/home-whale/client.ts';
+import { locales as homeWhaleLocales } from '../features/home-whale/locales.ts';
 import { createClientFeature as memory } from '../features/memory/client.ts';
 import { definition as memoryDefinition } from '../features/memory/definition.ts';
 import { locales as memoryLocales } from '../features/memory/locales.ts';
@@ -102,6 +109,8 @@ import { locales as webSearchLocales } from '../features/web-search/locales.ts';
 import { rpc as webSearchRpc } from '../features/web-search/rpc.ts';
 
 export const clientFeatures: ClientFeatureSelection[] = [
+  { definition: taskModelsDefinition, create: taskModels, locales: taskModelsLocales, rpc: taskModelsRpc },
+  { definition: homeWhaleDefinition, create: homeWhale, locales: homeWhaleLocales, rpc: [] },
   { definition: memoryDefinition, create: memory, locales: memoryLocales, rpc: memoryRpc },
   { definition: historySearchDefinition, create: historySearch, locales: historySearchLocales, rpc: [] },
   { definition: pluginUpdatesDefinition, create: pluginUpdates, locales: pluginUpdatesLocales, rpc: pluginUpdatesRpc },

@@ -484,6 +484,14 @@ export interface WebSearchCatalog {
   fetch: WebSearchChain;
 }
 /** One key-verification call against one backend. */
+export interface TaskModelSelection { provider: string; model: string; reasoningEffort?: string }
+export interface TaskModelOption { provider: string; model: string; label: string; efforts: { id: string; label: string }[] }
+export interface TaskModelRow {
+  id: string; title: string; target: 'new' | 'new_once' | 'session'; status: string;
+  selection: TaskModelSelection | null; error: string;
+}
+export interface TaskModelCatalog { revision: string; tasks: TaskModelRow[]; models: TaskModelOption[] }
+
 export interface WebSearchProbeDiagnostic {
   provider: 'tavily' | 'firecrawl' | 'tinyfish' | 'exa' | 'unknown';
   stage: 'credentials' | 'request' | 'response' | 'rpc';

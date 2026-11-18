@@ -1,4 +1,5 @@
 import type * as AccountFeature from '../features/account-blocking/host.ts';
+import type * as TaskModelsFeature from '../features/task-models/host.ts';
 import type * as MemoryFeature from '../features/memory/host.ts';
 import type * as TelemetryFeature from '../features/telemetry-blocking/host.ts';
 import type * as TodoFeature from '../features/todo-blocking/host.ts';
@@ -27,6 +28,7 @@ export const inject = ['settings', 'tools', 'clientModules', 'pluginManager', 't
 
 type ComposedService =
   typeof AccountFeature.methods & ReturnType<typeof AccountFeature.createHost>
+  & typeof TaskModelsFeature.methods & ReturnType<typeof TaskModelsFeature.createHost>
   & typeof MemoryFeature.methods & ReturnType<typeof MemoryFeature.createHost>
   & typeof TelemetryFeature.methods & ReturnType<typeof TelemetryFeature.createHost>
   & typeof TodoFeature.methods & ReturnType<typeof TodoFeature.createHost>

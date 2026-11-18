@@ -16,6 +16,9 @@ export interface WebSearchSlotPreference {
 }
 
 export interface Preferences {
+  taskModelsEnabled: boolean;
+  taskModelBindings: string;
+  homeWhaleFocusEnabled: boolean;
   showVersion: boolean;
   showThemeSwitcher: boolean;
   showRefreshButton: boolean;

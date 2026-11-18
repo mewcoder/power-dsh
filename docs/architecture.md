@@ -23,7 +23,7 @@ power-dsh 按用户特性组织 Host、Client、配置、协议、文案与测�
 | [src/app/host-features.ts](../src/app/host-features.ts)、[client-features.ts](../src/app/client-features.ts) | Host 与 Client 的显式特性选择 |
 | [src/app/host.ts](../src/app/host.ts)、[client.ts](../src/app/client.ts) | 宿主接入、共享状态与贡献装配，不实现各功能业务 |
 | [src/app/config.ts](../src/app/config.ts)、[rpc.ts](../src/app/rpc.ts) | 聚合配置和严格 RPC，拒绝重复与缺项 |
-| [src/features/](../src/features/) | 二十七项特性的定义、配置、实现、文案、主 Spec 和行为测试 |
+| [src/features/](../src/features/) | 二十九项特性的定义、配置、实现、文案、主 Spec 和行为测试 |
 | [src/shared/host/](../src/shared/host/)、[client/](../src/shared/client/)、[rpc/](../src/shared/rpc/) | 队列与原生启停、设置/目录/侧栏外壳、复用 codec |
 | [tests/integration/](../tests/integration/)、[shared/](../tests/shared/)、[helpers/](../tests/helpers/) | 完整装配与组合、共享机制测试及内存夹具 |
 | [assets/](../assets/)、[cordis.patch.yml](../cordis.patch.yml)、[screenshots.json](../screenshots.json) | 元数据、图标、Bundle 与市场截图入口 |
@@ -37,7 +37,7 @@ power-dsh 按用户特性组织 Host、Client、配置、协议、文案与测�
 
 ## Host 与 Client
 
-每个特性的 `definition.ts` 是纯元数据，`config.ts` 拥有本功能 schema；有 Host 行为时由 `host.ts` 提供实例创建与具名方法。装配只组合这些声明，保留受控配置键、默认值与操作顺序。具体行为由[二十七项主 Spec](README.md#功能规格spec)维护。
+每个特性的 `definition.ts` 是纯元数据，`config.ts` 拥有本功能 schema；有 Host 行为时由 `host.ts` 提供实例创建与具名方法。装配只组合这些声明，保留受控配置键、默认值与操作顺序。具体行为由[功能主 Spec](README.md#功能规格spec)维护。
 
 Host 负责持久配置、文件、进程、策略与安全数据投影；Client 负责设置贡献、页面、观察与交互。普通偏好通过原生 `configForms` 保存；精简等操作由设置界面通过 owner-only RPC 调用 Host 方法，不监听布尔配置异步执行。不注册 `power_dsh_settings` 对话工具，不向模型暴露插件偏好读写；记忆模块的 `power_dsh_memory` 工具独立保留。可选服务在特性内部子 context 接入，缺少辅助服务不应阻断其他入口。
 
@@ -122,6 +122,8 @@ Host 在功能子 context 中取得 `web` 服务，注册一个搜索提供方�
 已确认交接的助手可跨 Host 退出完成单次同路径重开，随后结束。macOS 使用 detached AppleScript 正常退出；Windows 通过 Explorer 交接 PowerShell 助手，确认后仅结束已绑定身份的当前进程树，确认旧树退出后重开。取消、交接失败或身份失效不结束进程，过期不补执行。该跨退出生命周期例外、平台范围和实际验收限制见[重启 Spec](../src/features/restart-button/spec.md)。
 
 ## 生命周期与扩展
+
+[自动化模型](../src/features/task-models/spec.md)把按任务的模型与 effort 保存于插件配置，仅通过原生调度激活 waterfall 和 inbox 插入事件在新会话第一次请求前选择，不写宿主任务表或全局默认模型。独立配置页使用设置 section，保留原生自动化任务编辑器。[首页鲸鱼](../src/features/home-whale/spec.md)只在原生 hero.frame 装饰 slot 的同 id 下提供优先级注册，透传全部 children；自有画布与首个主动输入手势归该组件，不修改根节点、其他注册项、宿主文件或布局。
 
 各功能的监听、订阅、观察器、样式、投影、租约和进程归属其 context 或组件，卸载后释放。模块选择、功能开关及内部条目持久状态分别处理，不能把移除界面当作恢复所有配置。
 

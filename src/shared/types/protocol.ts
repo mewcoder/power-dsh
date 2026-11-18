@@ -4,9 +4,12 @@ import type { NotificationTransport, PluginRelease } from './wire.ts';
 import type { SearchContentResult } from './wire.ts';
 import type { MemoryCatalog, MemoryFileDetail, MemoryWriteResult, MemoryModels, MemoryCleanupPreview, MemoryCleanupResult, MemorySourceResult } from './wire.ts';
 import type { WebSearchCatalog, WebSearchProbe, WebSearchQuota } from './wire.ts';
+import type { TaskModelCatalog } from './wire.ts';
 
 /** Named Host operations, before the transport adds its result envelope. */
 export interface PowerDshMethods {
+  readTaskModels(): Promise<TaskModelCatalog>;
+  saveTaskModel(id: string, selection: string, revision: string): Promise<TaskModelCatalog>;
   memoryCleanupModels(): Promise<MemoryModels>;
   prepareMemoryCleanup(scope: string, model: string, token: string): Promise<MemoryCleanupPreview>;
   cancelMemoryCleanup(token: string): Promise<boolean>;

@@ -15,6 +15,9 @@ interface WebSearchSlotPreference {
   provider: string;
 }
 interface Preferences {
+  taskModelsEnabled: boolean;
+  taskModelBindings: string;
+  homeWhaleFocusEnabled: boolean;
   showVersion: boolean;
   showThemeSwitcher: boolean;
   showRefreshButton: boolean;
@@ -68,7 +71,7 @@ interface LiveValue<T> {
   get(): T;
 }
 type LivePreferences = { [K in PreferenceKey]: LiveValue<Preferences[K]>; };
-type FeatureId = 'version-display' | 'appearance-shortcut' | 'refresh-button' | 'restart-button' | 'notifications' | 'personalization' | 'skills' | 'mcp' | 'account-blocking' | 'search-blocking' | 'telemetry-blocking' | 'todo-blocking' | 'plan-blocking' | 'goal-blocking' | 'double-click-rename' | 'thinking-effort' | 'flowing-background' | 'archive' | 'usage-stats' | 'projects' | 'wallpaper' | 'plugin-updates' | 'standalone-page' | 'search-popup' | 'memory' | 'history-search' | 'web-search';
+type FeatureId = 'version-display' | 'appearance-shortcut' | 'refresh-button' | 'restart-button' | 'task-models' | 'home-whale' | 'notifications' | 'personalization' | 'skills' | 'mcp' | 'account-blocking' | 'search-blocking' | 'telemetry-blocking' | 'todo-blocking' | 'plan-blocking' | 'goal-blocking' | 'double-click-rename' | 'thinking-effort' | 'flowing-background' | 'archive' | 'usage-stats' | 'projects' | 'wallpaper' | 'plugin-updates' | 'standalone-page' | 'search-popup' | 'memory' | 'history-search' | 'web-search';
 type FeatureCategory = 'general' | 'interface' | 'enhance' | 'management' | 'simplify' | 'other';
 interface FeatureDefinition {
   readonly id: FeatureId;
@@ -616,6 +619,33 @@ interface WebSearchCatalog {
   fetch: WebSearchChain;
 }
 /** One key-verification call against one backend. */
+interface TaskModelSelection {
+  provider: string;
+  model: string;
+  reasoningEffort?: string;
+}
+interface TaskModelOption {
+  provider: string;
+  model: string;
+  label: string;
+  efforts: {
+    id: string;
+    label: string;
+  }[];
+}
+interface TaskModelRow {
+  id: string;
+  title: string;
+  target: 'new' | 'new_once' | 'session';
+  status: string;
+  selection: TaskModelSelection | null;
+  error: string;
+}
+interface TaskModelCatalog {
+  revision: string;
+  tasks: TaskModelRow[];
+  models: TaskModelOption[];
+}
 interface WebSearchProbeDiagnostic {
   provider: 'tavily' | 'firecrawl' | 'tinyfish' | 'exa' | 'unknown';
   stage: 'credentials' | 'request' | 'response' | 'rpc';
@@ -658,6 +688,8 @@ type WebSearchQuota = {
 };
 /** Named Host operations, before the transport adds its result envelope. */
 interface PowerDshMethods {
+  readTaskModels(): Promise<TaskModelCatalog>;
+  saveTaskModel(id: string, selection: string, revision: string): Promise<TaskModelCatalog>;
   memoryCleanupModels(): Promise<MemoryModels>;
   prepareMemoryCleanup(scope: string, model: string, token: string): Promise<MemoryCleanupPreview>;
   cancelMemoryCleanup(token: string): Promise<boolean>;
@@ -1083,6 +1115,11 @@ interface NativeScope {
 }
 type CreateScope = (ctx: NativeContext, key: unknown) => NativeScope;
 interface NativeEvents {
+  'schedule/resolve-agent': [id: string, next: () => Promise<NativeAgent>];
+  'agent/inbox/inserted': [event: {
+    agent: NativeAgent;
+    message: unknown;
+  }];
   'session/created': [session: NativeSearchSession];
   'session/disposed': [session: NativeSearchSession];
   'session/event': [session: NativeSearchSession, event: unknown];

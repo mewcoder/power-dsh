@@ -1,4 +1,5 @@
 import type { RpcDescriptor } from '../shared/types/protocol.ts';
+import { rpc as taskModelsRpc } from '../features/task-models/rpc.ts';
 import { rpc as memoryRpc } from '../features/memory/rpc.ts';
 import { NOTIFICATION_TRANSPORT_RPC } from '../features/notifications/rpc.ts';
 // Browser-safe aggregation of the feature-owned wire contracts.
@@ -59,6 +60,7 @@ export function composeRpc<T extends RpcDescriptor[]>(descriptors: T): T {
 }
 
 export const MOD_RPC = composeRpc([
+  ...taskModelsRpc,
   ...memoryRpc,
   READ_PLUGIN_RELEASE_RPC,
   PLUGIN_RUNTIME_VERSION_RPC,

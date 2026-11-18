@@ -297,6 +297,14 @@ macOS / DSH `0.2.2-rc.3` 已通过本地链接构建和原生界面刷新确认�
 
 市场 PR `awesome-dsh-plugin/awesome-dsh-plugin#14457` 已合并，上游条目仍使用固定 Latest 下载地址，无需重复投稿；不承诺每个客户端已刷新。实际宿主验收与未验证项沿用上方准备回归，没有新增最终 tarball 原生升级、Windows 完整页面、真实鼠标拖拽或 Exa／Firecrawl／TinyFish 账户调用验收。
 
+### 0.1.4 发版准备回归（2026-11-18）
+
+本轮只在 power-dsh 实现自动化模型选择和首页鲸鱼触发，不发布 DSH 定制版、不写宿主源码、安装包或日常 profile。新增两份主 Spec、默认关闭的持久开关与严格 owner-only 配置 RPC；模型选择使用原生调度激活 waterfall 与 inbox 插入事件，在第一次请求捕获模型前应用。已有会话目标沿用会话模型，按任务绑定不更改全局默认。
+
+已通过原生 DSH 0.2.2-rc.1 的 Agent 循环定向检查，以及真实 Web 组合中以本地 Bundle 加载编译后插件的端到端检查：开关、模型与 effort 保存、刷新保留、实际任务请求与全局默认不变、浅深主题与 430px 窄屏、鲸鱼首次点击、重复不播放、离开再进入后的 Tab 触发、关闭后恢复原生装饰，浏览器无未捕获错误和异常启动警告。该测试使用隔离 profile 与确定性适配器，不调用外部模型、不替换用户桌面应用；原生 Agent/调度/slot 接入均未因插件实现修改。运行日志标识为 `power-dsh-native-final.log`，真实截图保留在本地预览目录，不随包发送。
+
+最低基线 0.2.0-rc.1 的隔离 SDK 快照通过 1078 项测试（1073 通过、5 跳过、0 失败）与最终产物在旧 SDK 上的 7 项 Host 装配检查，日志标识 `0.2.0-rc.1-yOffrc`；随后额外的两项渲染器清理／减少动效单测在当前 SDK 通过。此旧 SDK 回归证明默认关闭不阻断既有装配，不推定旧版支持新增任务/装饰扩展点。最终 tarball 的日常桌面升级、Windows 页面和旧宿主的新功能仍未验收。
+
 ### 0.1.0 公开发布核验（2026-11-15）
 
 重新认证后，发布提交 `c85a700fb4422779eb17c977040c0eba78c0381a` 已进入 `main`，annotated 标签 `v0.1.0` 指向同一提交。[Release workflow](https://github.com/mewcoder/power-dsh/actions/runs/43724729589) 成功，Linux 上 899 项行为测试中 893 通过、6 项平台检查跳过、0 失败，实际包与独立生产安装通过。[正式 Release](https://github.com/mewcoder/power-dsh/releases/tag/v0.1.0) 已公开并成为 Latest，附件为 `power-dsh.tgz`；既有市场 PR `awesome-dsh-plugin/awesome-dsh-plugin#14457` 已合并，上游条目保留固定 Latest 下载来源，无需重复投稿。

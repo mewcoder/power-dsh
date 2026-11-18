@@ -60,6 +60,462 @@ var OperationQueue = class {
 	}
 };
 
+// src/features/task-models/definition.ts
+const definition$28 = Object.freeze({
+	id: "task-models",
+	category: "enhance",
+	order: 15,
+	keys: Object.freeze(["taskModelsEnabled", "taskModelBindings"]),
+	spec: "src/features/task-models/spec.md"
+});
+
+// src/features/task-models/config.ts
+var config_exports$28 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$28 });
+const configFields$28 = {
+	taskModelsEnabled: z.boolean().default(false).volatile(),
+	taskModelBindings: z.string().default("{}").volatile()
+};
+
+// src/shared/types/protocol.ts
+function isArray(value) {
+	return Array.isArray(value);
+}
+function isStringArray(value) {
+	return isArray(value) && value.every((item) => typeof item === "string");
+}
+/** Validate external wire objects before reading their fields. */
+function isRecord$2(value) {
+	return typeof value === "object" && value !== null;
+}
+function hasStrings(value, keys) {
+	return keys.every((key) => typeof value[key] === "string");
+}
+function hasBooleans(value, keys) {
+	return keys.every((key) => typeof value[key] === "boolean");
+}
+function isOneOf(value, values) {
+	return typeof value === "string" && values.includes(value);
+}
+
+// src/features/task-models/types.ts
+function parseSelection(value) {
+	if (!isRecord$2(value) || Object.keys(value).some((key) => ![
+		"provider",
+		"model",
+		"reasoningEffort"
+	].includes(key)) || typeof value.provider !== "string" || !value.provider || value.provider.length > 200 || typeof value.model !== "string" || !value.model || value.model.length > 200 || value.reasoningEffort !== void 0 && (typeof value.reasoningEffort !== "string" || !value.reasoningEffort || value.reasoningEffort.length > 100)) throw new Error("taskModelsInvalid");
+	return {
+		provider: value.provider,
+		model: value.model,
+		...value.reasoningEffort === void 0 ? {} : { reasoningEffort: value.reasoningEffort }
+	};
+}
+function parseBindings(text) {
+	if (text.length > 1e6) throw new Error("taskModelsInvalid");
+	const value = JSON.parse(text);
+	if (!isRecord$2(value) || Array.isArray(value) || Object.keys(value).length > 1e3) throw new Error("taskModelsInvalid");
+	return new Map(Object.entries(value).map(([id, selection]) => {
+		if (!id || id.length > 200) throw new Error("taskModelsInvalid");
+		return [id, parseSelection(selection)];
+	}));
+}
+function parseModels(value) {
+	if (!isRecord$2(value) || !Array.isArray(value.groups)) throw new Error("taskModelsUnavailable");
+	const models = [];
+	for (const group of value.groups) {
+		if (!isRecord$2(group) || typeof group.id !== "string" || !Array.isArray(group.models)) throw new Error("taskModelsUnavailable");
+		for (const model of group.models) {
+			if (!isRecord$2(model) || typeof model.id !== "string" || typeof model.name !== "string") throw new Error("taskModelsUnavailable");
+			const reasoning = isRecord$2(model.reasoning) ? model.reasoning : null;
+			const efforts = Array.isArray(reasoning?.efforts) ? reasoning.efforts.map((effort) => {
+				if (!isRecord$2(effort) || typeof effort.id !== "string") throw new Error("taskModelsUnavailable");
+				return {
+					id: effort.id,
+					label: typeof effort.name === "string" ? effort.name : effort.id
+				};
+			}) : [];
+			models.push({
+				provider: group.id,
+				model: model.id,
+				label: `${typeof group.name === "string" ? group.name : group.id} · ${model.name}`,
+				efforts
+			});
+		}
+	}
+	if (models.length > 1e3) throw new Error("taskModelsUnavailable");
+	return models;
+}
+function requireModel(selection, models) {
+	const model = models.find((row) => row.provider === selection.provider && row.model === selection.model);
+	if (!model || selection.reasoningEffort !== void 0 && !model.efforts.some((effort) => effort.id === selection.reasoningEffort)) throw new Error("taskModelsModelUnavailable");
+}
+function reminderTaskId(message) {
+	if (!isRecord$2(message) || !isRecord$2(message.source) || message.source.kind !== "schedule" || !Array.isArray(message.content) || message.content.length !== 1) return null;
+	const block = message.content[0];
+	if (!isRecord$2(block) || block.type !== "text" || typeof block.text !== "string") return null;
+	const lines = block.text.split("\n", 4);
+	if (lines[0] !== "[SCHEDULE REMINDER]" || lines[1] !== "This is a scheduled message from the user" || !lines[2]?.startsWith("schedule_id_json: ")) return null;
+	try {
+		const id = JSON.parse(lines[2].slice(18));
+		return typeof id === "string" && id.length > 0 && id.length <= 200 ? id : null;
+	} catch {
+		return null;
+	}
+}
+
+// src/features/task-models/service.ts
+var TaskModels = class {
+	ctx;
+	config;
+	ensure;
+	runtime = null;
+	prepared = /* @__PURE__ */ new WeakMap();
+	blocked = /* @__PURE__ */ new WeakSet();
+	errors = /* @__PURE__ */ new Map();
+	generation = 0;
+	constructor(ctx, config, ensure) {
+		this.ctx = ctx;
+		this.config = config;
+		this.ensure = ensure;
+	}
+	enabled() {
+		return this.config.taskModelsEnabled?.get() === true;
+	}
+	revision() {
+		return this.config.taskModelBindings?.get() ?? "{}";
+	}
+	available() {
+		this.ensure();
+		if (!this.enabled() || !this.runtime) throw new Error("taskModelsUnavailable");
+		return this.runtime;
+	}
+	async catalog() {
+		const runtime = this.available();
+		const [tasks, catalog] = await Promise.all([runtime.tasks(), runtime.catalog()]);
+		this.available();
+		if (this.runtime !== runtime) throw new Error("taskModelsUnavailable");
+		const revision = this.revision();
+		const bindings = parseBindings(revision);
+		const models = parseModels(catalog);
+		return {
+			revision,
+			models,
+			tasks: tasks.map((task) => {
+				const selection = bindings.get(task.id) ?? null;
+				let error = this.errors.get(task.id) ?? "";
+				if (selection) try {
+					requireModel(selection, models);
+				} catch {
+					error = "taskModelsModelUnavailable";
+				}
+				return {
+					id: task.id,
+					title: task.title,
+					target: task.target.kind,
+					status: task.status,
+					selection,
+					error
+				};
+			})
+		};
+	}
+	async save(id, text, revision) {
+		const runtime = this.available();
+		if (!id || id.length > 200 || text.length > 2e3) throw new Error("taskModelsInvalid");
+		const selection = text === "" ? null : parseSelection(JSON.parse(text));
+		const task = (await runtime.tasks()).find((row) => row.id === id);
+		if (!task) throw new Error("taskModelsMissing");
+		if (selection) {
+			if (task.target.kind === "session") throw new Error("taskModelsExistingSession");
+			requireModel(selection, parseModels(await runtime.catalog()));
+			try {
+				await runtime.resolve(selection);
+			} catch {
+				throw new Error("taskModelsModelUnavailable");
+			}
+		}
+		this.available();
+		if (runtime !== this.runtime) throw new Error("taskModelsUnavailable");
+		await this.ctx.configEditor.edit(this.ctx.fiber.entry, (raw) => {
+			this.available();
+			const current = typeof raw.taskModelBindings === "string" ? raw.taskModelBindings : this.revision();
+			if (current !== revision) throw new Error("taskModelsConflict");
+			const bindings = parseBindings(current);
+			if (selection) bindings.set(id, selection);
+			else bindings.delete(id);
+			if (bindings.size > 1e3) throw new Error("taskModelsInvalid");
+			return {
+				...raw,
+				taskModelBindings: JSON.stringify(Object.fromEntries(bindings))
+			};
+		});
+		this.available();
+		this.errors.delete(id);
+		return this.catalog();
+	}
+	async prepare(agent) {
+		if (!this.enabled() || !this.runtime) return;
+		if (typeof agent.model?.select !== "function") throw new Error("taskModelsUnavailable");
+		const runtime = this.runtime;
+		const generation = this.generation;
+		const bindings = parseBindings(this.revision());
+		if (!bindings.size) return;
+		const tasks = (await runtime.tasks()).filter((task) => bindings.has(task.id) && task.target.kind !== "session" && (task.target.kind !== "new_once" || task.target.sessionId === agent.id));
+		if (!tasks.length || !this.enabled() || this.runtime !== runtime) return;
+		const catalog = await runtime.catalog();
+		if (!this.enabled() || this.runtime !== runtime) return;
+		if (generation !== this.generation) throw new Error("taskModelsConflict");
+		const models = parseModels(catalog);
+		const prepared = /* @__PURE__ */ new Map();
+		for (const task of tasks) {
+			const selection = bindings.get(task.id);
+			if (!selection || task.target.kind === "session" || task.target.kind === "new_once" && task.target.sessionId !== agent.id) continue;
+			try {
+				requireModel(selection, models);
+				await runtime.resolve(selection);
+				prepared.set(task.id, selection);
+			} catch {
+				prepared.set(task.id, null);
+			}
+		}
+		if (this.enabled() && this.runtime === runtime) {
+			if (generation !== this.generation) throw new Error("taskModelsConflict");
+			this.prepared.set(agent, prepared);
+		}
+	}
+	inserted(agent, message) {
+		if (!this.enabled()) return;
+		const id = reminderTaskId(message);
+		if (!id) return;
+		const prepared = this.prepared.get(agent);
+		if (!prepared?.has(id)) return;
+		const selection = prepared.get(id);
+		if (!selection) {
+			this.blocked.add(agent);
+			this.errors.set(id, "taskModelsModelUnavailable");
+			return;
+		}
+		try {
+			agent.model.select(selection);
+			this.blocked.delete(agent);
+			this.errors.delete(id);
+		} catch {
+			this.blocked.add(agent);
+			this.errors.set(id, "taskModelsModelUnavailable");
+		}
+	}
+	check(agent) {
+		if (this.enabled() && this.blocked.has(agent)) throw new Error("Scheduled model unavailable. Review Settings → power-dsh → Task models, then run the task again.");
+	}
+	clear() {
+		this.generation++;
+		this.prepared = /* @__PURE__ */ new WeakMap();
+		this.blocked = /* @__PURE__ */ new WeakSet();
+		this.errors.clear();
+	}
+};
+
+// src/features/task-models/host.ts
+var host_exports$20 = /* @__PURE__ */ __exportAll({
+	createHost: () => createHost$20,
+	methods: () => methods$19
+});
+function safeError(failure) {
+	const message = failure instanceof Error ? failure.message : "";
+	return new Error(/^taskModels(?:Unavailable|ModelUnavailable|Conflict|Missing|ExistingSession|Invalid)$/.test(message) ? message : "taskModelsFailed");
+}
+function createHost$20(ctx, config, { owner, ensureActive }) {
+	const taskModels = new TaskModels(owner, config, ensureActive);
+	ctx.inject([
+		"schedule",
+		"sessionController",
+		"llm"
+	], (child) => {
+		const schedule = Reflect.get(child, "schedule");
+		const controller = child.sessionController;
+		const llm = Reflect.get(child, "llm");
+		if (!schedule?.catalog || !controller?.modelCatalog || !llm?.resolveCallConfig) return;
+		taskModels.runtime = {
+			tasks: () => schedule.catalog(),
+			catalog: () => controller.modelCatalog(),
+			resolve: (selection) => llm.resolveCallConfig(selection)
+		};
+		child.on("schedule/resolve-agent", async (_id, next) => {
+			const agent = await next();
+			try {
+				await taskModels.prepare(agent);
+			} catch (failure) {
+				throw safeError(failure);
+			}
+			return agent;
+		}, { prepend: true });
+		child.on("agent/inbox/inserted", ({ agent, message }) => taskModels.inserted(agent, message));
+		child.on("agent/pre-step", ({ agent }, next) => {
+			taskModels.check(agent);
+			return next();
+		}, { prepend: true });
+		child.effect(() => () => {
+			taskModels.runtime = null;
+			taskModels.clear();
+		});
+	});
+	ctx.on("settings/document-updated", (namespace) => {
+		if (namespace === owner.fiber.entry.options.id) taskModels.clear();
+	});
+	ctx.effect(() => () => taskModels.clear());
+	return { taskModels };
+}
+const methods$19 = {
+	readTaskModels() {
+		return this.run(() => this.taskModels.catalog().catch((failure) => {
+			throw safeError(failure);
+		}));
+	},
+	saveTaskModel(id, selection, revision) {
+		return this.run(() => this.taskModels.save(id, selection, revision).catch((failure) => {
+			throw safeError(failure);
+		}));
+	}
+};
+
+// src/shared/rpc/codecs.ts
+const booleanCodec = {
+	mode: "strict",
+	typeSymbol: "boolean",
+	create: () => ({ parse(value) {
+		if (typeof value !== "boolean") throw new TypeError("Expected a boolean");
+		return value;
+	} })
+};
+const stringCodec = {
+	mode: "strict",
+	typeSymbol: "string",
+	create: () => ({ parse(value) {
+		if (typeof value !== "string") throw new TypeError("Expected a string");
+		return value;
+	} })
+};
+function policyRpc(method, resultType) {
+	return {
+		id: `power-dsh#powerDsh/${method}`,
+		service: "powerDsh",
+		namespace: "powerDsh",
+		method,
+		invocation: { kind: "direct" },
+		parameters: [{
+			name: "blocked",
+			wire: "blocked",
+			source: "json",
+			codec: booleanCodec
+		}],
+		result: {
+			mode: "strict",
+			typeSymbol: `power-dsh#${resultType}`,
+			create: () => ({ parse(value) {
+				if (!isRecord$2(value) || typeof value.blocked !== "boolean") throw new TypeError("Invalid policy result");
+				return { blocked: value.blocked };
+			} })
+		}
+	};
+}
+const numberCodec = {
+	mode: "strict",
+	typeSymbol: "number",
+	create: () => ({ parse(value) {
+		if (typeof value !== "number" || !Number.isSafeInteger(value)) throw new TypeError("Expected a safe integer");
+		return value;
+	} })
+};
+const stringArrayCodec$1 = {
+	mode: "strict",
+	typeSymbol: "string[]",
+	create: () => ({ parse(value) {
+		if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) throw new TypeError("Expected a string array");
+		return value;
+	} })
+};
+
+// src/features/task-models/rpc.ts
+const catalogCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#TaskModelCatalog",
+	create: () => ({ parse(value) {
+		if (!isRecord$2(value) || typeof value.revision !== "string" || value.revision.length > 1e6 || !Array.isArray(value.tasks) || !Array.isArray(value.models) || value.tasks.length > 1e4 || value.models.length > 1e3) throw new TypeError("taskModelsInvalid");
+		const tasks = value.tasks.map((task) => {
+			if (!isRecord$2(task) || typeof task.id !== "string" || typeof task.title !== "string" || ![
+				"session",
+				"new",
+				"new_once"
+			].includes(String(task.target)) || typeof task.status !== "string" || typeof task.error !== "string") throw new TypeError("taskModelsInvalid");
+			return {
+				id: task.id,
+				title: task.title,
+				target: task.target,
+				status: task.status,
+				error: task.error,
+				selection: task.selection === null ? null : parseSelection(task.selection)
+			};
+		});
+		const models = value.models.map((model) => {
+			const selection = parseSelection(isRecord$2(model) ? {
+				provider: model.provider,
+				model: model.model
+			} : model);
+			if (!isRecord$2(model) || typeof model.label !== "string" || !Array.isArray(model.efforts) || model.efforts.length > 100) throw new TypeError("taskModelsInvalid");
+			return {
+				...selection,
+				label: model.label,
+				efforts: model.efforts.map((effort) => {
+					if (!isRecord$2(effort) || typeof effort.id !== "string" || typeof effort.label !== "string") throw new TypeError("taskModelsInvalid");
+					return {
+						id: effort.id,
+						label: effort.label
+					};
+				})
+			};
+		});
+		return {
+			revision: value.revision,
+			tasks,
+			models
+		};
+	} })
+};
+function descriptor$3(method, fields) {
+	return {
+		id: `power-dsh#powerDsh/${method}`,
+		service: "powerDsh",
+		namespace: "powerDsh",
+		method,
+		invocation: { kind: "direct" },
+		parameters: fields.map((name) => ({
+			name,
+			wire: name,
+			source: "json",
+			codec: stringCodec
+		})),
+		result: catalogCodec
+	};
+}
+const rpc$19 = [descriptor$3("readTaskModels", []), descriptor$3("saveTaskModel", [
+	"id",
+	"selection",
+	"revision"
+])];
+
+// src/features/home-whale/definition.ts
+const definition$27 = Object.freeze({
+	id: "home-whale",
+	category: "interface",
+	order: 2,
+	keys: Object.freeze(["homeWhaleFocusEnabled"]),
+	spec: "src/features/home-whale/spec.md"
+});
+
+// src/features/home-whale/config.ts
+var config_exports$27 = /* @__PURE__ */ __exportAll({ configFields: () => configFields$27 });
+const configFields$27 = { homeWhaleFocusEnabled: z.boolean().default(false).volatile() };
+
 // src/features/memory/definition.ts
 const definition$26 = Object.freeze({
 	id: "memory",
@@ -116,27 +572,6 @@ const MEMORY_ERRORS = [
 function memoryError(error, fallback = "memoryWriteFailed") {
 	const message = error instanceof Error ? error.message : "";
 	return MEMORY_ERRORS.find((key) => message === key) ?? fallback;
-}
-
-// src/shared/types/protocol.ts
-function isArray(value) {
-	return Array.isArray(value);
-}
-function isStringArray(value) {
-	return isArray(value) && value.every((item) => typeof item === "string");
-}
-/** Validate external wire objects before reading their fields. */
-function isRecord$2(value) {
-	return typeof value === "object" && value !== null;
-}
-function hasStrings(value, keys) {
-	return keys.every((key) => typeof value[key] === "string");
-}
-function hasBooleans(value, keys) {
-	return keys.every((key) => typeof value[key] === "boolean");
-}
-function isOneOf(value, values) {
-	return typeof value === "string" && values.includes(value);
 }
 
 // src/features/memory/provenance.ts
@@ -1675,63 +2110,6 @@ const methods$18 = {
 	}
 };
 
-// src/shared/rpc/codecs.ts
-const booleanCodec = {
-	mode: "strict",
-	typeSymbol: "boolean",
-	create: () => ({ parse(value) {
-		if (typeof value !== "boolean") throw new TypeError("Expected a boolean");
-		return value;
-	} })
-};
-const stringCodec = {
-	mode: "strict",
-	typeSymbol: "string",
-	create: () => ({ parse(value) {
-		if (typeof value !== "string") throw new TypeError("Expected a string");
-		return value;
-	} })
-};
-function policyRpc(method, resultType) {
-	return {
-		id: `power-dsh#powerDsh/${method}`,
-		service: "powerDsh",
-		namespace: "powerDsh",
-		method,
-		invocation: { kind: "direct" },
-		parameters: [{
-			name: "blocked",
-			wire: "blocked",
-			source: "json",
-			codec: booleanCodec
-		}],
-		result: {
-			mode: "strict",
-			typeSymbol: `power-dsh#${resultType}`,
-			create: () => ({ parse(value) {
-				if (!isRecord$2(value) || typeof value.blocked !== "boolean") throw new TypeError("Invalid policy result");
-				return { blocked: value.blocked };
-			} })
-		}
-	};
-}
-const numberCodec = {
-	mode: "strict",
-	typeSymbol: "number",
-	create: () => ({ parse(value) {
-		if (typeof value !== "number" || !Number.isSafeInteger(value)) throw new TypeError("Expected a safe integer");
-		return value;
-	} })
-};
-const stringArrayCodec$1 = {
-	mode: "strict",
-	typeSymbol: "string[]",
-	create: () => ({ parse(value) {
-		if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) throw new TypeError("Expected a string array");
-		return value;
-	} })
-};
-
 // src/features/memory/rpc.ts
 function parseMemoryEntry(value) {
 	if (!isRecord$2(value) || !hasStrings(value, [
@@ -2645,7 +3023,7 @@ var PluginReleases = class {
 };
 
 // package.json
-var version = "0.1.3";
+var version = "0.1.4";
 
 // src/features/plugin-updates/host.ts
 var host_exports$17 = /* @__PURE__ */ __exportAll({
@@ -12601,6 +12979,16 @@ const rpc = [
 // src/app/host-features.ts
 const HOST_FEATURES = Object.freeze([
 	{
+		definition: definition$28,
+		...config_exports$28,
+		...host_exports$20,
+		rpc: rpc$19
+	},
+	{
+		definition: definition$27,
+		...config_exports$27
+	},
+	{
 		definition: definition$26,
 		...config_exports$26,
 		...host_exports$19,
@@ -12762,6 +13150,7 @@ function composeRpc(descriptors) {
 	return descriptors;
 }
 const MOD_RPC = composeRpc([
+	...rpc$19,
 	...rpc$18,
 	READ_PLUGIN_RELEASE_RPC,
 	PLUGIN_RUNTIME_VERSION_RPC,

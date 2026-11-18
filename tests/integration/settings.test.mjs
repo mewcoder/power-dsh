@@ -117,8 +117,8 @@ test('settings default to General with custom wallpaper first in Interface', asy
   const savedPreferences = structuredClone(app.settingsProps().source.getSnapshot().value);
   const groups = {
     general: ['notificationSoundEnabled'],
-    interface: ['wallpaperEnabled', 'showThinkingEffortSwitcher', 'showThemeSwitcher', 'showVersion', 'standalonePageEnabled', 'searchPopupEnabled'],
-    enhancements: ['webSearchEnabled', 'historySearchEnabled'],
+    interface: ['wallpaperEnabled', 'homeWhaleFocusEnabled', 'showThinkingEffortSwitcher', 'showThemeSwitcher', 'showVersion', 'standalonePageEnabled', 'searchPopupEnabled'],
+    enhancements: ['webSearchEnabled', 'taskModelsEnabled', 'historySearchEnabled'],
     management: ['personalizationEnabled', 'memoryEnabled', 'skillManagerEnabled', 'mcpManagerEnabled', 'projectManagerEnabled', 'archiveManagerEnabled', 'usageStatsEnabled'],
     simplify: ['blockOfficialAccount', 'blockOfficialSearch', 'blockOfficialTelemetry', 'blockTodo', 'blockPlan', 'blockGoal'],
     other: ['showRefreshButton', 'showRestartButton', 'blockDoubleClickRename'],

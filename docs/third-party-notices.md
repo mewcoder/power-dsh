@@ -2,7 +2,7 @@
 
 ## DeepSeek Harness — MIT
 
-用于改编的原生目录布局与交互样式。
+用于改编的原生目录布局与交互样式，以及首页鲸鱼图集（官方仓库提交 `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` 的 `packages/client/ui-brand-official/src/client/assets/breach-atlas.webp`，以 data URL 内置于插件）。图集复用官方 MIT 授权，触发与渲染由插件独立实现。
 
 ```text
 MIT License

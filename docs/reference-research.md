@@ -1,5 +1,11 @@
 # 参考研究
 
+## 自动化模型与首页鲸鱼（2026-11-18）
+
+从本地市场目录提交 `e190236` 检索 automation 条目，另只读核对 [alpacachen/dsh-automation](https://github.com/alpacachen/dsh-automation/tree/0ea9d848da45d8f47bc85ef09ca995f8fc7e80e6) 的 README、MIT 许可证、任务模型选择与 `agent-configuration.ts`。其维护独立调度，已有会话目标忽略任务执行模型；这里只核对独立配置与 `llm.resolveCallConfig` 的能力校验，没有复制代码、安装依赖或运行该插件。
+
+本功能采用 DSH 0.2.2-rc.1 提交 `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` 的 schedule/resolve-agent、agent/inbox/inserted 与 agent.model.select，插入前完成校验、driver 启动前选择，不用会连带更改全局默认的 sessionController.selectModel。任务模型界面用原生设置 section；不接管或改写原生任务页。鲸鱼复用同提交的 MIT 图集，通过公开 hero.frame 装饰 slot 的同 id 优先级注册提供自有触发与渲染，不修改 DSH 源码或安装包。Inspect 本轮不可用；图集来源与随包许可见[第三方声明](third-party-notices.md)。
+
 ## 实验性历史对话检索
 
 2026-11-16 按轻量实效方向补齐原文与纠正查询。本环境再次搜索 `cordis_inspect_list` 无可用工具，只读核对本机 DSH `0.2.2-rc.3` 安装包 `dsh-session-query/src/index.ts` 的公开 `readSession(id)`：它经原生会话回放校验后返回原始事件与同次观察的 header。历史检索优先使用它，缺席才使用 `readSurface`；记忆来源仅在当前表面找不到所引消息时按需回查原始日志，仍核对身份、项目及 seq/time/hash，明确旧原文可能被替换。无需新数据库、全文索引或后台任务，消息时间与角色过滤在现有读取后完成。

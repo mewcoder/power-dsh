@@ -125,6 +125,8 @@ interface NativeServices {
 export interface NativeScope { ctx: NativeContext; dispose(): Promise<void> }
 export type CreateScope = (ctx: NativeContext, key: unknown) => NativeScope;
 interface NativeEvents {
+  'schedule/resolve-agent': [id: string, next: () => Promise<NativeAgent>];
+  'agent/inbox/inserted': [event: { agent: NativeAgent; message: unknown }];
   'session/created': [session: NativeSearchSession];
   'session/disposed': [session: NativeSearchSession];
   'session/event': [session: NativeSearchSession, event: unknown];

@@ -178,6 +178,7 @@ test('duplicate feature and RPC ids fail before Host resources or contexts are a
 test('all feature configuration defaults survive composition without a settings tool', async t => {
   await fixture(t);
   const expected = {
+    taskModelsEnabled: false, taskModelBindings: '{}', homeWhaleFocusEnabled: false,
     showVersion: false, showThemeSwitcher: false, showRefreshButton: false, showRestartButton: false,
     notificationsEnabled: false, notificationMode: 'background', notificationSoundEnabled: true, notificationSound: 'default',
     blockOfficialAccount: false, blockOfficialSearch: false, blockOfficialTelemetry: false,
