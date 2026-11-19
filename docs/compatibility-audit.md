@@ -323,6 +323,14 @@ Node 24.14.0／pnpm 12.5.1 下，产物新鲜度、严格类型、结构与文�
 
 上述页面验收使用确定性适配器和候选 Bundle，不修改 DSH 源码或用户日常 profile；不冒充最终 tarball 的桌面原生管理器升级、Windows 页面或外部真实模型调用验收。不发布 npm，市场来源不变，无需重复投稿。
 
+### 0.1.5 公开发布核验（2026-11-19）
+
+发布提交 `d1249ffabb4e78ae0965f7a50f7094075c95a4e6` 已推送 main，annotated 标签 `v0.1.5` 指向同一提交。[发布前 CI](https://github.com/mewcoder/power-dsh/actions/runs/44485022723) 和[标签 CI](https://github.com/mewcoder/power-dsh/actions/runs/44485416150) 的 Windows／Linux 均成功；发布前两端各 1084 项测试，Windows 为 1083 通过／1 跳过，Linux 为 1078 通过／6 跳过，均无失败，实际包与隔离生产安装通过。[Release workflow](https://github.com/mewcoder/power-dsh/actions/runs/44485416183) 成功，[正式 Release](https://github.com/mewcoder/power-dsh/releases/tag/v0.1.5) 已公开并设为 Latest，附件为 `power-dsh.tgz`。
+
+匿名下载版本地址与 Latest 地址均成功，与上方受检候选逐字节一致：44 个文件、2,795,301 字节；SHA-256 为 `3b457b7bdef3bf5e58dc945979c84677ce594d7dacba1a1c4497e2d2b0961476`，integrity 为 `sha512-Q7N8DwymhWQlK8wLPzCnn0YSLu37yUeIDUAoNNM7jVVbB7zWs1Rnx7PWhiB+0+94+EL9no3c+jDezQKD6KcU5Q==`。公开包清单确认是 `power-dsh@0.1.5`，保留 `private: true`，不发布 npm，不覆盖附件或移动标签。
+
+已重新核对市场 PR `awesome-dsh-plugin/awesome-dsh-plugin#14457` 合并且条目仍使用固定 Latest 下载地址，无需重复投稿；不承诺客户端已刷新。候选 Bundle 的真实 Web 页面验收见上方准备记录，未升级用户的日常桌面插件，也未新增桌面原生管理器升级或 Windows 页面验收。
+
 ### 0.1.0 公开发布核验（2026-11-15）
 
 重新认证后，发布提交 `c85a700fb4422779eb17c977040c0eba78c0381a` 已进入 `main`，annotated 标签 `v0.1.0` 指向同一提交。[Release workflow](https://github.com/mewcoder/power-dsh/actions/runs/43724729589) 成功，Linux 上 899 项行为测试中 893 通过、6 项平台检查跳过、0 失败，实际包与独立生产安装通过。[正式 Release](https://github.com/mewcoder/power-dsh/releases/tag/v0.1.0) 已公开并成为 Latest，附件为 `power-dsh.tgz`；既有市场 PR `awesome-dsh-plugin/awesome-dsh-plugin#14457` 已合并，上游条目保留固定 Latest 下载来源，无需重复投稿。
