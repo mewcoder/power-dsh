@@ -47,7 +47,7 @@ export interface ClientRuntime extends PublicPrimitives {
   observable<T>(getSnapshot: () => T): Observable<T>;
   useSnapshot<T>(source: SnapshotSource<T>): T;
   useMounted(): ReactTypes.MutableRefObject<boolean>;
-  NativeIcon: ReactTypes.ComponentType<{ glyph: string; size?: number }>;
+  NativeIcon: ReactTypes.ComponentType<{ glyph: string; size?: number; weight?: 'regular' | 'medium' }>;
   loadingFeedback(props: { label: string; compact?: boolean }): ReactTypes.ReactElement;
   errorFeedback(props: import('./error-feedback.ts').ErrorFeedbackProps): ReactTypes.ReactElement;
 }

@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-[自动化模型选择](../src/features/task-models/spec.md)与[首页鲸鱼触发](../src/features/home-whale/spec.md)使用 DSH 0.2.2-rc.1 的原生插件扩展点，均默认关闭；原生 Agent 首次模型请求及真实 Web 组合中的插件加载、配置持久化与动画已定向验证。较旧宿主的新功能、最终压缩包升级及桌面安装未由此验收；其他既有功能沿用下述历史证据。
+[自动化任务模型](../src/features/task-models/spec.md)与[首页鲸鱼触发](../src/features/home-whale/spec.md)使用 DSH 0.2.2-rc.1 的原生插件扩展点，均默认关闭；原生 Agent 首次模型请求及真实 Web 组合中的插件加载、配置持久化与动画已定向验证。较旧宿主的新功能、最终压缩包升级及桌面安装未由此验收；其他既有功能沿用下述历史证据。
 
 [记忆功能](../src/features/memory/spec.md)只使用最低基线已有的 section/context、工具注册与步骤事件。旧 context 的严格插值由注入前转义保护，不依赖较新的 `when` 或 `required`。使用关闭运行时上下文的模式时不承诺索引召回；服务缺席仅停用本功能。本轮已在 macOS / DSH `0.2.2-rc.3` 本地链接安装中完成真实会话保存、召回与手动整理验收；不据此推定 Windows、旧宿主或最终压缩包升级已验收，具体见[0.1.0 发版准备记录](compatibility-audit.md#010-发版准备回归2026-11-15)。
 

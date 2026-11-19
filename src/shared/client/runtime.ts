@@ -26,8 +26,8 @@ export function createRuntime(React: ReactModule, primitives: PublicPrimitives):
       h(primitives.StateDot, { state: 'ongoing' }), h('span', null, label));
   }
   // Reuse the very same sprite symbols as the native Appearance controls.
-  function NativeIcon({ glyph, size = 16 }: { glyph: string; size?: number }) {
-    const id = `dsw-icon-${glyph}-medium`;
+  function NativeIcon({ glyph, size = 16, weight = 'medium' }: { glyph: string; size?: number; weight?: 'regular' | 'medium' }) {
+    const id = `dsw-icon-${glyph}-${weight}`;
     return h('svg', { width: size, height: size, 'data-icon': id, 'aria-hidden': true, focusable: false },
       h('use', { href: `#${id}` }));
   }

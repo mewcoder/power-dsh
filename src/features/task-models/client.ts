@@ -3,20 +3,33 @@ import type { TaskModelCatalog, TaskModelRow, TaskModelSelection } from './types
 import { styles as shellStyles } from '../../shared/client/shell-styles.ts';
 
 const styles = `
+.power-dsh-task-models{max-width:720px;container-type:inline-size}
 .power-dsh-task-models .power-dsh-task-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.power-dsh-task-models-list{display:grid;gap:12px;margin-top:20px}
-.power-dsh-task-model{border:0.5px solid var(--dsw-alias-settings-card-stroke);border-radius:var(--dsw-radius-lg,12px);background:var(--dsw-alias-settings-card-fill);padding:14px;min-width:0}
-.power-dsh-task-model h3{margin:0 0 10px;font-size:14px;font-weight:500;overflow-wrap:anywhere}
-.power-dsh-task-model p{margin:6px 0;font-size:12px;color:var(--dsw-alias-label-secondary)}
-.power-dsh-task-model label{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,60%);align-items:center;gap:16px;margin-top:10px;font-size:13px}
-.power-dsh-task-select{display:flex;align-items:center;gap:8px;justify-content:space-between;width:100%;min-width:0;font:inherit;color:inherit;background:var(--dsw-alias-bg-module-platform);border:0.5px solid var(--dsw-alias-settings-card-stroke);border-radius:8px;padding:6px 10px;text-align:left}
+.power-dsh-task-models-list{margin-top:12px}
+.power-dsh-task-models-empty{display:flex;align-items:center;flex-direction:column;padding:48px 20px;text-align:center;color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:1.6}
+.power-dsh-task-models-empty>svg{flex:none;margin-bottom:12px;color:var(--dsw-alias-label-caption)}
+.power-dsh-task-models-empty h3{margin:0;font-size:14px;line-height:1.6;font-weight:400}
+.power-dsh-task-model{padding:16px 0;border-bottom:0.5px solid var(--dsw-alias-border-l2);min-width:0}
+.power-dsh-task-model:last-child{border-bottom:0}
+.power-dsh-task-model-row{display:flex;align-items:center;justify-content:space-between;gap:24px;min-width:0}
+.power-dsh-task-model-copy{flex:1;min-width:0}
+.power-dsh-task-model h3{margin:0;font-size:14px;line-height:22px;font-weight:400;overflow-wrap:anywhere}
+.power-dsh-task-model p{margin:4px 0 0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}
+.power-dsh-task-model-controls{display:flex;align-items:center;gap:8px;min-width:0;max-width:70%}
+.power-dsh-task-model-picker{min-width:0}
+.power-dsh-task-model-picker:first-child{flex:1}
+.power-dsh-task-menu{min-width:0;max-width:100%}
+.power-dsh-task-select{box-sizing:border-box;display:inline-flex;align-items:center;gap:12px;justify-content:space-between;height:36px;max-width:100%;min-width:0;padding:0 14px;border:0;border-radius:var(--dsw-radius-md);font:inherit;font-size:14px;line-height:22px;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-module-platform);text-align:left;cursor:pointer}
 .power-dsh-task-select span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-.power-dsh-task-select svg{flex-shrink:0}
-.power-dsh-task-select:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.power-dsh-task-select svg{flex:none}
+.power-dsh-task-select:disabled{opacity:.5;cursor:default}
+.power-dsh-task-select:focus-visible{outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:2px}
+@media (hover:hover){.power-dsh-task-select:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}}
+@container (max-width:520px){.power-dsh-task-model-row{flex-direction:column;align-items:stretch;gap:12px}.power-dsh-task-model-controls{max-width:100%}.power-dsh-task-model-picker:first-child .power-dsh-task-menu,.power-dsh-task-model-picker:first-child .power-dsh-task-select{width:100%}}
 `;
 
 export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironment): ClientFeature {
-  const { React, h, Menu, Button, useSnapshot, errorFeedback, loadingFeedback } = runtime;
+  const { React, h, Menu, Button, NativeIcon, useSnapshot, errorFeedback, loadingFeedback } = runtime;
   const { ctx, t, source, preferenceSlot, namespace } = env;
   const message = (error: unknown) => {
     const text = error instanceof Error ? error.message : String(error);
@@ -66,13 +79,14 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     };
     const select = (id: string, label: string, value: string, items: { id: string; label: string }[], onSelect: (id: string) => void, title: string) => {
       const open = menu === id;
-      return h('label', { key: id }, label, h(Menu, {
-        open, items, selectedId: value, portal: true, align: 'end', autoFocus: true, minWidthFromAnchor: true,
+      const selectedLabel = items.find(item => item.id === value)?.label ?? t('taskModelsModelUnavailable');
+      return h('div', { key: id, className: 'power-dsh-task-model-picker' }, h(Menu, {
+        open, items, selectedId: value, portal: true, align: 'end', autoFocus: true, minWidthFromAnchor: true, className: 'power-dsh-task-menu',
         onClose: () => setMenu(null), onSelect: next => { setMenu(null); onSelect(next); },
         anchor: h('button', { type: 'button', className: 'power-dsh-task-select', disabled: loading || saving !== null || !form.writable,
-          'aria-label': `${label} · ${title}`, 'aria-haspopup': 'menu', 'aria-expanded': open,
-          onClick: () => setMenu(open ? null : id) }, h('span', null, items.find(item => item.id === value)?.label ?? t('taskModelsModelUnavailable')),
-          h('svg', { width: 14, height: 14, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', strokeWidth: 1.3, 'aria-hidden': true }, h('path', { d: 'm4 6 4 4 4-4' }))),
+          'aria-label': `${label} · ${title}`, 'aria-haspopup': 'menu', 'aria-expanded': open, title: `${label} · ${selectedLabel}`,
+          onClick: () => setMenu(open ? null : id) }, h('span', null, selectedLabel),
+          h(NativeIcon, { glyph: 'chevron-down-outline', weight: 'regular' })),
       }));
     };
     const renderTask = (task: TaskModelRow) => {
@@ -80,19 +94,20 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       const modelIndex = selected ? catalog?.models.findIndex(model => model.provider === selected.provider && model.model === selected.model) ?? -1 : -1;
       const model = modelIndex >= 0 ? catalog?.models[modelIndex] : null;
       return h('article', { key: task.id, className: 'power-dsh-task-model', 'aria-busy': saving === task.id },
-        h('h3', null, task.title),
-        task.target === 'session' ? h(React.Fragment, null,
-          h('p', null, t(selected ? 'taskModelsApplied' : 'taskModelsExisting')),
-          selected && h(Button, { variant: 'ghost', size: 'sm', disabled: saving !== null || loading || !form.writable,
-            onClick: () => save(task, null) }, t('taskModelsReset')))
-          : h(React.Fragment, null,
-            select(`${task.id}-model`, t('taskModelsModel'), selected ? String(modelIndex) : '',
-              [{ id: '', label: t('taskModelsDefault') }, ...(catalog?.models.map((model, index) => ({ id: String(index), label: model.label })) ?? [])],
-              next => { const model = next === '' ? null : catalog?.models[Number(next)];
-                void save(task, model ? { provider: model.provider, model: model.model } : null); }, task.title),
-            model && model.efforts.length > 0 && select(`${task.id}-effort`, t('taskModelsEffort'), selected?.reasoningEffort ?? '',
-              [{ id: '', label: t('taskModelsEffortDefault') }, ...model.efforts],
-              next => { if (selected) void save(task, { provider: selected.provider, model: selected.model, ...(next ? { reasoningEffort: next } : {}) }); }, task.title)),
+        h('div', { className: 'power-dsh-task-model-row' },
+          h('div', { className: 'power-dsh-task-model-copy' }, h('h3', null, task.title),
+            task.target === 'session' && h('p', null, t(selected ? 'taskModelsApplied' : 'taskModelsExisting'))),
+          task.target === 'session' ?
+            selected && h(Button, { variant: 'ghost', size: 'sm', disabled: saving !== null || loading || !form.writable,
+              onClick: () => save(task, null) }, t('taskModelsReset'))
+            : h('div', { className: 'power-dsh-task-model-controls' },
+              select(`${task.id}-model`, t('taskModelsModel'), selected ? String(modelIndex) : '',
+                [{ id: '', label: t('taskModelsDefault') }, ...(catalog?.models.map((model, index) => ({ id: String(index), label: model.label })) ?? [])],
+                next => { const model = next === '' ? null : catalog?.models[Number(next)];
+                  void save(task, model ? { provider: model.provider, model: model.model } : null); }, task.title),
+              model && model.efforts.length > 0 && select(`${task.id}-effort`, t('taskModelsEffort'), selected?.reasoningEffort ?? '',
+                [{ id: '', label: t('taskModelsEffortDefault') }, ...model.efforts],
+                next => { if (selected) void save(task, { provider: selected.provider, model: selected.model, ...(next ? { reasoningEffort: next } : {}) }); }, task.title))),
         task.error && errorFeedback({ t, message: message(task.error), code: 'PD-TASK-MODEL-UNAVAILABLE', operation: 'taskModels.delivery' }));
     };
     return h('section', { className: 'power-dsh-page power-dsh-task-models', 'aria-label': t('taskModelsTitle') },
@@ -103,12 +118,13 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       h('p', { className: 'power-dsh-description' }, t('taskModelsHelp'))),
       loading && loadingFeedback({ label: t('loading') }),
       error && errorFeedback({ t, message: error, code: 'PD-TASK-MODELS', operation: 'taskModels.configure', retry: load }),
-      !loading && catalog?.tasks.length === 0 && h('p', { className: 'power-dsh-description' }, t('taskModelsEmpty')),
-      h('div', { className: 'power-dsh-task-models-list' }, catalog?.tasks.map(renderTask)));
+      !loading && !error && catalog?.tasks.length === 0 && h('div', { className: 'power-dsh-task-models-empty', role: 'status' },
+        h(NativeIcon, { glyph: 'clock-outline', weight: 'regular', size: 24 }),
+        h('h3', null, t('taskModelsEmpty'))),
+      Boolean(catalog?.tasks.length) && h('div', { className: 'power-dsh-task-models-list' }, catalog?.tasks.map(renderTask)));
   }
   function Icon() {
-    return h('svg', { width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', strokeWidth: 1.2, 'aria-hidden': true },
-      h('rect', { x: 2.5, y: 3, width: 11, height: 11, rx: 2 }), h('path', { d: 'M5 1v4m6-4v4M3 7h10M6 10l1.5 1.5L10 9' }));
+    return h(NativeIcon, { glyph: 'clock-outline', weight: 'regular' });
   }
   preferenceSlot('taskModelsEnabled', 'settings.section', { id: 'power-dsh-task-models', order: 59, locale: namespace, label: () => t('taskModelsTitle') }, TaskModelsPage);
   preferenceSlot('taskModelsEnabled', 'settings.section.icon', { id: 'power-dsh-task-models', order: 59 }, Icon);

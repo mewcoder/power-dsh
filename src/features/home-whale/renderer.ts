@@ -9,6 +9,7 @@ export function attachWhale(canvas: HTMLCanvasElement, atlasUrl: string, failed:
   let pixels: Uint8ClampedArray | null = null;
   let started: number | null = null;
   let requested = false;
+  let lastStarted = -Infinity;
   let visible = true;
   let frame = 0;
   let previous = -Infinity;
@@ -17,10 +18,11 @@ export function attachWhale(canvas: HTMLCanvasElement, atlasUrl: string, failed:
   const clear = () => context.clearRect(0, 0, width, height);
   const stop = () => { cancelAnimationFrame(frame); frame = 0; started = null; clear(); };
   const eligible = () => !disposed && !document.hidden && !motion.matches && visible && width > 0 && height > 0;
-  const fail = () => { if (!disposed) { stop(); failed(); } };
+  const fail = () => { if (!disposed) { requested = false; stop(); failed(); } };
   const paint = (now: number) => {
     frame = 0;
     if (!eligible() || started === null || !pixels) { stop(); return; }
+    if (previous === -Infinity) { started = now; lastStarted = now; }
     const progress = (now - started) / 5700;
     if (progress >= 1) { stop(); return; }
     if (now - previous >= 1000 / 24) {
@@ -48,7 +50,10 @@ export function attachWhale(canvas: HTMLCanvasElement, atlasUrl: string, failed:
     }
     frame = requestAnimationFrame(paint);
   };
-  const begin = () => { if (eligible()) { started = performance.now(); previous = -Infinity; frame = requestAnimationFrame(paint); } };
+  const begin = () => {
+    if (!eligible() || !pixels || started !== null || performance.now() - lastStarted < 10_000) return;
+    started = performance.now(); previous = -Infinity; frame = requestAnimationFrame(paint);
+  };
   const resize = () => {
     width = canvas.clientWidth; height = canvas.clientHeight;
     const scale = Math.min(devicePixelRatio || 1, 2);
@@ -57,6 +62,7 @@ export function attachWhale(canvas: HTMLCanvasElement, atlasUrl: string, failed:
   };
   image.onload = () => {
     if (disposed) return;
+    requested = false;
     const source = document.createElement('canvas');
     try {
       if (image.naturalWidth !== 2304 || image.naturalHeight !== 1296) throw new Error('atlas');
@@ -79,7 +85,8 @@ export function attachWhale(canvas: HTMLCanvasElement, atlasUrl: string, failed:
   resize();
   return {
     play() {
-      if (!eligible() || requested) return;
+      if (!eligible() || requested || started !== null || performance.now() - lastStarted < 10_000) return;
+      if (pixels) { begin(); return; }
       requested = true;
       image.src = atlasUrl;
     },

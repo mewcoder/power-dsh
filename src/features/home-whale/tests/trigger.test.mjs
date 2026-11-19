@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { createWhaleTrigger } from '../trigger.ts';
 import { mount } from '../../../../tests/helpers/client-fixture.mjs';
 
-test('ignores automatic focus, blank clicks, untrusted events and repeated input interactions', () => {
+test('ignores automatic focus, blank clicks and untrusted events but accepts repeated deliberate clicks', () => {
   let plays = 0;
   const trigger = createWhaleTrigger(() => plays++);
   trigger.activate({ type: 'focus', isTrusted: true }, true);
@@ -13,24 +13,33 @@ test('ignores automatic focus, blank clicks, untrusted events and repeated input
   assert.equal(plays, 0);
   trigger.activate({ type: 'click', isTrusted: true, button: 0 }, true);
   trigger.activate({ type: 'click', isTrusted: true, button: 0 }, true);
-  assert.equal(plays, 1);
+  assert.equal(plays, 2);
+  trigger.dispose();
+  trigger.activate({ type: 'click', isTrusted: true, button: 0 }, true);
+  assert.equal(plays, 2);
 });
 
-test('Tab intent expires after the event; remount resets the single-play opportunity', async () => {
+test('Tab intent expires after the event and fresh Tab gestures can trigger again', async () => {
   let plays = 0;
   const trigger = createWhaleTrigger(() => plays++);
   trigger.key({ key: 'Tab', isTrusted: true });
   trigger.activate({ type: 'focus', isTrusted: true }, true);
   assert.equal(plays, 1);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  trigger.activate({ type: 'focus', isTrusted: true }, true);
+  assert.equal(plays, 1);
+  trigger.key({ key: 'Tab', isTrusted: true });
+  trigger.activate({ type: 'focus', isTrusted: true }, true);
+  assert.equal(plays, 2);
   trigger.dispose();
   const next = createWhaleTrigger(() => plays++);
   next.key({ key: 'Tab', isTrusted: true });
   await new Promise(resolve => setTimeout(resolve, 0));
   next.activate({ type: 'focus', isTrusted: true }, true);
-  assert.equal(plays, 1);
+  assert.equal(plays, 2);
   next.key({ key: 'Tab', isTrusted: true });
   next.activate({ type: 'focus', isTrusted: true }, true);
-  assert.equal(plays, 2);
+  assert.equal(plays, 3);
   next.dispose();
 });
 

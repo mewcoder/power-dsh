@@ -1,7 +1,7 @@
 export const locales = {
   zh: {
-    taskModelsEnabled: '自动化模型选择', taskModelsDescription: '为自动化任务指定模型和思考深度',
-    taskModelsTitle: '自动化模型', taskModelsHelp: '先在自动化任务中创建任务，再为新建会话的任务指定模型。',
+    taskModelsEnabled: '自动化任务模型', taskModelsDescription: '设置自动化任务的模型和思考深度',
+    taskModelsTitle: '自动化任务模型', taskModelsHelp: '设置自动化任务的模型和思考深度',
     taskModelsDefault: '跟随默认模型', taskModelsEffortDefault: '模型默认', taskModelsModel: '模型', taskModelsEffort: '思考深度',
     taskModelsEmpty: '暂无自动化任务', taskModelsReload: '刷新', taskModelsExisting: '沿用目标会话的模型',
     taskModelsApplied: '任务已绑定会话，后续沿用该会话的模型', taskModelsReset: '清除配置',
@@ -11,8 +11,8 @@ export const locales = {
     taskModelsExistingSession: '已有会话任务请在目标会话中切换模型。', taskModelsInvalid: '配置无效，请刷新后重试。',
   },
   en: {
-    taskModelsEnabled: 'Automation model selection', taskModelsDescription: 'Choose a model and reasoning effort for automated tasks',
-    taskModelsTitle: 'Task models', taskModelsHelp: 'Create tasks in Automations, then choose models for tasks that start new conversations.',
+    taskModelsEnabled: 'Automation task models', taskModelsDescription: 'Set the model and reasoning effort for automated tasks',
+    taskModelsTitle: 'Automation task models', taskModelsHelp: 'Set the model and reasoning effort for automated tasks',
     taskModelsDefault: 'Use default model', taskModelsEffortDefault: 'Model default', taskModelsModel: 'Model', taskModelsEffort: 'Reasoning effort',
     taskModelsEmpty: 'No automated tasks', taskModelsReload: 'Refresh', taskModelsExisting: 'Uses the destination conversation’s model',
     taskModelsApplied: 'This task now targets a conversation and follows its model', taskModelsReset: 'Clear configuration',

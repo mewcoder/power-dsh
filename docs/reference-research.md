@@ -1,5 +1,11 @@
 # 参考研究
 
+## 自动化任务模型设置样式（2026-11-19）
+
+本轮 Inspect 搜索仍无可用工具，沿用下述官方固定提交，只读核对 `locale/src/client/LanguageRow.tsx` 及样式、`ui-theme/src/client/FontSizeRow.module.css` 和 `ui-settings-models/src/client/ModelsSection.module.css`。任务列表使用通用设置行的留白、分隔线与文字规格，模型和思考深度同排，按钮采用语言选择器的尺寸、主题填充和 regular 下箭头；菜单继续直接复用公共 Menu。保留自有作用域样式，不导入官方内部组件或 CSS，不修改宿主。
+
+无任务空态另对照同提交 `ui-schedule/src/client/ScheduleTaskTab.tsx` 与 `TaskManagerPage.module.css` 的 empty/emptyGlyph：复用公共 24px regular 时钟符号、48px／20px 居中留白、主题次要文字与常规字重标题。按用户要求仅保留图标与「暂无自动化任务」。仅成功读取为空时展示，不把服务故障展示成无任务。
+
 ## 自动化模型与首页鲸鱼（2026-11-18）
 
 从本地市场目录提交 `e190236` 检索 automation 条目，另只读核对 [alpacachen/dsh-automation](https://github.com/alpacachen/dsh-automation/tree/0ea9d848da45d8f47bc85ef09ca995f8fc7e80e6) 的 README、MIT 许可证、任务模型选择与 `agent-configuration.ts`。其维护独立调度，已有会话目标忽略任务执行模型；这里只核对独立配置与 `llm.resolveCallConfig` 的能力校验，没有复制代码、安装依赖或运行该插件。

@@ -305,7 +305,7 @@ var TaskModels = class {
 		}
 	}
 	check(agent) {
-		if (this.enabled() && this.blocked.has(agent)) throw new Error("Scheduled model unavailable. Review Settings → power-dsh → Task models, then run the task again.");
+		if (this.enabled() && this.blocked.has(agent)) throw new Error("Scheduled model unavailable. Review Settings → power-dsh → Automation task models, then run the task again.");
 	}
 	clear() {
 		this.generation++;
@@ -3023,7 +3023,7 @@ var PluginReleases = class {
 };
 
 // package.json
-var version = "0.1.4";
+var version = "0.1.5";
 
 // src/features/plugin-updates/host.ts
 var host_exports$17 = /* @__PURE__ */ __exportAll({

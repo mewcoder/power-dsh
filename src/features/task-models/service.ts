@@ -131,7 +131,7 @@ export class TaskModels {
 
   check(agent: NativeAgent) {
     if (this.enabled() && this.blocked.has(agent)) {
-      throw new Error('Scheduled model unavailable. Review Settings → power-dsh → Task models, then run the task again.');
+      throw new Error('Scheduled model unavailable. Review Settings → power-dsh → Automation task models, then run the task again.');
     }
   }
 

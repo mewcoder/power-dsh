@@ -123,7 +123,7 @@ Host 在功能子 context 中取得 `web` 服务，注册一个搜索提供方�
 
 ## 生命周期与扩展
 
-[自动化模型](../src/features/task-models/spec.md)把按任务的模型与 effort 保存于插件配置，仅通过原生调度激活 waterfall 和 inbox 插入事件在新会话第一次请求前选择，不写宿主任务表或全局默认模型。独立配置页使用设置 section，保留原生自动化任务编辑器。[首页鲸鱼](../src/features/home-whale/spec.md)只在原生 hero.frame 装饰 slot 的同 id 下提供优先级注册，透传全部 children；自有画布与首个主动输入手势归该组件，不修改根节点、其他注册项、宿主文件或布局。
+[自动化任务模型](../src/features/task-models/spec.md)把按任务的模型与 effort 保存于插件配置，仅通过原生调度激活 waterfall 和 inbox 插入事件在新会话第一次请求前选择，不写宿主任务表或全局默认模型。独立配置页使用设置 section，保留原生自动化任务编辑器。[首页鲸鱼](../src/features/home-whale/spec.md)只在原生 hero.frame 装饰 slot 的同 id 下提供优先级注册，透传全部 children；自有画布与主动输入手势归该组件，渲染器从首个可绘制帧开始计算 10 秒冷却，复用已解码图集重播，不修改根节点、其他注册项、宿主文件或布局。
 
 各功能的监听、订阅、观察器、样式、投影、租约和进程归属其 context 或组件，卸载后释放。模块选择、功能开关及内部条目持久状态分别处理，不能把移除界面当作恢复所有配置。
 
