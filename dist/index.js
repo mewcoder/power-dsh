@@ -561,6 +561,7 @@ const MEMORY_ERRORS = [
 	"memoryFolderUnavailable",
 	"memoryOpenFolderFailed",
 	"memoryModelUnavailable",
+	"memoryCleanupEffortUnavailable",
 	"memoryCleanupFailed",
 	"memoryCleanupLimit",
 	"memoryPreviewExpired",
@@ -1628,7 +1629,7 @@ function renderMemoryContext(scopes, budget = 16e3) {
 
 // src/features/memory/cleanup-plan.ts
 function parseModel(value) {
-	if (!isRecord$2(value) || typeof value.provider !== "string" || !value.provider || value.provider.length > 200 || typeof value.model !== "string" || !value.model || value.model.length > 200 || value.reasoningEffort !== void 0 && (typeof value.reasoningEffort !== "string" || value.reasoningEffort.length > 100)) throw new Error("memoryModelUnavailable");
+	if (!isRecord$2(value) || typeof value.provider !== "string" || !value.provider || value.provider.length > 200 || typeof value.model !== "string" || !value.model || value.model.length > 200 || value.reasoningEffort !== void 0 && (typeof value.reasoningEffort !== "string" || !value.reasoningEffort || value.reasoningEffort.length > 100)) throw new Error("memoryModelUnavailable");
 	return {
 		provider: value.provider,
 		model: value.model,
@@ -1646,10 +1647,23 @@ function modelCatalog(value) {
 				provider: group.id,
 				model: model.id
 			});
-			if (!models.some((row) => row.provider === selection.provider && row.model === selection.model)) models.push({
-				...selection,
-				label: `${group.name} / ${model.name}`.slice(0, 400)
-			});
+			if (!models.some((row) => row.provider === selection.provider && row.model === selection.model)) {
+				const entries = isRecord$2(model.reasoning) && Array.isArray(model.reasoning.efforts) ? model.reasoning.efforts : [];
+				if (entries.length > 100) throw new Error("memoryModelUnavailable");
+				const efforts = /* @__PURE__ */ new Map();
+				for (const entry of entries) {
+					if (!isRecord$2(entry) || typeof entry.id !== "string" || !entry.id || entry.id.length > 100 || efforts.has(entry.id)) continue;
+					efforts.set(entry.id, (typeof entry.name === "string" && entry.name ? entry.name : entry.id).slice(0, 400));
+				}
+				models.push({
+					...selection,
+					label: `${group.name} / ${model.name}`.slice(0, 400),
+					efforts: Array.from(efforts, ([id, label]) => ({
+						id,
+						label
+					}))
+				});
+			}
 			if (models.length > 1e3) throw new Error("memoryModelUnavailable");
 		}
 	}
@@ -1782,7 +1796,9 @@ var MemoryCleanup = class {
 				const selected = parseModel(JSON.parse(selection));
 				const models = modelCatalog(await service.catalog());
 				guard();
-				if (!models.models.some((row) => row.provider === selected.provider && row.model === selected.model)) throw new Error("memoryModelUnavailable");
+				const available = models.models.find((row) => row.provider === selected.provider && row.model === selected.model);
+				if (!available) throw new Error("memoryModelUnavailable");
+				if (selected.reasoningEffort !== void 0 && !available.efforts.some((effort) => effort.id === selected.reasoningEffort)) throw new Error("memoryCleanupEffortUnavailable");
 				const snapshot = await this.store.cleanupSnapshot(scope);
 				guard();
 				let text = "";
@@ -2259,9 +2275,18 @@ const MEMORY_CLEANUP_MODELS_RPC = descriptor$2("memoryCleanupModels", [], {
 			default: value.default === null ? null : parseModel(value.default),
 			models: value.models.map((model) => {
 				if (!isRecord$2(model) || typeof model.label !== "string" || model.label.length > 400) throw new TypeError("memoryInvalid");
+				const efforts = model.efforts === void 0 ? [] : model.efforts;
+				if (!isArray(efforts) || efforts.length > 100) throw new TypeError("memoryInvalid");
 				return {
 					...parseModel(model),
-					label: model.label
+					label: model.label,
+					efforts: efforts.map((effort) => {
+						if (!isRecord$2(effort) || typeof effort.id !== "string" || !effort.id || effort.id.length > 100 || typeof effort.label !== "string" || effort.label.length > 400) throw new TypeError("memoryInvalid");
+						return {
+							id: effort.id,
+							label: effort.label
+						};
+					})
 				};
 			})
 		};
@@ -3023,7 +3048,7 @@ var PluginReleases = class {
 };
 
 // package.json
-var version = "0.1.5";
+var version = "0.1.6";
 
 // src/features/plugin-updates/host.ts
 var host_exports$17 = /* @__PURE__ */ __exportAll({

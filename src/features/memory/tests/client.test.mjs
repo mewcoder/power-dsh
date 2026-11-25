@@ -86,7 +86,8 @@ async function fixture(t, reply, options = {}) {
 
 test('manual cleanup uses current chat model, previews originals and only applies after confirmation', async t => {
   const current = { provider: 'provider', model: 'chat', reasoningEffort: 'low' };
-  const models = { models: [{ ...current, label: 'Provider / Chat' }, { provider: 'provider', model: 'other', label: 'Provider / Other' }],
+  const models = { models: [{ ...current, label: 'Provider / Chat', efforts: [{ id: 'low', label: 'Low' }] },
+    { provider: 'provider', model: 'other', label: 'Provider / Other', efforts: [] }],
     default: { provider: 'provider', model: 'other' } };
   const { app, render } = await fixture(t, async (method, args) => {
     if (method === 'memoryCleanupModels') return { ok: true, value: models };
@@ -106,7 +107,10 @@ test('manual cleanup uses current chat model, previews originals and only applie
   renderDialog();
   await flush();
   const choices = descendants(renderDialog()).filter(node => node.type?.name === 'Choice');
-  assert.match(choices[1].props.options[0].label, /Current chat/);
+  assert.equal(choices.length, 2);
+  assert.match(choices[0].props.options[0].label, /Current chat/);
+  assert.equal(choices[1].props.value, 'low');
+  assert.match(modal(renderDialog()).props.description, /Global memory/);
   assert.equal(app.memoryCalls.some(call => call.method === 'prepareMemoryCleanup'), false);
   await button(renderDialog(), 'Generate preview').props.onClick();
   assert.equal(app.memoryCalls.some(call => call.method === 'applyMemoryCleanup'), false);
@@ -115,6 +119,50 @@ test('manual cleanup uses current chat model, previews originals and only applie
   await button(renderDialog(), 'Apply').props.onClick();
   assert.equal(app.memoryCalls.filter(call => call.method === 'applyMemoryCleanup').length, 1);
   assert.match(JSON.stringify(renderDialog()), /memory-backups/);
+});
+
+test('cleanup keeps the clicked project scope when choosing a different model', async t => {
+  const project = { id: 'project/fixed', cwd: '/work/project-alpha', complete: true, revision: 'c'.repeat(64), entries: [row] };
+  const efforts = [{ id: 'high', label: 'High' }, { id: 'max', label: 'Max' }];
+  const models = { models: [{ provider: 'provider', model: 'default', label: 'Default model', efforts },
+    { provider: 'provider', model: 'other', label: 'Other model', efforts },
+    { provider: 'provider', model: 'plain', label: 'Plain model', efforts: [] }],
+    default: { provider: 'provider', model: 'default', reasoningEffort: 'high' } };
+  const { app, render } = await fixture(t, async (method, args) => {
+    if (method === 'memoryCleanupModels') return { ok: true, value: models };
+    if (method === 'prepareMemoryCleanup') {
+      return { ok: true, value: { token: args[2], scope: project.id, revision: project.revision,
+        changes: [{ before: { ...row, content: 'Keep answers short, please.' },
+          description: row.description, content: 'Short answers.', removed: [], reason: 'Remove filler' }] } };
+    }
+    if (method === 'cancelMemoryCleanup') return { ok: true, value: true };
+    return { ok: true, value: { ...catalog([row]), scopes: [...catalog([row]).scopes, project] } };
+  });
+  cleanupButton(render(), 'project-alpha').props.onClick();
+  const dialog = cleanupNode(render());
+  const renderDialog = () => app.renderComponent(dialog);
+  renderDialog();
+  await flush();
+  assert.match(modal(renderDialog()).props.description, /project-alpha/);
+  const choices = () => descendants(renderDialog()).filter(node => node.type?.name === 'Choice');
+  assert.equal(choices()[1].props.value, 'high');
+  choices()[0].props.onChange(JSON.stringify(['provider', 'other']));
+  assert.equal(choices()[1].props.value, '');
+  assert.deepEqual(Array.from(choices()[1].props.options, option => option.id), ['', 'high', 'max']);
+  choices()[1].props.onChange('max');
+  await button(renderDialog(), 'Generate preview').props.onClick();
+  assert.ok(button(renderDialog(), 'Apply'));
+  choices()[1].props.onChange('');
+  assert.equal(button(renderDialog(), 'Apply'), undefined);
+  await button(renderDialog(), 'Generate preview').props.onClick();
+  const prepared = app.memoryCalls.filter(call => call.method === 'prepareMemoryCleanup');
+  assert.deepEqual(prepared.map(call => [call.args[0], JSON.parse(call.args[1])]), [
+    [project.id, { provider: 'provider', model: 'other', reasoningEffort: 'max' }],
+    [project.id, { provider: 'provider', model: 'other' }],
+  ]);
+  assert.ok(app.memoryCalls.some(call => call.method === 'cancelMemoryCleanup' && call.args[0] === prepared[0].args[2]));
+  choices()[0].props.onChange(JSON.stringify(['provider', 'plain']));
+  assert.equal(choices().length, 1);
 });
 
 test('cleanup labels host default honestly without a current chat and cancels a late preview when closed', async t => {
@@ -133,7 +181,8 @@ test('cleanup labels host default honestly without a current chat and cancels a 
   renderDialog();
   await flush();
   const choices = descendants(renderDialog()).filter(node => node.type?.name === 'Choice');
-  assert.match(choices[1].props.options[0].label, /Default/);
+  assert.equal(choices.length, 1);
+  assert.match(choices[0].props.options[0].label, /Default/);
   const pending = button(renderDialog(), 'Generate preview').props.onClick();
   modal(renderDialog()).props.onClose();
   resolvePreview();
@@ -435,7 +484,7 @@ test('group organization starts with the clicked project and does not expand the
   value.scopes.push({ id: 'project-id', cwd: '/test/project', complete: true, revision: 'c'.repeat(64), entries: [row] });
   const { render } = await fixture(t, async () => ({ ok: true, value }));
   cleanupButton(render(), 'project').props.onClick();
-  assert.equal(cleanupNode(render()).props.initialScope, 'project-id');
+  assert.equal(cleanupNode(render()).props.scope.id, 'project-id');
   assert.equal(scopeButton(render(), 'project-id').props['aria-expanded'], false);
 });
 

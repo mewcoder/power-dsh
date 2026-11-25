@@ -41,7 +41,8 @@ for (const available of [true, false]) {
       loadingFeedback: () => null,
     };
     const Dialog = createCleanupDialog(runtime, { ctx, source: { getSnapshot: () => snapshot } });
-    Dialog({ scopes: [], initialScope: 'global', t: key => key, onClose() {}, async onApplied() {} });
+    Dialog({ scope: { id: 'global', cwd: '', complete: true, revision: '', entries: [] },
+      t: key => key, onClose() {}, async onApplied() {} });
     await new Promise(resolve => setImmediate(resolve));
     assert.ok(dependencies.includes('sessions'));
     assert.ok(dependencies.includes('modelDirectories'));

@@ -552,9 +552,14 @@ interface MemoryModel {
   model: string;
   reasoningEffort?: string;
 }
+interface ModelEffortOption {
+  id: string;
+  label: string;
+}
 interface MemoryModels {
   models: (MemoryModel & {
     label: string;
+    efforts: ModelEffortOption[];
   })[];
   default: MemoryModel | null;
 }
@@ -628,10 +633,7 @@ interface TaskModelOption {
   provider: string;
   model: string;
   label: string;
-  efforts: {
-    id: string;
-    label: string;
-  }[];
+  efforts: ModelEffortOption[];
 }
 interface TaskModelRow {
   id: string;

@@ -878,29 +878,30 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 
 // src/features/task-models/client.ts
 	const styles$16 = `
-.power-dsh-task-models{max-width:720px;container-type:inline-size}
+.power-dsh-task-models{max-width:720px}
 .power-dsh-task-models .power-dsh-task-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.power-dsh-task-models-list{margin-top:12px}
+.power-dsh-task-models-list{margin-top:24px}
 .power-dsh-task-models-empty{display:flex;align-items:center;flex-direction:column;padding:48px 20px;text-align:center;color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:1.6}
 .power-dsh-task-models-empty>svg{flex:none;margin-bottom:12px;color:var(--dsw-alias-label-caption)}
 .power-dsh-task-models-empty h3{margin:0;font-size:14px;line-height:1.6;font-weight:400}
 .power-dsh-task-model{padding:16px 0;border-bottom:0.5px solid var(--dsw-alias-border-l2);min-width:0}
+.power-dsh-task-model:first-child{padding-top:0}
 .power-dsh-task-model:last-child{border-bottom:0}
-.power-dsh-task-model-row{display:flex;align-items:center;justify-content:space-between;gap:24px;min-width:0}
+.power-dsh-task-model-row{display:flex;flex-direction:column;align-items:stretch;gap:10px;min-width:0}
+.power-dsh-task-model-row[data-session]{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}
 .power-dsh-task-model-copy{flex:1;min-width:0}
-.power-dsh-task-model h3{margin:0;font-size:14px;line-height:22px;font-weight:400;overflow-wrap:anywhere}
+.power-dsh-task-model h3{margin:0;font-size:14px;line-height:22px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .power-dsh-task-model p{margin:4px 0 0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}
-.power-dsh-task-model-controls{display:flex;align-items:center;gap:8px;min-width:0;max-width:70%}
+.power-dsh-task-model-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,128px);align-items:center;gap:8px;min-width:0}
 .power-dsh-task-model-picker{min-width:0}
-.power-dsh-task-model-picker:first-child{flex:1}
-.power-dsh-task-menu{min-width:0;max-width:100%}
-.power-dsh-task-select{box-sizing:border-box;display:inline-flex;align-items:center;gap:12px;justify-content:space-between;height:36px;max-width:100%;min-width:0;padding:0 14px;border:0;border-radius:var(--dsw-radius-md);font:inherit;font-size:14px;line-height:22px;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-module-platform);text-align:left;cursor:pointer}
+.power-dsh-task-model-picker:only-child{grid-column:1/-1}
+.power-dsh-task-menu{width:100%;min-width:0;max-width:100%}
+.power-dsh-task-select{box-sizing:border-box;display:inline-flex;align-items:center;gap:12px;justify-content:space-between;width:100%;height:36px;max-width:100%;min-width:0;padding:0 14px;border:0;border-radius:var(--dsw-radius-md);font:inherit;font-size:14px;line-height:22px;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-module-platform);text-align:left;cursor:pointer}
 .power-dsh-task-select span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .power-dsh-task-select svg{flex:none}
 .power-dsh-task-select:disabled{opacity:.5;cursor:default}
 .power-dsh-task-select:focus-visible{outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:2px}
 @media (hover:hover){.power-dsh-task-select:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}}
-@container (max-width:520px){.power-dsh-task-model-row{flex-direction:column;align-items:stretch;gap:12px}.power-dsh-task-model-controls{max-width:100%}.power-dsh-task-model-picker:first-child .power-dsh-task-menu,.power-dsh-task-model-picker:first-child .power-dsh-task-select{width:100%}}
 `;
 	function createClientFeature$27(runtime, env) {
 		const { React, h, Menu, Button, NativeIcon, useSnapshot, errorFeedback, loadingFeedback } = runtime;
@@ -1015,7 +1016,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					key: task.id,
 					className: "power-dsh-task-model",
 					"aria-busy": saving === task.id
-				}, h("div", { className: "power-dsh-task-model-row" }, h("div", { className: "power-dsh-task-model-copy" }, h("h3", null, task.title), task.target === "session" && h("p", null, t(selected ? "taskModelsApplied" : "taskModelsExisting"))), task.target === "session" ? selected && h(Button, {
+				}, h("div", {
+					className: "power-dsh-task-model-row",
+					"data-session": task.target === "session" || void 0
+				}, h("div", { className: "power-dsh-task-model-copy" }, h("h3", { title: task.title }, task.title), task.target === "session" && h("p", null, t(selected ? "taskModelsApplied" : "taskModelsExisting"))), task.target === "session" ? selected && h(Button, {
 					variant: "ghost",
 					size: "sm",
 					disabled: saving !== null || loading || !form.writable,
@@ -1581,13 +1585,13 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 // src/features/home-whale/locales.ts
 	const locales$28 = {
 		zh: {
-			homeWhaleFocusEnabled: "输入框聚焦播放鲸鱼",
-			homeWhaleFocusDescription: "空白首页点击或 Tab 聚焦输入框时播放，间隔至少 10 秒",
+			homeWhaleFocusEnabled: "首页鲸鱼动画",
+			homeWhaleFocusDescription: "输入框聚焦时，上方显示动画",
 			homeWhaleFailed: "鲸鱼动画暂不可用，可关闭此开关恢复原生效果。"
 		},
 		en: {
-			homeWhaleFocusEnabled: "Play whale on composer focus",
-			homeWhaleFocusDescription: "Play on the blank home when clicking or tabbing into the composer, at least 10 seconds apart",
+			homeWhaleFocusEnabled: "Home whale animation",
+			homeWhaleFocusDescription: "Show the animation above the message box when it gains focus",
 			homeWhaleFailed: "The whale animation is unavailable. Turn this off to restore the native effect."
 		}
 	};
@@ -1614,6 +1618,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		"memoryFolderUnavailable",
 		"memoryOpenFolderFailed",
 		"memoryModelUnavailable",
+		"memoryCleanupEffortUnavailable",
 		"memoryCleanupFailed",
 		"memoryCleanupLimit",
 		"memoryPreviewExpired",
@@ -1625,9 +1630,13 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 
 // src/features/memory/styles.ts
 	const styles$15 = `
-.power-dsh-memory-choice { display:flex; align-items:center; justify-content:space-between; gap:16px; font-size:14px; }
-.power-dsh-memory-choice > * { min-width:0; overflow-wrap:anywhere; }
-.power-dsh-memory-choice button { max-width:80%; height:auto; min-height:32px; white-space:normal; text-align:left; }
+.power-dsh-memory-cleanup-choices { display:grid; grid-template-columns:minmax(0,1fr) 144px; gap:12px; min-width:0; }
+.power-dsh-memory-cleanup-choices > :only-child { grid-column:1/-1; }
+.power-dsh-memory-choice { display:flex; flex-direction:column; gap:8px; min-width:0; font-size:14px; line-height:22px; }
+.power-dsh-memory-choice-menu { width:100%; min-width:0; }
+.power-dsh-memory-choice .power-dsh-memory-choice-trigger { width:100%; min-width:0; justify-content:space-between; gap:12px; text-align:left; }
+.power-dsh-memory-choice-trigger > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.power-dsh-memory-choice-trigger > svg { flex:none; }
 .power-dsh-memory-cleanup-change { display:flex; flex-direction:column; gap:12px; }
 .power-dsh-memory-cleanup-change + .power-dsh-memory-cleanup-change { border-top:.5px solid var(--dsw-alias-border-l2); padding-top:16px; }
 .power-dsh-memory-cleanup-change h3 { font-size:12px; font-weight:500; margin:0 0 6px; color:var(--dsw-alias-label-secondary); }
@@ -1663,6 +1672,8 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 .power-dsh-memory-message { margin-top:12px; padding-top:12px; border-top:.5px solid var(--dsw-alias-border-l2); }
 .power-dsh-memory-original h3 { margin:0; font-size:14px; line-height:22px; font-weight:500; }
 .power-dsh-memory-detail { width:min(640px,100%); max-height:100%; }
+.power-dsh-memory-cleanup { width:min(520px,100%); }
+.power-dsh-memory-cleanup-preview { width:min(720px,100%); }
 .power-dsh-memory-detail-body { display:flex; flex-direction:column; gap:16px; min-width:0; max-height:min(560px,60vh); overflow:auto; overscroll-behavior:contain; scrollbar-gutter:stable; overflow-wrap:anywhere; }
 .power-dsh-memory-detail-body > * { flex-shrink:0; }
 .power-dsh-memory-detail-body > .power-dsh-memory-meta { margin:0; user-select:text; }
@@ -1671,7 +1682,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 .power-dsh-memory-empty > svg { margin-bottom:4px; }
 .power-dsh-memory-empty p { margin:0; font-size:13px; line-height:20px; }
 .power-dsh-memory-empty .power-dsh-memory-empty-title { color:var(--dsw-alias-label-primary); font-size:14px; }
-@media (max-width:520px) { .power-dsh-memory-row { flex-wrap:wrap; } .power-dsh-memory-actions { margin-left:auto; } }
+@media (max-width:520px) { .power-dsh-memory-cleanup-choices { grid-template-columns:minmax(0,1fr); } .power-dsh-memory-row { flex-wrap:wrap; } .power-dsh-memory-actions { margin-left:auto; } }
 @media (prefers-reduced-motion:reduce) { .power-dsh-memory-chevron { transition:none; } }
 `;
 
@@ -1693,11 +1704,13 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		});
 		function Choice({ label, options, value, disabled, onChange }) {
 			const [open, setOpen] = React.useState(false);
+			const selectedLabel = options.find((option) => option.id === value)?.label ?? label;
 			return h("div", { className: "power-dsh-memory-choice" }, h("span", null, label), h(Menu, {
 				open: open && !disabled,
 				portal: true,
 				autoFocus: true,
 				minWidthFromAnchor: true,
+				className: "power-dsh-memory-choice-menu",
 				selectedId: value,
 				items: options,
 				onClose: () => setOpen(false),
@@ -1707,23 +1720,26 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				},
 				anchor: h(Button, {
 					variant: "outline",
+					className: "power-dsh-memory-choice-trigger",
 					disabled,
-					"aria-label": label,
+					title: selectedLabel,
+					"aria-label": selectedLabel === label ? label : `${label} · ${selectedLabel}`,
 					"aria-haspopup": "menu",
 					"aria-expanded": open && !disabled,
 					onClick: () => setOpen((previous) => !previous)
-				}, options.find((option) => option.id === value)?.label ?? label, h(NativeIcon, {
+				}, h("span", null, selectedLabel), h(NativeIcon, {
 					glyph: "chevron-down-outline",
-					size: 16
+					size: 16,
+					weight: "regular"
 				}))
 			}));
 		}
-		return function MemoryCleanupDialog({ scopes, initialScope, t, onClose, onApplied }) {
+		return function MemoryCleanupDialog({ scope, t, onClose, onApplied }) {
 			const settings = useSnapshot(source);
 			const mounted = useMounted();
-			const [scope, setScope] = React.useState(initialScope);
 			const [models, setModels] = React.useState(null);
 			const [selected, setSelected] = React.useState("");
+			const [effort, setEffort] = React.useState("");
 			const [preferred, setPreferred] = React.useState(null);
 			const [busy, setBusy] = React.useState("models");
 			const [error, setError] = React.useState("");
@@ -1744,6 +1760,9 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				token.current = "";
 			};
 			const modelId = (model) => JSON.stringify([model.provider, model.model]);
+			const selectedModel = models?.models.find((row) => modelId(row) === selected);
+			const efforts = selectedModel?.efforts ?? [];
+			const selectedEffort = efforts.some((option) => option.id === effort) ? effort : "";
 			async function loadModels() {
 				const version = ++sequence.current;
 				setBusy("models");
@@ -1769,6 +1788,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 						current: available(current)
 					} : null);
 					setSelected(choice ? modelId(choice) : result.value.models[0] ? modelId(result.value.models[0]) : "");
+					setEffort(choice?.reasoningEffort ?? "");
 				} catch (failure) {
 					if (live(version)) setError(fail(failure));
 				} finally {
@@ -1786,9 +1806,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				}
 			}, [writable]);
 			async function generate() {
-				if (!writable || pending.current || !selected) return;
-				const selectedModel = models?.models.find((row) => modelId(row) === selected);
-				if (!selectedModel) return;
+				if (!writable || pending.current || !selectedModel || !scopeAvailable) return;
 				pending.current = true;
 				cancel();
 				const version = sequence.current;
@@ -1796,7 +1814,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				setError("");
 				setPreview(null);
 				setDone("");
-				const model = preferred && modelId(preferred.model) === selected ? preferred.model : selectedModel;
+				const model = {
+					provider: selectedModel.provider,
+					model: selectedModel.model,
+					...selectedEffort ? { reasoningEffort: selectedEffort } : {}
+				};
 				try {
 					const hex = Array.from(crypto.getRandomValues(/* @__PURE__ */ new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
 					const id = [
@@ -1807,7 +1829,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 						hex.slice(20)
 					].join("-");
 					token.current = id;
-					const result = await ctx.remote.powerDsh.prepareMemoryCleanup(scope, JSON.stringify(model), id);
+					const result = await ctx.remote.powerDsh.prepareMemoryCleanup(scope.id, JSON.stringify(model), id);
 					if (!live(version)) return;
 					if (!result.ok) throw new Error(result.error.message);
 					setPreview(result.value);
@@ -1843,14 +1865,13 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					if (live(version)) setBusy(null);
 				}
 			}
-			const scopeOptions = scopes.filter((row) => row.complete && row.entries.length > 0 && row.entries.every((entry) => !entry.invalid)).map((row) => ({
-				id: row.id,
-				label: row.id === "global" ? t("memoryGlobalEnabled") : row.cwd.split(/[\\/]/).filter(Boolean).at(-1) || row.cwd
-			}));
+			const scopeAvailable = scope.complete && scope.entries.length > 0 && scope.entries.every((entry) => !entry.invalid);
+			const scopeName = scope.id === "global" ? t("memoryGlobalEnabled") : scope.cwd.split(/[\\/]/).filter(Boolean).at(-1) || scope.cwd;
 			const modelOptions = models?.models.map((model) => ({
 				id: modelId(model),
 				label: preferred && modelId(preferred.model) === modelId(model) ? `${t(preferred.current ? "memoryCurrentModel" : "memoryDefaultModel")} · ${model.label}` : model.label
 			})) ?? [];
+			const choosingDisabled = busy !== null || !writable;
 			const reset = () => {
 				cancel();
 				setPreview(null);
@@ -1860,10 +1881,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			const plain = (text) => h("pre", { className: "power-dsh-memory-cleanup-text" }, text);
 			return h(Modal, {
 				open: true,
-				className: "power-dsh-memory-detail",
+				className: `power-dsh-memory-detail power-dsh-memory-cleanup${preview?.changes.length ? " power-dsh-memory-cleanup-preview" : ""}`,
 				title: t("memoryCleanup"),
 				closeLabel: t("close"),
-				description: t("memoryCleanupDescription"),
+				description: t("memoryCleanupDescription").replace("{name}", () => scopeName),
 				onClose: () => {
 					cancel();
 					onClose();
@@ -1876,32 +1897,38 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 						onClose();
 					}
 				}, t("cancel")), h(Button, {
-					variant: "outline",
-					disabled: !writable || busy !== null || !selected || !scopeOptions.some((option) => option.id === scope) || preview !== null && !preview.changes.length,
+					variant: "primary",
+					disabled: choosingDisabled || !selectedModel || !scopeAvailable || preview !== null && !preview.changes.length,
 					onClick: preview?.changes.length ? apply : generate
 				}, t(preview?.changes.length ? "memoryCleanupApply" : "memoryCleanupGenerate")))
 			}, h("div", {
 				className: "power-dsh-memory-detail-body",
 				tabIndex: 0
-			}, h(Choice, {
-				label: t("memoryCleanupScope"),
-				value: scope,
-				options: scopeOptions,
-				disabled: busy !== null || !writable,
-				onChange: (id) => {
-					reset();
-					setScope(id);
-				}
-			}), h(Choice, {
+			}, h("div", { className: "power-dsh-memory-cleanup-choices" }, h(Choice, {
 				label: t("memoryCleanupModel"),
 				value: selected,
 				options: modelOptions,
-				disabled: busy !== null || !writable,
+				disabled: choosingDisabled,
 				onChange: (id) => {
+					if (choosingDisabled || id === selected) return;
 					reset();
 					setSelected(id);
+					setEffort("");
 				}
-			}), busy && loadingFeedback({ label: t(busy === "generate" ? "memoryCleanupGenerating" : busy === "apply" ? "memoryCleanupApplying" : "loading") }), error && errorFeedback({
+			}), efforts.length > 0 && h(Choice, {
+				label: t("memoryCleanupEffort"),
+				value: selectedEffort,
+				options: [{
+					id: "",
+					label: t("memoryCleanupEffortDefault")
+				}, ...efforts],
+				disabled: choosingDisabled,
+				onChange: (id) => {
+					if (choosingDisabled || id === selectedEffort) return;
+					reset();
+					setEffort(id);
+				}
+			})), busy && loadingFeedback({ label: t(busy === "generate" ? "memoryCleanupGenerating" : busy === "apply" ? "memoryCleanupApplying" : "loading") }), error && errorFeedback({
 				t,
 				message: error,
 				code: "PD-MEMORY-CLEANUP",
@@ -2258,6 +2285,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			}
 			const scopeName = (scope) => scope.id === "global" ? t("memoryGlobalEnabled") : scope.cwd.split(/[\\/]/).filter(Boolean).at(-1) || scope.cwd;
 			const scopes = catalog?.scopes.filter((scope) => scope.entries.length > 0 || !scope.complete) ?? [];
+			const selectedCleanupScope = catalog?.scopes.find((scope) => scope.id === cleanupScope);
 			const complete = catalog?.scopes.every((scope) => scope.complete) ?? false;
 			const empty = snapshot.status === "ready" && complete && scopes.length === 0;
 			const storageSummary = catalog ? t("memoryStorageSummary").replace("{path}", () => catalog.path) : t("memoryStorageLocal");
@@ -2454,9 +2482,9 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			}), empty && h("div", {
 				className: "power-dsh-memory-empty",
 				role: "status"
-			}, h(MemoryIcon, { size: 32 }), h("p", { className: "power-dsh-memory-empty-title" }, t("memoryEmpty")), h("p", { className: "power-dsh-memory-empty-hint" }, t(automatic ? "memoryEmptyHint" : "memoryManualHint")))), cleanupScope && h(CleanupDialog, {
-				scopes: catalog?.scopes ?? [],
-				initialScope: cleanupScope,
+			}, h(MemoryIcon, { size: 32 }), h("p", { className: "power-dsh-memory-empty-title" }, t("memoryEmpty")), h("p", { className: "power-dsh-memory-empty-hint" }, t(automatic ? "memoryEmptyHint" : "memoryManualHint")))), selectedCleanupScope && h(CleanupDialog, {
+				key: selectedCleanupScope.id,
+				scope: selectedCleanupScope,
 				t,
 				onClose: () => setCleanupScope(null),
 				onApplied: loadEntries
@@ -2633,11 +2661,12 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			memoryManualMechanism: "Saved memories are recalled; say “remember” to add one",
 			memoryManualHint: "Say “remember” in a chat to save useful information",
 			memoryCleanup: "Organize memories",
-			memoryCleanupDescription: "Merge duplicates and shorten entries; review before applying",
-			memoryCleanupScope: "Scope",
+			memoryCleanupDescription: "Merge duplicates and shorten entries in “{name}”; review before applying",
 			memoryCleanupModel: "Model",
 			memoryCurrentModel: "Current chat",
 			memoryDefaultModel: "Default",
+			memoryCleanupEffort: "Reasoning effort",
+			memoryCleanupEffortDefault: "Model default",
 			memoryCleanupGenerate: "Generate preview",
 			memoryCleanupApply: "Apply",
 			memoryCleanupGenerating: "Preparing suggestions…",
@@ -2648,6 +2677,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			memoryCleanupUnchanged: "No changes needed",
 			memoryCleanupDone: "Applied. Backup: {path}",
 			memoryModelUnavailable: "No model is available. Check your host model settings and try again.",
+			memoryCleanupEffortUnavailable: "This reasoning effort is no longer available. Select Model default or reopen this dialog to refresh the options.",
 			memoryCleanupFailed: "Organization stopped. No suggestions were applied; generate a new preview to retry.",
 			memoryCleanupLimit: "Too many memories for one pass. Shorten the selected folder’s contents before retrying.",
 			memoryPreviewExpired: "This preview expired. Generate a new one.",
@@ -2717,11 +2747,12 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			memoryManualMechanism: "继续使用已有记忆，说“记住”时才新增",
 			memoryManualHint: "聊天时说“记住”，即可保存有用信息",
 			memoryCleanup: "整理记忆",
-			memoryCleanupDescription: "合并重复、精简内容，预览后确认应用",
-			memoryCleanupScope: "范围",
+			memoryCleanupDescription: "合并“{name}”中的重复记忆并精简内容，确认后应用",
 			memoryCleanupModel: "模型",
 			memoryCurrentModel: "当前对话",
 			memoryDefaultModel: "默认",
+			memoryCleanupEffort: "思考深度",
+			memoryCleanupEffortDefault: "模型默认",
 			memoryCleanupGenerate: "生成预览",
 			memoryCleanupApply: "应用",
 			memoryCleanupGenerating: "正在生成整理建议…",
@@ -2732,6 +2763,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			memoryCleanupUnchanged: "暂时无需整理",
 			memoryCleanupDone: "已应用，备份保存在：{path}",
 			memoryModelUnavailable: "没有可用模型，请检查宿主的模型设置后重试。",
+			memoryCleanupEffortUnavailable: "所选思考深度已不可用，请选择「模型默认」，或重新打开弹窗刷新档位。",
 			memoryCleanupFailed: "整理已停止，建议未应用；可重新生成预览。",
 			memoryCleanupLimit: "单次整理内容过多，请先精简所选文件夹内的记忆再重试。",
 			memoryPreviewExpired: "预览已过期，请重新生成。",
@@ -2777,7 +2809,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 
 // src/features/memory/cleanup-plan.ts
 	function parseModel(value) {
-		if (!isRecord(value) || typeof value.provider !== "string" || !value.provider || value.provider.length > 200 || typeof value.model !== "string" || !value.model || value.model.length > 200 || value.reasoningEffort !== void 0 && (typeof value.reasoningEffort !== "string" || value.reasoningEffort.length > 100)) throw new Error("memoryModelUnavailable");
+		if (!isRecord(value) || typeof value.provider !== "string" || !value.provider || value.provider.length > 200 || typeof value.model !== "string" || !value.model || value.model.length > 200 || value.reasoningEffort !== void 0 && (typeof value.reasoningEffort !== "string" || !value.reasoningEffort || value.reasoningEffort.length > 100)) throw new Error("memoryModelUnavailable");
 		return {
 			provider: value.provider,
 			model: value.model,
@@ -2990,9 +3022,18 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				default: value.default === null ? null : parseModel(value.default),
 				models: value.models.map((model) => {
 					if (!isRecord(model) || typeof model.label !== "string" || model.label.length > 400) throw new TypeError("memoryInvalid");
+					const efforts = model.efforts === void 0 ? [] : model.efforts;
+					if (!isArray(efforts) || efforts.length > 100) throw new TypeError("memoryInvalid");
 					return {
 						...parseModel(model),
-						label: model.label
+						label: model.label,
+						efforts: efforts.map((effort) => {
+							if (!isRecord(effort) || typeof effort.id !== "string" || !effort.id || effort.id.length > 100 || typeof effort.label !== "string" || effort.label.length > 400) throw new TypeError("memoryInvalid");
+							return {
+								id: effort.id,
+								label: effort.label
+							};
+						})
 					};
 				})
 			};
@@ -17909,7 +17950,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 							t,
 							version,
 							namespace,
-							pluginVersion: "0.1.5",
+							pluginVersion: "0.1.6",
 							savePreference,
 							preferenceSlot: preferenceSlot$1,
 							get footerBusy() {

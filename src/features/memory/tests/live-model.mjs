@@ -322,7 +322,8 @@ export async function runMemoryLive(options) {
       ...(options.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}) };
     const cleanupRuntime = {
       catalog: async () => ({ default: selection, groups: [{ id: selection.provider, name: 'Configured test model',
-        models: [{ id: selection.model, name: selection.model }] }] }),
+        models: [{ id: selection.model, name: selection.model,
+          ...(selection.reasoningEffort ? { reasoning: { efforts: [{ id: selection.reasoningEffort, name: selection.reasoningEffort }] } } : {}) }] }] }),
       llm: { async *stream(input) {
         for await (const choice of completion(options, { signal: input.signal, maxTokens: input.maxTokens,
           messages: [{ role: 'system', content: input.system }, ...input.messages.map(message => ({

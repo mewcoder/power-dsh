@@ -83,7 +83,11 @@ export class MemoryCleanup {
         const selected = parseModel(JSON.parse(selection));
         const models = modelCatalog(await service.catalog());
         guard();
-        if (!models.models.some(row => row.provider === selected.provider && row.model === selected.model)) throw new Error('memoryModelUnavailable');
+        const available = models.models.find(row => row.provider === selected.provider && row.model === selected.model);
+        if (!available) throw new Error('memoryModelUnavailable');
+        if (selected.reasoningEffort !== undefined && !available.efforts.some(effort => effort.id === selected.reasoningEffort)) {
+          throw new Error('memoryCleanupEffortUnavailable');
+        }
         const snapshot = await this.store.cleanupSnapshot(scope);
         guard();
         let text = '';

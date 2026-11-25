@@ -6,7 +6,7 @@ export const MEMORY_ERRORS = [
   'memoryDisabled', 'memoryUnavailable', 'memoryLoadFailed', 'memoryWriteFailed', 'memoryInvalid',
   'memoryConflict', 'memoryBusy', 'memoryNotFound', 'memoryWorkspaceUnavailable', 'memoryLimit', 'memoryClearPartial',
   'memoryFolderUnavailable', 'memoryOpenFolderFailed',
-  'memoryModelUnavailable', 'memoryCleanupFailed', 'memoryCleanupLimit', 'memoryPreviewExpired', 'memoryRecoveryRequired',
+  'memoryModelUnavailable', 'memoryCleanupEffortUnavailable', 'memoryCleanupFailed', 'memoryCleanupLimit', 'memoryPreviewExpired', 'memoryRecoveryRequired',
   'memoryIncomplete',
   'memorySourceUnavailable', 'memorySourceNotFound',
 ] as const;

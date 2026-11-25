@@ -294,6 +294,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const scopeName = (scope: MemoryScope) => scope.id === 'global' ? t('memoryGlobalEnabled')
       : scope.cwd.split(/[\\/]/).filter(Boolean).at(-1) || scope.cwd;
     const scopes = catalog?.scopes.filter(scope => scope.entries.length > 0 || !scope.complete) ?? [];
+    const selectedCleanupScope = catalog?.scopes.find(scope => scope.id === cleanupScope);
     const complete = catalog?.scopes.every(scope => scope.complete) ?? false;
     const empty = snapshot.status === 'ready' && complete && scopes.length === 0;
     const storageSummary = catalog
@@ -390,7 +391,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         h(MemoryIcon, { size: 32 }),
         h('p', { className: 'power-dsh-memory-empty-title' }, t('memoryEmpty')),
         h('p', { className: 'power-dsh-memory-empty-hint' }, t(automatic ? 'memoryEmptyHint' : 'memoryManualHint')))),
-      cleanupScope && h(CleanupDialog, { scopes: catalog?.scopes ?? [], initialScope: cleanupScope, t, onClose: () => setCleanupScope(null), onApplied: loadEntries }),
+      selectedCleanupScope && h(CleanupDialog, { key: selectedCleanupScope.id, scope: selectedCleanupScope, t, onClose: () => setCleanupScope(null), onApplied: loadEntries }),
       confirmation && h(Modal, { open: true, title: t('memoryDeleteTitle'),
         closeLabel: t('close'), onClose: () => { if (!pending.current) setConfirmation(null); },
         description: t(confirmation.entry ? 'memoryDeleteDescription' : 'memoryDeleteScopeDescription')

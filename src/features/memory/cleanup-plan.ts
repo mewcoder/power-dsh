@@ -4,7 +4,7 @@ import { isRecord } from '../../shared/types/protocol.ts';
 export function parseModel(value: unknown): MemoryModel {
   if (!isRecord(value) || typeof value.provider !== 'string' || !value.provider || value.provider.length > 200
     || typeof value.model !== 'string' || !value.model || value.model.length > 200
-    || value.reasoningEffort !== undefined && (typeof value.reasoningEffort !== 'string' || value.reasoningEffort.length > 100)) {
+    || value.reasoningEffort !== undefined && (typeof value.reasoningEffort !== 'string' || !value.reasoningEffort || value.reasoningEffort.length > 100)) {
     throw new Error('memoryModelUnavailable');
   }
   return { provider: value.provider, model: value.model,
@@ -20,7 +20,15 @@ export function modelCatalog(value: unknown): MemoryModels {
       if (!isRecord(model) || typeof model.id !== 'string' || typeof model.name !== 'string') continue;
       const selection = parseModel({ provider: group.id, model: model.id });
       if (!models.some(row => row.provider === selection.provider && row.model === selection.model)) {
-        models.push({ ...selection, label: `${group.name} / ${model.name}`.slice(0, 400) });
+        const entries = isRecord(model.reasoning) && Array.isArray(model.reasoning.efforts) ? model.reasoning.efforts : [];
+        if (entries.length > 100) throw new Error('memoryModelUnavailable');
+        const efforts = new Map<string, string>();
+        for (const entry of entries) {
+          if (!isRecord(entry) || typeof entry.id !== 'string' || !entry.id || entry.id.length > 100 || efforts.has(entry.id)) continue;
+          efforts.set(entry.id, (typeof entry.name === 'string' && entry.name ? entry.name : entry.id).slice(0, 400));
+        }
+        models.push({ ...selection, label: `${group.name} / ${model.name}`.slice(0, 400),
+          efforts: Array.from(efforts, ([id, label]) => ({ id, label })) });
       }
       if (models.length > 1000) throw new Error('memoryModelUnavailable');
     }

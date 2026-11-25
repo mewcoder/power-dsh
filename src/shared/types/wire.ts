@@ -429,7 +429,8 @@ export interface MemoryScope {
 export interface MemoryCatalog { path: string; available: boolean; error: string; scopes: MemoryScope[] }
 export interface MemoryWriteResult { indexUpdated: boolean }
 export interface MemoryModel { provider: string; model: string; reasoningEffort?: string }
-export interface MemoryModels { models: (MemoryModel & { label: string })[]; default: MemoryModel | null }
+export interface ModelEffortOption { id: string; label: string }
+export interface MemoryModels { models: (MemoryModel & { label: string; efforts: ModelEffortOption[] })[]; default: MemoryModel | null }
 export interface MemoryCleanupChange {
   before: MemoryDetail; description: string; content: string; removed: MemoryDetail[]; reason: string;
 }
@@ -485,7 +486,7 @@ export interface WebSearchCatalog {
 }
 /** One key-verification call against one backend. */
 export interface TaskModelSelection { provider: string; model: string; reasoningEffort?: string }
-export interface TaskModelOption { provider: string; model: string; label: string; efforts: { id: string; label: string }[] }
+export interface TaskModelOption { provider: string; model: string; label: string; efforts: ModelEffortOption[] }
 export interface TaskModelRow {
   id: string; title: string; target: 'new' | 'new_once' | 'session'; status: string;
   selection: TaskModelSelection | null; error: string;

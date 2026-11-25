@@ -23,23 +23,25 @@ export function createCleanupDialog(runtime: ClientRuntime, env: ClientEnvironme
     label: string; options: { id: string; label: string }[]; value: string; disabled: boolean; onChange(id: string): void;
   }) {
     const [open, setOpen] = React.useState(false);
+    const selectedLabel = options.find(option => option.id === value)?.label ?? label;
     return h('div', { className: 'power-dsh-memory-choice' }, h('span', null, label),
-      h(Menu, { open: open && !disabled, portal: true, autoFocus: true, minWidthFromAnchor: true,
+      h(Menu, { open: open && !disabled, portal: true, autoFocus: true, minWidthFromAnchor: true, className: 'power-dsh-memory-choice-menu',
         selectedId: value, items: options, onClose: () => setOpen(false),
         onSelect: id => { setOpen(false); onChange(id); },
-        anchor: h(Button, { variant: 'outline', disabled, 'aria-label': label, 'aria-haspopup': 'menu', 'aria-expanded': open && !disabled,
+        anchor: h(Button, { variant: 'outline', className: 'power-dsh-memory-choice-trigger', disabled, title: selectedLabel,
+          'aria-label': selectedLabel === label ? label : `${label} · ${selectedLabel}`, 'aria-haspopup': 'menu', 'aria-expanded': open && !disabled,
           onClick: () => setOpen(previous => !previous) },
-        options.find(option => option.id === value)?.label ?? label, h(NativeIcon, { glyph: 'chevron-down-outline', size: 16 })) }));
+        h('span', null, selectedLabel), h(NativeIcon, { glyph: 'chevron-down-outline', size: 16, weight: 'regular' })) }));
   }
 
-  return function MemoryCleanupDialog({ scopes, initialScope, t, onClose, onApplied }: {
-    scopes: MemoryScope[]; initialScope: string; t(key: string): string; onClose(): void; onApplied(): Promise<void>;
+  return function MemoryCleanupDialog({ scope, t, onClose, onApplied }: {
+    scope: MemoryScope; t(key: string): string; onClose(): void; onApplied(): Promise<void>;
   }) {
     const settings = useSnapshot(source);
     const mounted = useMounted();
-    const [scope, setScope] = React.useState(initialScope);
     const [models, setModels] = React.useState<MemoryModels | null>(null);
     const [selected, setSelected] = React.useState('');
+    const [effort, setEffort] = React.useState('');
     const [preferred, setPreferred] = React.useState<{ model: MemoryModel; current: boolean } | null>(null);
     const [busy, setBusy] = React.useState<'models' | 'generate' | 'apply' | null>('models');
     const [error, setError] = React.useState('');
@@ -61,6 +63,9 @@ export function createCleanupDialog(runtime: ClientRuntime, env: ClientEnvironme
       token.current = '';
     };
     const modelId = (model: MemoryModel) => JSON.stringify([model.provider, model.model]);
+    const selectedModel = models?.models.find(row => modelId(row) === selected);
+    const efforts = selectedModel?.efforts ?? [];
+    const selectedEffort = efforts.some(option => option.id === effort) ? effort : '';
     async function loadModels() {
       const version = ++sequence.current;
       setBusy('models');
@@ -83,6 +88,7 @@ export function createCleanupDialog(runtime: ClientRuntime, env: ClientEnvironme
         setModels(result.value);
         setPreferred(choice ? { model: choice, current: available(current) } : null);
         setSelected(choice ? modelId(choice) : result.value.models[0] ? modelId(result.value.models[0]) : '');
+        setEffort(choice?.reasoningEffort ?? '');
       } catch (failure) { if (live(version)) setError(fail(failure)); }
       finally { if (live(version)) setBusy(null); }
     }
@@ -90,9 +96,7 @@ export function createCleanupDialog(runtime: ClientRuntime, env: ClientEnvironme
     React.useEffect(() => { if (!writable) { cancel(); onClose(); } }, [writable]);
 
     async function generate() {
-      if (!writable || pending.current || !selected) return;
-      const selectedModel = models?.models.find(row => modelId(row) === selected);
-      if (!selectedModel) return;
+      if (!writable || pending.current || !selectedModel || !scopeAvailable) return;
       pending.current = true;
       cancel();
       const version = sequence.current;
@@ -100,12 +104,13 @@ export function createCleanupDialog(runtime: ClientRuntime, env: ClientEnvironme
       setError('');
       setPreview(null);
       setDone('');
-      const model = preferred && modelId(preferred.model) === selected ? preferred.model : selectedModel;
+      const model: MemoryModel = { provider: selectedModel.provider, model: selectedModel.model,
+        ...(selectedEffort ? { reasoningEffort: selectedEffort } : {}) };
       try {
         const hex = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
         const id = [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join('-');
         token.current = id;
-        const result = await ctx.remote.powerDsh.prepareMemoryCleanup(scope, JSON.stringify(model), id);
+        const result = await ctx.remote.powerDsh.prepareMemoryCleanup(scope.id, JSON.stringify(model), id);
         if (!live(version)) return;
         if (!result.ok) throw new Error(result.error.message);
         setPreview(result.value);
@@ -134,23 +139,36 @@ export function createCleanupDialog(runtime: ClientRuntime, env: ClientEnvironme
         if (live(version)) { setError(fail(failure)); setPreview(null); }
       } finally { pending.current = false; if (live(version)) setBusy(null); }
     }
-    const scopeOptions = scopes.filter(row => row.complete && row.entries.length > 0 && row.entries.every(entry => !entry.invalid)).map(row => ({ id: row.id,
-      label: row.id === 'global' ? t('memoryGlobalEnabled') : row.cwd.split(/[\\/]/).filter(Boolean).at(-1) || row.cwd }));
+    const scopeAvailable = scope.complete && scope.entries.length > 0 && scope.entries.every(entry => !entry.invalid);
+    const scopeName = scope.id === 'global' ? t('memoryGlobalEnabled') : scope.cwd.split(/[\\/]/).filter(Boolean).at(-1) || scope.cwd;
     const modelOptions = models?.models.map(model => ({ id: modelId(model), label: preferred && modelId(preferred.model) === modelId(model)
       ? `${t(preferred.current ? 'memoryCurrentModel' : 'memoryDefaultModel')} · ${model.label}` : model.label })) ?? [];
+    const choosingDisabled = busy !== null || !writable;
     const reset = () => { cancel(); setPreview(null); setDone(''); setError(''); };
     const plain = (text: string) => h('pre', { className: 'power-dsh-memory-cleanup-text' }, text);
-    return h(Modal, { open: true, className: 'power-dsh-memory-detail', title: t('memoryCleanup'), closeLabel: t('close'),
-      description: t('memoryCleanupDescription'), onClose: () => { cancel(); onClose(); },
+    return h(Modal, { open: true, className: `power-dsh-memory-detail power-dsh-memory-cleanup${preview?.changes.length ? ' power-dsh-memory-cleanup-preview' : ''}`,
+      title: t('memoryCleanup'), closeLabel: t('close'),
+      description: t('memoryCleanupDescription').replace('{name}', () => scopeName), onClose: () => { cancel(); onClose(); },
       footer: h(React.Fragment, null,
         h(Button, { variant: 'outline', 'data-modal-autofocus': true, onClick: () => { cancel(); onClose(); } }, t('cancel')),
-        h(Button, { variant: 'outline', disabled: !writable || busy !== null || !selected || !scopeOptions.some(option => option.id === scope) || preview !== null && !preview.changes.length,
+        h(Button, { variant: 'primary', disabled: choosingDisabled || !selectedModel || !scopeAvailable || preview !== null && !preview.changes.length,
           onClick: preview?.changes.length ? apply : generate }, t(preview?.changes.length ? 'memoryCleanupApply' : 'memoryCleanupGenerate'))) },
     h('div', { className: 'power-dsh-memory-detail-body', tabIndex: 0 },
-      h(Choice, { label: t('memoryCleanupScope'), value: scope, options: scopeOptions, disabled: busy !== null || !writable,
-        onChange: id => { reset(); setScope(id); } }),
-      h(Choice, { label: t('memoryCleanupModel'), value: selected, options: modelOptions, disabled: busy !== null || !writable,
-        onChange: id => { reset(); setSelected(id); } }),
+      h('div', { className: 'power-dsh-memory-cleanup-choices' },
+        h(Choice, { label: t('memoryCleanupModel'), value: selected, options: modelOptions, disabled: choosingDisabled,
+          onChange: id => {
+            if (choosingDisabled || id === selected) return;
+            reset();
+            setSelected(id);
+            setEffort('');
+          } }),
+        efforts.length > 0 && h(Choice, { label: t('memoryCleanupEffort'), value: selectedEffort,
+          options: [{ id: '', label: t('memoryCleanupEffortDefault') }, ...efforts], disabled: choosingDisabled,
+          onChange: id => {
+            if (choosingDisabled || id === selectedEffort) return;
+            reset();
+            setEffort(id);
+          } })),
       busy && loadingFeedback({ label: t(busy === 'generate' ? 'memoryCleanupGenerating' : busy === 'apply' ? 'memoryCleanupApplying' : 'loading') }),
       error && errorFeedback({ t, message: error, code: 'PD-MEMORY-CLEANUP', operation: 'memoryCleanup', placement: 'modal',
         ...(models === null ? { retry: loadModels } : {}) }),

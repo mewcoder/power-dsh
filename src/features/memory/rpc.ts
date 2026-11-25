@@ -95,7 +95,13 @@ export const MEMORY_CLEANUP_MODELS_RPC = descriptor('memoryCleanupModels', [], {
     if (!isRecord(value) || !isArray(value.models) || value.models.length > 1000) throw new TypeError('memoryInvalid');
     return { default: value.default === null ? null : parseModel(value.default), models: value.models.map(model => {
       if (!isRecord(model) || typeof model.label !== 'string' || model.label.length > 400) throw new TypeError('memoryInvalid');
-      return { ...parseModel(model), label: model.label };
+      const efforts = model.efforts === undefined ? [] : model.efforts;
+      if (!isArray(efforts) || efforts.length > 100) throw new TypeError('memoryInvalid');
+      return { ...parseModel(model), label: model.label, efforts: efforts.map(effort => {
+        if (!isRecord(effort) || typeof effort.id !== 'string' || !effort.id || effort.id.length > 100
+          || typeof effort.label !== 'string' || effort.label.length > 400) throw new TypeError('memoryInvalid');
+        return { id: effort.id, label: effort.label };
+      }) };
     }) };
   } }),
 });

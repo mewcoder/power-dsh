@@ -3,29 +3,30 @@ import type { TaskModelCatalog, TaskModelRow, TaskModelSelection } from './types
 import { styles as shellStyles } from '../../shared/client/shell-styles.ts';
 
 const styles = `
-.power-dsh-task-models{max-width:720px;container-type:inline-size}
+.power-dsh-task-models{max-width:720px}
 .power-dsh-task-models .power-dsh-task-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.power-dsh-task-models-list{margin-top:12px}
+.power-dsh-task-models-list{margin-top:24px}
 .power-dsh-task-models-empty{display:flex;align-items:center;flex-direction:column;padding:48px 20px;text-align:center;color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:1.6}
 .power-dsh-task-models-empty>svg{flex:none;margin-bottom:12px;color:var(--dsw-alias-label-caption)}
 .power-dsh-task-models-empty h3{margin:0;font-size:14px;line-height:1.6;font-weight:400}
 .power-dsh-task-model{padding:16px 0;border-bottom:0.5px solid var(--dsw-alias-border-l2);min-width:0}
+.power-dsh-task-model:first-child{padding-top:0}
 .power-dsh-task-model:last-child{border-bottom:0}
-.power-dsh-task-model-row{display:flex;align-items:center;justify-content:space-between;gap:24px;min-width:0}
+.power-dsh-task-model-row{display:flex;flex-direction:column;align-items:stretch;gap:10px;min-width:0}
+.power-dsh-task-model-row[data-session]{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}
 .power-dsh-task-model-copy{flex:1;min-width:0}
-.power-dsh-task-model h3{margin:0;font-size:14px;line-height:22px;font-weight:400;overflow-wrap:anywhere}
+.power-dsh-task-model h3{margin:0;font-size:14px;line-height:22px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .power-dsh-task-model p{margin:4px 0 0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}
-.power-dsh-task-model-controls{display:flex;align-items:center;gap:8px;min-width:0;max-width:70%}
+.power-dsh-task-model-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,128px);align-items:center;gap:8px;min-width:0}
 .power-dsh-task-model-picker{min-width:0}
-.power-dsh-task-model-picker:first-child{flex:1}
-.power-dsh-task-menu{min-width:0;max-width:100%}
-.power-dsh-task-select{box-sizing:border-box;display:inline-flex;align-items:center;gap:12px;justify-content:space-between;height:36px;max-width:100%;min-width:0;padding:0 14px;border:0;border-radius:var(--dsw-radius-md);font:inherit;font-size:14px;line-height:22px;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-module-platform);text-align:left;cursor:pointer}
+.power-dsh-task-model-picker:only-child{grid-column:1/-1}
+.power-dsh-task-menu{width:100%;min-width:0;max-width:100%}
+.power-dsh-task-select{box-sizing:border-box;display:inline-flex;align-items:center;gap:12px;justify-content:space-between;width:100%;height:36px;max-width:100%;min-width:0;padding:0 14px;border:0;border-radius:var(--dsw-radius-md);font:inherit;font-size:14px;line-height:22px;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-module-platform);text-align:left;cursor:pointer}
 .power-dsh-task-select span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .power-dsh-task-select svg{flex:none}
 .power-dsh-task-select:disabled{opacity:.5;cursor:default}
 .power-dsh-task-select:focus-visible{outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:2px}
 @media (hover:hover){.power-dsh-task-select:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}}
-@container (max-width:520px){.power-dsh-task-model-row{flex-direction:column;align-items:stretch;gap:12px}.power-dsh-task-model-controls{max-width:100%}.power-dsh-task-model-picker:first-child .power-dsh-task-menu,.power-dsh-task-model-picker:first-child .power-dsh-task-select{width:100%}}
 `;
 
 export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironment): ClientFeature {
@@ -94,8 +95,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       const modelIndex = selected ? catalog?.models.findIndex(model => model.provider === selected.provider && model.model === selected.model) ?? -1 : -1;
       const model = modelIndex >= 0 ? catalog?.models[modelIndex] : null;
       return h('article', { key: task.id, className: 'power-dsh-task-model', 'aria-busy': saving === task.id },
-        h('div', { className: 'power-dsh-task-model-row' },
-          h('div', { className: 'power-dsh-task-model-copy' }, h('h3', null, task.title),
+        h('div', { className: 'power-dsh-task-model-row', 'data-session': task.target === 'session' || undefined },
+          h('div', { className: 'power-dsh-task-model-copy' }, h('h3', { title: task.title }, task.title),
             task.target === 'session' && h('p', null, t(selected ? 'taskModelsApplied' : 'taskModelsExisting'))),
           task.target === 'session' ?
             selected && h(Button, { variant: 'ghost', size: 'sm', disabled: saving !== null || loading || !form.writable,

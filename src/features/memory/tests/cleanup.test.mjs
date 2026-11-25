@@ -7,10 +7,13 @@ import { randomUUID } from 'node:crypto';
 import { MemoryStore } from '../memory-store.ts';
 import { MemoryCleanup } from '../cleanup.ts';
 import { CLEANUP_PROMPT, parseCleanupPlan } from '../cleanup-plan.ts';
-import { PREPARE_MEMORY_CLEANUP_RPC } from '../rpc.ts';
+import { MEMORY_CLEANUP_MODELS_RPC, PREPARE_MEMORY_CLEANUP_RPC } from '../rpc.ts';
 
 const selection = { provider: 'configured', model: 'chat-model', reasoningEffort: 'low' };
-const catalog = { default: selection, groups: [{ id: 'configured', name: 'Configured', models: [{ id: 'chat-model', name: 'Chat model' }] }] };
+const catalog = { default: selection, groups: [{ id: 'configured', name: 'Configured', models: [
+  { id: 'chat-model', name: 'Chat model', reasoning: { efforts: [{ id: 'low', name: 'Low' }, { id: 'high', name: 'High' }] } },
+  { id: 'plain', name: 'Plain model' },
+] }] };
 const input = (name, content) => ({ name, content, type: 'user', description: name, revision: '', originSessionId: 'source' });
 const plan = { changes: [{ id: 'user/short', description: '回答简短', content: '回答简短，使用中文。', remove: ['user/concise'], reason: '相同偏好，保留中文要求' }] };
 
@@ -83,6 +86,21 @@ test('an empty configured catalog reports model unavailability without affecting
   app.service.catalog = async () => ({ default: selection, groups: [] });
   await assert.rejects(app.cleanup.models(), /memoryModelUnavailable/);
   assert.equal((await app.store.list('global')).entries.length, 2);
+});
+
+test('the cleanup catalog round-trips model efforts and generation rejects a stale effort', async t => {
+  const app = await fixture(t);
+  const models = await app.cleanup.models();
+  const codec = MEMORY_CLEANUP_MODELS_RPC.result.create();
+  assert.deepEqual(codec.parse(models), models);
+  assert.deepEqual(models.models.map(model => model.efforts), [[{ id: 'low', label: 'Low' }, { id: 'high', label: 'High' }], []]);
+  await assert.rejects(app.cleanup.prepare('global', JSON.stringify({ ...selection, model: 'plain' }), randomUUID()),
+    /memoryCleanupEffortUnavailable/);
+  await assert.rejects(app.cleanup.prepare('global', JSON.stringify({ ...selection, reasoningEffort: 'max' }), randomUUID()),
+    /memoryCleanupEffortUnavailable/);
+  assert.equal(app.calls.length, 0);
+  await app.cleanup.prepare('global', JSON.stringify({ ...selection, reasoningEffort: undefined }), randomUUID());
+  assert.equal(Object.hasOwn(app.calls[0], 'reasoningEffort'), false);
 });
 
 test('plan validation rejects unknown files, reused sources, extra commands and oversized bodies', async t => {
