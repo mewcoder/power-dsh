@@ -331,6 +331,16 @@ Node 24.14.0／pnpm 12.5.1 下，产物新鲜度、严格类型、结构与文�
 
 已重新核对市场 PR `awesome-dsh-plugin/awesome-dsh-plugin#14457` 合并且条目仍使用固定 Latest 下载地址，无需重复投稿；不承诺客户端已刷新。候选 Bundle 的真实 Web 页面验收见上方准备记录，未升级用户的日常桌面插件，也未新增桌面原生管理器升级或 Windows 页面验收。
 
+### 0.1.6 公开发布核验（2026-11-25）
+
+本轮调整整理记忆弹窗、自动化任务模型列表和首页鲸鱼开关文案。整理记忆沿用既有模型目录和推理调用，读取模型声明的档位并在生成前复核。最低安装基线与依赖范围沿用既有证据。`0.2.0-rc.1` 隔离 SDK 的仓库检查与 7 项生产 Host 装配检查通过，证据标识为 `summary-1795589728818.json`。
+
+发布提交 `b5f45db857a757105f27e0e710f4ee654b1ab63b` 已进入 main，annotated 标签 `v0.1.6` 指向同一提交。[发布前 CI](https://github.com/mewcoder/power-dsh/actions/runs/45564395441)及[标签 CI](https://github.com/mewcoder/power-dsh/actions/runs/45565086254)的 Linux／Windows 均通过，[Release workflow](https://github.com/mewcoder/power-dsh/actions/runs/45565086298)成功。[正式 Release](https://github.com/mewcoder/power-dsh/releases/tag/v0.1.6)已公开并设为 Latest。
+
+干净 Git 导出上的本地检查共 1086 项，其中 1081 通过、5 跳过、0 失败，产物新鲜度、实际包与独立生产安装通过。版本地址与 Latest 地址的 `power-dsh.tgz` 匿名下载成功，均与受检候选逐字节一致。包为 `power-dsh@0.1.6`，共 44 个文件、2,797,078 字节，SHA-256 为 `a5060c47956087052e6427be1137f892af712f2813afcc7cea46f32613509f31`，integrity 为 `sha512-bdZJhV2NWWaoyTqW4p5fDfm2b5+JB2WaOZwq+E8P95+RLwGMPP1L5zPAsZWh8L7Hvnp7AORF9hO7LhFA3mVjUQ==`。包保留 `private: true`，分发渠道为 GitHub Release。
+
+macOS DSH `0.2.2-rc.5` 本地链接预览验证了整理弹窗显示、当前对话深度继承、手动选择档位及换模型后恢复「模型默认」。最终候选通过同版 DSH CLI 在隔离 Web profile 安装，配置包含 `power-dsh`，启动后返回经过认证的 Web shell。桌面端通过公开附件升级、Windows 页面和用本版重新调用真实模型生成建议仍未验证。市场 PR `awesome-dsh-plugin/awesome-dsh-plugin#14457` 已合并，条目使用固定 Latest 下载地址，客户端刷新状态未实测。
+
 ### 0.1.0 公开发布核验（2026-11-15）
 
 重新认证后，发布提交 `c85a700fb4422779eb17c977040c0eba78c0381a` 已进入 `main`，annotated 标签 `v0.1.0` 指向同一提交。[Release workflow](https://github.com/mewcoder/power-dsh/actions/runs/43724729589) 成功，Linux 上 899 项行为测试中 893 通过、6 项平台检查跳过、0 失败，实际包与独立生产安装通过。[正式 Release](https://github.com/mewcoder/power-dsh/releases/tag/v0.1.0) 已公开并成为 Latest，附件为 `power-dsh.tgz`；既有市场 PR `awesome-dsh-plugin/awesome-dsh-plugin#14457` 已合并，上游条目保留固定 Latest 下载来源，无需重复投稿。
