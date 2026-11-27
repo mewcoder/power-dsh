@@ -231,11 +231,13 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   const calls = [];
   const rpcCalls = [];
   const memoryCalls = [];
+  let taskModelsReply = { ok: true, value: { revision: '{}', tasks: [], models: [] } };
   let memoryReply = async method => method === 'listMemoryEntries'
     ? { ok: true, value: { path: '/test/dsh/power-dsh/memory', available: true, error: '',
       scopes: [{ id: 'global', cwd: '', revision: 'b'.repeat(64), complete: true, entries: [] }] } }
     : { ok: false, error: { message: 'memoryNotFound' } };
   const fileWrites = [];
+  let skillWorkspaceReads = 0;
   const skillReads = [];
   const skillDetailReads = [];
   const skillWrites = [];
@@ -247,13 +249,16 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   const importDestinationReads = [];
   let externalValue = externalSkillCatalog ?? { complete: true, entries: [] };
   const externalAvailability = new Set();
-  const skillView = (cwd, scope = 'user') => ({
-    ...skillValue, cwd: scope === 'project' ? cwd || skillValue.cwd || skillValue.workspaces[0]?.path || '' : '', scope: scope || 'user',
-    skills: skillValue.skills.filter(skill => {
-      const project = skill.source === 'project' || skill.source.startsWith('project-');
-      return (scope === 'project' ? project : !project) && (skill.targetCwd === undefined || skill.targetCwd === cwd);
-    }),
-  });
+  const skillView = (cwd, scope = 'user') => {
+    const selectedCwd = scope === 'project' ? cwd || skillValue.cwd || skillValue.workspaces[0]?.path || '' : '';
+    return {
+      ...skillValue, cwd: selectedCwd, scope: scope || 'user',
+      skills: skillValue.skills.filter(skill => {
+        const project = skill.source === 'project' || skill.source.startsWith('project-');
+        return (scope === 'project' ? project : !project) && (skill.targetCwd === undefined || skill.targetCwd === selectedCwd);
+      }),
+    };
+  };
   const mcpReads = [];
   const mcpDetailReads = [];
   const mcpWrites = [];
@@ -613,6 +618,10 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
             if (mcpProbeError) return { ok: false, error: { message: mcpProbeError } };
             return { ok: true, value: mcpProbe || { ok: true, toolNames: ['navigate'], truncated: false, durationMs: 5, cleanupFailed: false } };
           }
+          if (descriptor.method === 'listSkillWorkspaces') {
+            skillWorkspaceReads++;
+            return { ok: true, value: skillValue.workspaces };
+          }
           if (descriptor.method === 'listSkills') {
             skillReads.push({ cwd: blocked, scope: revision });
             if (skillList) return skillList(blocked, revision);
@@ -810,6 +819,10 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
             memoryCalls.push({ method: descriptor.method, args: rpcArgs });
             return memoryReply(descriptor.method, rpcArgs);
           }
+          if (descriptor.method === 'readTaskModels') {
+            rpcCalls.push({ method: descriptor.method });
+            return taskModelsReply;
+          }
           rpcCalls.push({ method: descriptor.method, blocked });
           const result = rpcReply ? await rpcReply : rpcError ? { ok: false, error: { message: rpcError } } : { ok: true, value: { blocked } };
           if (result.ok) {
@@ -870,6 +883,10 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
   await plugin.apply(ctx);
   const app = {
     memoryCalls,
+    setTaskModelsReply(reply) { taskModelsReply = reply; },
+    renderTaskModels() {
+      return renderComponent(React.createElement(entries.get('settings.section:power-dsh-task-models').component));
+    },
     setMemoryReply(reply) { memoryReply = reply; },
     renderMemory(language) {
       return renderComponent(entries.get('settings.section:power-dsh-memory').component({ t: key => dictionaries.get(language)?.[key] ?? key }));
@@ -902,6 +919,7 @@ export async function mount({ featureIds, localeLanguage, restartStatus = { supp
     },
     reloadMcp() { return app.mcpProps().loadMcpServers(); },
     setSkills(value) { skillValue = value; },
+    get skillWorkspaceReads() { return skillWorkspaceReads; },
     skillsProps() {
       return entries.get('settings.section:power-dsh-skills').component({ t: key => key }).props;
     },

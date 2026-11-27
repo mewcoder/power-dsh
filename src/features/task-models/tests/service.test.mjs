@@ -26,6 +26,19 @@ function fixture({ enabled = true, target = { kind: 'new' }, bindings = { task: 
   return { service, values, calls, agent, tasks, config, ctx, ensure, unload: () => { active = false; service.clear(); } };
 }
 
+test('the catalog uses the native effective next-run order and preserves ties', async () => {
+  const app = fixture();
+  app.tasks.splice(0, app.tasks.length,
+    { id: 'limited', title: 'Limited', status: 'active', target: { kind: 'new' },
+      scheduledAt: '2026-11-27T01:00:00Z', deliveryFloorEndsAt: '2026-11-27T04:00:00Z' },
+    { id: 'ended', title: 'Ended', status: 'ended', target: { kind: 'session' }, scheduledAt: '2026-11-27T02:00:00Z' },
+    { id: 'tied', title: 'Tied', status: 'active', target: { kind: 'new' }, scheduledAt: '2026-11-27T02:00:00Z' },
+    { id: 'paused', title: 'Paused', status: 'paused', target: { kind: 'new_once' },
+      scheduledAt: '2026-11-27T03:00:00Z', deliveryFloorEndsAt: '2026-11-27T01:00:00Z' });
+  assert.deepEqual((await app.service.catalog()).tasks.map(task => task.id), ['ended', 'tied', 'paused', 'limited']);
+  assert.deepEqual(app.tasks.map(task => task.id), ['limited', 'ended', 'tied', 'paused']);
+});
+
 test('selects only trusted native schedule framing, before the first model request, without changing defaults', async () => {
   const app = fixture();
   await app.service.prepare(app.agent);

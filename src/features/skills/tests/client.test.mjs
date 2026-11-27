@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { skillFixture, catalogFixture, mount, button, descendants, skillsPage } from '../../../../tests/helpers/client-fixture.mjs';
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
+const refreshSkills = page => page.render().find(node => node.props['aria-label'] === 'skillRefresh');
 async function confirmDestination(page) {
   await settle();
   const confirm = descendants(page.dialog()).find(node => node.props.className === 'power-dsh-confirm-import');
@@ -88,7 +89,7 @@ test('the skill management switch controls only its own native page and icon and
   }
   app.set({ skillManagerEnabled: true, personalizationEnabled: true });
   app.renderSkills();
-  assert.equal(app.focusSubscriptions(), 2);
+  assert.equal(app.focusSubscriptions(), 1);
   app.unmount();
   assert.equal(app.subscriptions(), 0);
   assert.equal(app.focusSubscriptions(), 0);
@@ -308,6 +309,41 @@ test('a failed skill change reads backend facts again and keeps its row error ac
   app.unmount();
 });
 
+test('workspace loading hides empty project headings and waits for both catalogs before showing an empty result', async () => {
+  const installed = Promise.withResolvers();
+  const discovered = Promise.withResolvers();
+  const app = await mount({ featureIds: ['skills'],
+    skillList: (cwd, scope) => scope === 'project' && cwd === '/work/a' ? installed.promise
+      : { ok: true, value: catalogFixture({ cwd, scope, skills: [] }) },
+    externalSkillList: cwd => cwd === '/work/b' ? discovered.promise
+      : { ok: true, value: { complete: true, entries: [] } },
+  });
+  const page = await skillsPage(app);
+  const assertLoading = () => {
+    const nodes = page.render();
+    assert.ok(!nodes.some(node => node.props['data-workspace']));
+    assert.ok(!nodes.some(node => node.props.className === 'power-dsh-skill-empty'));
+    assert.equal(nodes.filter(node => node.props.className === 'power-dsh-loading').length, 1);
+  };
+  page.tab('project').props.onClick();
+  assertLoading();
+  await settle();
+  assertLoading();
+  installed.resolve({ ok: true, value: catalogFixture({ cwd: '/work/a', scope: 'project', skills: [] }) });
+  await settle();
+  assertLoading();
+  page.search().props.onChange({ target: { value: 'missing' } });
+  assertLoading();
+  discovered.resolve({ ok: true, value: { complete: true, entries: [] } });
+  await settle();
+  const nodes = page.render();
+  assert.ok(!nodes.some(node => node.props['data-workspace'] || node.props.className === 'power-dsh-loading'));
+  assert.deepEqual(nodes.filter(node => node.props.className === 'power-dsh-skill-empty').map(node => node.props.children[0]), ['skillNoMatches']);
+  page.search().props.onChange({ target: { value: '' } });
+  assert.deepEqual(page.render().filter(node => node.props.className === 'power-dsh-skill-empty').map(node => node.props.children[0]), ['skillEmpty']);
+  app.unmount();
+});
+
 test('workspace refresh discards stale reads independently and ignores replies after unload', async () => {
   const old = Promise.withResolvers();
   const latest = Promise.withResolvers();
@@ -319,12 +355,10 @@ test('workspace refresh discards stale reads independently and ignores replies a
     return stage === 0 ? old.promise : stage === 1 ? latest.promise : late.promise;
   } });
   const page = await skillsPage(app, 'project');
-  expandWorkspaceGroups(page);
-  assert.ok(page.workspace('/work/a'));
-  assert.equal(groupCount(page.workspace('/work/a')), undefined);
+  assert.equal(page.workspace('/work/a'), undefined);
   assert.equal(page.workspace('/work/b'), undefined);
   stage = 1;
-  app.focus();
+  refreshSkills(page).props.onClick();
   await settle();
   latest.resolve({ ok: true, value: catalogFixture({ cwd: '/work/a', scope: 'project', skills: [skillFixture({ name: 'new-context', source: 'project-dsh' })] }) });
   await settle();
@@ -334,7 +368,7 @@ test('workspace refresh discards stale reads independently and ignores replies a
   assert.ok(page.row('new-context', '/work/a'));
   assert.equal(page.row('old-context', '/work/a'), undefined);
   stage = 2;
-  app.focus();
+  refreshSkills(page).props.onClick();
   await settle();
   assert.equal(groupCount(page.workspace('/work/a')), 1);
   assert.ok(page.row('new-context', '/work/a'));
@@ -346,7 +380,7 @@ test('workspace refresh discards stale reads independently and ignores replies a
   assert.equal(source.getSnapshot(), before);
 });
 
-test('workspace groups retain distinct paths, counts and collapse choices across tabs, search and focus', async () => {
+test('workspace groups retain distinct paths, counts and collapse choices across tabs, search and manual refresh', async () => {
   const app = await mount({ skillCatalog: catalogFixture({ workspaces: [
     { path: '/work/a', title: 'Same project' }, { path: '/work/b', title: 'Same project' },
   ], skills: [skillFixture({ source: 'project-dsh' })] }) });
@@ -360,6 +394,7 @@ test('workspace groups retain distinct paths, counts and collapse choices across
     assert.ok(page.row('code-review', path));
   }
   const reads = app.skillReads.length;
+  const discoveries = app.externalReads.length;
   page.workspaceToggle('/work/a').props.onClick();
   assert.equal(page.row('code-review', '/work/a'), undefined);
   assert.ok(page.row('code-review', '/work/b'));
@@ -378,7 +413,55 @@ test('workspace groups retain distinct paths, counts and collapse choices across
   page.render();
   app.focus();
   await settle();
-  assert.deepEqual(app.skillReads.slice(reads), [{ cwd: '', scope: 'user' }, { cwd: '/work/b', scope: 'project' }]);
+  assert.deepEqual(app.skillReads.slice(reads), []);
+  assert.deepEqual(app.externalReads.slice(discoveries), []);
+  refreshSkills(page).props.onClick();
+  await settle();
+  assert.deepEqual(app.skillReads.slice(reads), [{ cwd: '/work/a', scope: 'project' }, { cwd: '/work/b', scope: 'project' }]);
+  assert.deepEqual(app.externalReads.slice(discoveries), [{ cwd: '/work/a', scope: 'project' }, { cwd: '/work/b', scope: 'project' }]);
+  assert.equal(page.workspaceToggle('/work/a').props['aria-expanded'], false);
+  app.unmount();
+});
+
+test('the first workspace visit and manual refresh discover registry changes without reading the global catalog', async () => {
+  const app = await mount({ featureIds: ['skills'], skillCatalog: catalogFixture({ workspaces: [], skills: [] }) });
+  const page = await skillsPage(app);
+  assert.equal(app.skillWorkspaceReads, 0);
+  const reads = app.skillReads.length;
+  app.setSkills(catalogFixture({ workspaces: [{ path: '/work/new', title: 'New project' }],
+    skills: [skillFixture({ source: 'project-dsh', targetCwd: '/work/new' })] }));
+  page.tab('project').props.onClick();
+  assert.ok(!page.render().some(node => node.props.children.includes('skillNoProjects')));
+  await settle();
+  assert.ok(page.row('code-review', '/work/new'));
+  assert.equal(app.skillWorkspaceReads, 1);
+  assert.deepEqual(app.skillReads.slice(reads), [{ cwd: '/work/new', scope: 'project' }]);
+  app.setSkills(catalogFixture({ workspaces: [], skills: [] }));
+  refreshSkills(page).props.onClick();
+  await settle();
+  assert.equal(page.workspace('/work/new'), undefined);
+  assert.ok(page.render().some(node => node.props.children.includes('skillNoProjects')));
+  assert.equal(app.skillWorkspaceReads, 2);
+  assert.deepEqual(app.skillReads.slice(reads), [{ cwd: '/work/new', scope: 'project' }]);
+  app.unmount();
+});
+
+test('a failed project read during refresh leaves other project reads independent', async () => {
+  let refreshing = false;
+  const app = await mount({ featureIds: ['skills'], skillList: (cwd, scope) => {
+    if (scope === 'user') return { ok: true, value: catalogFixture({ skills: [] }) };
+    if (refreshing && (cwd === '/work/a' || cwd === '')) return { ok: false, error: { message: 'Project A could not be read' } };
+    const skills = cwd === '/work/b' ? [skillFixture({ name: refreshing ? 'new-skill' : 'old-skill', source: 'project-dsh' })] : [];
+    return { ok: true, value: catalogFixture({ cwd, scope, skills }) };
+  } });
+  const page = await skillsPage(app, 'project');
+  assert.ok(page.row('old-skill', '/work/b'));
+  refreshing = true;
+  refreshSkills(page).props.onClick();
+  await settle();
+  assert.ok(descendants(page.workspace('/work/a')).some(node => node.props.role === 'alert'));
+  assert.ok(page.row('new-skill', '/work/b'));
+  assert.equal(page.row('old-skill', '/work/b'), undefined);
   app.unmount();
 });
 
@@ -642,11 +725,11 @@ test('global discovery group lists importable skills and imports one card', asyn
   const page = await skillsPage(app);
   await settle();
   page.render();
-  assert.deepEqual(app.externalReads, [], 'The group must not scan before it is opened');
+  assert.deepEqual(app.externalReads, [{ cwd: '', scope: 'user' }]);
   const group = () => page.discoveryGroup();
   assert.ok(group());
   assert.equal(descendants(group()).find(node => node.type === 'button' && node.props['aria-controls']).props['aria-expanded'], false);
-  assert.equal(groupCount(group()), undefined);
+  assert.equal(groupCount(group()), 2);
   await page.openDiscovery();
   assert.deepEqual(app.externalReads, [{ cwd: '', scope: 'user' }]);
   assert.equal(groupCount(group()), 2);
@@ -688,7 +771,7 @@ test('workspace discovery cards stay in their project group and use the same imp
   await settle();
   page.render();
   assert.deepEqual(app.externalReads, [
-    { cwd: '/work/a', scope: 'project' }, { cwd: '/work/b', scope: 'project' },
+    { cwd: '', scope: 'user' }, { cwd: '/work/a', scope: 'project' }, { cwd: '/work/b', scope: 'project' },
   ]);
   const group = page.workspace('/work/a');
   const lists = descendants(group).filter(node => node.type === 'ul' && node.props.className === 'power-dsh-skill-cards');
@@ -708,6 +791,27 @@ test('workspace discovery cards stay in their project group and use the same imp
     const footer = descendants(card).find(node => node.props.className === 'power-dsh-skill-card-meta');
     assert.deepEqual(descendants(footer).filter(node => node.type === 'button').map(node => node.props.children[0]), ['skillDetail']);
   }
+  app.unmount();
+});
+
+test('importing across tabs defers the target catalog and discovery until that tab is opened', async () => {
+  const entry = { id: 'codex:report:dir', name: 'report', description: 'Write reports', source: 'Codex',
+    path: '/home/.codex/skills/report', flat: false };
+  const app = await mount({ featureIds: ['skills'], externalSkillCatalog: { complete: true, entries: [entry] } });
+  const page = await skillsPage(app);
+  await page.openDiscovery();
+  descendants(page.discovery('report')).find(node => node.props['data-import-action']).props.onClick();
+  await settle();
+  descendants(page.dialog()).find(node => node.type === 'native-menu-fixture').props.onSelect('/work/a');
+  await confirmDestination(page);
+  assert.equal(app.externalImports[0].targetCwd, '/work/a');
+  assert.ok(app.skillReads.every(read => read.scope === 'user'));
+  assert.ok(app.externalReads.every(read => read.scope === 'user'));
+  page.tab('project').props.onClick();
+  page.render();
+  await settle();
+  assert.ok(page.row('report', '/work/a'));
+  assert.equal(page.discovery('report', '/work/a'), undefined);
   app.unmount();
 });
 
@@ -761,9 +865,7 @@ test('already present external skills are omitted from discovery in both scopes'
   const globalPage = await skillsPage(global);
   await settle();
   globalPage.render();
-  assert.ok(globalPage.discoveryGroup(), 'The lazy group is visible before it is opened');
-  await globalPage.openDiscovery();
-  assert.equal(globalPage.discoveryGroup(), undefined, 'An empty scan removes the group');
+  assert.equal(globalPage.discoveryGroup(), undefined, 'An empty scan never shows the group');
   assert.equal(globalPage.render().filter(node => node.type === 'li' && node.props['data-import']).length, 0);
 
   const workspace = await mount({ featureIds: ['skills'], externalSkillCatalog: { complete: true, entries: [entry] } });
@@ -908,16 +1010,48 @@ test('discovery search filters paths and descriptions in both scopes without res
   app.unmount();
 });
 
-test('an empty discovery result leaves no group in either scope', async () => {
-  const app = await mount({ featureIds: ['skills'], skillCatalog: catalogFixture({ workspaces: [], skills: [] }) });
-  const page = await skillsPage(app);
-  await settle();
-  page.render();
+test('global loading never flashes an empty group or empty list and refreshes only the visible tab', async () => {
+  let discovery = Promise.withResolvers();
+  const app = await mount({ featureIds: ['skills'], skillCatalog: catalogFixture({ skills: [] }),
+    externalSkillList: cwd => cwd ? { ok: true, value: { complete: true, entries: [] } } : discovery.promise });
+  app.set({ skillManagerEnabled: true });
+  assert.deepEqual(app.skillReads, []);
   assert.deepEqual(app.externalReads, []);
-  assert.ok(page.discoveryGroup());
-  await page.openDiscovery();
+  const page = await skillsPage(app);
   assert.deepEqual(app.externalReads, [{ cwd: '', scope: 'user' }]);
-  assert.equal(page.discoveryGroup(), undefined);
+  assert.ok(app.skillReads.every(read => read.scope === 'user'));
+  const assertLoading = () => {
+    const nodes = page.render();
+    assert.equal(page.discoveryGroup(), undefined);
+    assert.ok(!nodes.some(node => node.props.className === 'power-dsh-skill-empty'));
+    assert.equal(nodes.filter(node => node.props.className === 'power-dsh-loading').length, 1);
+  };
+  assertLoading();
+  discovery.resolve({ ok: true, value: { complete: true, entries: [] } });
+  await settle();
+  assert.equal(page.render().filter(node => node.props.className === 'power-dsh-skill-empty').length, 1);
+  page.tab('project').props.onClick();
+  page.render();
+  await settle();
+  page.tab('user').props.onClick();
+  page.render();
+  const reads = app.skillReads.length;
+  const discoveries = app.externalReads.length;
+  app.focus();
+  await settle();
+  assert.equal(app.skillReads.length, reads);
+  assert.equal(app.externalReads.length, discoveries);
+  discovery = Promise.withResolvers();
+  const refresh = refreshSkills(page).props.onClick;
+  refresh();
+  refresh();
+  await settle();
+  assertLoading();
+  assert.equal(refreshSkills(page).props['aria-busy'], true);
+  assert.deepEqual(app.skillReads.slice(reads), [{ cwd: '', scope: 'user' }]);
+  assert.deepEqual(app.externalReads.slice(discoveries), [{ cwd: '', scope: 'user' }]);
+  discovery.resolve({ ok: true, value: { complete: true, entries: [] } });
+  await settle();
   assert.equal(page.render().filter(node => node.props.className === 'power-dsh-skill-empty').length, 1);
   app.unmount();
 });

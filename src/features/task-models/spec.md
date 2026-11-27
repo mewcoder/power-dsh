@@ -10,7 +10,9 @@
 
 设置页沿用官方模型页的 720px 正文与标题说明规格。任务列表与标题组间距 24px，任务之间上下 16px 留白与 0.5px 分隔线，无独立卡片。每项先显示 14px／500 的任务名，下方间隔 10px 同排放置模型与思考深度选择器；模型占剩余宽度，思考深度列固定 128px，各行左右边界对齐。窄面板保持相同布局，长任务名和模型名截断并保留完整提示。选择器复用公共 Menu，使用官方语言设置的 36px 高、无描边主题底色与 regular 下箭头。不支持思考深度的模型隐藏该项，模型选择器占满一行；已有会话显示原说明与右侧清除入口。
 
-首次成功读取且没有任务时，正文显示官方自动化任务页同规格的居中空态，仅包含 24px regular 时钟图标和「暂无自动化任务」。保留页头与刷新入口，不显示空列表或选择器；加载中及读取失败不显示空态，失败继续使用共享错误反馈。创建任务后刷新或重新聚焦页面恢复列表。
+列表使用与原生自动化任务页相同的调度目录、状态筛选和顺序。筛选依次为「已开启」「已暂停」「已结束」「全部」，首次进入默认「已开启」；刷新、重新聚焦及保存保留当前筛选。各范围按原生下一次运行时间升序，使用预定时间和投递间隔限制中较晚的一项，时间相同时保留目录顺序。切换筛选只使用已经加载的目录。
+
+首次成功读取且当前筛选没有任务时，正文显示居中空态，仅包含 24px regular 时钟图标和对应提示。目录没有任何任务时显示「暂无自动化任务」。保留页头、状态筛选与刷新入口；加载中及读取失败不显示空态，失败继续使用共享错误反馈。创建任务后刷新或重新聚焦页面恢复列表。
 
 `taskModelsEnabled` 默认 false；隐藏配置 `taskModelBindings` 默认 `{}`，以 JSON 字符串保存任务 id 对应的 provider/model/可选 reasoningEffort，均持久化于插件自己的原生配置。写入由 owner-only RPC 串行处理，按配置原文校验冲突，保存失败保留原选择并可重试。模型来自原生 modelCatalog，切换模型清除旧思考深度；默认模型移除绑定，默认思考深度省略 effort。
 
@@ -18,7 +20,7 @@
 
 ## 生命周期、权限与兼容
 
-Inspect 工具当前不可用。接口依据为官方 DSH 0.2.2-rc.1 提交 fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159：schedule.catalog、schedule/resolve-agent waterfall、agent/inbox/inserted、agent/pre-step、agent.model.select、sessionController.modelCatalog、llm.resolveCallConfig。schedule/resolve-agent 仅调用 next 后准备本次目标的选择；仅信任 source.kind=schedule 且符合原生固定 framing 的单条提醒，在 inbox 插入、driver 启动前选择模型。普通消息、批量已有会话提醒和无绑定任务不干预。模型不可用时阻止该会话的模型请求，显示可恢复错误，不偷偷改用默认模型；原生投递可能已记为完成，修正后需在原生任务页再次执行。
+Inspect 工具当前不可用。接口依据为官方 DSH 0.2.2-rc.1 提交 fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159：schedule.catalog、schedule/resolve-agent waterfall、agent/inbox/inserted、agent/pre-step、agent.model.select、sessionController.modelCatalog、llm.resolveCallConfig。列表状态和排序依据该版原生任务管理页及本机 DSH 0.2.2-rc.5 桌面发行包。schedule/resolve-agent 仅调用 next 后准备本次目标的选择；仅信任 source.kind=schedule 且符合原生固定 framing 的单条提醒，在 inbox 插入、driver 启动前选择模型。普通消息、批量已有会话提醒和无绑定任务不干预。模型不可用时阻止该会话的模型请求，显示可恢复错误，不偷偷改用默认模型；原生投递可能已记为完成，修正后需在原生任务页再次执行。
 
 服务缺席时页面报告不可用，不伪造空目录；不扫描会话内容、不增加计时调度或网络请求。事件、目标缓存和错误状态随子 context 释放。已激活的请求保持原生生命周期。
 

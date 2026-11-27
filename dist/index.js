@@ -164,6 +164,12 @@ function reminderTaskId(message) {
 }
 
 // src/features/task-models/service.ts
+function nextRunTime(task) {
+	const scheduled = Date.parse(task.scheduledAt ?? "");
+	const floor = Date.parse(task.deliveryFloorEndsAt ?? "");
+	if (floor > scheduled) return floor;
+	return Number.isFinite(scheduled) ? scheduled : Infinity;
+}
 var TaskModels = class {
 	ctx;
 	config;
@@ -200,7 +206,7 @@ var TaskModels = class {
 		return {
 			revision,
 			models,
-			tasks: tasks.map((task) => {
+			tasks: tasks.toSorted((left, right) => nextRunTime(left) - nextRunTime(right)).map((task) => {
 				const selection = bindings.get(task.id) ?? null;
 				let error = this.errors.get(task.id) ?? "";
 				if (selection) try {
@@ -3048,7 +3054,7 @@ var PluginReleases = class {
 };
 
 // package.json
-var version = "0.1.6";
+var version = "0.1.7";
 
 // src/features/plugin-updates/host.ts
 var host_exports$17 = /* @__PURE__ */ __exportAll({
@@ -5510,19 +5516,23 @@ var SkillPolicy = class {
 		}
 		return lease.key;
 	}
+	async listWorkspaces() {
+		await this.ready;
+		this.active();
+		if (!this.ctx || this.closed) throw new Error("DSH skill management is unavailable.");
+		return this.ctx.workspaceRegistry.list().map((row) => ({
+			path: resolve(row.path),
+			title: row.title
+		}));
+	}
 	async context(cwd, scope) {
 		if (typeof cwd !== "string" || typeof scope !== "string" || ![
 			"",
 			"user",
 			"project"
 		].includes(scope)) throw new TypeError("Invalid skill context.");
-		await this.ready;
+		const workspaces = await this.listWorkspaces();
 		this.active();
-		if (!this.ctx || this.closed) throw new Error("DSH skill management is unavailable.");
-		const workspaces = this.ctx.workspaceRegistry.list().map((row) => ({
-			path: resolve(row.path),
-			title: row.title
-		}));
 		scope ||= "user";
 		const defaultDirectory = resolve(this.ctx.workingDirectory.defaultDirectory);
 		const firstProject = workspaces.find((row) => row.path === defaultDirectory) ?? workspaces[0];
@@ -5992,6 +6002,12 @@ function createHost$13(ctx, config, { owner, ensureActive }) {
 	return { skills };
 }
 const methods$13 = {
+	listSkillWorkspaces() {
+		return this.run(() => {
+			if (!this.skills.current) throw new Error("DSH skill management is unavailable.");
+			return this.skills.current.listWorkspaces();
+		});
+	},
 	listSkills(cwd, scope) {
 		return this.run(() => {
 			if (!this.skills.current) throw new Error("DSH skill management is unavailable.");
@@ -6118,11 +6134,27 @@ function parseDeletionOption(value) {
 		workspaceTitle: value.workspaceTitle
 	};
 }
+function parseWorkspaces(value) {
+	if (!isArray(value)) throw new TypeError("Invalid skill workspaces");
+	return value.map((item) => {
+		if (!isRecord$2(item) || !hasStrings(item, ["path", "title"])) throw new TypeError("Invalid skill workspace");
+		return {
+			path: item.path,
+			title: item.title
+		};
+	});
+}
+const skillWorkspacesCodec = {
+	mode: "strict",
+	typeSymbol: "power-dsh#SkillWorkspace[]",
+	create: () => ({ parse: parseWorkspaces })
+};
 const skillCatalogCodec = {
 	mode: "strict",
 	typeSymbol: "power-dsh#SkillCatalog",
 	create: () => ({ parse(value) {
-		if (!isRecord$2(value) || typeof value.cwd !== "string" || !isOneOf(value.scope, ["user", "project"]) || typeof value.complete !== "boolean" || !isArray(value.workspaces) || !value.workspaces.every((item) => isRecord$2(item) && typeof item.path === "string" && typeof item.title === "string") || !isArray(value.skills)) throw new TypeError("Invalid skill catalog");
+		if (!isRecord$2(value) || typeof value.cwd !== "string" || !isOneOf(value.scope, ["user", "project"]) || typeof value.complete !== "boolean" || !isArray(value.skills)) throw new TypeError("Invalid skill catalog");
+		const workspaces = parseWorkspaces(value.workspaces);
 		const skills = value.skills.map((row) => {
 			if (!isRecord$2(row) || !hasStrings(row, [
 				"name",
@@ -6153,10 +6185,7 @@ const skillCatalogCodec = {
 		return {
 			cwd: value.cwd,
 			scope: value.scope,
-			workspaces: value.workspaces.map((item) => ({
-				path: item.path,
-				title: item.title
-			})),
+			workspaces,
 			complete: value.complete,
 			skills
 		};
@@ -6212,6 +6241,7 @@ function skillRpc(method, fields, result = skillCatalogCodec) {
 		result
 	};
 }
+const LIST_SKILL_WORKSPACES_RPC = skillRpc("listSkillWorkspaces", [], skillWorkspacesCodec);
 const LIST_SKILLS_RPC = skillRpc("listSkills", ["cwd", "scope"]);
 const READ_SKILL_RPC = skillRpc("readSkill", [
 	"cwd",
@@ -6437,6 +6467,7 @@ const DELETE_SKILL_RPC = skillRpc("deleteSkill", [
 	"revision"
 ]);
 const rpc$13 = [
+	LIST_SKILL_WORKSPACES_RPC,
 	LIST_SKILLS_RPC,
 	READ_SKILL_RPC,
 	SET_SKILL_ENABLED_RPC,
@@ -13206,6 +13237,7 @@ const MOD_RPC = composeRpc([
 	RECENT_PREVIEWS_RPC,
 	READ_PERSONALIZATION_RPC,
 	SAVE_PERSONALIZATION_RPC,
+	LIST_SKILL_WORKSPACES_RPC,
 	LIST_SKILLS_RPC,
 	READ_SKILL_RPC,
 	SET_SKILL_ENABLED_RPC,

@@ -726,6 +726,7 @@ interface PowerDshMethods {
   readWallpaper(): Promise<WallpaperAsset | null>;
   saveWallpaper(dataUrl: string, name: string): Promise<WallpaperAsset>;
   clearWallpaper(): Promise<WallpaperCleared>;
+  listSkillWorkspaces(): Promise<SkillWorkspace[]>;
   listSkills(cwd: string, scope: string): Promise<SkillCatalog>;
   readSkill(cwd: string, scope: string, name: string): Promise<SkillDetail | null>;
   setSkillEnabled(cwd: string, scope: string, name: string, enabled: boolean): Promise<SkillCatalog>;

@@ -45,10 +45,10 @@ interface ImportConfirmation {
   destination: SkillImportDestination | null;
   error: string;
 }
-interface SkillsPageProps extends PageSlotProps { source: SnapshotSource<FormSnapshot>; skillsSource: SnapshotSource<SkillsState>; loadSkills(cwd?: string, scope?: SkillScope): Promise<void>; setSkillEnabled(cwd: string, name: string, enabled: boolean): Promise<SkillCatalog | null>; readSkill(cwd: string, name: string): Promise<SkillDetail | null>; deleteSkill(cwd: string, name: string, revision: string): Promise<SkillCatalog>; listWorkspaceSkills(path: string): Promise<SkillCatalog>; discoverSkills(cwd: string, scope: SkillScope): Promise<ExternalSkillCatalog>; readExternalSkill(cwd: string, id: string): Promise<ExternalSkillDetail | null>; readImportDestination(cwd: string, name: string, flat: boolean): Promise<SkillImportDestination>; importSkills(cwd: string, ids: string[], mode?: SkillImportMode, revision?: string, targetCwd?: string): Promise<SkillImportResult>; }
+interface SkillsPageProps extends PageSlotProps { source: SnapshotSource<FormSnapshot>; skillsSource: SnapshotSource<SkillsState>; loadSkills(cwd?: string, scope?: SkillScope): Promise<void>; setSkillEnabled(cwd: string, name: string, enabled: boolean): Promise<SkillCatalog | null>; readSkill(cwd: string, name: string): Promise<SkillDetail | null>; deleteSkill(cwd: string, name: string, revision: string): Promise<SkillCatalog>; listSkillWorkspaces(): Promise<SkillWorkspace[]>; listWorkspaceSkills(path: string): Promise<SkillCatalog>; discoverSkills(cwd: string, scope: SkillScope): Promise<ExternalSkillCatalog>; readExternalSkill(cwd: string, id: string): Promise<ExternalSkillDetail | null>; readImportDestination(cwd: string, name: string, flat: boolean): Promise<SkillImportDestination>; importSkills(cwd: string, ids: string[], mode?: SkillImportMode, revision?: string, targetCwd?: string): Promise<SkillImportResult>; }
 
 export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironment) {
-  const { React, h, Menu, MenuSurface, Modal, Button, Tooltip, MarkdownText, NativeIcon, observable, useSnapshot, useMounted, errorFeedback, loadingFeedback } = runtime;
+  const { React, h, Menu, MenuSurface, Modal, Button, Tooltip, StateDot, MarkdownText, NativeIcon, observable, useSnapshot, useMounted, errorFeedback, loadingFeedback } = runtime;
   const { ctx, form, source, t, savePreference, preferenceSlot, namespace } = env;
   const styles = shellStyles + catalogStyles + featureStyles;
   const { SkillSearchIcon, SkillChevron } = createCatalogUI(runtime);
@@ -82,7 +82,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   }
 
 
-  function SkillsPage({ t, source, skillsSource, loadSkills, setSkillEnabled, readSkill, deleteSkill, listWorkspaceSkills, discoverSkills, readExternalSkill, readImportDestination, importSkills }: SkillsPageProps) {
+  function SkillsPage({ t, source, skillsSource, loadSkills, setSkillEnabled, readSkill, deleteSkill, listSkillWorkspaces, listWorkspaceSkills, discoverSkills, readExternalSkill, readImportDestination, importSkills }: SkillsPageProps) {
     const config = useSnapshot(source);
     const snapshot = useSnapshot(skillsSource);
     const catalog = snapshot.value;
@@ -111,44 +111,42 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const [workspaceState, setWorkspaceState] = React.useState<Record<string, WorkspaceGroupState>>({});
     const [workspaceOpen, setWorkspaceOpen] = React.useState<Partial<Record<string, boolean>>>({});
     const [workspaceSaving, setWorkspaceSaving] = React.useState<{ cwd: string; name: string } | null>(null);
+    const [workspaceList, setWorkspaceList] = React.useState<{ value?: SkillWorkspace[]; error?: string }>({});
+    const [refreshingTab, setRefreshingTab] = React.useState<SkillTab | null>(null);
+    const refreshing = React.useRef(false);
+    const staleTabs = React.useRef(new Set<SkillTab>());
     const workspaceGeneration = React.useRef<Record<string, number>>({});
-    const workspaceOpenRef = React.useRef<Partial<Record<string, boolean>>>({});
     const importGeneration = React.useRef<Record<string, number>>({});
     const mounted = useMounted();
     const pending = React.useRef(false);
     const detailGeneration = React.useRef(0);
     const detailTrigger = React.useRef<HTMLButtonElement | null>(null);
     const id = React.useId();
-    const busy = snapshot.status === 'loading' || Boolean(snapshot.saving) || Boolean(workspaceSaving) || importing !== '' || deleting;
+    const busy = snapshot.status === 'loading' || Boolean(snapshot.saving) || Boolean(workspaceSaving) || importing !== '' || deleting || refreshingTab !== null;
     // Workspace uses its own group catalogs, so the page-level catalog stays in
     // the user scope while the visible tab switches locally.
     const tab: SkillTab = projectView ? 'project' : 'user';
     const writable = config.status === 'ready' && config.writable && config.value?.skillManagerEnabled === true;
     const disabled = busy || !writable || snapshot.status !== 'ready' || !catalog?.complete;
-    const workspaces = snapshot.workspaces ?? [];
+    const workspaces = tab === 'project' ? workspaceList.value ?? [] : snapshot.workspaces;
     React.useEffect(() => {
       if (!importNotice) return;
       const timer = window.setTimeout(() => setImportNotice(''), 3000);
       return () => window.clearTimeout(timer);
     }, [importNotice]);
     React.useEffect(() => {
-      workspaceOpenRef.current = Object.fromEntries(workspaces.map(workspace => [workspace.path, workspaceOpen[workspace.path] ?? true]));
-    }, [workspaces, workspaceOpen]);
-    React.useEffect(() => {
-      if (projectView) queueWorkspaceLoads();
-    }, [projectView, workspaces]);
-    React.useEffect(() => {
-      void loadSkills();
-      const refresh = () => {
-        void loadSkills();
-        // Expanded workspace groups re-read their own catalogs on focus.
-        if (!pending.current) for (const [path, open] of Object.entries(workspaceOpenRef.current)) {
-          if (open && workspaceGeneration.current[path]) void loadWorkspace(path);
-        }
-      };
-      window.addEventListener('focus', refresh);
-      return () => window.removeEventListener('focus', refresh);
+      void loadSkills('', 'user');
     }, []);
+    React.useEffect(() => {
+      if (!writable || refreshing.current) return;
+      if (tab === 'user') {
+        if (!importGeneration.current['']) void loadImportGroup('');
+      } else {
+        for (const { path } of workspaceList.value ?? []) {
+          if (!importGeneration.current[path]) void loadImportGroup(path);
+        }
+      }
+    }, [tab, workspaceList.value, writable, refreshingTab]);
     const sourceLabel = (value: string) => ['skillPersonalSource', 'skillProjectSource', 'skillPluginSource', 'skillCustomSource', 'skillBundledSource'].includes(value) ? t(value) : value;
     const displaySource = (skill: SkillEntry) => scope === 'user'
       ? ['runtime', 'plugin', 'bundled'].includes(skill.source) || skill.source.startsWith('bundled-') ? 'skillBundledSource' : 'skillPersonalSource'
@@ -159,27 +157,21 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       `${skill.name} ${skill.description} ${skill.origin} ${sourceLabel(displaySource(skill))}`.toLocaleLowerCase().includes(needle));
     const globalDiscovered = discoveryEntries('');
     const globalDiscoveryState = importState.groups[''];
-    const globalDiscoveryPending = writable && Boolean(globalDiscoveryState)
-      && (globalDiscoveryState.status === 'loading' || globalDiscoveryState.status === 'error'
-        || Boolean(globalDiscoveryState.catalog && !globalDiscoveryState.catalog.complete));
+    const globalDiscoveryLoading = writable && (!globalDiscoveryState || globalDiscoveryState.status === 'loading');
+    const globalDiscoveryIssue = globalDiscoveryState?.status === 'error'
+      || Boolean(globalDiscoveryState?.catalog && !globalDiscoveryState.catalog.complete);
+    const listError = tab === 'user' ? snapshot.error : workspaceList.error;
     const TABS: readonly SkillTab[] = ['user', 'project'];
     function selectTab(next: SkillTab) {
-      if (busy || pending.current || tab === next) return;
+      if (busy || refreshing.current || pending.current || tab === next) return;
       setError(null);
       closeConfirmation();
       closeExternalDetail();
       activeTab.current = next;
       setImportNotice('');
       setProjectView(next === 'project');
-      // Re-enter a scope refreshes discovery for the cards already on that
-      // page; a first workspace visit is loaded by the project effect below.
-      if (next === 'user') {
-        if (importState.groups[''] && (importGroupsOpen[''] ?? false)) void loadImportGroup('');
-      } else {
-        for (const workspace of workspaces) {
-          if (importState.groups[workspace.path]) void loadImportGroup(workspace.path);
-        }
-      }
+      const firstWorkspaceVisit = next === 'project' && !workspaceList.value && !workspaceList.error;
+      if (firstWorkspaceVisit || staleTabs.current.has(next)) void refreshTab(next, firstWorkspaceVisit);
       return undefined;
     }
     function tabButton(value: SkillTab, label: string) {
@@ -195,7 +187,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             : event.key === 'End' ? TABS[TABS.length - 1]
               : event.key === 'ArrowLeft' ? TABS[(index + TABS.length - 1) % TABS.length]
                 : event.key === 'ArrowRight' ? TABS[(index + 1) % TABS.length] : null;
-          if (!next || busy || pending.current) return;
+          if (!next || busy || refreshing.current || pending.current) return;
           event.preventDefault();
           selectTab(next);
           scopeTabs.current[next]?.focus();
@@ -219,7 +211,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     // from the read-back result; a failure re-reads the workspace's facts.
     async function toggleWorkspace(cwd: string, skill: SkillEntry) {
       const state = workspaceState[cwd];
-      if (activeTab.current !== 'project' || busy || !writable || pending.current || snapshot.status !== 'ready'
+      if (activeTab.current !== 'project' || busy || !writable || pending.current || workspaceList.error
         || !skill.canToggle || skill.reason || state?.status !== 'ready' || !state.catalog?.complete) return;
       pending.current = true;
       setError(null);
@@ -242,7 +234,8 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     // card shape serves the global tab and every workspace group.
     const renderCard = (skill: SkillEntry, cwd = '', rows: readonly SkillEntry[] = catalog?.skills ?? []) => {
       const group = cwd ? workspaceState[cwd] : null;
-      const groupReady = cwd ? group?.status === 'ready' && Boolean(group.catalog?.complete) : Boolean(catalog?.complete);
+      const groupReady = cwd ? !workspaceList.error && group?.status === 'ready' && Boolean(group.catalog?.complete)
+        : snapshot.status === 'ready' && Boolean(catalog?.complete);
       const index = rows.indexOf(skill);
       const workspaceIndex = cwd ? Math.max(workspaces.findIndex(row => row.path === cwd), 0) : -1;
       const control = `${id}-skill-${cwd ? `w${workspaceIndex}-${index}` : index}`;
@@ -259,7 +252,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
               'aria-checked': skill.enabled, 'aria-labelledby': `${control}-name`,
               'aria-describedby': [skill.description && `${control}-description`, reason && `${control}-reason`, rowError && `${control}-error`].filter(Boolean).join(' ') || undefined,
               'aria-busy': cwd ? workspaceSaving?.cwd === cwd && workspaceSaving.name === skill.name : snapshot.saving?.name === skill.name,
-              disabled: Boolean(busy || !writable || snapshot.status !== 'ready' || !groupReady || !skill.canToggle || skill.reason),
+              disabled: Boolean(busy || !writable || !groupReady || !skill.canToggle || skill.reason),
               onClick: () => cwd ? toggleWorkspace(cwd, skill) : toggle(skill),
             }, h('span', { className: 'power-dsh-switch-thumb', 'aria-hidden': true }))),
           skill.description && h(Tooltip, { label: skill.description, side: 'top', portal: true, delayMs: 0, maxWidth: 400 },
@@ -405,17 +398,15 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
         for (const [cwd, result] of results) {
           if (cwd) setWorkspaceState(state => ({ ...state, [cwd]: { status: 'ready', catalog: result, error: '' } }));
         }
-        await loadSkills();
-        await Promise.all(Object.keys(importState.groups).map(path => loadImportGroup(path, true)));
+        await refreshAfterWrite([...results.keys()], results.has('') ? [''] : []);
       } catch (failure) {
         if (!mounted.current) return;
         const message = errorMessage(failure) || '';
         deleteConfirmationRef.current = null;
         setDeleteError(t(message.includes('skill-delete-changed') ? 'skillDeleteChanged'
           : message.includes('skill-delete-readback-failed') || message.includes('skill-delete-preferences-failed') ? 'skillDeleteReadbackFailed' : 'skillDeleteFailed'));
-        if (current.cwd) void loadWorkspace(current.cwd);
-        else void loadSkills();
-        for (const option of options) if (option.cwd) void loadWorkspace(option.cwd);
+        const affected = [current.cwd, ...selected.map(option => option.cwd)];
+        await refreshAfterWrite(affected, affected);
       } finally {
         pending.current = false;
         if (mounted.current) setDeleting(false);
@@ -468,7 +459,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     }
     function importOne(entry: ExternalSkillEntry, cwd: string, selectedId = '') {
       const group = importState.groups[cwd];
-      if (!mounted.current || activeTab.current !== (cwd ? 'project' : 'user') || !writable || pending.current
+      if (!mounted.current || activeTab.current !== (cwd ? 'project' : 'user') || busy || !writable || pending.current
         || group?.status !== 'ready' || !group.catalog?.complete) return;
       if (entry.available) return;
       if (entry.conflict || entry.comparison === 'unknown') { void openExternalDetail(entry, cwd); return; }
@@ -480,13 +471,11 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       void loadDestination({ entry, variant, cwd, targetCwd: cwd, status: 'loading', destination: null, error: '' });
     }
     async function confirmImport(current: ImportConfirmation) {
-      if (!mounted.current || confirmationRef.current !== current || pending.current || !writable || activeTab.current !== (current.cwd ? 'project' : 'user')
+      if (!mounted.current || confirmationRef.current !== current || pending.current || busy || !writable || activeTab.current !== (current.cwd ? 'project' : 'user')
         || current.status !== 'ready' || !current.destination?.complete || current.destination.available
-        || current.targetCwd && !skillsSource.getSnapshot().workspaces.some(workspace => workspace.path === current.targetCwd)) return;
+        || current.targetCwd && !workspaces.some(workspace => workspace.path === current.targetCwd)) return;
       const { entry, variant, cwd, targetCwd } = current;
-      const latest = skillsSource.getSnapshot();
       pending.current = true;
-      for (const path of Object.keys(importGeneration.current)) importGeneration.current[path] = (importGeneration.current[path] ?? 0) + 1;
       setImporting(JSON.stringify([cwd, entry.id]));
       setImportNotice('');
       updateConfirmation({ ...current, error: '' });
@@ -504,9 +493,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
           return { ...current, groups: { ...current.groups, [targetCwd]: { ...group,
             catalog: { ...group.catalog, entries: group.catalog.entries.map(item => item.name === entry.name ? { ...item, available: true } : item) } } } };
         });
-        await Promise.all(Object.keys(importState.groups).map(path => loadImportGroup(path, true)));
-        if (targetCwd && workspaceGeneration.current[targetCwd]) await loadWorkspace(targetCwd);
-        await loadSkills(latest.cwd, latest.scope);
+        await refreshAfterWrite([cwd, targetCwd], [targetCwd]);
       } catch (failure) {
         if (mounted.current) await loadDestination(current, importFailure(failure));
       } finally {
@@ -529,10 +516,35 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
           [path]: { status: 'error', catalog: current[path]?.catalog ?? null, error: errorMessage(failure) || t('skillLoadFailed') } }));
       }
     }
-    function queueWorkspaceLoads() {
-      for (const workspace of workspaces) {
-        if (!workspaceGeneration.current[workspace.path]) void loadWorkspace(workspace.path);
-        if (!importState.groups[workspace.path]) void loadImportGroup(workspace.path);
+    async function refreshAfterWrite(paths: string[], installed: string[]) {
+      const visible = (path: string) => activeTab.current === (path ? 'project' : 'user');
+      for (const path of paths) if (!visible(path)) staleTabs.current.add(path ? 'project' : 'user');
+      await Promise.all([
+        ...[...new Set(installed)].filter(visible).map(path => path ? loadWorkspace(path) : loadSkills('', 'user')),
+        ...[...new Set(paths)].filter(path => visible(path) && importGeneration.current[path]).map(path => loadImportGroup(path, true)),
+      ]);
+    }
+    async function refreshTab(scope: SkillTab, firstWorkspaceVisit = false) {
+      if (!mounted.current || activeTab.current !== scope || refreshing.current || pending.current) return;
+      refreshing.current = true;
+      staleTabs.current.delete(scope);
+      setRefreshingTab(scope);
+      try {
+        if (scope === 'user') {
+          await Promise.all([loadSkills('', 'user'), loadImportGroup('')]);
+          return;
+        }
+        setWorkspaceList(current => ({ ...current, error: undefined }));
+        const registered = await listSkillWorkspaces();
+        if (!mounted.current) return;
+        setWorkspaceList({ value: registered });
+        const reads = Promise.all(registered.flatMap(({ path }) => [loadWorkspace(path), loadImportGroup(path)]));
+        if (!firstWorkspaceVisit) await reads;
+      } catch (failure) {
+        if (mounted.current) setWorkspaceList(current => ({ ...current, error: errorMessage(failure) || t('skillLoadFailed') }));
+      } finally {
+        refreshing.current = false;
+        if (mounted.current) setRefreshingTab(null);
       }
     }
     function matchesDiscovery(entry: ExternalSkillEntry) {
@@ -560,7 +572,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             variant: 'outline', size: 'sm', className: 'power-dsh-skill-import-button', ...{ 'data-import-action': entry.name },
             'aria-label': `${t('skillImportOne')}: ${entry.name}`, 'aria-haspopup': 'dialog', 'aria-busy': busyRow,
             title: reason || (cwd ? t('skillImportProjectTarget').replace('{path}', cwd) : t('skillImportUserTarget')),
-            disabled: importing !== '' || !writable || Boolean(reason) || state?.status !== 'ready' || !state.catalog?.complete,
+            disabled: busy || !writable || Boolean(reason) || state?.status !== 'ready' || !state.catalog?.complete,
             onClick: () => { void importOne(entry, cwd); },
           }, t(busyRow ? 'skillImporting' : 'skillImportOne')),
           entry.available && h('span', { className: 'power-dsh-skill-existing', title: reason }, t('skillAlreadyExists'))),
@@ -575,17 +587,14 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
           }, t('skillDetail')))));
     };
     const renderDiscoveryGroup = () => {
-      const state = importState.groups[''] ?? { status: 'idle', catalog: null, error: '' };
-      const entries = discoveryEntries('');
-      const empty = state.status === 'ready' && Boolean(state.catalog?.complete) && entries.length === 0;
-      if (state.status !== 'error' && empty) return null;
+      const state = globalDiscoveryState;
+      const entries = globalDiscovered;
+      if (!state || (entries.length === 0 && !globalDiscoveryIssue)) return null;
       const titleId = `${id}-import-group-global`;
       const open = Boolean(needle) || (importGroupsOpen[''] ?? false);
       const toggle = () => {
         if (needle) return;
-        const next = !(importGroupsOpen[''] ?? false);
-        setImportGroupsOpen(value => ({ ...value, '': next }));
-        if (next && (importState.groups['']?.status ?? 'idle') === 'idle') void loadImportGroup('');
+        setImportGroupsOpen(value => ({ ...value, '': !open }));
       };
       return h('section', { key: 'discovery', className: 'power-dsh-skill-group', 'aria-labelledby': titleId, 'data-import-group': 'user', 'data-import-cwd': '' },
         h('div', { className: 'power-dsh-skill-group-header' },
@@ -594,12 +603,12 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             'aria-expanded': open, 'aria-controls': `${titleId}-body`, onClick: toggle,
           }, h(SkillChevron), h('span', { className: 'power-dsh-skill-group-title' }, t('skillImportGroup')),
           state.catalog?.complete && h('span', { className: 'power-dsh-skill-group-count' }, entries.length))),
-        open && h('div', { id: `${titleId}-body`, className: 'power-dsh-skill-group-body' },
+        (open || globalDiscoveryIssue) && h('div', { id: `${titleId}-body`, className: 'power-dsh-skill-group-body' },
           state.status === 'loading' && loadingFeedback({ label: t('loading'), compact: true }),
           state.status === 'error' && errorFeedback({ t, message: state.error, code: 'PD-SKILLS-IMPORT',
-            operation: 'discoverExternalSkills', disabled: pending.current, retry: () => { void loadImportGroup(''); } }),
+            operation: 'discoverExternalSkills', disabled: pending.current || refreshingTab !== null, retry: () => { void loadImportGroup(''); } }),
           state.catalog && !state.catalog.complete && h('p', { className: 'power-dsh-skill-import-empty-title' }, t('skillIncomplete')),
-          entries.length > 0
+          open && entries.length > 0
             && h('ul', { className: 'power-dsh-skill-cards' }, entries.map(entry => entryCard(entry, '')))));
     };
     const renderWorkspaceDiscoveryFeedback = (cwd: string, suppressIncomplete = false) => {
@@ -626,13 +635,12 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
       const open = Boolean(needle) || (workspaceOpen[workspace.path] ?? true);
       const discovery = importState.groups[workspace.path];
       const discovered = discoveryEntries(workspace.path);
-      const discoveryBusy = Boolean(discovery?.catalog) && discovery?.status === 'loading';
-      const discoveryFailed = discovery?.status === 'error';
-      const hasFeedback = state.status === 'loading' || state.status === 'error' || Boolean(state.catalog && !state.catalog.complete)
-        || discoveryBusy || discoveryFailed || Boolean(discovery?.catalog && !discovery.catalog.complete);
+      const hasIssue = state.status === 'error' || discovery?.status === 'error'
+        || Boolean(state.catalog && !state.catalog.complete) || Boolean(discovery?.catalog && !discovery.catalog.complete);
       const groupRows = (state.catalog?.skills ?? []).filter(skill =>
         `${skill.name} ${skill.description} ${skill.origin} ${sourceLabel(skillSource(skill.source))}`.toLocaleLowerCase().includes(needle));
-      if (state.status === 'ready' && state.catalog?.complete && groupRows.length === 0 && discovered.length === 0 && !hasFeedback) return null;
+      if (groupRows.length === 0 && discovered.length === 0 && !hasIssue) return null;
+      const hasFeedback = hasIssue || state.status === 'loading' || (Boolean(discovery?.catalog) && discovery?.status === 'loading');
       return h('section', { key: workspace.path, className: 'power-dsh-skill-group', 'aria-labelledby': titleId, 'data-workspace': workspace.path },
         h('div', { className: 'power-dsh-skill-group-header' },
           h('button', {
@@ -640,10 +648,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             'aria-expanded': open, 'aria-controls': `${titleId}-body`,
             onClick: () => {
               if (needle) return;
-              const next = !(workspaceOpen[workspace.path] ?? true);
-              setWorkspaceOpen(current => ({ ...current, [workspace.path]: next }));
-              if (next && (workspaceState[workspace.path]?.status ?? 'idle') === 'idle') void loadWorkspace(workspace.path);
-              if (next && (importState.groups[workspace.path]?.status ?? 'idle') === 'idle') void loadImportGroup(workspace.path);
+              setWorkspaceOpen(current => ({ ...current, [workspace.path]: !open }));
             },
           }, h(SkillChevron), h('span', { className: 'power-dsh-skill-group-title', title: workspace.path }, workspace.title),
           state.catalog?.complete && groupRows.length > 0 && h('span', { className: 'power-dsh-skill-group-count' }, groupRows.length))),
@@ -658,9 +663,18 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
             ...discovered.map(entry => entryCard(entry, workspace.path)))));
     };
     const renderWorkspaces = () => {
-      if (workspaces.length === 0) return h('p', { className: 'power-dsh-skill-empty' }, t('skillNoProjects'));
       const groups = workspaces.map(renderWorkspaceGroup).filter(Boolean);
-      return groups.length ? groups : h('p', { className: 'power-dsh-skill-empty' }, t(needle ? 'skillNoMatches' : 'skillEmpty'));
+      if (groups.length || workspaceList.error) return groups;
+      const loading = refreshingTab === 'project' || workspaces.some(({ path }) => {
+        const installed = workspaceState[path]?.status;
+        const discovered = importState.groups[path]?.status;
+        return (installed !== 'ready' && installed !== 'error')
+          || (writable && discovered !== 'ready' && discovered !== 'error');
+      });
+      if (loading) return loadingFeedback({ label: t('loading') });
+      if (!workspaceList.value) return null;
+      const message = workspaces.length === 0 ? 'skillNoProjects' : needle ? 'skillNoMatches' : 'skillEmpty';
+      return h('p', { className: 'power-dsh-skill-empty' }, t(message));
     };
 
     const detailField = (key: string, value: import('react').ReactNode) => h('div', { key, className: 'power-dsh-skill-detail-row' },
@@ -849,30 +863,33 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
               h(SkillHelpIcon))))),
       h('div', { className: 'power-dsh-skill-navigation' },
         h('div', { className: 'power-dsh-tabs', role: 'tablist', 'aria-label': t('skillScope') },
-          tabButton('user', 'skillUserScope'), tabButton('project', 'skillProjectScope'))),
+          tabButton('user', 'skillUserScope'), tabButton('project', 'skillProjectScope')),
+        h(Tooltip, { label: t('skillRefresh'), side: 'top', portal: true },
+          h(Button, { variant: 'ghost', size: 'sm', className: 'power-dsh-skill-refresh',
+            'aria-label': t('skillRefresh'), 'aria-busy': refreshingTab === tab, disabled: busy,
+            onClick: () => { if (!busy) void refreshTab(tab); } },
+          refreshingTab === tab ? h(StateDot, { state: 'ongoing' }) : h(NativeIcon, { glyph: 'refresh-outline', size: 14 })))),
       h('div', { id: `${id}-skill-panel`, className: 'power-dsh-skill-panel', role: 'tabpanel', 'aria-labelledby': `${id}-scope-${tab}` },
         importNotice && h('div', { className: 'power-dsh-skill-import-notice', role: 'status' },
           importNotice),
         (tab === 'project' ? workspaces.length > 0 : Boolean(catalog))
           && h('label', { className: 'power-dsh-skill-search-field' }, h(SkillSearchIcon), h('input', {
             type: 'search', value: query, placeholder: t('skillSearch'), 'aria-label': t('skillSearch'),
-            onChange: (event: import('react').ChangeEvent<HTMLInputElement>) => {
-              setQuery(event.target.value);
-              if (tab === 'project' && event.target.value.trim()) queueWorkspaceLoads();
-              if (tab === 'user' && event.target.value.trim() && (importState.groups['']?.status ?? 'idle') === 'idle') void loadImportGroup('');
-            },
+            onChange: (event: import('react').ChangeEvent<HTMLInputElement>) => setQuery(event.target.value),
           })),
-        snapshot.status === 'loading' && loadingFeedback({ label: t('loading'), ...(catalog ? { compact: true } : {}) }),
-        snapshot.error && errorFeedback({ t, message: snapshot.error, code: 'PD-SKILLS-LOAD',
-          operation: 'listSkills', placement: 'page', retry: () => loadSkills(), disabled: busy }),
+        tab === 'user' && (snapshot.status === 'loading'
+          || (globalDiscoveryLoading && rows.length === 0 && globalDiscovered.length === 0 && !globalDiscoveryIssue && snapshot.status === 'ready'))
+          && loadingFeedback({ label: t('loading'), ...(catalog && snapshot.status === 'loading' ? { compact: true } : {}) }),
+        listError && errorFeedback({ t, message: listError, code: 'PD-SKILLS-LOAD',
+          operation: tab === 'project' ? 'listSkillWorkspaces' : 'listSkills', placement: 'page', retry: () => refreshTab(tab), disabled: busy }),
         tab === 'user' && catalog && !catalog.complete && h('p', { className: 'power-dsh-description power-dsh-skill-notice', role: 'status' }, t('skillIncomplete')),
         config.status === 'ready' && !config.writable && h('p', { className: 'power-dsh-description power-dsh-skill-notice' }, t('readOnly')),
         tab === 'project' ? renderWorkspaces()
-          : catalog && [renderGroup('personal', 'skillPersonalGroup', rows.filter(skill => displaySource(skill) !== 'skillBundledSource')),
-            renderGroup('preinstalled', 'skillPreinstalledGroup', rows.filter(skill => displaySource(skill) === 'skillBundledSource')),
+          : [catalog && renderGroup('personal', 'skillPersonalGroup', rows.filter(skill => displaySource(skill) !== 'skillBundledSource')),
+            catalog && renderGroup('preinstalled', 'skillPreinstalledGroup', rows.filter(skill => displaySource(skill) === 'skillBundledSource')),
             renderDiscoveryGroup()],
-        tab === 'user' && catalog && snapshot.status === 'ready' && catalog.complete && rows.length === 0 && globalDiscovered.length === 0 && !globalDiscoveryPending
-          && h('p', { className: 'power-dsh-skill-empty' }, t(query ? 'skillNoMatches' : 'skillEmpty')),
+        tab === 'user' && catalog && snapshot.status === 'ready' && catalog.complete && rows.length === 0 && globalDiscovered.length === 0
+          && !globalDiscoveryLoading && !globalDiscoveryIssue && h('p', { className: 'power-dsh-skill-empty' }, t(needle ? 'skillNoMatches' : 'skillEmpty')),
         detail && renderDetail(),
         externalDetail && renderExternalDetail(),
         confirmation && renderConfirmation()));
@@ -926,6 +943,12 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
   };
   // Workspace groups load their own catalogs straight from the same RPC the
   // snapshot uses, so one expanded group never depends on the page's scope.
+  const listSkillWorkspaces = async (): Promise<SkillWorkspace[]> => {
+    if (!active) throw new Error(t('skillUnavailable'));
+    const result = await ctx.remote.powerDsh.listSkillWorkspaces();
+    if (!result.ok) throw new Error(result.error.message);
+    return result.value;
+  };
   const listWorkspaceSkills = async (path: string): Promise<SkillCatalog> => {
     if (!active || typeof path !== 'string' || path === '') throw new Error(t('skillUnavailable'));
     const result = await ctx.remote.powerDsh.listSkills(path, 'project');
@@ -1007,7 +1030,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     }
     return null;
   };
-  const renderPage = (props: PageSlotProps) => h(SkillsPage, { ...props, source, skillsSource, loadSkills, setSkillEnabled, readSkill, deleteSkill, listWorkspaceSkills, discoverSkills, readExternalSkill, readImportDestination, importSkills });
+  const renderPage = (props: PageSlotProps) => h(SkillsPage, { ...props, source, skillsSource, loadSkills, setSkillEnabled, readSkill, deleteSkill, listSkillWorkspaces, listWorkspaceSkills, discoverSkills, readExternalSkill, readImportDestination, importSkills });
   preferenceSlot('skillManagerEnabled', 'settings.section', {
     id: 'power-dsh-skills', order: 52, locale: namespace, label: () => t('skillsTab'),
   }, renderPage, () => !standalonePageActive(source));

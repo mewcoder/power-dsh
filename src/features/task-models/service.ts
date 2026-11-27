@@ -5,6 +5,7 @@ import type { LivePreferences } from '../../shared/types/preferences.ts';
 
 export interface ScheduleTask {
   id: string; title: string; status: string;
+  scheduledAt?: string; deliveryFloorEndsAt?: string;
   target: { kind: 'new' | 'new_once' | 'session'; sessionId?: string };
 }
 export interface TaskModelRuntime {
@@ -15,6 +16,13 @@ export interface TaskModelRuntime {
 export interface ModelAgent extends NativeAgent {
   id: string;
   model: { select(selection: TaskModelSelection): void };
+}
+
+function nextRunTime(task: ScheduleTask): number {
+  const scheduled = Date.parse(task.scheduledAt ?? '');
+  const floor = Date.parse(task.deliveryFloorEndsAt ?? '');
+  if (floor > scheduled) return floor;
+  return Number.isFinite(scheduled) ? scheduled : Infinity;
 }
 
 export class TaskModels {
@@ -47,7 +55,8 @@ export class TaskModels {
     const revision = this.revision();
     const bindings = parseBindings(revision);
     const models = parseModels(catalog);
-    return { revision, models, tasks: tasks.map(task => {
+    const orderedTasks = tasks.toSorted((left, right) => nextRunTime(left) - nextRunTime(right));
+    return { revision, models, tasks: orderedTasks.map(task => {
       const selection = bindings.get(task.id) ?? null;
       let error = this.errors.get(task.id) ?? '';
       if (selection) try { requireModel(selection, models); } catch { error = 'taskModelsModelUnavailable'; }

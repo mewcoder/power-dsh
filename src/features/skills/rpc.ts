@@ -26,13 +26,24 @@ function parseDeletionOption(value: unknown): SkillDeletionOption {
   return { path: value.path, linked: value.linked, revision: value.revision,
     cwd: value.cwd, scope: value.scope, workspaceTitle: value.workspaceTitle };
 }
+function parseWorkspaces(value: unknown): SkillWorkspace[] {
+  if (!isArray(value)) throw new TypeError('Invalid skill workspaces');
+  return value.map(item => {
+    if (!isRecord(item) || !hasStrings(item, ['path', 'title'])) throw new TypeError('Invalid skill workspace');
+    return { path: item.path, title: item.title };
+  });
+}
+const skillWorkspacesCodec: Codec<SkillWorkspace[]> = {
+  mode: 'strict', typeSymbol: 'power-dsh#SkillWorkspace[]',
+  create: () => ({ parse: parseWorkspaces }),
+};
 const skillCatalogCodec: Codec<SkillCatalog> = {
   mode: 'strict', typeSymbol: 'power-dsh#SkillCatalog',
   create: () => ({ parse(value) {
     if (!isRecord(value) || typeof value.cwd !== 'string' || !isOneOf(value.scope, ['user', 'project'])
       || typeof value.complete !== 'boolean'
-      || !isArray(value.workspaces) || !value.workspaces.every((item): item is SkillWorkspace => isRecord(item) && typeof item.path === 'string' && typeof item.title === 'string')
       || !isArray(value.skills)) throw new TypeError('Invalid skill catalog');
+    const workspaces = parseWorkspaces(value.workspaces);
     const skills = value.skills.map(row => {
       if (!isRecord(row) || !hasStrings(row, ['name', 'description', 'source', 'path', 'origin', 'reason'])
         || !hasBooleans(row, ['enabled', 'modelInvocable', 'userInvocable', 'canToggle'])
@@ -41,7 +52,7 @@ const skillCatalogCodec: Codec<SkillCatalog> = {
         enabled: row.enabled, modelInvocable: row.modelInvocable, userInvocable: row.userInvocable,
         canToggle: row.canToggle, reason: row.reason };
     });
-    return { cwd: value.cwd, scope: value.scope, workspaces: value.workspaces.map(item => ({ path: item.path, title: item.title })), complete: value.complete, skills };
+    return { cwd: value.cwd, scope: value.scope, workspaces, complete: value.complete, skills };
   } }),
 };
 const skillDetailCodec: Codec<SkillDetail | null> = {
@@ -70,6 +81,7 @@ function skillRpc<M extends string>(method: M, fields: string[], result: Codec<u
     result,
   };
 }
+export const LIST_SKILL_WORKSPACES_RPC = skillRpc('listSkillWorkspaces', [], skillWorkspacesCodec);
 export const LIST_SKILLS_RPC = skillRpc('listSkills', ['cwd', 'scope']);
 export const READ_SKILL_RPC = skillRpc('readSkill', ['cwd', 'scope', 'name'], skillDetailCodec);
 export const SET_SKILL_ENABLED_RPC = skillRpc('setSkillEnabled', ['cwd', 'scope', 'name', 'enabled']);
@@ -168,4 +180,4 @@ export const READ_SKILL_IMPORT_DESTINATION_RPC = skillRpc('readSkillImportDestin
 export const IMPORT_SKILL_TO_RPC = skillRpc('importSkillTo', ['cwd', 'scope', 'id', 'revision', 'targetCwd'], skillImportResultCodec);
 export const DELETE_SKILL_RPC = skillRpc('deleteSkill', ['cwd', 'scope', 'name', 'revision']);
 
-export const rpc = [LIST_SKILLS_RPC, READ_SKILL_RPC, SET_SKILL_ENABLED_RPC, DISCOVER_EXTERNAL_SKILLS_RPC, READ_EXTERNAL_SKILL_RPC, IMPORT_EXTERNAL_SKILLS_RPC, ADD_SKILL_RPC, READ_SKILL_IMPORT_DESTINATION_RPC, IMPORT_SKILL_TO_RPC, DELETE_SKILL_RPC];
+export const rpc = [LIST_SKILL_WORKSPACES_RPC, LIST_SKILLS_RPC, READ_SKILL_RPC, SET_SKILL_ENABLED_RPC, DISCOVER_EXTERNAL_SKILLS_RPC, READ_EXTERNAL_SKILL_RPC, IMPORT_EXTERNAL_SKILLS_RPC, ADD_SKILL_RPC, READ_SKILL_IMPORT_DESTINATION_RPC, IMPORT_SKILL_TO_RPC, DELETE_SKILL_RPC];

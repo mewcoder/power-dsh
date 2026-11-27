@@ -40,7 +40,7 @@ test('skill cards expose switches directly, reject stale tab actions and keep pr
 });
 
 test('MCP has no project controls while skills retain their independent project scope', async () => {
-  const app = await mount();
+  const app = await mount({ skillCatalog: catalogFixture({ skills: [skillFixture({ source: 'project-dsh' })] }) });
   const page = await mcpPage(app);
   assert.ok(page.search());
   assert.ok(page.group('user'));
@@ -51,6 +51,8 @@ test('MCP has no project controls while skills retain their independent project 
   const skills = await skillsPage(app);
   assert.equal(skills.tab('user').props['aria-selected'], true);
   await skills.tab('project').props.onClick();
+  skills.render();
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(skills.tab('project').props['aria-selected'], true);
   assert.equal(skills.projectTrigger(), undefined);
   assert.ok(skills.workspace('/work/a'));

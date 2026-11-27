@@ -877,10 +877,34 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 	});
 
 // src/features/task-models/client.ts
+	const statusFilters = [
+		{
+			id: "active",
+			label: "taskModelsActive",
+			empty: "taskModelsEmptyActive"
+		},
+		{
+			id: "paused",
+			label: "taskModelsPaused",
+			empty: "taskModelsEmptyPaused"
+		},
+		{
+			id: "ended",
+			label: "taskModelsEnded",
+			empty: "taskModelsEmptyEnded"
+		},
+		{
+			id: "all",
+			label: "taskModelsAll",
+			empty: "taskModelsEmpty"
+		}
+	];
 	const styles$16 = `
 .power-dsh-task-models{max-width:720px}
 .power-dsh-task-models .power-dsh-task-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.power-dsh-task-models-list{margin-top:24px}
+.power-dsh-task-models-filters{display:flex;flex-wrap:wrap;gap:4px;margin-top:24px}
+.power-dsh-task-models-filters button[aria-pressed="true"]{background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary)}
+.power-dsh-task-models-list{margin-top:16px}
 .power-dsh-task-models-empty{display:flex;align-items:center;flex-direction:column;padding:48px 20px;text-align:center;color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:1.6}
 .power-dsh-task-models-empty>svg{flex:none;margin-bottom:12px;color:var(--dsw-alias-label-caption)}
 .power-dsh-task-models-empty h3{margin:0;font-size:14px;line-height:1.6;font-weight:400}
@@ -925,6 +949,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			const [saving, setSaving] = React.useState(null);
 			const [error, setError] = React.useState("");
 			const [menu, setMenu] = React.useState(null);
+			const [statusFilter, setStatusFilter] = React.useState(statusFilters[0]);
 			const generation = React.useRef(0);
 			const pending = React.useRef(false);
 			const mounted = React.useRef(true);
@@ -1052,6 +1077,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					operation: "taskModels.delivery"
 				}));
 			};
+			const rows = catalog?.tasks.filter((task) => statusFilter.id === "all" || task.status === statusFilter.id) ?? [];
 			return h("section", {
 				className: "power-dsh-page power-dsh-task-models",
 				"aria-label": t("taskModelsTitle")
@@ -1060,20 +1086,33 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				size: "sm",
 				disabled: loading || saving !== null,
 				onClick: load
-			}, t("taskModelsReload"))), h("p", { className: "power-dsh-description" }, t("taskModelsHelp"))), loading && loadingFeedback({ label: t("loading") }), error && errorFeedback({
+			}, t("taskModelsReload"))), h("p", { className: "power-dsh-description" }, t("taskModelsHelp"))), h("div", {
+				className: "power-dsh-task-models-filters",
+				role: "group",
+				"aria-label": t("taskModelsStatusFilter")
+			}, statusFilters.map((filter) => h(Button, {
+				key: filter.id,
+				variant: "ghost",
+				size: "sm",
+				"aria-pressed": statusFilter.id === filter.id,
+				onClick: () => {
+					setMenu(null);
+					setStatusFilter(filter);
+				}
+			}, t(filter.label)))), loading && loadingFeedback({ label: t("loading") }), error && errorFeedback({
 				t,
 				message: error,
 				code: "PD-TASK-MODELS",
 				operation: "taskModels.configure",
 				retry: load
-			}), !loading && !error && catalog?.tasks.length === 0 && h("div", {
+			}), !loading && !error && catalog && rows.length === 0 && h("div", {
 				className: "power-dsh-task-models-empty",
 				role: "status"
 			}, h(NativeIcon, {
 				glyph: "clock-outline",
 				weight: "regular",
 				size: 24
-			}), h("h3", null, t("taskModelsEmpty"))), Boolean(catalog?.tasks.length) && h("div", { className: "power-dsh-task-models-list" }, catalog?.tasks.map(renderTask)));
+			}), h("h3", null, t(catalog.tasks.length ? statusFilter.empty : "taskModelsEmpty"))), rows.length > 0 && h("div", { className: "power-dsh-task-models-list" }, rows.map(renderTask)));
 		}
 		function Icon() {
 			return h(NativeIcon, {
@@ -1115,6 +1154,14 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			taskModelsEmpty: "暂无自动化任务",
 			taskModelsReload: "刷新",
 			taskModelsExisting: "沿用目标会话的模型",
+			taskModelsStatusFilter: "任务状态",
+			taskModelsActive: "已开启",
+			taskModelsPaused: "已暂停",
+			taskModelsEnded: "已结束",
+			taskModelsAll: "全部",
+			taskModelsEmptyActive: "暂无已开启的自动化任务",
+			taskModelsEmptyPaused: "暂无已暂停的自动化任务",
+			taskModelsEmptyEnded: "暂无已结束的自动化任务",
 			taskModelsApplied: "任务已绑定会话，后续沿用该会话的模型",
 			taskModelsReset: "清除配置",
 			taskModelsUnavailable: "自动化任务或模型服务暂不可用，请刷新重试。",
@@ -1137,6 +1184,14 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			taskModelsEmpty: "No automated tasks",
 			taskModelsReload: "Refresh",
 			taskModelsExisting: "Uses the destination conversation’s model",
+			taskModelsStatusFilter: "Task status",
+			taskModelsActive: "Enabled",
+			taskModelsPaused: "Paused",
+			taskModelsEnded: "Ended",
+			taskModelsAll: "All",
+			taskModelsEmptyActive: "No active automation tasks",
+			taskModelsEmptyPaused: "No paused automation tasks",
+			taskModelsEmptyEnded: "No ended automation tasks",
 			taskModelsApplied: "This task now targets a conversation and follows its model",
 			taskModelsReset: "Clear configuration",
 			taskModelsUnavailable: "Tasks or model services are unavailable. Refresh to retry.",
@@ -7592,6 +7647,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 .power-dsh-skills-page .power-dsh-skill-scope-help:focus-visible { outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary)); outline-offset:2px; border-radius:var(--dsw-radius-xs); }
 .power-dsh-page .power-dsh-skill-navigation { display:flex; align-items:flex-end; flex-wrap:wrap; gap:12px; margin-top:14px; border-bottom:.5px solid var(--dsw-alias-border-l2); }
 .power-dsh-page .power-dsh-skill-navigation > .power-dsh-tabs { margin-top:0; border-bottom:0; }
+.power-dsh-skills-page .power-dsh-skill-refresh { flex:none; width:28px; height:28px; padding:0; margin:0 0 4px auto; }
 .power-dsh-skills-page .power-dsh-tab:focus-visible { color:var(--dsw-alias-label-primary); }
 .power-dsh-skills-page .power-dsh-tab:focus-visible::after { position:absolute; right:0; bottom:-1px; left:0; height:2px; border-radius:2px 2px 0 0; background:var(--dsw-alias-label-primary); content:""; }
 @media (hover:hover) { .power-dsh-skills-page .power-dsh-tab:hover:not(:disabled) { color:var(--dsw-alias-label-primary); } }
@@ -7658,7 +7714,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 
 // src/features/skills/client.ts
 	function createClientFeature$13(runtime, env) {
-		const { React, h, Menu, MenuSurface, Modal, Button, Tooltip, MarkdownText, NativeIcon, observable, useSnapshot, useMounted, errorFeedback, loadingFeedback } = runtime;
+		const { React, h, Menu, MenuSurface, Modal, Button, Tooltip, StateDot, MarkdownText, NativeIcon, observable, useSnapshot, useMounted, errorFeedback, loadingFeedback } = runtime;
 		const { ctx, form, source, t, savePreference, preferenceSlot, namespace } = env;
 		const styles = styles$19 + styles$13 + styles$9;
 		const { SkillSearchIcon, SkillChevron } = createCatalogUI(runtime);
@@ -7706,7 +7762,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			if (source === "bundled" || source.startsWith("bundled-")) return "skillBundledSource";
 			return source;
 		}
-		function SkillsPage({ t, source, skillsSource, loadSkills, setSkillEnabled, readSkill, deleteSkill, listWorkspaceSkills, discoverSkills, readExternalSkill, readImportDestination, importSkills }) {
+		function SkillsPage({ t, source, skillsSource, loadSkills, setSkillEnabled, readSkill, deleteSkill, listSkillWorkspaces, listWorkspaceSkills, discoverSkills, readExternalSkill, readImportDestination, importSkills }) {
 			const config = useSnapshot(source);
 			const snapshot = useSnapshot(skillsSource);
 			const catalog = snapshot.value;
@@ -7735,41 +7791,41 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			const [workspaceState, setWorkspaceState] = React.useState({});
 			const [workspaceOpen, setWorkspaceOpen] = React.useState({});
 			const [workspaceSaving, setWorkspaceSaving] = React.useState(null);
+			const [workspaceList, setWorkspaceList] = React.useState({});
+			const [refreshingTab, setRefreshingTab] = React.useState(null);
+			const refreshing = React.useRef(false);
+			const staleTabs = React.useRef(/* @__PURE__ */ new Set());
 			const workspaceGeneration = React.useRef({});
-			const workspaceOpenRef = React.useRef({});
 			const importGeneration = React.useRef({});
 			const mounted = useMounted();
 			const pending = React.useRef(false);
 			const detailGeneration = React.useRef(0);
 			const detailTrigger = React.useRef(null);
 			const id = React.useId();
-			const busy = snapshot.status === "loading" || Boolean(snapshot.saving) || Boolean(workspaceSaving) || importing !== "" || deleting;
+			const busy = snapshot.status === "loading" || Boolean(snapshot.saving) || Boolean(workspaceSaving) || importing !== "" || deleting || refreshingTab !== null;
 			const tab = projectView ? "project" : "user";
 			const writable = config.status === "ready" && config.writable && config.value?.skillManagerEnabled === true;
 			const disabled = busy || !writable || snapshot.status !== "ready" || !catalog?.complete;
-			const workspaces = snapshot.workspaces ?? [];
+			const workspaces = tab === "project" ? workspaceList.value ?? [] : snapshot.workspaces;
 			React.useEffect(() => {
 				if (!importNotice) return;
 				const timer = window.setTimeout(() => setImportNotice(""), 3e3);
 				return () => window.clearTimeout(timer);
 			}, [importNotice]);
 			React.useEffect(() => {
-				workspaceOpenRef.current = Object.fromEntries(workspaces.map((workspace) => [workspace.path, workspaceOpen[workspace.path] ?? true]));
-			}, [workspaces, workspaceOpen]);
-			React.useEffect(() => {
-				if (projectView) queueWorkspaceLoads();
-			}, [projectView, workspaces]);
-			React.useEffect(() => {
-				loadSkills();
-				const refresh = () => {
-					loadSkills();
-					if (!pending.current) {
-						for (const [path, open] of Object.entries(workspaceOpenRef.current)) if (open && workspaceGeneration.current[path]) loadWorkspace(path);
-					}
-				};
-				window.addEventListener("focus", refresh);
-				return () => window.removeEventListener("focus", refresh);
+				loadSkills("", "user");
 			}, []);
+			React.useEffect(() => {
+				if (!writable || refreshing.current) return;
+				if (tab === "user") {
+					if (!importGeneration.current[""]) loadImportGroup("");
+				} else for (const { path } of workspaceList.value ?? []) if (!importGeneration.current[path]) loadImportGroup(path);
+			}, [
+				tab,
+				workspaceList.value,
+				writable,
+				refreshingTab
+			]);
 			const sourceLabel = (value) => [
 				"skillPersonalSource",
 				"skillProjectSource",
@@ -7787,19 +7843,20 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			const rows = (catalog?.skills ?? []).filter((skill) => `${skill.name} ${skill.description} ${skill.origin} ${sourceLabel(displaySource(skill))}`.toLocaleLowerCase().includes(needle));
 			const globalDiscovered = discoveryEntries("");
 			const globalDiscoveryState = importState.groups[""];
-			const globalDiscoveryPending = writable && Boolean(globalDiscoveryState) && (globalDiscoveryState.status === "loading" || globalDiscoveryState.status === "error" || Boolean(globalDiscoveryState.catalog && !globalDiscoveryState.catalog.complete));
+			const globalDiscoveryLoading = writable && (!globalDiscoveryState || globalDiscoveryState.status === "loading");
+			const globalDiscoveryIssue = globalDiscoveryState?.status === "error" || Boolean(globalDiscoveryState?.catalog && !globalDiscoveryState.catalog.complete);
+			const listError = tab === "user" ? snapshot.error : workspaceList.error;
 			const TABS = ["user", "project"];
 			function selectTab(next) {
-				if (busy || pending.current || tab === next) return;
+				if (busy || refreshing.current || pending.current || tab === next) return;
 				setError(null);
 				closeConfirmation();
 				closeExternalDetail();
 				activeTab.current = next;
 				setImportNotice("");
 				setProjectView(next === "project");
-				if (next === "user") {
-					if (importState.groups[""] && (importGroupsOpen[""] ?? false)) loadImportGroup("");
-				} else for (const workspace of workspaces) if (importState.groups[workspace.path]) loadImportGroup(workspace.path);
+				const firstWorkspaceVisit = next === "project" && !workspaceList.value && !workspaceList.error;
+				if (firstWorkspaceVisit || staleTabs.current.has(next)) refreshTab(next, firstWorkspaceVisit);
 			}
 			function tabButton(value, label) {
 				return h("button", {
@@ -7818,7 +7875,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					onKeyDown: (event) => {
 						const index = TABS.indexOf(value);
 						const next = event.key === "Home" ? TABS[0] : event.key === "End" ? TABS[TABS.length - 1] : event.key === "ArrowLeft" ? TABS[(index + TABS.length - 1) % TABS.length] : event.key === "ArrowRight" ? TABS[(index + 1) % TABS.length] : null;
-						if (!next || busy || pending.current) return;
+						if (!next || busy || refreshing.current || pending.current) return;
 						event.preventDefault();
 						selectTab(next);
 						scopeTabs.current[next]?.focus();
@@ -7844,7 +7901,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			}
 			async function toggleWorkspace(cwd, skill) {
 				const state = workspaceState[cwd];
-				if (activeTab.current !== "project" || busy || !writable || pending.current || snapshot.status !== "ready" || !skill.canToggle || skill.reason || state?.status !== "ready" || !state.catalog?.complete) return;
+				if (activeTab.current !== "project" || busy || !writable || pending.current || workspaceList.error || !skill.canToggle || skill.reason || state?.status !== "ready" || !state.catalog?.complete) return;
 				pending.current = true;
 				setError(null);
 				setWorkspaceSaving({
@@ -7877,7 +7934,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			}
 			const renderCard = (skill, cwd = "", rows = catalog?.skills ?? []) => {
 				const group = cwd ? workspaceState[cwd] : null;
-				const groupReady = cwd ? group?.status === "ready" && Boolean(group.catalog?.complete) : Boolean(catalog?.complete);
+				const groupReady = cwd ? !workspaceList.error && group?.status === "ready" && Boolean(group.catalog?.complete) : snapshot.status === "ready" && Boolean(catalog?.complete);
 				const index = rows.indexOf(skill);
 				const workspaceIndex = cwd ? Math.max(workspaces.findIndex((row) => row.path === cwd), 0) : -1;
 				const control = `${id}-skill-${cwd ? `w${workspaceIndex}-${index}` : index}`;
@@ -7913,7 +7970,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 						rowError && `${control}-error`
 					].filter(Boolean).join(" ") || void 0,
 					"aria-busy": cwd ? workspaceSaving?.cwd === cwd && workspaceSaving.name === skill.name : snapshot.saving?.name === skill.name,
-					disabled: Boolean(busy || !writable || snapshot.status !== "ready" || !groupReady || !skill.canToggle || skill.reason),
+					disabled: Boolean(busy || !writable || !groupReady || !skill.canToggle || skill.reason),
 					onClick: () => cwd ? toggleWorkspace(cwd, skill) : toggle(skill)
 				}, h("span", {
 					className: "power-dsh-switch-thumb",
@@ -8123,8 +8180,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				detailTrigger.current?.focus?.();
 			}
 			async function confirmDelete(current) {
-				const options = deletionsOf(current.value, current.cwd);
-				const selected = options.filter((option) => deleteSelection.includes(option.revision));
+				const selected = deletionsOf(current.value, current.cwd).filter((option) => deleteSelection.includes(option.revision));
 				if (!mounted.current || pending.current || !writable || busy || !deleteConfirm || selected.length === 0 || deleteConfirmationRef.current !== current) return;
 				pending.current = true;
 				setDeleting(true);
@@ -8146,16 +8202,14 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 							error: ""
 						}
 					}));
-					await loadSkills();
-					await Promise.all(Object.keys(importState.groups).map((path) => loadImportGroup(path, true)));
+					await refreshAfterWrite([...results.keys()], results.has("") ? [""] : []);
 				} catch (failure) {
 					if (!mounted.current) return;
 					const message = errorMessage(failure) || "";
 					deleteConfirmationRef.current = null;
 					setDeleteError(t(message.includes("skill-delete-changed") ? "skillDeleteChanged" : message.includes("skill-delete-readback-failed") || message.includes("skill-delete-preferences-failed") ? "skillDeleteReadbackFailed" : "skillDeleteFailed"));
-					if (current.cwd) loadWorkspace(current.cwd);
-					else loadSkills();
-					for (const option of options) if (option.cwd) loadWorkspace(option.cwd);
+					const affected = [current.cwd, ...selected.map((option) => option.cwd)];
+					await refreshAfterWrite(affected, affected);
 				} finally {
 					pending.current = false;
 					if (mounted.current) setDeleting(false);
@@ -8248,7 +8302,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			}
 			function importOne(entry, cwd, selectedId = "") {
 				const group = importState.groups[cwd];
-				if (!mounted.current || activeTab.current !== (cwd ? "project" : "user") || !writable || pending.current || group?.status !== "ready" || !group.catalog?.complete) return;
+				if (!mounted.current || activeTab.current !== (cwd ? "project" : "user") || busy || !writable || pending.current || group?.status !== "ready" || !group.catalog?.complete) return;
 				if (entry.available) return;
 				if (entry.conflict || entry.comparison === "unknown") {
 					openExternalDetail(entry, cwd);
@@ -8273,11 +8327,9 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				});
 			}
 			async function confirmImport(current) {
-				if (!mounted.current || confirmationRef.current !== current || pending.current || !writable || activeTab.current !== (current.cwd ? "project" : "user") || current.status !== "ready" || !current.destination?.complete || current.destination.available || current.targetCwd && !skillsSource.getSnapshot().workspaces.some((workspace) => workspace.path === current.targetCwd)) return;
+				if (!mounted.current || confirmationRef.current !== current || pending.current || busy || !writable || activeTab.current !== (current.cwd ? "project" : "user") || current.status !== "ready" || !current.destination?.complete || current.destination.available || current.targetCwd && !workspaces.some((workspace) => workspace.path === current.targetCwd)) return;
 				const { entry, variant, cwd, targetCwd } = current;
-				const latest = skillsSource.getSnapshot();
 				pending.current = true;
-				for (const path of Object.keys(importGeneration.current)) importGeneration.current[path] = (importGeneration.current[path] ?? 0) + 1;
 				setImporting(JSON.stringify([cwd, entry.id]));
 				setImportNotice("");
 				updateConfirmation({
@@ -8312,9 +8364,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 							}
 						};
 					});
-					await Promise.all(Object.keys(importState.groups).map((path) => loadImportGroup(path, true)));
-					if (targetCwd && workspaceGeneration.current[targetCwd]) await loadWorkspace(targetCwd);
-					await loadSkills(latest.cwd, latest.scope);
+					await refreshAfterWrite([cwd, targetCwd], [targetCwd]);
 				} catch (failure) {
 					if (mounted.current) await loadDestination(current, importFailure(failure));
 				} finally {
@@ -8356,10 +8406,38 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					}));
 				}
 			}
-			function queueWorkspaceLoads() {
-				for (const workspace of workspaces) {
-					if (!workspaceGeneration.current[workspace.path]) loadWorkspace(workspace.path);
-					if (!importState.groups[workspace.path]) loadImportGroup(workspace.path);
+			async function refreshAfterWrite(paths, installed) {
+				const visible = (path) => activeTab.current === (path ? "project" : "user");
+				for (const path of paths) if (!visible(path)) staleTabs.current.add(path ? "project" : "user");
+				await Promise.all([...[...new Set(installed)].filter(visible).map((path) => path ? loadWorkspace(path) : loadSkills("", "user")), ...[...new Set(paths)].filter((path) => visible(path) && importGeneration.current[path]).map((path) => loadImportGroup(path, true))]);
+			}
+			async function refreshTab(scope, firstWorkspaceVisit = false) {
+				if (!mounted.current || activeTab.current !== scope || refreshing.current || pending.current) return;
+				refreshing.current = true;
+				staleTabs.current.delete(scope);
+				setRefreshingTab(scope);
+				try {
+					if (scope === "user") {
+						await Promise.all([loadSkills("", "user"), loadImportGroup("")]);
+						return;
+					}
+					setWorkspaceList((current) => ({
+						...current,
+						error: void 0
+					}));
+					const registered = await listSkillWorkspaces();
+					if (!mounted.current) return;
+					setWorkspaceList({ value: registered });
+					const reads = Promise.all(registered.flatMap(({ path }) => [loadWorkspace(path), loadImportGroup(path)]));
+					if (!firstWorkspaceVisit) await reads;
+				} catch (failure) {
+					if (mounted.current) setWorkspaceList((current) => ({
+						...current,
+						error: errorMessage(failure) || t("skillLoadFailed")
+					}));
+				} finally {
+					refreshing.current = false;
+					if (mounted.current) setRefreshingTab(null);
 				}
 			}
 			function matchesDiscovery(entry) {
@@ -8397,7 +8475,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					"aria-haspopup": "dialog",
 					"aria-busy": busyRow,
 					title: reason || (cwd ? t("skillImportProjectTarget").replace("{path}", cwd) : t("skillImportUserTarget")),
-					disabled: importing !== "" || !writable || Boolean(reason) || state?.status !== "ready" || !state.catalog?.complete,
+					disabled: busy || !writable || Boolean(reason) || state?.status !== "ready" || !state.catalog?.complete,
 					onClick: () => {
 						importOne(entry, cwd);
 					}
@@ -8425,24 +8503,17 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				}, t("skillDetail")))));
 			};
 			const renderDiscoveryGroup = () => {
-				const state = importState.groups[""] ?? {
-					status: "idle",
-					catalog: null,
-					error: ""
-				};
-				const entries = discoveryEntries("");
-				const empty = state.status === "ready" && Boolean(state.catalog?.complete) && entries.length === 0;
-				if (state.status !== "error" && empty) return null;
+				const state = globalDiscoveryState;
+				const entries = globalDiscovered;
+				if (!state || entries.length === 0 && !globalDiscoveryIssue) return null;
 				const titleId = `${id}-import-group-global`;
 				const open = Boolean(needle) || (importGroupsOpen[""] ?? false);
 				const toggle = () => {
 					if (needle) return;
-					const next = !(importGroupsOpen[""] ?? false);
 					setImportGroupsOpen((value) => ({
 						...value,
-						"": next
+						"": !open
 					}));
-					if (next && (importState.groups[""]?.status ?? "idle") === "idle") loadImportGroup("");
 				};
 				return h("section", {
 					key: "discovery",
@@ -8457,7 +8528,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					"aria-expanded": open,
 					"aria-controls": `${titleId}-body`,
 					onClick: toggle
-				}, h(SkillChevron), h("span", { className: "power-dsh-skill-group-title" }, t("skillImportGroup")), state.catalog?.complete && h("span", { className: "power-dsh-skill-group-count" }, entries.length))), open && h("div", {
+				}, h(SkillChevron), h("span", { className: "power-dsh-skill-group-title" }, t("skillImportGroup")), state.catalog?.complete && h("span", { className: "power-dsh-skill-group-count" }, entries.length))), (open || globalDiscoveryIssue) && h("div", {
 					id: `${titleId}-body`,
 					className: "power-dsh-skill-group-body"
 				}, state.status === "loading" && loadingFeedback({
@@ -8468,11 +8539,11 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					message: state.error,
 					code: "PD-SKILLS-IMPORT",
 					operation: "discoverExternalSkills",
-					disabled: pending.current,
+					disabled: pending.current || refreshingTab !== null,
 					retry: () => {
 						loadImportGroup("");
 					}
-				}), state.catalog && !state.catalog.complete && h("p", { className: "power-dsh-skill-import-empty-title" }, t("skillIncomplete")), entries.length > 0 && h("ul", { className: "power-dsh-skill-cards" }, entries.map((entry) => entryCard(entry, "")))));
+				}), state.catalog && !state.catalog.complete && h("p", { className: "power-dsh-skill-import-empty-title" }, t("skillIncomplete")), open && entries.length > 0 && h("ul", { className: "power-dsh-skill-cards" }, entries.map((entry) => entryCard(entry, "")))));
 			};
 			const renderWorkspaceDiscoveryFeedback = (cwd, suppressIncomplete = false) => {
 				const state = importState.groups[cwd];
@@ -8515,11 +8586,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				const open = Boolean(needle) || (workspaceOpen[workspace.path] ?? true);
 				const discovery = importState.groups[workspace.path];
 				const discovered = discoveryEntries(workspace.path);
-				const discoveryBusy = Boolean(discovery?.catalog) && discovery?.status === "loading";
-				const discoveryFailed = discovery?.status === "error";
-				const hasFeedback = state.status === "loading" || state.status === "error" || Boolean(state.catalog && !state.catalog.complete) || discoveryBusy || discoveryFailed || Boolean(discovery?.catalog && !discovery.catalog.complete);
+				const hasIssue = state.status === "error" || discovery?.status === "error" || Boolean(state.catalog && !state.catalog.complete) || Boolean(discovery?.catalog && !discovery.catalog.complete);
 				const groupRows = (state.catalog?.skills ?? []).filter((skill) => `${skill.name} ${skill.description} ${skill.origin} ${sourceLabel(skillSource(skill.source))}`.toLocaleLowerCase().includes(needle));
-				if (state.status === "ready" && state.catalog?.complete && groupRows.length === 0 && discovered.length === 0 && !hasFeedback) return null;
+				if (groupRows.length === 0 && discovered.length === 0 && !hasIssue) return null;
+				const hasFeedback = hasIssue || state.status === "loading" || Boolean(discovery?.catalog) && discovery?.status === "loading";
 				return h("section", {
 					key: workspace.path,
 					className: "power-dsh-skill-group",
@@ -8533,13 +8603,10 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 					"aria-controls": `${titleId}-body`,
 					onClick: () => {
 						if (needle) return;
-						const next = !(workspaceOpen[workspace.path] ?? true);
 						setWorkspaceOpen((current) => ({
 							...current,
-							[workspace.path]: next
+							[workspace.path]: !open
 						}));
-						if (next && (workspaceState[workspace.path]?.status ?? "idle") === "idle") loadWorkspace(workspace.path);
-						if (next && (importState.groups[workspace.path]?.status ?? "idle") === "idle") loadImportGroup(workspace.path);
 					}
 				}, h(SkillChevron), h("span", {
 					className: "power-dsh-skill-group-title",
@@ -8561,9 +8628,16 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				}), state.catalog && !state.catalog.complete && h("p", { className: "power-dsh-skill-import-empty-title" }, t("skillIncomplete")), renderWorkspaceDiscoveryFeedback(workspace.path, Boolean(state.catalog && !state.catalog.complete)), open && (groupRows.length > 0 || discovered.length > 0) && h("ul", { className: "power-dsh-skill-cards" }, ...groupRows.map((skill) => renderCard(skill, workspace.path, state.catalog?.skills)), ...discovered.map((entry) => entryCard(entry, workspace.path)))));
 			};
 			const renderWorkspaces = () => {
-				if (workspaces.length === 0) return h("p", { className: "power-dsh-skill-empty" }, t("skillNoProjects"));
 				const groups = workspaces.map(renderWorkspaceGroup).filter(Boolean);
-				return groups.length ? groups : h("p", { className: "power-dsh-skill-empty" }, t(needle ? "skillNoMatches" : "skillEmpty"));
+				if (groups.length || workspaceList.error) return groups;
+				if (refreshingTab === "project" || workspaces.some(({ path }) => {
+					const installed = workspaceState[path]?.status;
+					const discovered = importState.groups[path]?.status;
+					return installed !== "ready" && installed !== "error" || writable && discovered !== "ready" && discovered !== "error";
+				})) return loadingFeedback({ label: t("loading") });
+				if (!workspaceList.value) return null;
+				const message = workspaces.length === 0 ? "skillNoProjects" : needle ? "skillNoMatches" : "skillEmpty";
+				return h("p", { className: "power-dsh-skill-empty" }, t(message));
 			};
 			const detailField = (key, value) => h("div", {
 				key,
@@ -8902,7 +8976,24 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				className: "power-dsh-tabs",
 				role: "tablist",
 				"aria-label": t("skillScope")
-			}, tabButton("user", "skillUserScope"), tabButton("project", "skillProjectScope"))), h("div", {
+			}, tabButton("user", "skillUserScope"), tabButton("project", "skillProjectScope")), h(Tooltip, {
+				label: t("skillRefresh"),
+				side: "top",
+				portal: true
+			}, h(Button, {
+				variant: "ghost",
+				size: "sm",
+				className: "power-dsh-skill-refresh",
+				"aria-label": t("skillRefresh"),
+				"aria-busy": refreshingTab === tab,
+				disabled: busy,
+				onClick: () => {
+					if (!busy) refreshTab(tab);
+				}
+			}, refreshingTab === tab ? h(StateDot, { state: "ongoing" }) : h(NativeIcon, {
+				glyph: "refresh-outline",
+				size: 14
+			})))), h("div", {
 				id: `${id}-skill-panel`,
 				className: "power-dsh-skill-panel",
 				role: "tabpanel",
@@ -8915,30 +9006,26 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 				value: query,
 				placeholder: t("skillSearch"),
 				"aria-label": t("skillSearch"),
-				onChange: (event) => {
-					setQuery(event.target.value);
-					if (tab === "project" && event.target.value.trim()) queueWorkspaceLoads();
-					if (tab === "user" && event.target.value.trim() && (importState.groups[""]?.status ?? "idle") === "idle") loadImportGroup("");
-				}
-			})), snapshot.status === "loading" && loadingFeedback({
+				onChange: (event) => setQuery(event.target.value)
+			})), tab === "user" && (snapshot.status === "loading" || globalDiscoveryLoading && rows.length === 0 && globalDiscovered.length === 0 && !globalDiscoveryIssue && snapshot.status === "ready") && loadingFeedback({
 				label: t("loading"),
-				...catalog ? { compact: true } : {}
-			}), snapshot.error && errorFeedback({
+				...catalog && snapshot.status === "loading" ? { compact: true } : {}
+			}), listError && errorFeedback({
 				t,
-				message: snapshot.error,
+				message: listError,
 				code: "PD-SKILLS-LOAD",
-				operation: "listSkills",
+				operation: tab === "project" ? "listSkillWorkspaces" : "listSkills",
 				placement: "page",
-				retry: () => loadSkills(),
+				retry: () => refreshTab(tab),
 				disabled: busy
 			}), tab === "user" && catalog && !catalog.complete && h("p", {
 				className: "power-dsh-description power-dsh-skill-notice",
 				role: "status"
-			}, t("skillIncomplete")), config.status === "ready" && !config.writable && h("p", { className: "power-dsh-description power-dsh-skill-notice" }, t("readOnly")), tab === "project" ? renderWorkspaces() : catalog && [
-				renderGroup("personal", "skillPersonalGroup", rows.filter((skill) => displaySource(skill) !== "skillBundledSource")),
-				renderGroup("preinstalled", "skillPreinstalledGroup", rows.filter((skill) => displaySource(skill) === "skillBundledSource")),
+			}, t("skillIncomplete")), config.status === "ready" && !config.writable && h("p", { className: "power-dsh-description power-dsh-skill-notice" }, t("readOnly")), tab === "project" ? renderWorkspaces() : [
+				catalog && renderGroup("personal", "skillPersonalGroup", rows.filter((skill) => displaySource(skill) !== "skillBundledSource")),
+				catalog && renderGroup("preinstalled", "skillPreinstalledGroup", rows.filter((skill) => displaySource(skill) === "skillBundledSource")),
 				renderDiscoveryGroup()
-			], tab === "user" && catalog && snapshot.status === "ready" && catalog.complete && rows.length === 0 && globalDiscovered.length === 0 && !globalDiscoveryPending && h("p", { className: "power-dsh-skill-empty" }, t(query ? "skillNoMatches" : "skillEmpty")), detail && renderDetail(), externalDetail && renderExternalDetail(), confirmation && renderConfirmation()));
+			], tab === "user" && catalog && snapshot.status === "ready" && catalog.complete && rows.length === 0 && globalDiscovered.length === 0 && !globalDiscoveryLoading && !globalDiscoveryIssue && h("p", { className: "power-dsh-skill-empty" }, t(needle ? "skillNoMatches" : "skillEmpty")), detail && renderDetail(), externalDetail && renderExternalDetail(), confirmation && renderConfirmation()));
 		}
 		let active = true;
 		ctx.effect(() => () => {
@@ -9017,6 +9104,12 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			} finally {
 				skillWritePending = false;
 			}
+		};
+		const listSkillWorkspaces = async () => {
+			if (!active) throw new Error(t("skillUnavailable"));
+			const result = await ctx.remote.powerDsh.listSkillWorkspaces();
+			if (!result.ok) throw new Error(result.error.message);
+			return result.value;
 		};
 		const listWorkspaceSkills = async (path) => {
 			if (!active || typeof path !== "string" || path === "") throw new Error(t("skillUnavailable"));
@@ -9118,6 +9211,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			setSkillEnabled,
 			readSkill,
 			deleteSkill,
+			listSkillWorkspaces,
 			listWorkspaceSkills,
 			discoverSkills,
 			readExternalSkill,
@@ -9176,6 +9270,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"skillsDescription": "Manage global and workspace skills",
 			"skillScopeHint": "DSH only recognizes skills in .dsh and .agents",
 			"skillSearch": "Search skills",
+			"skillRefresh": "Refresh skills",
 			"skillSources": "Filter by source",
 			"skillAllSources": "All sources",
 			"skillNoProjects": "No imported workspaces",
@@ -9294,6 +9389,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			"skillsDescription": "管理全局与工作区技能",
 			"skillScopeHint": "DSH 只识别 .dsh 和 .agents 中的技能",
 			"skillSearch": "搜索技能",
+			"skillRefresh": "刷新技能",
 			"skillSources": "按来源筛选",
 			"skillAllSources": "全部来源",
 			"skillNoProjects": "暂无已导入工作区",
@@ -9464,11 +9560,27 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			workspaceTitle: value.workspaceTitle
 		};
 	}
+	function parseWorkspaces(value) {
+		if (!isArray(value)) throw new TypeError("Invalid skill workspaces");
+		return value.map((item) => {
+			if (!isRecord(item) || !hasStrings(item, ["path", "title"])) throw new TypeError("Invalid skill workspace");
+			return {
+				path: item.path,
+				title: item.title
+			};
+		});
+	}
+	const skillWorkspacesCodec = {
+		mode: "strict",
+		typeSymbol: "power-dsh#SkillWorkspace[]",
+		create: () => ({ parse: parseWorkspaces })
+	};
 	const skillCatalogCodec = {
 		mode: "strict",
 		typeSymbol: "power-dsh#SkillCatalog",
 		create: () => ({ parse(value) {
-			if (!isRecord(value) || typeof value.cwd !== "string" || !isOneOf(value.scope, ["user", "project"]) || typeof value.complete !== "boolean" || !isArray(value.workspaces) || !value.workspaces.every((item) => isRecord(item) && typeof item.path === "string" && typeof item.title === "string") || !isArray(value.skills)) throw new TypeError("Invalid skill catalog");
+			if (!isRecord(value) || typeof value.cwd !== "string" || !isOneOf(value.scope, ["user", "project"]) || typeof value.complete !== "boolean" || !isArray(value.skills)) throw new TypeError("Invalid skill catalog");
+			const workspaces = parseWorkspaces(value.workspaces);
 			const skills = value.skills.map((row) => {
 				if (!isRecord(row) || !hasStrings(row, [
 					"name",
@@ -9499,10 +9611,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			return {
 				cwd: value.cwd,
 				scope: value.scope,
-				workspaces: value.workspaces.map((item) => ({
-					path: item.path,
-					title: item.title
-				})),
+				workspaces,
 				complete: value.complete,
 				skills
 			};
@@ -9558,6 +9667,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 			result
 		};
 	}
+	const LIST_SKILL_WORKSPACES_RPC = skillRpc("listSkillWorkspaces", [], skillWorkspacesCodec);
 	const LIST_SKILLS_RPC = skillRpc("listSkills", ["cwd", "scope"]);
 	const READ_SKILL_RPC = skillRpc("readSkill", [
 		"cwd",
@@ -9783,6 +9893,7 @@ html[data-windows-titlebar] .power-dsh-header-seat .power-dsh-header-error { top
 		"revision"
 	]);
 	const rpc$10 = [
+		LIST_SKILL_WORKSPACES_RPC,
 		LIST_SKILLS_RPC,
 		READ_SKILL_RPC,
 		SET_SKILL_ENABLED_RPC,
@@ -17861,6 +17972,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 		RECENT_PREVIEWS_RPC,
 		READ_PERSONALIZATION_RPC,
 		SAVE_PERSONALIZATION_RPC,
+		LIST_SKILL_WORKSPACES_RPC,
 		LIST_SKILLS_RPC,
 		READ_SKILL_RPC,
 		SET_SKILL_ENABLED_RPC,
@@ -17950,7 +18062,7 @@ html[data-windows-titlebar] .${names.frame}:not([data-sidebar-drawer]):has(> .po
 							t,
 							version,
 							namespace,
-							pluginVersion: "0.1.6",
+							pluginVersion: "0.1.7",
 							savePreference,
 							preferenceSlot: preferenceSlot$1,
 							get footerBusy() {

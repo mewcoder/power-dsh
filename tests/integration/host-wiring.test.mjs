@@ -102,6 +102,10 @@ test('the actual Host injector starts skill management with workspaceRegistry an
   const { service, providers, lookups } = await fixture(t);
   assert.ok(service.skills.current, 'The Host skill-management dependency injection must activate.');
   await service.skills.current.ready;
+  const priorLookups = lookups.length;
+  const workspaces = await service.listSkillWorkspaces();
+  assert.deepEqual(workspaces, [{ path: resolve('/memory-only/project'), title: 'Memory project' }]);
+  assert.equal(lookups.length, priorLookups);
   const result = await service.listSkills('', '');
   assert.equal(result.cwd, '');
   assert.ok(lookups.every(options => !Object.hasOwn(options, 'cwd')), 'Global skill queries must omit the project directory.');
@@ -152,7 +156,7 @@ test('feature-owned RPC methods retain the invocation owner check through the ac
     ['listMemoryEntries', []], ['readMemoryEntry', ['global', 'user/example']],
     ['deleteMemoryEntry', ['global', 'user/example', 'revision']],
     ['clearMemoryScope', ['global', 'revision']],
-    ['listSkills', ['', '']], ['readSkill', ['', '', 'review']], ['setSkillEnabled', ['', '', 'review', false]],
+    ['listSkillWorkspaces', []], ['listSkills', ['', '']], ['readSkill', ['', '', 'review']], ['setSkillEnabled', ['', '', 'review', false]],
     ['listMcpServers', []], ['readMcpServer', ['include:browser']], ['setMcpServerEnabled', ['server', false]],
   ]) {
     await assert.rejects(async () => service[method](...args), /Only the profile owner can change Mod policies/, method);

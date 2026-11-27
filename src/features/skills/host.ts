@@ -23,6 +23,12 @@ export function createHost(ctx: NativeContext, config: LivePreferences, { owner,
 }
 
 export const methods = {
+  listSkillWorkspaces() {
+    return this.run(() => {
+      if (!this.skills.current) throw new Error('DSH skill management is unavailable.');
+      return this.skills.current.listWorkspaces();
+    });
+  },
   listSkills(cwd: string, scope: string) {
     return this.run(() => {
       if (!this.skills.current) throw new Error('DSH skill management is unavailable.');

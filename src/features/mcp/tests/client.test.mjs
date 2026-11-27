@@ -50,8 +50,9 @@ test('the MCP preference owns a separate page and icon with independent lifecycl
   app.set({ mcpManagerEnabled: true, skillManagerEnabled: true });
   assert.ok(app.entries.has('settings.section:power-dsh-skills'));
   app.renderMcp();
+  const focusSubscriptions = app.focusSubscriptions();
   app.renderSkills();
-  assert.equal(app.focusSubscriptions(), 3);
+  assert.equal(app.focusSubscriptions(), focusSubscriptions);
   app.unmount();
   assert.ok(!app.entries.has(section));
   assert.ok(!app.entries.has(icon));

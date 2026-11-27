@@ -1,4 +1,4 @@
-import type { SkillCatalog, SkillDetail, ExternalSkillCatalog, ExternalSkillDetail, SkillImportResult, SkillImportDestination, McpCatalog, McpServerDetail, McpProbe, PersonalizationFile, SystemSoundsCatalog, SoundPlayback, RestartStatus, RestartAccepted, ArchiveCatalog, WallpaperAsset, WallpaperCleared, UsageSnapshot, ProjectCatalog } from './wire.ts';
+import type { SkillCatalog, SkillDetail, SkillWorkspace, ExternalSkillCatalog, ExternalSkillDetail, SkillImportResult, SkillImportDestination, McpCatalog, McpServerDetail, McpProbe, PersonalizationFile, SystemSoundsCatalog, SoundPlayback, RestartStatus, RestartAccepted, ArchiveCatalog, WallpaperAsset, WallpaperCleared, UsageSnapshot, ProjectCatalog } from './wire.ts';
 import type { WindowsNotification, NotificationDelivery, NotificationCleared } from './wire.ts';
 import type { NotificationTransport, PluginRelease } from './wire.ts';
 import type { SearchContentResult } from './wire.ts';
@@ -44,6 +44,7 @@ export interface PowerDshMethods {
   readWallpaper(): Promise<WallpaperAsset | null>;
   saveWallpaper(dataUrl: string, name: string): Promise<WallpaperAsset>;
   clearWallpaper(): Promise<WallpaperCleared>;
+  listSkillWorkspaces(): Promise<SkillWorkspace[]>;
   listSkills(cwd: string, scope: string): Promise<SkillCatalog>;
   readSkill(cwd: string, scope: string, name: string): Promise<SkillDetail | null>;
   setSkillEnabled(cwd: string, scope: string, name: string, enabled: boolean): Promise<SkillCatalog>;

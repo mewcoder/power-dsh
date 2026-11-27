@@ -2,10 +2,19 @@ import type { ClientRuntime, ClientEnvironment, ClientFeature } from '../../shar
 import type { TaskModelCatalog, TaskModelRow, TaskModelSelection } from './types.ts';
 import { styles as shellStyles } from '../../shared/client/shell-styles.ts';
 
+const statusFilters = [
+  { id: 'active', label: 'taskModelsActive', empty: 'taskModelsEmptyActive' },
+  { id: 'paused', label: 'taskModelsPaused', empty: 'taskModelsEmptyPaused' },
+  { id: 'ended', label: 'taskModelsEnded', empty: 'taskModelsEmptyEnded' },
+  { id: 'all', label: 'taskModelsAll', empty: 'taskModelsEmpty' },
+] as const;
+
 const styles = `
 .power-dsh-task-models{max-width:720px}
 .power-dsh-task-models .power-dsh-task-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.power-dsh-task-models-list{margin-top:24px}
+.power-dsh-task-models-filters{display:flex;flex-wrap:wrap;gap:4px;margin-top:24px}
+.power-dsh-task-models-filters button[aria-pressed="true"]{background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary)}
+.power-dsh-task-models-list{margin-top:16px}
 .power-dsh-task-models-empty{display:flex;align-items:center;flex-direction:column;padding:48px 20px;text-align:center;color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:1.6}
 .power-dsh-task-models-empty>svg{flex:none;margin-bottom:12px;color:var(--dsw-alias-label-caption)}
 .power-dsh-task-models-empty h3{margin:0;font-size:14px;line-height:1.6;font-weight:400}
@@ -45,6 +54,7 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
     const [saving, setSaving] = React.useState<string | null>(null);
     const [error, setError] = React.useState('');
     const [menu, setMenu] = React.useState<string | null>(null);
+    const [statusFilter, setStatusFilter] = React.useState<(typeof statusFilters)[number]>(statusFilters[0]);
     const generation = React.useRef(0);
     const pending = React.useRef(false);
     const mounted = React.useRef(true);
@@ -111,18 +121,23 @@ export function createClientFeature(runtime: ClientRuntime, env: ClientEnvironme
                 next => { if (selected) void save(task, { provider: selected.provider, model: selected.model, ...(next ? { reasoningEffort: next } : {}) }); }, task.title))),
         task.error && errorFeedback({ t, message: message(task.error), code: 'PD-TASK-MODEL-UNAVAILABLE', operation: 'taskModels.delivery' }));
     };
+    const rows = catalog?.tasks.filter(task => statusFilter.id === 'all' || task.status === statusFilter.id) ?? [];
     return h('section', { className: 'power-dsh-page power-dsh-task-models', 'aria-label': t('taskModelsTitle') },
       h('style', null, shellStyles + styles),
       h('header', null, h('div', { className: 'power-dsh-task-heading' },
         h('h2', { className: 'power-dsh-title' }, t('taskModelsTitle')),
         h(Button, { variant: 'ghost', size: 'sm', disabled: loading || saving !== null, onClick: load }, t('taskModelsReload'))),
       h('p', { className: 'power-dsh-description' }, t('taskModelsHelp'))),
+      h('div', { className: 'power-dsh-task-models-filters', role: 'group', 'aria-label': t('taskModelsStatusFilter') },
+        statusFilters.map(filter => h(Button, { key: filter.id, variant: 'ghost', size: 'sm',
+          'aria-pressed': statusFilter.id === filter.id,
+          onClick: () => { setMenu(null); setStatusFilter(filter); } }, t(filter.label)))),
       loading && loadingFeedback({ label: t('loading') }),
       error && errorFeedback({ t, message: error, code: 'PD-TASK-MODELS', operation: 'taskModels.configure', retry: load }),
-      !loading && !error && catalog?.tasks.length === 0 && h('div', { className: 'power-dsh-task-models-empty', role: 'status' },
+      !loading && !error && catalog && rows.length === 0 && h('div', { className: 'power-dsh-task-models-empty', role: 'status' },
         h(NativeIcon, { glyph: 'clock-outline', weight: 'regular', size: 24 }),
-        h('h3', null, t('taskModelsEmpty'))),
-      Boolean(catalog?.tasks.length) && h('div', { className: 'power-dsh-task-models-list' }, catalog?.tasks.map(renderTask)));
+        h('h3', null, t(catalog.tasks.length ? statusFilter.empty : 'taskModelsEmpty'))),
+      rows.length > 0 && h('div', { className: 'power-dsh-task-models-list' }, rows.map(renderTask)));
   }
   function Icon() {
     return h(NativeIcon, { glyph: 'clock-outline', weight: 'regular' });

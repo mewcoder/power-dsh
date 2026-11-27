@@ -236,12 +236,17 @@ export class SkillPolicy {
     return lease.key;
   }
 
-  async context(cwd: string, scope: string): Promise<SkillView> {
-    if (typeof cwd !== 'string' || typeof scope !== 'string' || !['', 'user', 'project'].includes(scope)) throw new TypeError('Invalid skill context.');
+  async listWorkspaces(): Promise<SkillWorkspace[]> {
     await this.ready;
     this.active();
     if (!this.ctx || this.closed) throw new Error('DSH skill management is unavailable.');
-    const workspaces = this.ctx.workspaceRegistry.list().map(row => ({ path: resolve(row.path), title: row.title }));
+    return this.ctx.workspaceRegistry.list().map(row => ({ path: resolve(row.path), title: row.title }));
+  }
+
+  async context(cwd: string, scope: string): Promise<SkillView> {
+    if (typeof cwd !== 'string' || typeof scope !== 'string' || !['', 'user', 'project'].includes(scope)) throw new TypeError('Invalid skill context.');
+    const workspaces = await this.listWorkspaces();
+    this.active();
     scope ||= 'user';
     const defaultDirectory = resolve(this.ctx.workingDirectory.defaultDirectory);
     const firstProject = workspaces.find(row => row.path === defaultDirectory) ?? workspaces[0];
